@@ -49,7 +49,7 @@ class StaticSiteContractTests(unittest.TestCase):
     def test_page_has_required_sections_and_accessibility_hooks(self):
         required_ids = [
             "main-content", "hero", "offerings", "resin-art", "hamper-rail",
-            "process", "order", "gallery", "footer",
+            "process", "festive-offers", "order", "gallery", "footer",
         ]
         for section_id in required_ids:
             with self.subTest(section_id=section_id):
@@ -104,6 +104,17 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertEqual(len(find_nodes(owner, "data-carousel-track")), 1)
                 self.assertEqual(len(find_nodes(owner, "data-carousel-prev")), 1)
                 self.assertEqual(len(find_nodes(owner, "data-carousel-next")), 1)
+
+    def test_festive_offers_area_has_diwali_navratri_and_contact_paths(self):
+        match = re.search(r'<section\b[^>]*id=["\']festive-offers["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(match)
+        section = match.group(0)
+        self.assertIn("Diwali", section)
+        self.assertIn("Navratri", section)
+        self.assertRegex(section, r"special discounts")
+        self.assertRegex(section, r"Contact Saloni for offer details")
+        self.assertIn('href="tel:8209238541"', section)
+        self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', section)
 
     def test_carousel_enhancement_is_progressive(self):
         self.assertGreaterEqual(self.html.count('data-carousel'), 2)
