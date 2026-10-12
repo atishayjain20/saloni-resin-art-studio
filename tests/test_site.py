@@ -49,7 +49,7 @@ class StaticSiteContractTests(unittest.TestCase):
     def test_page_has_required_sections_and_accessibility_hooks(self):
         required_ids = [
             "main-content", "hero", "offerings", "resin-art", "hamper-rail",
-            "process", "festive-offers", "order", "gallery", "footer",
+            "process", "festive-offers", "testimonials", "order", "gallery", "footer",
         ]
         for section_id in required_ids:
             with self.subTest(section_id=section_id):
@@ -98,12 +98,37 @@ class StaticSiteContractTests(unittest.TestCase):
         owners = []
         for root in parser.roots:
             owners.extend(find_nodes(root, "data-carousel"))
-        self.assertEqual(len(owners), 2)
+        self.assertEqual(len(owners), 3)
         for owner in owners:
             with self.subTest(carousel=owner["attrs"].get("data-carousel")):
                 self.assertEqual(len(find_nodes(owner, "data-carousel-track")), 1)
                 self.assertEqual(len(find_nodes(owner, "data-carousel-prev")), 1)
                 self.assertEqual(len(find_nodes(owner, "data-carousel-next")), 1)
+
+    def test_testimonial_carousel_contract(self):
+        parser = MarkupTreeParser()
+        parser.feed(self.html)
+        owners = []
+        for root in parser.roots:
+            owners.extend(find_nodes(root, "data-carousel"))
+        testimonials = [owner for owner in owners if owner["attrs"].get("data-carousel") == "testimonials"]
+        self.assertEqual(len(testimonials), 1)
+        owner = testimonials[0]
+        self.assertEqual(len(find_nodes(owner, "data-carousel-track")), 1)
+        self.assertEqual(len(find_nodes(owner, "data-carousel-prev")), 1)
+        self.assertEqual(len(find_nodes(owner, "data-carousel-next")), 1)
+
+        section = re.search(r'<section\b[^>]*id=["\']testimonials["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        section_html = section.group(0)
+        for name in ("Gaurav Jain", "Atishay Jain", "Aarti Suthar", "Bharat Sharma", "Puchki"):
+            with self.subTest(name=name):
+                self.assertIn(name, section_html)
+        self.assertEqual(section_html.count('data-testimonial-card'), 5)
+        self.assertIn("Sample testimonials for layout preview", section_html)
+        self.assertEqual(section_html.count('class="sample-label">Sample testimonial</span>'), 5)
+        ratings = re.findall(r'class="sr-only">Sample rating:\s*([45]) out of 5', section_html)
+        self.assertEqual(len(ratings), 5)
 
     def test_festive_offers_area_has_diwali_navratri_and_contact_paths(self):
         match = re.search(r'<section\b[^>]*id=["\']festive-offers["\'][\s\S]*?</section>', self.html)

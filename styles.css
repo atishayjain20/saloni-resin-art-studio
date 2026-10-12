@@ -127,6 +127,18 @@ h1 em { color: var(--rose); font-style: italic; }
 .offers-section .eyebrow { color: #f2b0b9; }.offers-section h2 { max-width: 11ch; margin-bottom: 1.1rem; font-size: clamp(2.5rem, 5vw, 4.6rem); line-height: 0.98; }.offers-section .offers-copy > p:last-child { max-width: 34ch; margin: 0; color: #f0ddd4; font-size: 1.05rem; }.offers-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: flex-end; }.offers-section .button-dark { background: var(--ivory); color: var(--ink); }.offers-section .button-dark:hover, .offers-section .button-dark:focus-visible { background: #fff; }.offers-section .button-line { border-color: var(--ivory); color: var(--ivory); }.offers-section .button-line:hover, .offers-section .button-line:focus-visible { background: var(--ivory); color: var(--cocoa); }
 .offers-section :focus-visible { outline-color: var(--ivory); }
 
+.testimonials-section { padding-block: clamp(4rem, 9vw, 8rem); border-top: 1px solid var(--line); }
+.testimonials-section .rail-heading { margin-bottom: 1rem; }
+.testimonial-notice { max-width: 62ch; margin: 0 0 1.8rem; color: var(--muted); font-size: 0.82rem; }
+.testimonial-card { display: flex; flex-direction: column; min-width: 0; padding: clamp(1.4rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); scroll-snap-align: start; }
+.testimonial-meta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.sample-label { color: var(--cocoa); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.sample-rating { color: var(--cocoa); font-size: 0.9rem; letter-spacing: 0.1em; white-space: nowrap; }
+.star-muted { color: var(--line); }
+.testimonial-card blockquote { max-width: 29ch; margin: clamp(2.2rem, 6vw, 4rem) 0 clamp(2.5rem, 6vw, 4rem); font: 500 clamp(1.35rem, 2.3vw, 2rem)/1.1 var(--display); letter-spacing: -0.035em; }
+.testimonial-card cite { margin-top: auto; font-style: normal; font-size: 0.84rem; font-weight: 800; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
 .process-section { display: grid; grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr); gap: clamp(2.5rem, 8vw, 8rem); padding-block: clamp(5rem, 11vw, 10rem); }
 .process-lead { position: sticky; top: 8rem; align-self: start; }
 .process-lead h2 { max-width: 8ch; }.process-lead > p:not(.eyebrow) { max-width: 31ch; margin-bottom: 1.5rem; color: var(--muted); }
