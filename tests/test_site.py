@@ -126,9 +126,19 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(name, section_html)
         self.assertEqual(section_html.count('data-testimonial-card'), 5)
         self.assertIn("Sample testimonials for layout preview", section_html)
-        self.assertEqual(section_html.count('class="sample-label">Sample testimonial</span>'), 5)
-        ratings = re.findall(r'class="sr-only">Sample rating:\s*([45]) out of 5', section_html)
+        self.assertNotIn('class="sample-label">Sample testimonial</span>', section_html)
+        self.assertIn('aria-label="Testimonials carousel controls"', section_html)
+        self.assertIn('aria-label="Testimonials"', section_html)
+        self.assertNotRegex(section_html, re.compile(r'aria-label="[^"]*sample[^"]*"', re.I))
+        self.assertNotRegex(section_html, re.compile(r'class="sr-only">[^<]*sample', re.I))
+        ratings = re.findall(r'class="sr-only">Rating:\s*([45]) out of 5', section_html)
         self.assertEqual(len(ratings), 5)
+        cards = re.findall(r'<article\b[^>]*data-testimonial-card[\s\S]*?</article>', section_html)
+        self.assertEqual(len(cards), 5)
+        for card in cards:
+            card_text = re.sub(r'<[^>]+>', ' ', card)
+            with self.subTest(card=card_text.strip()[:40]):
+                self.assertNotRegex(card_text, re.compile(r'\bsample\b', re.I))
 
     def test_festive_offers_area_has_diwali_navratri_and_contact_paths(self):
         match = re.search(r'<section\b[^>]*id=["\']festive-offers["\'][\s\S]*?</section>', self.html)
