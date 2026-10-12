@@ -132,7 +132,6 @@ h1 em { color: var(--rose); font-style: italic; }
 .testimonial-notice { max-width: 62ch; margin: 0 0 1.8rem; color: var(--muted); font-size: 0.82rem; }
 .testimonial-card { display: flex; flex-direction: column; min-width: 0; padding: clamp(1.4rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); scroll-snap-align: start; }
 .testimonial-meta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.sample-label { color: var(--cocoa); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .sample-rating { color: var(--cocoa); font-size: 0.9rem; letter-spacing: 0.1em; white-space: nowrap; }
 .star-muted { color: var(--line); }
 .testimonial-card blockquote { max-width: 29ch; margin: clamp(2.2rem, 6vw, 4rem) 0 clamp(2.5rem, 6vw, 4rem); font: 500 clamp(1.35rem, 2.3vw, 2rem)/1.1 var(--display); letter-spacing: -0.035em; }
