@@ -1,7 +1,9 @@
 from html.parser import HTMLParser
 from pathlib import Path
+import json
 import re
 import unittest
+import xml.etree.ElementTree as ET
 
 
 class MarkupTreeParser(HTMLParser):
@@ -58,6 +60,63 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-label="Previous', self.html)
         self.assertIn('aria-label="Next', self.html)
         self.assertIn('class="site-script"', self.html)
+
+    def test_seo_metadata_and_studio_namokar_label(self):
+        title = "Resin Art &amp; Customized Hampers | Saloni Resin Art Studio"
+        description = "Explore resin art, personalized gifts and customized hampers from Saloni Resin Art Studio. Contact Saloni to discuss colours, themes and your occasion."
+        self.assertEqual(self.html.count("<title>"), 1)
+        self.assertIn(f"<title>{title}</title>", self.html)
+        self.assertEqual(self.html.count('<meta name="description"'), 1)
+        self.assertIn(f'<meta name="description" content="{description}">', self.html)
+        self.assertIn(f'<meta property="og:title" content="{title}">', self.html)
+        self.assertIn(f'<meta property="og:description" content="{description}">', self.html)
+        self.assertEqual(self.html.count('rel="canonical"'), 1)
+        image_alt = re.search(r'<meta property="og:image:alt" content="([^"]+)">', self.html)
+        self.assertIsNotNone(image_alt)
+        self.assertTrue(image_alt.group(1).strip())
+        self.assertNotIn('<meta name="keywords"', self.html)
+
+        studio_card = re.search(r'<article\b[^>]*>[\s\S]*?src=["\']assets/studio-blue-mantra-frame\.jpeg["\'][\s\S]*?</article>', self.html)
+        self.assertIsNotNone(studio_card)
+        card = studio_card.group(0)
+        self.assertIn('src="assets/studio-blue-mantra-frame.jpeg"', card)
+        self.assertIn("Namokar", card)
+        self.assertIn("<strong>Namokar mantra frame</strong>", card)
+        self.assertNotIn("<strong>Blue mantra frame</strong>", card)
+
+    def test_organization_jsonld_and_sitemap_match_canonical(self):
+        canonical = "https://atishayjain20.github.io/saloni-resin-art-studio/"
+        script = re.search(r'<script\b[^>]*type=["\']application/ld\+json["\']>([\s\S]*?)</script>', self.html)
+        self.assertIsNotNone(script)
+        organization = json.loads(script.group(1))
+        self.assertEqual(set(organization), {"@context", "@type", "name", "url", "sameAs", "description"})
+        self.assertEqual(organization["@context"], "https://schema.org")
+        self.assertEqual(organization["@type"], "Organization")
+        self.assertEqual(organization["name"], "Saloni Resin Art Studio")
+        self.assertIn(f'<link rel="canonical" href="{canonical}">', self.html)
+        self.assertIn(f'<meta property="og:url" content="{canonical}">', self.html)
+        self.assertEqual(organization["url"], canonical)
+        self.assertEqual(organization["sameAs"], ["https://www.instagram.com/saloniresin_art_studio/"])
+        self.assertNotRegex(script.group(1), re.compile(r"Review|AggregateRating|rating|telephone|address", re.I))
+
+        sitemap_path = ROOT / "sitemap.xml"
+        self.assertTrue(sitemap_path.is_file())
+        sitemap = ET.parse(sitemap_path).getroot()
+        namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        self.assertEqual(sitemap.tag, "{http://www.sitemaps.org/schemas/sitemap/0.9}urlset")
+        urls = sitemap.findall("sm:url", namespace)
+        self.assertEqual(len(urls), 1)
+        self.assertEqual(urls[0].findtext("sm:loc", namespaces=namespace), canonical)
+        self.assertEqual(len(list(urls[0])), 1)
+        self.assertNotIn("#", sitemap_path.read_text(encoding="utf-8"))
+
+    def test_hero_copy_names_searchable_offerings(self):
+        hero = re.search(r'<p\b[^>]*class=["\']hero-intro["\'][\s\S]*?</p>', self.html)
+        self.assertIsNotNone(hero)
+        hero_copy = hero.group(0).lower()
+        for phrase in ("resin art", "personalized gifts", "customized hampers"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, hero_copy)
 
     def test_public_metadata_uses_settled_github_pages_url(self):
         public_url = "https://atishayjain20.github.io/saloni-resin-art-studio/"
