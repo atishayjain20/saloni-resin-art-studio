@@ -98,12 +98,75 @@ class StaticSiteContractTests(unittest.TestCase):
         owners = []
         for root in parser.roots:
             owners.extend(find_nodes(root, "data-carousel"))
-        self.assertEqual(len(owners), 3)
+        self.assertEqual(len(owners), 4)
         for owner in owners:
             with self.subTest(carousel=owner["attrs"].get("data-carousel")):
                 self.assertEqual(len(find_nodes(owner, "data-carousel-track")), 1)
                 self.assertEqual(len(find_nodes(owner, "data-carousel-prev")), 1)
                 self.assertEqual(len(find_nodes(owner, "data-carousel-next")), 1)
+
+    def test_studio_art_carousel_contract(self):
+        parser = MarkupTreeParser()
+        parser.feed(self.html)
+        owners = []
+        for root in parser.roots:
+            owners.extend(find_nodes(root, "data-carousel"))
+        studio_owners = [owner for owner in owners if owner["attrs"].get("data-carousel") == "studio-art"]
+        self.assertEqual(len(studio_owners), 1)
+        owner = studio_owners[0]
+        tracks = find_nodes(owner, "data-carousel-track")
+        self.assertEqual(len(tracks), 1)
+        self.assertEqual(tracks[0]["attrs"].get("id"), "studio-art-track")
+        self.assertEqual(tracks[0]["attrs"].get("tabindex"), "0")
+        self.assertEqual(len(find_nodes(owner, "data-carousel-prev")), 1)
+        self.assertEqual(len(find_nodes(owner, "data-carousel-next")), 1)
+
+        section = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        section_html = section.group(0)
+        self.assertIn("Art from the studio", section_html)
+        self.assertIn("Swipe or use the arrows to explore all 10 pieces.", section_html)
+        self.assertEqual(self.html.count('id="studio-art"'), 1)
+        self.assertEqual(self.html.count('id="studio-art-track"'), 1)
+        self.assertEqual(section_html.count('aria-controls="studio-art-track"'), 2)
+
+        asset_names = (
+            "studio-blue-mantra-frame.jpeg",
+            "studio-lilac-symbol-rakhi.jpeg",
+            "studio-little-brother-rakhi.jpeg",
+            "studio-white-mantra-frame.jpeg",
+            "studio-lilac-scalloped-tray.jpeg",
+            "studio-personalized-photo-clock.jpeg",
+            "studio-floral-square-keepsake.jpeg",
+            "studio-floral-hexagon-keepsake.jpeg",
+            "studio-floral-handled-tray.jpeg",
+            "studio-rose-hexagon-keepsake.jpeg",
+        )
+        cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
+        self.assertEqual(len(cards), 10)
+        self.assertEqual(section_html.count("<figcaption>"), 10)
+        for asset_name in asset_names:
+            with self.subTest(asset=asset_name):
+                image = re.search(rf'<img\b[^>]*src=["\']assets/{re.escape(asset_name)}["\'][^>]*>', section_html)
+                self.assertIsNotNone(image)
+                image_tag = image.group(0)
+                self.assertEqual(section_html.count(f'src="assets/{asset_name}"'), 1)
+                self.assertRegex(image_tag, r'\balt=["\'][^"\']{9,}["\']')
+                self.assertRegex(image_tag, r'\bwidth=["\']\d+["\']')
+                self.assertRegex(image_tag, r'\bheight=["\']\d+["\']')
+                self.assertIn('loading="lazy"', image_tag)
+                self.assertIn('decoding="async"', image_tag)
+        for card in cards:
+            with self.subTest(card=card[:80]):
+                self.assertNotIn("<button", card)
+
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        studio_rule = re.search(r"\.studio-art-section \.work-card img\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(studio_rule)
+        self.assertIn("aspect-ratio: 4 / 5", studio_rule.group(1))
+        self.assertIn("object-fit: contain", studio_rule.group(1))
+        self.assertIn("object-position: center", studio_rule.group(1))
+        self.assertIn("background: var(--paper)", studio_rule.group(1))
 
     def test_testimonial_carousel_contract(self):
         parser = MarkupTreeParser()
