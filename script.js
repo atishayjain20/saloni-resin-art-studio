@@ -46,6 +46,37 @@
       carousel.classList.add("is-ready");
     });
 
+    var lightbox = document.getElementById("art-lightbox");
+    var lightboxImage = document.getElementById("lightbox-image");
+    var lightboxCaption = document.getElementById("lightbox-caption");
+    var lightboxTriggers = document.querySelectorAll("[data-lightbox-trigger]");
+    var lastTrigger = null;
+    if (lightbox && lightboxImage && lightboxCaption && typeof lightbox.showModal === "function") {
+      lightbox.addEventListener("click", function (event) {
+        if (event.target === lightbox) lightbox.close();
+      });
+      lightbox.addEventListener("close", function () {
+        lightboxImage.removeAttribute("src");
+        lightboxImage.alt = "";
+        lightboxCaption.textContent = "";
+        if (lastTrigger) lastTrigger.focus();
+        lastTrigger = null;
+      });
+      lightboxTriggers.forEach(function (trigger) {
+        trigger.addEventListener("click", function (event) {
+          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          var image = trigger.querySelector("img");
+          if (!image) return;
+          event.preventDefault();
+          lastTrigger = trigger;
+          lightboxImage.src = trigger.href;
+          lightboxImage.alt = image.alt || "";
+          lightboxCaption.textContent = image.alt || "";
+          lightbox.showModal();
+        });
+      });
+    }
+
     var reveals = document.querySelectorAll(".reveal");
     if ("IntersectionObserver" in window) {
       root.classList.add("reveal-ready");
