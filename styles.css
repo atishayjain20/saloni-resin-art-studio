@@ -123,6 +123,14 @@ h1 em { color: var(--rose); font-style: italic; }
 .work-card figcaption span { display: block; margin-bottom: 0.42rem; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; }
 .work-card figcaption strong { display: block; margin-bottom: 0.35rem; font: 500 1.65rem/1.05 var(--display); letter-spacing: -0.03em; }
 .work-card figcaption p { max-width: 28ch; margin: 0; color: var(--muted); font-size: 0.8rem; }
+.rail-heading .catalogue-note { max-width: 42ch; margin: 0.9rem 0 0; color: var(--muted); font-size: 0.8rem; }
+.work-card figcaption .product-pricing { display: grid; gap: 0.4rem; margin: 1rem 0 0; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+.work-card figcaption .product-pricing > div { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; min-width: 0; }
+.work-card figcaption .product-pricing dt { color: var(--muted); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.work-card figcaption .product-pricing dd { margin: 0; color: var(--ink); font-size: 0.82rem; font-weight: 800; text-align: right; overflow-wrap: anywhere; }
+.work-card figcaption .product-pricing > div:nth-child(2) dd { color: var(--cocoa); font: 500 1.35rem/1 var(--display); letter-spacing: -0.02em; }
+.work-card figcaption .product-pricing > div:last-child dt, .work-card figcaption .product-pricing > div:last-child dd { color: var(--rose-ink); }
+.work-card figcaption .product-pricing s { color: var(--muted); font-weight: 500; }
 
 .offers-section { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr); align-items: end; gap: 2rem; margin-bottom: clamp(4rem, 8vw, 7rem); padding: clamp(2rem, 6vw, 5rem); border-radius: 1.2rem; background: var(--cocoa); color: var(--ivory); }
 .offers-section .eyebrow { color: #f2b0b9; }.offers-section h2 { max-width: 11ch; margin-bottom: 1.1rem; font-size: clamp(2.5rem, 5vw, 4.6rem); line-height: 0.98; }.offers-section .offers-copy > p:last-child { max-width: 34ch; margin: 0; color: #f0ddd4; font-size: 1.05rem; }.offers-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: flex-end; }.offers-section .button-dark { background: var(--ivory); color: var(--ink); }.offers-section .button-dark:hover, .offers-section .button-dark:focus-visible { background: #fff; }.offers-section .button-line { border-color: var(--ivory); color: var(--ivory); }.offers-section .button-line:hover, .offers-section .button-line:focus-visible { background: var(--ivory); color: var(--cocoa); }
