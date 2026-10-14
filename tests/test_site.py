@@ -1,4 +1,5 @@
 from html.parser import HTMLParser
+import math
 from pathlib import Path
 import json
 import re
@@ -391,13 +392,13 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-labelledby="customizer-title"', section)
         self.assertIn('aria-label="Illustrative preview"', section)
         for control_id in (
-            "frame-type", "border-style", "frame-size", "filling-colour", "brush-colour",
+            "frame-type", "border-style", "frame-preset", "filling-colour", "brush-colour",
             "personal-text", "reference-image", "paint-toggle", "paint-clear",
             "customizer-reset", "copy-summary",
         ):
             with self.subTest(control_id=control_id):
                 self.assertRegex(section, rf'\bid=["\']{control_id}["\']')
-        for control_id in ("frame-type", "border-style", "frame-size", "filling-colour", "brush-colour", "personal-text", "reference-image", "paint-toggle"):
+        for control_id in ("frame-type", "border-style", "frame-preset", "filling-colour", "brush-colour", "personal-text", "reference-image", "paint-toggle"):
             with self.subTest(label_for=control_id):
                 self.assertRegex(section, rf'<label\b[^>]*for=["\']{control_id}["\']')
         self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Frame shape and finish')
@@ -407,7 +408,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('type="file"', section)
         self.assertRegex(section, r'accept=["\'][^"\']*(?:image/jpeg|image/png|image/webp)[^"\']*["\']')
         self.assertIn("10MB", section)
-        self.assertIn('id="paint-canvas"', section)
+        self.assertIn('id="scene-canvas"', section)
         self.assertIn('id="customizer-summary"', section)
         self.assertIn("Images and paint stay on this device", section)
         self.assertIn("attach your image or a screenshot separately", section)
@@ -436,7 +437,8 @@ class StaticSiteContractTests(unittest.TestCase):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".customizer-section", css)
         self.assertIn(".customizer-preview", css)
-        self.assertIn(".paint-canvas", css)
+        self.assertIn(".scene-canvas", css)
+        self.assertIn(".brush-cursor", css)
         self.assertIn("@media (max-width: 620px)", css)
 
     def test_customizer_interaction_regressions_have_contracts(self):
@@ -447,20 +449,115 @@ class StaticSiteContractTests(unittest.TestCase):
             script,
             r'form\.addEventListener\("submit",\s*function \(event\) \{[\s\S]*?event\.preventDefault\(\);',
         )
-        self.assertIn('class="reference-preview"', self.html)
-        self.assertRegex(
-            script,
-            r'function canvasSize\(\) \{[\s\S]*?drawImage[\s\S]*?\n    \}',
-        )
-        canvas_size = re.search(r'function canvasSize\(\) \{([\s\S]*?)\n    \}', script)
-        self.assertIsNotNone(canvas_size)
-        self.assertNotIn("state.paintHasMarks = false", canvas_size.group(1))
-        self.assertRegex(script, r'if \(paintToggle\.checked\) canvasSize\(\);')
+        self.assertIn('id="scene-canvas"', self.html)
+        self.assertIn('width="1200" height="1200"', self.html)
+        self.assertRegex(script, r'function renderPreview\(\) \{[\s\S]*?drawIllustrativeLabel[\s\S]*?\n    \}')
+        self.assertIn("state.strokes", script)
+        self.assertIn("state.imageRequest", script)
+        self.assertIn("imageLoading", script)
+        self.assertIn("downloadPreview.disabled", script)
+        self.assertIn("paintToggle.checked = false", script)
         self.assertRegex(css, r'\[hidden\]\s*\{\s*display:\s*none !important;')
+        self.assertIn(".scene-canvas", css)
+        self.assertIn(".brush-cursor", css)
 
         fallback = re.search(r'function fallbackCopy\(text\) \{([\s\S]*?)\n    \}', script)
         self.assertIsNotNone(fallback)
         self.assertIn("copySummary.focus()", fallback.group(1))
+
+    def test_scene_canvas_and_download_contract(self):
+        section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        customizer = section.group(0)
+        canvas = re.search(r'<canvas\b[^>]*id=["\']scene-canvas["\'][^>]*>', customizer)
+        self.assertIsNotNone(canvas)
+        self.assertIn('width="1200"', canvas.group(0))
+        self.assertIn('height="1200"', canvas.group(0))
+        self.assertRegex(canvas.group(0), r'tabindex=["\']0["\']')
+        self.assertIn("Illustrative preview", customizer)
+        self.assertIn('id="download-preview"', customizer)
+        self.assertIn('id="download-status"', customizer)
+        self.assertNotIn('id="preview-frame"', customizer)
+        self.assertNotIn('id="reference-preview"', customizer)
+
+    def test_colour_dimension_and_paint_controls_are_accessible(self):
+        section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        customizer = section.group(0)
+        for control_id in ("filling-colour", "brush-colour", "paint-colour", "filling-colour-hex", "brush-colour-hex", "paint-colour-hex", "frame-unit", "frame-preset", "frame-dimension-label", "paint-toggle"):
+            with self.subTest(control_id=control_id):
+                self.assertRegex(customizer, rf'\bid=["\']{control_id}["\']')
+        for control_id in ("filling-colour", "brush-colour", "paint-colour"):
+            with self.subTest(colour=control_id):
+                self.assertRegex(customizer, rf'<input\b[^>]*type=["\']color["\'][^>]*id=["\']{control_id}["\']')
+                self.assertRegex(customizer, rf'id=["\']{control_id}-error["\']')
+        self.assertIn('inputmode="text"', customizer)
+        self.assertIn('aria-keyshortcuts="Arrow keys, Space, Escape"', customizer)
+        self.assertIn("inches", customizer)
+        self.assertIn("feet", customizer)
+        self.assertRegex(customizer, r'data-inches=["\'](?:6|8|10|12)["\']')
+
+    def test_scene_renderer_and_export_contract(self):
+        script = (ROOT / "customizer.js").read_text(encoding="utf-8")
+        self.assertIn("CANVAS_SIZE = 1200", script)
+        self.assertRegex(script, r'function renderPreview\s*\(')
+        for helper in ("drawMarbling", "drawStones", "drawBotanicalOrnament", "drawPressedFlowers", "drawCropCover", "drawPaintStrokes"):
+            with self.subTest(helper=helper):
+                self.assertRegex(script, rf'function {helper}\s*\(')
+        self.assertIn("sceneCanvas.toBlob", script)
+        self.assertIn("createObjectURL", script)
+        self.assertIn("download-preview", script)
+        self.assertIn("ArrowLeft", script)
+        self.assertIn("ArrowRight", script)
+        self.assertIn("ArrowUp", script)
+        self.assertIn("ArrowDown", script)
+        self.assertIn('event.key === " "', script)
+        self.assertIn('event.key === "Escape"', script)
+        self.assertIn("drawImage", script)
+        self.assertIn("Math.max", script)
+        self.assertNotIn("Math.random", script)
+        self.assertNotIn("localStorage", script)
+        self.assertNotIn("sessionStorage", script)
+        self.assertNotRegex(script, re.compile(r'\bfetch\s*\('))
+
+    def test_scene_visual_language_and_colour_validation_contract(self):
+        script = (ROOT / "customizer.js").read_text(encoding="utf-8")
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        for token in ("marbl", "speck", "gloss", "botanical", "pressed", "facet", "shadow"):
+            with self.subTest(token=token):
+                self.assertIn(token, script.lower())
+        self.assertRegex(script, r'#[0-9A-Fa-f]{6}')
+        self.assertIn("colour-error", css)
+        self.assertIn("brush-cursor", css)
+        self.assertIn("touch-action: none", css)
+
+    def test_review_findings_contracts(self):
+        script = (ROOT / "customizer.js").read_text(encoding="utf-8")
+        section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        customizer = section.group(0)
+
+        self.assertIn('id="detail-stones"', customizer)
+        self.assertIn('value="Stones"', customizer)
+        self.assertRegex(script, r'selectedDetails\(\)\.indexOf\("Stones"\)')
+        self.assertRegex(script, r'function drawResinOverlay\s*\(')
+        self.assertLess(script.index("drawCropCover(sceneContext"), script.index("drawResinOverlay(sceneContext"))
+        self.assertRegex(script, r'function scallopedRoundPath\s*\(')
+        self.assertRegex(script, r'function scallopedArchPath\s*\(')
+        arch = re.search(r'function scallopedArchPath\([\s\S]*?\n    \}\n\n    function traceShape', script)
+        self.assertIsNotNone(arch)
+        self.assertRegex(arch.group(0), r'centerY - Math\.max\(0, radius - bump\) \* Math\.sin')
+        self.assertRegex(arch.group(0), r'centerY - radius \* Math\.sin')
+        self.assertNotRegex(script, r'\n\s*if \(scalloped\) scallopedPath\(')
+        metrics_y = 92
+        radius = 360
+        self.assertAlmostEqual(metrics_y, metrics_y + radius - radius * math.sin(math.pi / 2))
+        self.assertRegex(script, r'function normalisePoint\s*\(')
+        self.assertIn('point.x * inner.width', script)
+        self.assertIn('currentStroke.points.push', script)
+        self.assertNotIn('state.paintMode', script)
+        self.assertIn('function updateFramePresetLabels', script)
+        self.assertNotIn('canonical', customizer.lower())
 
 
 if __name__ == "__main__":
