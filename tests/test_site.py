@@ -225,7 +225,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn("aspect-ratio: 4 / 5", studio_rule.group(1))
         self.assertIn("object-fit: contain", studio_rule.group(1))
         self.assertIn("object-position: center", studio_rule.group(1))
-        self.assertIn("background: var(--paper)", studio_rule.group(1))
+        self.assertIn("background: transparent", studio_rule.group(1))
 
     def test_testimonial_carousel_contract(self):
         parser = MarkupTreeParser()
