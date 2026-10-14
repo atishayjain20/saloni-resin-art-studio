@@ -29,6 +29,8 @@ The tests check the required sections, exact contact links, local asset referenc
 
 The site uses relative asset paths and includes `.nojekyll`, so it works under a project subpath without a build step. The `work/` source folder is intentionally ignored and is not part of the published site.
 
+If GitHub Pages fails after building the site artifact, merge a fresh commit into `main` to start a new deployment run.
+
 ## Content notes
 
 The published gallery uses curated product and process photography supplied with the project. Contact details are limited to the requested phone number and Instagram profile; no prices, shipping promises, reviews, or location claims are made.
