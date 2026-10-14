@@ -349,7 +349,6 @@ class StaticSiteContractTests(unittest.TestCase):
                     self.assertNotRegex(section_match.group(0), r'<dl\b')
         self.assertNotIn("schema.org/Offer", self.html)
 
-
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
         self.assertEqual(len(triggers), 18)
@@ -383,6 +382,85 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('data-carousel-next', self.html)
         self.assertIn('scroll-snap-type', (ROOT / "styles.css").read_text(encoding="utf-8") if (ROOT / "styles.css").exists() else "")
         self.assertIn('DOMContentLoaded', (ROOT / "script.js").read_text(encoding="utf-8") if (ROOT / "script.js").exists() else "")
+
+    def test_customizer_markup_contract(self):
+        match = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(match)
+        section = match.group(0)
+        self.assertIn("Design your custom resin frame", section)
+        self.assertIn('aria-labelledby="customizer-title"', section)
+        self.assertIn('aria-label="Illustrative preview"', section)
+        for control_id in (
+            "frame-type", "border-style", "frame-size", "filling-colour", "brush-colour",
+            "personal-text", "reference-image", "paint-toggle", "paint-clear",
+            "customizer-reset", "copy-summary",
+        ):
+            with self.subTest(control_id=control_id):
+                self.assertRegex(section, rf'\bid=["\']{control_id}["\']')
+        for control_id in ("frame-type", "border-style", "frame-size", "filling-colour", "brush-colour", "personal-text", "reference-image", "paint-toggle"):
+            with self.subTest(label_for=control_id):
+                self.assertRegex(section, rf'<label\b[^>]*for=["\']{control_id}["\']')
+        self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Frame shape and finish')
+        self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Colour story')
+        self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Personal details')
+        self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Finishing touches')
+        self.assertIn('type="file"', section)
+        self.assertRegex(section, r'accept=["\'][^"\']*(?:image/jpeg|image/png|image/webp)[^"\']*["\']')
+        self.assertIn("10MB", section)
+        self.assertIn('id="paint-canvas"', section)
+        self.assertIn('id="customizer-summary"', section)
+        self.assertIn("Images and paint stay on this device", section)
+        self.assertIn("attach your image or a screenshot separately", section)
+        self.assertIn('href="tel:8209238541"', section)
+        self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', section)
+
+    def test_customizer_script_contract_is_local_and_safe(self):
+        script_path = ROOT / "customizer.js"
+        self.assertTrue(script_path.is_file())
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("10 * 1024 * 1024", script)
+        self.assertIn("image/jpeg", script)
+        self.assertIn("image/png", script)
+        self.assertIn("image/webp", script)
+        self.assertIn("URL.createObjectURL", script)
+        self.assertIn("textContent", script)
+        self.assertIn("navigator.clipboard", script)
+        self.assertIn("paint-toggle", script)
+        self.assertIn("paint-clear", script)
+        self.assertIn("customizer-reset", script)
+        self.assertNotIn("localStorage", script)
+        self.assertNotIn("sessionStorage", script)
+        self.assertNotRegex(script, re.compile(r'\bfetch\s*\('))
+
+    def test_customizer_css_has_preview_and_mobile_layout_hooks(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertIn(".customizer-section", css)
+        self.assertIn(".customizer-preview", css)
+        self.assertIn(".paint-canvas", css)
+        self.assertIn("@media (max-width: 620px)", css)
+
+    def test_customizer_interaction_regressions_have_contracts(self):
+        script = (ROOT / "customizer.js").read_text(encoding="utf-8")
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertRegex(
+            script,
+            r'form\.addEventListener\("submit",\s*function \(event\) \{[\s\S]*?event\.preventDefault\(\);',
+        )
+        self.assertIn('class="reference-preview"', self.html)
+        self.assertRegex(
+            script,
+            r'function canvasSize\(\) \{[\s\S]*?drawImage[\s\S]*?\n    \}',
+        )
+        canvas_size = re.search(r'function canvasSize\(\) \{([\s\S]*?)\n    \}', script)
+        self.assertIsNotNone(canvas_size)
+        self.assertNotIn("state.paintHasMarks = false", canvas_size.group(1))
+        self.assertRegex(script, r'if \(paintToggle\.checked\) canvasSize\(\);')
+        self.assertRegex(css, r'\[hidden\]\s*\{\s*display:\s*none !important;')
+
+        fallback = re.search(r'function fallbackCopy\(text\) \{([\s\S]*?)\n    \}', script)
+        self.assertIsNotNone(fallback)
+        self.assertIn("copySummary.focus()", fallback.group(1))
 
 
 if __name__ == "__main__":
