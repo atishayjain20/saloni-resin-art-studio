@@ -303,6 +303,17 @@ class StaticSiteContractTests(unittest.TestCase):
             "holi-hamper.webp": ("3,499", "2,199", 37),
             "romantic-hamper.jpg": ("3,999", "2,399", 40),
         }
+        resin_match = re.search(r'<section\b[^>]*id=["\']resin-art["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(resin_match)
+        resin = resin_match.group(0)
+        self.assertRegex(resin, r'Displayed prices are for pictured/base designs')
+        self.assertRegex(resin, r'Size, materials, and personalisation can change the final quote; Saloni confirms the final quote')
+        resin_matrix = {
+            "resin-clock.jpg": ("3,999", "2,999", 25),
+            "resin-message-coasters.jpg": ("2,499", "1,899", 24),
+            "navkar-resin-frame.jpg": ("5,499", "3,999", 27),
+            "personalized-floral-hoop.jpg": ("3,499", "2,699", 23),
+        }
 
         def assert_matrix(section_html, matrix):
             cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
@@ -326,9 +337,10 @@ class StaticSiteContractTests(unittest.TestCase):
 
         assert_matrix(studio, studio_matrix)
         assert_matrix(hamper, hamper_matrix)
+        assert_matrix(resin, resin_matrix)
 
-        self.assertEqual(studio.count('class="product-pricing"') + hamper.count('class="product-pricing"'), 14)
-        for section_id in ("resin-art", "festive-offers"):
+        self.assertEqual(studio.count('class="product-pricing"') + hamper.count('class="product-pricing"') + resin.count('class="product-pricing"'), 18)
+        for section_id in ("festive-offers",):
             section_match = re.search(rf'<section\b[^>]*id=["\']{section_id}["\'][\s\S]*?</section>', self.html)
             self.assertIsNotNone(section_match)
             with self.subTest(section=section_id):
@@ -336,6 +348,34 @@ class StaticSiteContractTests(unittest.TestCase):
                 if section_id == "festive-offers":
                     self.assertNotRegex(section_match.group(0), r'<dl\b')
         self.assertNotIn("schema.org/Offer", self.html)
+
+
+    def test_art_lightbox_contract_preserves_product_catalogue(self):
+        triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
+        self.assertEqual(len(triggers), 18)
+        for trigger in triggers:
+            with self.subTest(trigger=trigger):
+                self.assertRegex(trigger, r'href=["\']assets/[^"\']+["\']')
+                self.assertRegex(trigger, r'aria-label=["\'][^"\']+["\']')
+
+        dialogs = re.findall(r'<dialog\b[\s\S]*?</dialog>', self.html)
+        self.assertEqual(len(dialogs), 1)
+        dialog = dialogs[0]
+        self.assertIn('id="art-lightbox"', dialog)
+        self.assertRegex(dialog, r'aria-labelledby=["\'][^"\']+["\']')
+        self.assertIn('id="lightbox-image"', dialog)
+        self.assertIn('id="lightbox-caption"', dialog)
+        self.assertIn('aria-label="Close enlarged artwork"', dialog)
+        dialog_image = re.search(r'<img\b[^>]*id=["\']lightbox-image["\'][^>]*>', dialog)
+        self.assertIsNotNone(dialog_image)
+        self.assertNotRegex(dialog_image.group(0), r'\bsrc=')
+
+        for section_id, cards, pricing_blocks in (("studio-art", 10, 10), ("resin-art", 4, 4), ("hamper-rail", 4, 4)):
+            section = re.search(rf'<section\b[^>]*id=["\']{section_id}["\'][\s\S]*?</section>', self.html)
+            self.assertIsNotNone(section)
+            with self.subTest(section=section_id):
+                self.assertEqual(section.group(0).count('class="work-card'), cards)
+                self.assertEqual(section.group(0).count('class="product-pricing"'), pricing_blocks)
 
     def test_carousel_enhancement_is_progressive(self):
         self.assertGreaterEqual(self.html.count('data-carousel'), 2)
