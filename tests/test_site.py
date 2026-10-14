@@ -273,6 +273,70 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('href="tel:8209238541"', section)
         self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', section)
 
+    def test_studio_catalogue_prices_are_exact_and_scoped(self):
+        studio_match = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(studio_match)
+        studio = studio_match.group(0)
+        self.assertRegex(studio, r'Displayed prices are for pictured/base designs')
+        self.assertRegex(studio, r'Size, materials, and personalisation can change the final quote; Saloni confirms the final quote')
+
+        studio_matrix = {
+            "studio-blue-mantra-frame.jpeg": ("4,499", "3,099", 31),
+            "studio-lilac-symbol-rakhi.jpeg": ("899", "649", 28),
+            "studio-little-brother-rakhi.jpeg": ("999", "699", 30),
+            "studio-white-mantra-frame.jpeg": ("7,499", "3,999", 47),
+            "studio-lilac-scalloped-tray.jpeg": ("2,499", "1,899", 24),
+            "studio-personalized-photo-clock.jpeg": ("5,499", "3,999", 27),
+            "studio-floral-square-keepsake.jpeg": ("3,499", "2,699", 23),
+            "studio-floral-hexagon-keepsake.jpeg": ("3,299", "2,499", 24),
+            "studio-floral-handled-tray.jpeg": ("4,499", "3,399", 24),
+            "studio-rose-hexagon-keepsake.jpeg": ("3,999", "2,999", 25),
+        }
+        hamper_match = re.search(r'<section\b[^>]*id=["\']hamper-rail["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(hamper_match)
+        hamper = hamper_match.group(0)
+        self.assertRegex(hamper, r'Displayed prices are for pictured/base designs')
+        self.assertRegex(hamper, r'Size, materials, and personalisation can change the final quote; Saloni confirms the final quote')
+        hamper_matrix = {
+            "birthday-hamper.jpg": ("3,499", "2,299", 34),
+            "car-theme-hamper.jpg": ("3,999", "2,499", 38),
+            "holi-hamper.webp": ("3,499", "2,199", 37),
+            "romantic-hamper.jpg": ("3,999", "2,399", 40),
+        }
+
+        def assert_matrix(section_html, matrix):
+            cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
+            self.assertEqual(len(cards), len(matrix))
+            self.assertEqual(section_html.count('class="product-pricing"'), len(matrix))
+            for asset, (regular, festive, discount) in matrix.items():
+                with self.subTest(asset=asset):
+                    card = next((card for card in cards if f'assets/{asset}' in card), None)
+                    self.assertIsNotNone(card)
+                    pricing_blocks = re.findall(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
+                    self.assertEqual(len(pricing_blocks), 1)
+                    pricing = pricing_blocks[0]
+                    self.assertRegex(pricing, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
+                    self.assertRegex(pricing, rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
+                    self.assertRegex(pricing, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+                    self.assertEqual(pricing.count("<dt"), 3)
+                    regular_value = int(regular.replace(",", ""))
+                    festive_value = int(festive.replace(",", ""))
+                    self.assertGreater(regular_value, festive_value)
+                    self.assertEqual(round((regular_value - festive_value) / regular_value * 100), discount)
+
+        assert_matrix(studio, studio_matrix)
+        assert_matrix(hamper, hamper_matrix)
+
+        self.assertEqual(studio.count('class="product-pricing"') + hamper.count('class="product-pricing"'), 14)
+        for section_id in ("resin-art", "festive-offers"):
+            section_match = re.search(rf'<section\b[^>]*id=["\']{section_id}["\'][\s\S]*?</section>', self.html)
+            self.assertIsNotNone(section_match)
+            with self.subTest(section=section_id):
+                self.assertNotIn("product-pricing", section_match.group(0))
+                if section_id == "festive-offers":
+                    self.assertNotRegex(section_match.group(0), r'<dl\b')
+        self.assertNotIn("schema.org/Offer", self.html)
+
     def test_carousel_enhancement_is_progressive(self):
         self.assertGreaterEqual(self.html.count('data-carousel'), 2)
         self.assertIn('data-carousel-prev', self.html)
