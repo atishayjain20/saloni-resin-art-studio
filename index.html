@@ -171,7 +171,7 @@
       <div class="customizer-heading">
         <p class="eyebrow">A starting point</p>
         <h2 id="customizer-title">Design your custom resin frame.</h2>
-        <p>Choose a few curated details and make a visual brief to share with Saloni. The preview is illustrative, not a final quote.</p>
+        <p>Choose curated details and make a visual brief to share with Saloni. The scene is illustrative; Saloni confirms the final size and quote.</p>
       </div>
 
       <div class="customizer-layout">
@@ -181,50 +181,60 @@
             <label for="frame-type">Frame type
               <select id="frame-type" name="frame-type">
                 <option value="square">Square keepsake</option>
-                <option value="arch">Soft arch</option>
                 <option value="round">Round medallion</option>
+                <option value="arch">Soft arch · 3:4</option>
               </select>
             </label>
             <label for="border-style">Border style
               <select id="border-style" name="border-style">
-                <option value="scalloped">Scalloped edge</option>
-                <option value="textured">Textured stone</option>
-                <option value="gold">Fine gold edge</option>
+                <option value="scalloped">Scalloped outer edge</option>
+                <option value="stones">Crushed-stone border</option>
+                <option value="gold">Fine metallic gold edge</option>
               </select>
             </label>
-            <label for="frame-size">Frame size
-              <select id="frame-size" name="frame-size">
-                <option value="small">Small · desk size</option>
-                <option value="medium" selected>Medium · keepsake size</option>
-                <option value="large">Large · statement size</option>
+            <label for="frame-preset">Frame preset
+              <select id="frame-preset" name="frame-preset">
+                <option value="6" data-inches="6">6 in size</option>
+                <option value="8" data-inches="8" selected>8 in size</option>
+                <option value="10" data-inches="10">10 in size</option>
+                <option value="12" data-inches="12">12 in size</option>
               </select>
             </label>
+            <label for="frame-unit">Show dimensions in
+              <select id="frame-unit" name="frame-unit">
+                <option value="in" selected>inches</option>
+                <option value="ft">feet</option>
+              </select>
+            </label>
+            <p class="dimension-note" id="frame-dimension-label" role="status" aria-live="polite">Square · 8 × 8 in</p>
           </fieldset>
 
           <fieldset class="customizer-fieldset">
             <legend>Colour story</legend>
-            <label for="filling-colour">Filling colour
-              <select id="filling-colour" name="filling-colour">
-                <option value="lilac">Lilac bloom</option>
-                <option value="ocean">Blue hour</option>
-                <option value="peach">Peach glow</option>
-                <option value="ivory">Warm ivory</option>
-              </select>
-            </label>
-            <label for="brush-colour">Brush colour
-              <select id="brush-colour" name="brush-colour">
-                <option value="gold">Antique gold</option>
-                <option value="rose">Rose pink</option>
-                <option value="cocoa">Cocoa brown</option>
-                <option value="ink">Ink black</option>
-              </select>
-            </label>
+            <div class="colour-control">
+              <label class="colour-label" for="filling-colour">Filling colour</label>
+              <div class="colour-pair">
+                <input type="color" id="filling-colour" value="#c7a5cc" aria-describedby="filling-colour-error">
+                <label class="sr-only" for="filling-colour-hex">Filling colour hex value</label>
+                <input id="filling-colour-hex" class="hex-input" type="text" value="#C7A5CC" inputmode="text" maxlength="7" spellcheck="false" aria-describedby="filling-colour-error">
+              </div>
+              <p class="colour-error" id="filling-colour-error" role="alert" aria-live="polite" hidden>Use 6 hex digits, for example #C7A5CC.</p>
+            </div>
+            <div class="colour-control">
+              <label class="colour-label" for="brush-colour">Marbling / brush colour</label>
+              <div class="colour-pair">
+                <input type="color" id="brush-colour" value="#D1A24B" aria-describedby="brush-colour-error">
+                <label class="sr-only" for="brush-colour-hex">Marbling / brush colour hex value</label>
+                <input id="brush-colour-hex" class="hex-input" type="text" value="#D1A24B" inputmode="text" maxlength="7" spellcheck="false" aria-describedby="brush-colour-error">
+              </div>
+              <p class="colour-error" id="brush-colour-error" role="alert" aria-live="polite" hidden>Use 6 hex digits, for example #D1A24B.</p>
+            </div>
           </fieldset>
 
           <fieldset class="customizer-fieldset">
             <legend>Personal details</legend>
             <label for="personal-text">Personal text
-              <input id="personal-text" name="personal-text" type="text" maxlength="50" placeholder="A name, date, or little message">
+              <input id="personal-text" name="personal-text" type="text" maxlength="50" placeholder="A name, date, or little message" aria-describedby="personal-text-hint">
             </label>
             <p class="field-hint" id="personal-text-hint">Keep it short so the studio can place it beautifully.</p>
             <label for="reference-image">One local reference image
@@ -241,18 +251,24 @@
           <fieldset class="customizer-fieldset">
             <legend>Finishing touches</legend>
             <div class="choice-grid" aria-label="Optional frame details">
-              <label class="choice-chip" for="detail-stones"><input id="detail-stones" type="checkbox" name="details" value="Stones"> Stones</label>
-              <label class="choice-chip" for="detail-ornament"><input id="detail-ornament" type="checkbox" name="details" value="Ornament"> Ornament</label>
-              <label class="choice-chip" for="detail-filling"><input id="detail-filling" type="checkbox" name="details" value="Pressed flower filling"> Flower filling</label>
+              <label class="choice-chip" for="detail-stones"><input id="detail-stones" type="checkbox" name="details" value="Stones"> Faceted stones</label>
+              <label class="choice-chip" for="detail-ornament"><input id="detail-ornament" type="checkbox" name="details" value="Botanical ornament"> Botanical ornament</label>
+              <label class="choice-chip" for="detail-filling"><input id="detail-filling" type="checkbox" name="details" value="Pressed flowers and leaves"> Pressed flowers</label>
             </div>
-            <label class="paint-toggle" for="paint-toggle"><input id="paint-toggle" type="checkbox"> Add freehand paint overlay</label>
-            <div class="paint-tools" id="paint-tools" hidden>
-              <label for="paint-colour">Paint colour
-                <input id="paint-colour" type="color" value="#c96572">
-              </label>
+            <label class="paint-toggle" for="paint-toggle"><input id="paint-toggle" type="checkbox"> Paint mode (Space draws, Escape stops)</label>
+            <div class="paint-tools" id="paint-tools">
+              <div class="colour-control">
+                <label class="colour-label" for="paint-colour">Paint colour</label>
+                <div class="colour-pair">
+                  <input type="color" id="paint-colour" value="#C96572" aria-describedby="paint-colour-error">
+                  <label class="sr-only" for="paint-colour-hex">Paint colour hex value</label>
+                  <input id="paint-colour-hex" class="hex-input" type="text" value="#C96572" inputmode="text" maxlength="7" spellcheck="false" aria-describedby="paint-colour-error">
+                </div>
+                <p class="colour-error" id="paint-colour-error" role="alert" aria-live="polite" hidden>Use 6 hex digits, for example #C96572.</p>
+              </div>
               <button class="mini-button" id="paint-clear" type="button">Clear paint</button>
             </div>
-            <p class="field-hint">Paint is a local visual note only. It is never transmitted.</p>
+            <p class="field-hint">The brush cursor is a local guide and is not included in the PNG.</p>
           </fieldset>
 
           <div class="customizer-actions">
@@ -266,23 +282,17 @@
           <figure class="customizer-preview" aria-label="Illustrative preview">
             <p class="preview-label">Illustrative preview</p>
             <div class="preview-stage" id="preview-stage">
-              <div class="preview-frame" id="preview-frame">
-                <div class="preview-border" id="preview-border">
-                  <div class="preview-art" id="preview-art">
-                    <span class="preview-filling" id="preview-filling" aria-hidden="true"></span>
-                    <img class="reference-preview" id="reference-preview" alt="Local reference image preview" width="640" height="640" hidden>
-                    <canvas class="paint-canvas" id="paint-canvas" aria-label="Freehand paint overlay" hidden></canvas>
-                    <p class="preview-personal-text" id="preview-personal-text">Your words here</p>
-                    <p class="preview-detail-list" id="preview-detail-list">Choose a finishing touch</p>
-                  </div>
-                </div>
-              </div>
+              <canvas class="scene-canvas" id="scene-canvas" width="1200" height="1200" role="img" tabindex="0" aria-label="Illustrative preview of custom resin frame" aria-describedby="preview-dimension-label" aria-keyshortcuts="Arrow keys, Space, Escape"></canvas>
+              <span class="brush-cursor" id="brush-cursor" aria-hidden="true"></span>
             </div>
-            <figcaption>Colours, scale, and materials are a visual guide for the conversation.</figcaption>
+            <p class="preview-dimension-label" id="preview-dimension-label">Square · 8 × 8 in</p>
+            <figcaption>One responsive scene canvas powers this preview and the downloaded PNG. Saloni confirms the final size, materials, and quote.</figcaption>
           </figure>
           <div class="customizer-summary-card">
             <p class="panel-label">Ready to share</p>
             <output id="customizer-summary" aria-live="polite"></output>
+            <button class="button button-dark download-button" id="download-preview" type="button">Download preview PNG</button>
+            <p class="customizer-status" id="download-status" role="status" aria-live="polite"></p>
           </div>
         </div>
       </div>
@@ -290,7 +300,7 @@
       <div class="customizer-handoff">
         <div>
           <strong>Take the summary to the studio.</strong>
-          <p>Images and paint stay on this device and do not transmit. When you contact Saloni, attach your image or a screenshot separately.</p>
+          <p>Images and paint stay on this device and do not transmit. The PNG is local too. When you contact Saloni, attach your image or a screenshot separately.</p>
         </div>
         <div class="customizer-contact-links">
           <a class="button button-dark" href="tel:8209238541">Call Saloni <span aria-hidden="true">↗</span></a>
