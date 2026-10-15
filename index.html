@@ -324,10 +324,8 @@
           </fieldset>
 
           <div class="customizer-actions">
-            <button class="button button-dark" id="copy-summary" type="button">Copy design summary</button>
             <button class="button button-line" id="customizer-reset" type="button">Reset choices</button>
           </div>
-          <p class="customizer-status" id="copy-status" role="status" aria-live="polite"></p>
         </form>
 
         <div class="customizer-preview-panel">
@@ -344,11 +342,14 @@
             <p class="panel-label">Ready to share</p>
             <output id="customizer-summary" aria-live="polite"></output>
             <button class="button button-dark download-button" id="download-preview" type="button">Download preview PNG</button>
-            <button class="button button-line download-button" id="share-design" type="button" aria-describedby="share-guidance">Share design</button>
-            <p class="share-guidance" id="share-guidance">Choose Instagram if available, select @saloniresin_art_studio, verify the photo and details, then tap Send. Some apps may omit the text.</p>
             <p class="customizer-status" id="download-status" role="status" aria-live="polite"></p>
+            <button class="button button-line download-button" id="copy-summary" type="button">Copy design summary</button>
+            <p class="customizer-status" id="copy-status" role="status" aria-live="polite"></p>
+            <a class="button button-line download-button" href="https://ig.me/m/saloniresin_art_studio" target="_blank" rel="noreferrer" aria-describedby="instagram-chat-guidance">Open Saloni’s Instagram chat <span aria-hidden="true">↗</span></a>
+            <p class="share-guidance" id="instagram-chat-guidance">For Instagram, use these controls in order: Download preview PNG, then Copy design summary, then open this chat. Attach the downloaded PNG, paste the copied details, then tap Send.</p>
+            <button class="button button-line download-button" id="share-design" type="button" aria-describedby="share-guidance">Share design</button>
+            <p class="share-guidance" id="share-guidance">Optional native Share can pass the PNG and summary to the destination you choose. Some apps may omit the text or PNG; for Instagram, use the manual steps above.</p>
             <p class="customizer-status" id="share-status" role="status" aria-live="polite"></p>
-            <a class="button button-line download-button" href="https://ig.me/m/saloniresin_art_studio" target="_blank" rel="noreferrer">Open Saloni’s Instagram chat <span aria-hidden="true">↗</span></a>
           </div>
         </div>
       </div>
