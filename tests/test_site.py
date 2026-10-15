@@ -564,6 +564,25 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn("brush-cursor", css)
         self.assertIn("touch-action: none", css)
 
+    def test_text_colour_control_updates_preview_and_summary(self):
+        section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        customizer = section.group(0)
+        for control_id in ("text-colour", "text-colour-hex", "text-colour-error"):
+            with self.subTest(control_id=control_id):
+                self.assertRegex(customizer, rf'\bid=["\']{control_id}["\']')
+        self.assertRegex(customizer, r'<input\b[^>]*type=["\']color["\'][^>]*id=["\']text-colour["\']')
+        script = (ROOT / "customizer.js").read_text(encoding="utf-8")
+        self.assertIn('text: "#2C2523"', script)
+        self.assertRegex(script, r'text:\s*colourControl\("text-colour"\)')
+        self.assertRegex(
+            script,
+            r'colors:\s*\{[\s\S]*?border:\s*DEFAULT_COLOURS\.border,\s*text:\s*DEFAULT_COLOURS\.text',
+        )
+        self.assertIn("state.colors.text", script)
+        self.assertRegex(script, r'drawFittedText\([\s\S]*?state\.colors\.text')
+        self.assertIn('"Text colour: " + state.colors.text', script)
+
     def test_review_findings_contracts(self):
         script = (ROOT / "customizer.js").read_text(encoding="utf-8")
         section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
