@@ -239,6 +239,15 @@
               <p class="field-hint" id="border-colour-hint">Changes the outer edge only.</p>
               <p class="colour-error" id="border-colour-error" role="alert" aria-live="polite" hidden>Use 6 hex digits, for example #D8C9B9.</p>
             </div>
+            <div class="colour-control">
+              <label class="colour-label" for="text-colour">Text colour</label>
+              <div class="colour-pair">
+                <input type="color" id="text-colour" value="#2C2523" aria-describedby="text-colour-error">
+                <label class="sr-only" for="text-colour-hex">Text colour hex value</label>
+                <input id="text-colour-hex" class="hex-input" type="text" value="#2C2523" inputmode="text" maxlength="7" spellcheck="false" aria-describedby="text-colour-error">
+              </div>
+              <p class="colour-error" id="text-colour-error" role="alert" aria-live="polite" hidden>Use 6 hex digits, for example #2C2523.</p>
+            </div>
           </fieldset>
 
           <fieldset class="customizer-fieldset">

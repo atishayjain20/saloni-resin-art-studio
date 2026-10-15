@@ -11,7 +11,8 @@
     filling: "#C7A5CC",
     brush: "#D1A24B",
     paint: "#C96572",
-    border: "#D8C9B9"
+    border: "#D8C9B9",
+    text: "#2C2523"
   };
   var PHOTO_DEFAULTS = {
     x: 0.5,
@@ -214,7 +215,7 @@
     return PIGMENT_PATCHES.map(function (patch) { return Object.assign({}, patch); });
   }
 
-  function drawFittedText(context, fit, centerX, outline) {
+  function drawFittedText(context, fit, centerX, outline, textColour) {
     context.font = textFont(fit.fontSize);
     context.textAlign = "center";
     context.textBaseline = "middle";
@@ -226,7 +227,7 @@
         context.strokeText(line, centerX, fit.firstBaseline + index * fit.lineHeight);
       });
     }
-    context.fillStyle = "rgba(44, 37, 35, 0.92)";
+    context.fillStyle = textColour || "#2C2523";
     fit.lines.forEach(function (line, index) {
       context.fillText(line, centerX, fit.firstBaseline + index * fit.lineHeight);
     });
@@ -335,14 +336,16 @@
       filling: colourControl("filling-colour"),
       brush: colourControl("brush-colour"),
       paint: colourControl("paint-colour"),
-      border: colourControl("border-colour")
+      border: colourControl("border-colour"),
+      text: colourControl("text-colour")
     };
     var state = {
       colors: {
         filling: DEFAULT_COLOURS.filling,
         brush: DEFAULT_COLOURS.brush,
         paint: DEFAULT_COLOURS.paint,
-        border: DEFAULT_COLOURS.border
+        border: DEFAULT_COLOURS.border,
+        text: DEFAULT_COLOURS.text
       },
       image: null,
       imageRequest: 0,
@@ -988,7 +991,7 @@
       context.save();
       traceShape(context, inner, false);
       context.clip();
-      drawFittedText(context, fit, fit.candidate.rect.x + fit.candidate.rect.width / 2, fit.backingVeil);
+      drawFittedText(context, fit, fit.candidate.rect.x + fit.candidate.rect.width / 2, fit.backingVeil, state.colors.text);
       context.restore();
     }
 
@@ -1070,6 +1073,7 @@
         "Marbling / brush colour: " + state.colors.brush,
         "Paint colour: " + state.colors.paint,
         "Side-border colour: " + state.colors.border,
+        "Text colour: " + state.colors.text,
         "Text: " + (messageValue() || "None"),
         "Finishing touches: " + (details.length ? details.join(", ") : "None"),
         "Reference image: " + (state.image ? state.image.name : "None"),
