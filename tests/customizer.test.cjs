@@ -356,6 +356,7 @@ test("announces an honest manual fallback when native sharing is unsupported", (
   assert.match(fixture.shareStatus.textContent, /download/i);
   assert.match(fixture.shareStatus.textContent, /copy/i);
   assert.match(fixture.shareStatus.textContent, /open.*chat/i);
+  assert.match(fixture.shareStatus.textContent, /attach.*downloaded PNG.*paste.*copied details.*tap Send/i);
   assert.equal(fixture.state.shareInProgress, false);
 });
 
