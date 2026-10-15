@@ -393,18 +393,22 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-label="Illustrative preview"', section)
         for control_id in (
             "frame-type", "border-style", "frame-preset", "filling-colour", "brush-colour",
-            "personal-text", "reference-image", "paint-toggle", "paint-clear",
+            "border-colour", "personal-text", "reference-image", "image-size", "crop-zoom",
+            "crop-x", "crop-y", "position-left", "position-centre", "position-right",
+            "paint-toggle", "paint-clear",
             "customizer-reset", "copy-summary",
         ):
             with self.subTest(control_id=control_id):
                 self.assertRegex(section, rf'\bid=["\']{control_id}["\']')
-        for control_id in ("frame-type", "border-style", "frame-preset", "filling-colour", "brush-colour", "personal-text", "reference-image", "paint-toggle"):
+        for control_id in ("frame-type", "border-style", "frame-preset", "filling-colour", "brush-colour", "border-colour", "personal-text", "reference-image", "image-size", "crop-zoom", "crop-x", "crop-y", "position-left", "position-centre", "position-right", "paint-toggle"):
             with self.subTest(label_for=control_id):
                 self.assertRegex(section, rf'<label\b[^>]*for=["\']{control_id}["\']')
         self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Frame shape and finish')
         self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Colour story')
         self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Personal details')
         self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Finishing touches')
+        self.assertRegex(section, r'<label\b[^>]*for=["\']personal-text["\']>Text\s*<textarea')
+        self.assertNotIn("Message or mantra", section)
         self.assertIn('type="file"', section)
         self.assertRegex(section, r'accept=["\'][^"\']*(?:image/jpeg|image/png|image/webp)[^"\']*["\']')
         self.assertIn("10MB", section)
@@ -451,7 +455,8 @@ class StaticSiteContractTests(unittest.TestCase):
         )
         self.assertIn('id="scene-canvas"', self.html)
         self.assertIn('width="1200" height="1200"', self.html)
-        self.assertRegex(script, r'function renderPreview\(\) \{[\s\S]*?drawIllustrativeLabel[\s\S]*?\n    \}')
+        self.assertNotIn("drawIllustrativeLabel", script)
+        self.assertIn("drawGlobalResinGlaze", script)
         self.assertIn("state.strokes", script)
         self.assertIn("state.imageRequest", script)
         self.assertIn("imageLoading", script)
@@ -480,6 +485,34 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn('id="preview-frame"', customizer)
         self.assertNotIn('id="reference-preview"', customizer)
 
+    def test_multiline_photo_layout_and_clean_export_contract(self):
+        section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        customizer = section.group(0)
+        textarea = re.search(r'<textarea\b[^>]*id=["\']personal-text["\'][^>]*>', customizer)
+        self.assertIsNotNone(textarea)
+        self.assertIn('rows="5"', textarea.group(0))
+        self.assertNotIn("maxlength", textarea.group(0))
+        self.assertIn("One line per row. Line breaks stay in the preview.", customizer)
+        self.assertIn("Image size", customizer)
+        self.assertIn('min="0.2"', customizer)
+        self.assertIn('max="1"', customizer)
+        self.assertIn("Fine-tune image crop", customizer)
+        self.assertIn("Arrow keys move it when the preview is focused", customizer)
+        self.assertIn('aria-describedby="image-placement-hint"', customizer)
+
+        script = (ROOT / "customizer.js").read_text(encoding="utf-8")
+        self.assertIn('context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, rect.x, rect.y, rect.width, rect.height)', script)
+        self.assertIn("state.photoDrag.pointerId", script)
+        self.assertIn('event.key === "Escape"', script)
+        self.assertIn('function nudgePhotoLayout', script)
+        self.assertIn('state.photoLayout.cropZoom', script)
+        self.assertIn('state.photoLayout.cropX', script)
+        self.assertIn('state.photoLayout.cropY', script)
+        self.assertIn('sceneCanvas.addEventListener("lostpointercapture"', script)
+        self.assertIn('downloadPreview.disabled = state.imageLoading || state.textOverflow', script)
+        self.assertNotIn("drawIllustrativeLabel", script)
+
     def test_colour_dimension_and_paint_controls_are_accessible(self):
         section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
@@ -492,7 +525,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertRegex(customizer, rf'<input\b[^>]*type=["\']color["\'][^>]*id=["\']{control_id}["\']')
                 self.assertRegex(customizer, rf'id=["\']{control_id}-error["\']')
         self.assertIn('inputmode="text"', customizer)
-        self.assertIn('aria-keyshortcuts="Arrow keys, Space, Escape"', customizer)
+        self.assertIn('aria-keyshortcuts="Arrow keys, Shift+Arrow, Escape"', customizer)
         self.assertIn("inches", customizer)
         self.assertIn("feet", customizer)
         self.assertRegex(customizer, r'data-inches=["\'](?:6|8|10|12)["\']')
@@ -501,7 +534,7 @@ class StaticSiteContractTests(unittest.TestCase):
         script = (ROOT / "customizer.js").read_text(encoding="utf-8")
         self.assertIn("CANVAS_SIZE = 1200", script)
         self.assertRegex(script, r'function renderPreview\s*\(')
-        for helper in ("drawMarbling", "drawStones", "drawBotanicalOrnament", "drawPressedFlowers", "drawCropCover", "drawPaintStrokes"):
+        for helper in ("drawMarbling", "drawStones", "drawBotanicalOrnament", "drawPressedFlowers", "drawCropCover", "drawPaintStrokes", "drawGlobalResinGlaze"):
             with self.subTest(helper=helper):
                 self.assertRegex(script, rf'function {helper}\s*\(')
         self.assertIn("sceneCanvas.toBlob", script)
@@ -531,6 +564,25 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn("brush-cursor", css)
         self.assertIn("touch-action: none", css)
 
+    def test_text_colour_control_updates_preview_and_summary(self):
+        section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        customizer = section.group(0)
+        for control_id in ("text-colour", "text-colour-hex", "text-colour-error"):
+            with self.subTest(control_id=control_id):
+                self.assertRegex(customizer, rf'\bid=["\']{control_id}["\']')
+        self.assertRegex(customizer, r'<input\b[^>]*type=["\']color["\'][^>]*id=["\']text-colour["\']')
+        script = (ROOT / "customizer.js").read_text(encoding="utf-8")
+        self.assertIn('text: "#2C2523"', script)
+        self.assertRegex(script, r'text:\s*colourControl\("text-colour"\)')
+        self.assertRegex(
+            script,
+            r'colors:\s*\{[\s\S]*?border:\s*DEFAULT_COLOURS\.border,\s*text:\s*DEFAULT_COLOURS\.text',
+        )
+        self.assertIn("state.colors.text", script)
+        self.assertRegex(script, r'drawFittedText\([\s\S]*?state\.colors\.text')
+        self.assertIn('"Text colour: " + state.colors.text', script)
+
     def test_review_findings_contracts(self):
         script = (ROOT / "customizer.js").read_text(encoding="utf-8")
         section = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
@@ -541,7 +593,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('value="Stones"', customizer)
         self.assertRegex(script, r'selectedDetails\(\)\.indexOf\("Stones"\)')
         self.assertRegex(script, r'function drawResinOverlay\s*\(')
-        self.assertLess(script.index("drawCropCover(sceneContext"), script.index("drawResinOverlay(sceneContext"))
+        self.assertLess(script.index("drawCropCover(sceneContext"), script.index("drawGlobalResinGlaze(sceneContext"))
         self.assertRegex(script, r'function scallopedRoundPath\s*\(')
         self.assertRegex(script, r'function scallopedArchPath\s*\(')
         arch = re.search(r'function scallopedArchPath\([\s\S]*?\n    \}\n\n    function traceShape', script)
