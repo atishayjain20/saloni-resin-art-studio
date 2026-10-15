@@ -400,6 +400,12 @@ class StaticSiteContractTests(unittest.TestCase):
         ):
             with self.subTest(control_id=control_id):
                 self.assertRegex(section, rf'\bid=["\']{control_id}["\']')
+        self.assertIn('id="share-design"', section)
+        self.assertIn('id="share-status"', section)
+        self.assertIn('href="https://ig.me/m/saloniresin_art_studio"', section)
+        self.assertIn("Open Saloni’s Instagram chat", section)
+        self.assertRegex(section, r'<button\b[^>]*id="share-design"[^>]*type="button"[^>]*aria-describedby="share-guidance"[^>]*>Share design</button>')
+        self.assertIn("Some apps may omit the text", section)
         for control_id in ("frame-type", "border-style", "frame-preset", "filling-colour", "brush-colour", "border-colour", "personal-text", "reference-image", "image-size", "crop-zoom", "crop-x", "crop-y", "position-left", "position-centre", "position-right", "paint-toggle"):
             with self.subTest(label_for=control_id):
                 self.assertRegex(section, rf'<label\b[^>]*for=["\']{control_id}["\']')
@@ -414,7 +420,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn("10MB", section)
         self.assertIn('id="scene-canvas"', section)
         self.assertIn('id="customizer-summary"', section)
-        self.assertIn("Images and paint stay on this device", section)
+        self.assertIn("Images and paint stay on this device until you choose to share", section)
         self.assertIn("attach your image or a screenshot separately", section)
         self.assertIn('href="tel:8209238541"', section)
         self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', section)
@@ -437,12 +443,30 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("sessionStorage", script)
         self.assertNotRegex(script, re.compile(r'\bfetch\s*\('))
 
+    def test_customizer_share_contract_is_native_and_truthful(self):
+        script = (ROOT / "customizer.js").read_text(encoding="utf-8")
+        self.assertIn("navigator.canShare", script)
+        self.assertIn("navigator.share", script)
+        self.assertIn("toDataURL(\"image/png\")", script)
+        self.assertIn("files: [payload.file]", script)
+        self.assertIn("text: payload.text", script)
+        self.assertIn("title: payload.title", script)
+        self.assertIn("AbortError", script)
+        self.assertIn("state.shareInProgress", script)
+        self.assertIn('shareStatus.textContent = ""', script)
+        self.assertIn("Verify the photo and details before sending", script)
+        self.assertIn("Download the PNG, copy the summary, and open Saloni’s Instagram chat", script)
+
     def test_customizer_css_has_preview_and_mobile_layout_hooks(self):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".customizer-section", css)
         self.assertIn(".customizer-preview", css)
         self.assertIn(".scene-canvas", css)
         self.assertIn(".brush-cursor", css)
+        self.assertIn(".customizer-summary-card .button-line", css)
+        self.assertIn(".customizer-summary-card .button-line { border-color: var(--ivory); background: transparent; color: var(--ivory); }", css)
+        self.assertIn(".customizer-summary-card .button-line:disabled", css)
+        self.assertIn(".customizer-summary-card #share-status", css)
         self.assertIn("@media (max-width: 620px)", css)
 
     def test_customizer_interaction_regressions_have_contracts(self):
