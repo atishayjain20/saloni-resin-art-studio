@@ -233,6 +233,93 @@
     });
   }
 
+  var SHARE_TITLE = "Saloni resin frame design";
+  var SHARE_FALLBACK_MESSAGE = "Share unavailable or failed. Download the PNG, copy the summary, and open Saloni’s Instagram chat.";
+
+  function createSharePayload(canvas, summary, FileCtor) {
+    if (!canvas || typeof canvas.toDataURL !== "function") throw new Error("Canvas export is unavailable.");
+    var dataUrl = canvas.toDataURL("image/png");
+    var separator = dataUrl.indexOf(",");
+    if (separator === -1 || dataUrl.slice(0, separator).indexOf("image/png") === -1) throw new Error("Canvas did not produce a PNG.");
+    var encoded = dataUrl.slice(separator + 1);
+    var decode = typeof atob === "function" ? atob : null;
+    var binary;
+    if (decode) binary = decode(encoded);
+    else if (typeof Buffer !== "undefined") binary = Buffer.from(encoded, "base64").toString("binary");
+    else throw new Error("Base64 decoding is unavailable.");
+    var bytes = new Uint8Array(binary.length);
+    for (var index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    var Constructor = FileCtor || (typeof File !== "undefined" ? File : null);
+    if (typeof Constructor !== "function") throw new Error("File sharing is unavailable.");
+    return {
+      file: new Constructor([bytes], "saloni-resin-frame-design.png", { type: "image/png" }),
+      text: String(summary || ""),
+      title: SHARE_TITLE
+    };
+  }
+
+  function shareDesignFlow(options) {
+    options = options || {};
+    var state = options.state || {};
+    var shareButton = options.shareButton;
+    var shareStatus = options.shareStatus;
+    var setDisabled = function () {
+      if (shareButton) shareButton.disabled = Boolean(state.imageLoading || state.textOverflow || state.shareInProgress);
+    };
+    var finish = function () {
+      state.shareInProgress = false;
+      setDisabled();
+    };
+    var fallback = function () {
+      if (shareStatus) shareStatus.textContent = SHARE_FALLBACK_MESSAGE;
+      finish();
+      return false;
+    };
+
+    if (state.imageLoading || state.textOverflow || state.shareInProgress) {
+      setDisabled();
+      return false;
+    }
+    state.shareInProgress = true;
+    setDisabled();
+    if (shareStatus) shareStatus.textContent = "Preparing your design to share…";
+    try {
+      if (typeof options.render === "function") options.render();
+      if (state.imageLoading || state.textOverflow) {
+        setDisabled();
+        if (shareStatus && state.textOverflow) shareStatus.textContent = "Shorten the message before sharing.";
+        finish();
+        return false;
+      }
+      var summary = options.summaryOutput ? options.summaryOutput.textContent : "";
+      var payload = createSharePayload(options.canvas, summary, options.FileCtor);
+      var navigator = options.navigatorObject || (typeof globalThis !== "undefined" ? globalThis.navigator : null);
+      if (!navigator || typeof navigator.canShare !== "function" || typeof navigator.share !== "function") return fallback();
+      var canShare = false;
+      try {
+        canShare = navigator.canShare({ files: [payload.file] });
+      } catch (error) {
+        canShare = false;
+      }
+      if (!canShare) return fallback();
+      var shareResult = navigator.share({ files: [payload.file], text: payload.text, title: payload.title });
+      Promise.resolve(shareResult).then(function () {
+        if (shareStatus) shareStatus.textContent = "Share handoff completed. Verify the photo and details before sending.";
+        finish();
+      }, function (error) {
+        if (error && error.name === "AbortError") {
+          if (shareStatus) shareStatus.textContent = "Share cancelled.";
+          finish();
+          return;
+        }
+        fallback();
+      });
+      return true;
+    } catch (error) {
+      return fallback();
+    }
+  }
+
   function stoneRingPoint(index, shape, aspectRatio) {
     var step = (index + 0.5) / (STONE_RING_SEGMENTS * 4);
     if (shape === "round") {
@@ -289,7 +376,9 @@
       nudgePhotoLayout: nudgePhotoLayout,
       drawFittedText: drawFittedText,
       pigmentPatchPlan: pigmentPatchPlan,
-      stoneChipPlan: stoneChipPlan
+      stoneChipPlan: stoneChipPlan,
+      createSharePayload: createSharePayload,
+      shareDesignFlow: shareDesignFlow
     };
   }
   if (typeof document === "undefined") return;
@@ -327,6 +416,8 @@
     var reset = document.getElementById("customizer-reset");
     var downloadPreview = document.getElementById("download-preview");
     var downloadStatus = document.getElementById("download-status");
+    var shareDesign = document.getElementById("share-design");
+    var shareStatus = document.getElementById("share-status");
     var sceneCanvas = document.getElementById("scene-canvas");
     var sceneContext = sceneCanvas && sceneCanvas.getContext ? sceneCanvas.getContext("2d") : null;
     var previewStage = document.getElementById("preview-stage");
@@ -353,6 +444,7 @@
       photoLayout: clonePhotoDefaults(),
       photoDrag: null,
       textOverflow: false,
+      shareInProgress: false,
       strokes: [],
       cursor: { x: CANVAS_SIZE / 2, y: CANVAS_SIZE / 2 },
       currentStroke: null,
@@ -1059,6 +1151,7 @@
       sceneCanvas.setAttribute("aria-label", "Illustrative preview of " + label + (state.image ? ". Image position: " + photoPositionLabel(state.photoLayout.custom ? "custom" : state.photoLayout.position) : ". No reference image") + (messageValue() ? ". Message text added" : ". No message text"));
       updateSummary();
       updateDownloadState();
+      updateShareState();
       updateBrushCursor();
     }
 
@@ -1088,6 +1181,14 @@
       if (state.imageLoading) downloadStatus.textContent = "Preparing preview while the reference image loads…";
       else if (state.textOverflow) downloadStatus.textContent = "Shorten the message before downloading a PNG.";
       else if (/^(Preparing preview while the reference image loads|Shorten the message before downloading)/.test(downloadStatus.textContent)) downloadStatus.textContent = "";
+    }
+
+    function updateShareState() {
+      if (shareDesign) shareDesign.disabled = state.imageLoading || state.textOverflow || state.shareInProgress;
+      if (!shareStatus) return;
+      if (state.imageLoading) shareStatus.textContent = "Preparing preview while the reference image loads…";
+      else if (state.textOverflow) shareStatus.textContent = "Shorten the message before sharing.";
+      else if (/^(Preparing preview while the reference image loads|Shorten the message before sharing)/.test(shareStatus.textContent)) shareStatus.textContent = "";
     }
 
     function imageExtension(fileName) {
@@ -1129,6 +1230,7 @@
       imageActions.hidden = false;
       setImageStatus("Loading reference image…");
       updateDownloadState();
+      updateShareState();
       var url = URL.createObjectURL(file);
       var image = new Image();
       image.onload = function () {
@@ -1142,6 +1244,7 @@
         resetPhotoLayout();
         releaseImage(previous);
         setImageStatus("Reference image ready: " + file.name);
+        updateShareState();
         renderPreview();
       };
       image.onerror = function () {
@@ -1154,6 +1257,7 @@
         referenceImage.value = "";
         setImageStatus("That image could not be loaded. Your previous image is unchanged.");
         updateDownloadState();
+        updateShareState();
       };
       image.src = url;
     }
@@ -1404,6 +1508,18 @@
       }, "image/png");
     }
 
+    function shareDesignNow() {
+      return shareDesignFlow({
+        state: state,
+        canvas: sceneCanvas,
+        summaryOutput: summaryOutput,
+        shareButton: shareDesign,
+        shareStatus: shareStatus,
+        render: renderPreview,
+        navigatorObject: typeof navigator !== "undefined" ? navigator : null
+      });
+    }
+
     function resetCustomiser() {
       form.reset();
       state.strokes = [];
@@ -1428,6 +1544,7 @@
       });
       copyStatus.textContent = "";
       downloadStatus.textContent = "";
+      shareStatus.textContent = "";
       updateImageControls();
       updateBrushCursor();
       renderPreview();
@@ -1508,6 +1625,7 @@
     });
     copySummary.addEventListener("click", copySummaryText);
     downloadPreview.addEventListener("click", downloadPng);
+    shareDesign.addEventListener("click", shareDesignNow);
     reset.addEventListener("click", resetCustomiser);
     frameType.addEventListener("change", endPhotoDrag);
     borderStyle.addEventListener("change", endPhotoDrag);

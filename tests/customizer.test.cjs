@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const {
   safeTextRect,
@@ -12,6 +13,8 @@ const {
   drawFittedText,
   pigmentPatchPlan,
   stoneChipPlan,
+  createSharePayload,
+  shareDesignFlow,
 } = require("../customizer.js");
 
 const rendererSource = fs.readFileSync(path.join(__dirname, "..", "customizer.js"), "utf8");
@@ -30,6 +33,114 @@ function measuredContext(widthFor) {
       };
     },
   };
+}
+
+class FakeFile {
+  constructor(parts, name, options) {
+    this.parts = parts;
+    this.name = name;
+    this.type = options.type;
+  }
+}
+
+function shareFixture(overrides = {}) {
+  const shareButton = { disabled: false };
+  const shareStatus = { textContent: "" };
+  const summaryOutput = { textContent: "old summary" };
+  const calls = { canShare: [], share: [] };
+  let resolveShare;
+  let rejectShare;
+  const pending = new Promise((resolve, reject) => {
+    resolveShare = resolve;
+    rejectShare = reject;
+  });
+  const navigatorObject = {
+    canShare(payload) {
+      calls.canShare.push(payload);
+      return overrides.canShareResult === undefined ? true : overrides.canShareResult;
+    },
+    share(payload) {
+      calls.share.push(payload);
+      if (overrides.shareResult) return overrides.shareResult;
+      return pending;
+    },
+  };
+  const fixture = {
+    state: { imageLoading: false, textOverflow: false, shareInProgress: false },
+    canvas: {
+      width: 1200,
+      height: 1200,
+      toDataURL(type) {
+        assert.equal(type, "image/png");
+        return "data:image/png;base64,AAEC";
+      },
+    },
+    summaryOutput,
+    shareButton,
+    shareStatus,
+    navigatorObject,
+    FileCtor: FakeFile,
+    render() {
+      summaryOutput.textContent = "fresh line 1\nfresh line 2";
+    },
+    calls,
+    resolveShare,
+    rejectShare,
+  };
+  return Object.assign(fixture, overrides);
+}
+
+function imageFailureBrowserFixture() {
+  const elements = new Map();
+  let createdImage;
+  class Element {
+    constructor(id) {
+      this.id = id;
+      this.value = id === "frame-type" ? "square" : id === "border-style" ? "scalloped" : id === "frame-preset" ? "8" : id === "frame-unit" ? "in" : "0.5";
+      this.checked = false;
+      this.hidden = false;
+      this.disabled = false;
+      this.files = [];
+      this.textContent = "";
+      this.style = {};
+      this.classList = { contains: () => false, toggle() {} };
+      this.listeners = {};
+    }
+    addEventListener(type, listener) { this.listeners[type] = listener; }
+    dispatch(type, event = { target: this }) { this.listeners[type]?.(event); }
+    querySelectorAll() { return []; }
+    setAttribute() {}
+    getContext() { return null; }
+    reset() {}
+    focus() {}
+  }
+  const documentObject = {
+    getElementById(id) {
+      if (!elements.has(id)) elements.set(id, new Element(id));
+      return elements.get(id);
+    },
+    addEventListener(type, listener) {
+      if (type === "DOMContentLoaded") listener();
+    },
+  };
+  const context = {
+    document: documentObject,
+    window: { addEventListener() {} },
+    URL: { createObjectURL: () => "blob:reference", revokeObjectURL() {} },
+    Image: class {
+      constructor() { createdImage = this; this.complete = false; }
+      set src(value) { this.url = value; }
+    },
+    module: { exports: {} },
+    console,
+  };
+  vm.runInNewContext(rendererSource, context, { filename: "customizer.js" });
+  const referenceImage = elements.get("reference-image");
+  const shareDesign = elements.get("share-design");
+  const shareStatus = elements.get("share-status");
+  referenceImage.files = [{ name: "reference.png", type: "image/png", size: 1024 }];
+  referenceImage.dispatch("change");
+  return { elements, createdImage, shareDesign, shareStatus };
 }
 
 const inner = { x: 100, y: 80, width: 600, height: 760, shape: "arch" };
@@ -171,4 +282,108 @@ test("uses cloudy border material with narrow rim highlights", () => {
 test("uses Text wording in the generated customizer summary", () => {
   assert.match(rendererSource, /"Text: " \+ \(messageValue\(\) \|\| "None"\)/);
   assert.doesNotMatch(rendererSource, /Message or mantra/);
+});
+
+test("builds a native PNG File with the exact multiline summary payload", () => {
+  const payload = createSharePayload({
+    width: 1200,
+    height: 1200,
+    toDataURL(type) {
+      assert.equal(type, "image/png");
+      return "data:image/png;base64,AAEC";
+    },
+  }, "line one\nline two", FakeFile);
+
+  assert.equal(payload.file.name, "saloni-resin-frame-design.png");
+  assert.equal(payload.file.type, "image/png");
+  assert.deepEqual(Array.from(payload.file.parts[0]), [0, 1, 2]);
+  assert.equal(payload.text, "line one\nline two");
+  assert.equal(payload.title, "Saloni resin frame design");
+});
+
+test("shares the freshly rendered summary and prevents duplicate clicks", async () => {
+  const fixture = shareFixture();
+  assert.equal(shareDesignFlow(fixture), true);
+  assert.equal(shareDesignFlow(fixture), false);
+  assert.equal(fixture.calls.share.length, 1);
+  assert.equal(fixture.calls.share[0].text, "fresh line 1\nfresh line 2");
+  assert.equal(fixture.calls.share[0].files.length, 1);
+  assert.equal(fixture.shareButton.disabled, true);
+
+  fixture.resolveShare();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(fixture.state.shareInProgress, false);
+  assert.equal(fixture.shareButton.disabled, false);
+  assert.match(fixture.shareStatus.textContent, /handoff completed/i);
+});
+
+test("blocks sharing while the preview is loading, overflowing, or already sharing", () => {
+  for (const key of ["imageLoading", "textOverflow", "shareInProgress"]) {
+    const fixture = shareFixture();
+    fixture.state[key] = true;
+    assert.equal(shareDesignFlow(fixture), false, key);
+    assert.equal(fixture.calls.share.length, 0, key);
+  }
+});
+
+test("rechecks the final preview state before exporting", () => {
+  const fixture = shareFixture({
+    render() {
+      fixture.state.textOverflow = true;
+    },
+  });
+  assert.equal(shareDesignFlow(fixture), false);
+  assert.equal(fixture.calls.share.length, 0);
+  assert.equal(fixture.shareButton.disabled, true);
+  assert.match(fixture.shareStatus.textContent, /Shorten the message/i);
+});
+
+test("re-enables Share after a reference image load error", () => {
+  const fixture = imageFailureBrowserFixture();
+  assert.equal(fixture.shareDesign.disabled, true);
+  assert.match(fixture.shareStatus.textContent, /reference image loads/i);
+
+  fixture.createdImage.onerror();
+
+  assert.equal(fixture.shareDesign.disabled, false);
+  assert.doesNotMatch(fixture.shareStatus.textContent, /reference image loads/i);
+});
+
+test("announces an honest manual fallback when native sharing is unsupported", () => {
+  const fixture = shareFixture({ canShareResult: false });
+  assert.equal(shareDesignFlow(fixture), false);
+  assert.match(fixture.shareStatus.textContent, /download/i);
+  assert.match(fixture.shareStatus.textContent, /copy/i);
+  assert.match(fixture.shareStatus.textContent, /open.*chat/i);
+  assert.equal(fixture.state.shareInProgress, false);
+});
+
+test("treats AbortError as cancellation without fallback side effects", async () => {
+  const fixture = shareFixture();
+  assert.equal(shareDesignFlow(fixture), true);
+  const error = new Error("dismissed");
+  error.name = "AbortError";
+  fixture.rejectShare(error);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.match(fixture.shareStatus.textContent, /cancelled/i);
+  assert.doesNotMatch(fixture.shareStatus.textContent, /download|copy|open/i);
+  assert.equal(fixture.state.shareInProgress, false);
+});
+
+test("announces fallback for export and native share failures", async () => {
+  const exportFailure = shareFixture({
+    canvas: { toDataURL() { throw new Error("canvas export failed"); } },
+  });
+  assert.equal(shareDesignFlow(exportFailure), false);
+  assert.match(exportFailure.shareStatus.textContent, /download.*copy.*open.*chat/i);
+
+  const shareFailure = shareFixture();
+  assert.equal(shareDesignFlow(shareFailure), true);
+  shareFailure.rejectShare(new Error("native share failed"));
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.match(shareFailure.shareStatus.textContent, /download.*copy.*open.*chat/i);
+  assert.equal(shareFailure.state.shareInProgress, false);
 });
