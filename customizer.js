@@ -234,7 +234,7 @@
   }
 
   var SHARE_TITLE = "Saloni resin frame design";
-  var SHARE_FALLBACK_MESSAGE = "Share unavailable or failed. Download the PNG, copy the summary, and open Saloni’s Instagram chat.";
+  var SHARE_FALLBACK_MESSAGE = "Share unavailable or failed. Use Download preview PNG, then Copy design summary, then open Saloni’s Instagram chat. Attach the downloaded PNG, paste the copied details, then tap Send.";
 
   function createSharePayload(canvas, summary, FileCtor) {
     if (!canvas || typeof canvas.toDataURL !== "function") throw new Error("Canvas export is unavailable.");

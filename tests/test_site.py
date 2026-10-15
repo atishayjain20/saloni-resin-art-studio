@@ -425,6 +425,32 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('href="tel:8209238541"', section)
         self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', section)
 
+    def test_instagram_handoff_is_explicitly_manual(self):
+        match = re.search(r'<section\b[^>]*id=["\']customizer["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(match)
+        section = match.group(0)
+        summary = re.search(r'<div class=["\']customizer-summary-card["\']>([\s\S]*?)</div>\s*</div>\s*</div>', section)
+        self.assertIsNotNone(summary)
+        summary_content = summary.group(1)
+        self.assertIn('id="copy-summary"', summary_content)
+        self.assertIn('id="copy-status"', summary_content)
+        self.assertRegex(section, r'id=["\']download-preview["\'][^>]*>Download preview PNG</button>')
+        self.assertRegex(section, r'id=["\']copy-summary["\'][^>]*>Copy design summary</button>')
+        chat = re.search(r'<a\b[^>]*href=["\']https://ig\.me/m/saloniresin_art_studio["\'][^>]*aria-describedby=["\']instagram-chat-guidance["\'][^>]*>Open Saloni’s Instagram chat', section)
+        self.assertIsNotNone(chat)
+        download_position = section.index('id="download-preview"')
+        copy_position = section.index('id="copy-summary"')
+        chat_position = section.index('href="https://ig.me/m/saloniresin_art_studio"')
+        share_position = section.index('id="share-design"')
+        self.assertLess(download_position, copy_position)
+        self.assertLess(copy_position, chat_position)
+        self.assertLess(chat_position, share_position)
+        guidance = re.search(r'<p\b[^>]*id=["\']instagram-chat-guidance["\'][^>]*>([\s\S]*?)</p>', section)
+        self.assertIsNotNone(guidance)
+        text = re.sub(r'<[^>]+>', ' ', guidance.group(1))
+        self.assertRegex(text, r'(?i)attach the downloaded PNG.*paste the copied details.*tap Send')
+        self.assertNotRegex(text, r'(?i)prefill|delivered|sent automatically')
+
     def test_customizer_script_contract_is_local_and_safe(self):
         script_path = ROOT / "customizer.js"
         self.assertTrue(script_path.is_file())
@@ -455,7 +481,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn("state.shareInProgress", script)
         self.assertIn('shareStatus.textContent = ""', script)
         self.assertIn("Verify the photo and details before sending", script)
-        self.assertIn("Download the PNG, copy the summary, and open Saloni’s Instagram chat", script)
+        self.assertIn("Download preview PNG, then Copy design summary, then open Saloni’s Instagram chat", script)
+        self.assertIn("Attach the downloaded PNG, paste the copied details, then tap Send", script)
 
     def test_customizer_css_has_preview_and_mobile_layout_hooks(self):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -467,6 +494,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn(".customizer-summary-card .button-line { border-color: var(--ivory); background: transparent; color: var(--ivory); }", css)
         self.assertIn(".customizer-summary-card .button-line:disabled", css)
         self.assertIn(".customizer-summary-card #share-status", css)
+        self.assertIn(".customizer-summary-card .customizer-status", css)
         self.assertIn("@media (max-width: 620px)", css)
 
     def test_customizer_interaction_regressions_have_contracts(self):
