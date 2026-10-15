@@ -229,18 +229,61 @@
               </div>
               <p class="colour-error" id="brush-colour-error" role="alert" aria-live="polite" hidden>Use 6 hex digits, for example #D1A24B.</p>
             </div>
+            <div class="colour-control">
+              <label class="colour-label" for="border-colour">Side-border colour</label>
+              <div class="colour-pair">
+                <input type="color" id="border-colour" value="#D8C9B9" aria-describedby="border-colour-hint border-colour-error">
+                <label class="sr-only" for="border-colour-hex">Side-border colour hex value</label>
+                <input id="border-colour-hex" class="hex-input" type="text" value="#D8C9B9" inputmode="text" maxlength="7" spellcheck="false" aria-describedby="border-colour-hint border-colour-error">
+              </div>
+              <p class="field-hint" id="border-colour-hint">Changes the outer edge only.</p>
+              <p class="colour-error" id="border-colour-error" role="alert" aria-live="polite" hidden>Use 6 hex digits, for example #D8C9B9.</p>
+            </div>
           </fieldset>
 
           <fieldset class="customizer-fieldset">
             <legend>Personal details</legend>
-            <label for="personal-text">Personal text
-              <input id="personal-text" name="personal-text" type="text" maxlength="50" placeholder="A name, date, or little message" aria-describedby="personal-text-hint">
+            <label for="personal-text">Text
+              <textarea id="personal-text" name="personal-text" rows="5" placeholder="One line per row" aria-describedby="personal-text-hint"></textarea>
             </label>
-            <p class="field-hint" id="personal-text-hint">Keep it short so the studio can place it beautifully.</p>
+            <p class="field-hint" id="personal-text-hint">One line per row. Line breaks stay in the preview.</p>
+            <p class="customizer-status" id="text-status" role="status" aria-live="polite"></p>
             <label for="reference-image">One local reference image
               <input id="reference-image" name="reference-image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
             </label>
             <p class="field-hint">JPG, PNG, or WebP · up to 10MB. The image stays on this device.</p>
+            <div class="image-layout-controls" id="image-layout-controls" aria-describedby="image-placement-hint">
+              <div class="range-control">
+                <label for="image-size">Image size <output id="image-size-value" for="image-size">Default</output></label>
+                <input id="image-size" name="image-size" type="range" min="0.2" max="1" step="0.01" value="0.2" aria-describedby="image-placement-hint">
+              </div>
+              <fieldset class="image-position-group" aria-describedby="image-placement-hint">
+                <legend>Image position</legend>
+                <div class="position-options">
+                  <label class="choice-chip" for="position-left"><input id="position-left" type="radio" name="image-position" value="left"> Left</label>
+                  <label class="choice-chip" for="position-centre"><input id="position-centre" type="radio" name="image-position" value="centre" checked> Centre</label>
+                  <label class="choice-chip" for="position-right"><input id="position-right" type="radio" name="image-position" value="right"> Right</label>
+                </div>
+              </fieldset>
+              <details class="crop-details">
+                <summary>Fine-tune image crop</summary>
+                <div class="crop-controls">
+                  <div class="range-control">
+                    <label for="crop-zoom">Crop zoom <output id="crop-zoom-value" for="crop-zoom">1×</output></label>
+                    <input id="crop-zoom" name="crop-zoom" type="range" min="1" max="3" step="0.01" value="1" aria-describedby="image-placement-hint">
+                  </div>
+                  <div class="range-control">
+                    <label for="crop-x">Crop horizontal <output id="crop-x-value" for="crop-x">Centre</output></label>
+                    <input id="crop-x" name="crop-x" type="range" min="0" max="1" step="0.01" value="0.5" aria-describedby="image-placement-hint">
+                  </div>
+                  <div class="range-control">
+                    <label for="crop-y">Crop vertical <output id="crop-y-value" for="crop-y">Centre</output></label>
+                    <input id="crop-y" name="crop-y" type="range" min="0" max="1" step="0.01" value="0.5" aria-describedby="image-placement-hint">
+                  </div>
+                </div>
+              </details>
+            </div>
+            <p class="field-hint" id="image-placement-hint">Drag the image to place it. Arrow keys move it when the preview is focused. Size and crop zoom are independent.</p>
             <p class="customizer-status" id="image-status" role="status" aria-live="polite"></p>
             <div class="image-actions" id="image-actions" hidden>
               <button class="mini-button" id="replace-image" type="button">Replace image</button>
@@ -282,7 +325,7 @@
           <figure class="customizer-preview" aria-label="Illustrative preview">
             <p class="preview-label">Illustrative preview</p>
             <div class="preview-stage" id="preview-stage">
-              <canvas class="scene-canvas" id="scene-canvas" width="1200" height="1200" role="img" tabindex="0" aria-label="Illustrative preview of custom resin frame" aria-describedby="preview-dimension-label" aria-keyshortcuts="Arrow keys, Space, Escape"></canvas>
+              <canvas class="scene-canvas" id="scene-canvas" width="1200" height="1200" role="img" tabindex="0" aria-label="Illustrative preview of custom resin frame" aria-describedby="preview-dimension-label image-placement-hint" aria-keyshortcuts="Arrow keys, Shift+Arrow, Escape"></canvas>
               <span class="brush-cursor" id="brush-cursor" aria-hidden="true"></span>
             </div>
             <p class="preview-dimension-label" id="preview-dimension-label">Square · 8 × 8 in</p>
