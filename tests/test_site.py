@@ -63,15 +63,20 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('class="site-script"', self.html)
 
     def test_seo_metadata_and_studio_namokar_label(self):
-        title = "Resin Art &amp; Customized Hampers | Saloni Resin Art Studio"
-        description = "Explore resin art, personalized gifts and customized hampers from Saloni Resin Art Studio. Contact Saloni to discuss colours, themes and your occasion."
+        title = "Custom Resin Art &amp; Gifts | Saloni Resin Art Studio"
+        description = "Explore custom resin frames, personalized gifts and customized hampers from Saloni Resin Art Studio. Share your colours, theme and occasion with Saloni."
         self.assertEqual(self.html.count("<title>"), 1)
         self.assertIn(f"<title>{title}</title>", self.html)
         self.assertEqual(self.html.count('<meta name="description"'), 1)
         self.assertIn(f'<meta name="description" content="{description}">', self.html)
         self.assertIn(f'<meta property="og:title" content="{title}">', self.html)
         self.assertIn(f'<meta property="og:description" content="{description}">', self.html)
+        self.assertIn('<meta property="og:site_name" content="Saloni Resin Art Studio">', self.html)
+        self.assertIn('<meta name="twitter:card" content="summary_large_image">', self.html)
+        self.assertIn(f'<meta name="twitter:title" content="{title}">', self.html)
+        self.assertIn(f'<meta name="twitter:description" content="{description}">', self.html)
         self.assertEqual(self.html.count('rel="canonical"'), 1)
+        self.assertIn('<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">', self.html)
         image_alt = re.search(r'<meta property="og:image:alt" content="([^"]+)">', self.html)
         self.assertIsNotNone(image_alt)
         self.assertTrue(image_alt.group(1).strip())
@@ -86,19 +91,27 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("<strong>Blue mantra frame</strong>", card)
 
     def test_organization_jsonld_and_sitemap_match_canonical(self):
-        canonical = "https://atishayjain20.github.io/saloni-resin-art-studio/"
+        canonical = "https://saloniresinart.com/"
         script = re.search(r'<script\b[^>]*type=["\']application/ld\+json["\']>([\s\S]*?)</script>', self.html)
         self.assertIsNotNone(script)
         organization = json.loads(script.group(1))
-        self.assertEqual(set(organization), {"@context", "@type", "name", "url", "sameAs", "description"})
+        self.assertEqual(set(organization), {"@context", "@type", "name", "url", "sameAs", "description", "telephone", "address", "areaServed"})
         self.assertEqual(organization["@context"], "https://schema.org")
         self.assertEqual(organization["@type"], "Organization")
         self.assertEqual(organization["name"], "Saloni Resin Art Studio")
+        self.assertEqual(organization["telephone"], "+91-8209238541")
+        self.assertEqual(organization["address"], {
+            "@type": "PostalAddress",
+            "addressLocality": "Ajmer",
+            "addressRegion": "Rajasthan",
+            "addressCountry": "IN",
+        })
+        self.assertEqual(organization["areaServed"], "IN")
         self.assertIn(f'<link rel="canonical" href="{canonical}">', self.html)
         self.assertIn(f'<meta property="og:url" content="{canonical}">', self.html)
         self.assertEqual(organization["url"], canonical)
         self.assertEqual(organization["sameAs"], ["https://www.instagram.com/saloniresin_art_studio/"])
-        self.assertNotRegex(script.group(1), re.compile(r"Review|AggregateRating|rating|telephone|address", re.I))
+        self.assertNotRegex(script.group(1), re.compile(r"Review|AggregateRating|rating|Offer|LocalBusiness|streetAddress|postalCode|openingHours", re.I))
 
         sitemap_path = ROOT / "sitemap.xml"
         self.assertTrue(sitemap_path.is_file())
@@ -115,16 +128,72 @@ class StaticSiteContractTests(unittest.TestCase):
         hero = re.search(r'<p\b[^>]*class=["\']hero-intro["\'][\s\S]*?</p>', self.html)
         self.assertIsNotNone(hero)
         hero_copy = hero.group(0).lower()
-        for phrase in ("resin art", "personalized gifts", "customized hampers"):
+        for phrase in ("custom resin frames", "resin art", "personalized gifts", "customized hampers"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, hero_copy)
 
-    def test_public_metadata_uses_settled_github_pages_url(self):
-        public_url = "https://atishayjain20.github.io/saloni-resin-art-studio/"
+    def test_public_metadata_uses_settled_custom_domain_url(self):
+        public_url = "https://saloniresinart.com/"
         image_url = public_url + "assets/hero-floral-bouquet.jpg"
         self.assertIn(f'<link rel="canonical" href="{public_url}">', self.html)
         self.assertIn(f'<meta property="og:url" content="{public_url}">', self.html)
         self.assertIn(f'<meta property="og:image" content="{image_url}">', self.html)
+        self.assertIn(f'<meta name="twitter:image" content="{image_url}">', self.html)
+        self.assertNotIn("atishayjain20.github.io", self.html)
+
+    def test_discovery_files_and_favicon_are_valid(self):
+        robots_path = ROOT / "robots.txt"
+        self.assertTrue(robots_path.is_file())
+        self.assertEqual(
+            robots_path.read_text(encoding="utf-8").splitlines(),
+            ["User-agent: *", "Allow: /", "Sitemap: https://saloniresinart.com/sitemap.xml"],
+        )
+
+        favicon_path = ROOT / "assets" / "favicon.svg"
+        self.assertTrue(favicon_path.is_file())
+        favicon = ET.parse(favicon_path).getroot()
+        self.assertEqual(favicon.tag.rsplit("}", 1)[-1], "svg")
+        self.assertEqual(favicon.attrib.get("viewBox", "").split(), ["0", "0", "64", "64"])
+        self.assertEqual(favicon.attrib.get("width"), "64")
+        self.assertEqual(favicon.attrib.get("height"), "64")
+
+    def test_buyer_copy_and_order_questions_are_native(self):
+        for phrase in (
+            "Resin keepsakes from the studio",
+            "Resin clocks, coasters &amp; frames",
+            "Customized hampers for special moments",
+            "Blue hour resin clock",
+            "Personalized message coasters",
+            "Namokar mantra resin frame",
+            "Personalized photo clock",
+            "Based in Ajmer, shipping across India. Order enquiries are open 24 hours.",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.html)
+
+        order = re.search(r'<section\b[^>]*id=["\']order["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(order)
+        order_html = order.group(0)
+        details = re.findall(r'<details\b[\s\S]*?</details>', order_html)
+        self.assertEqual(len(details), 3)
+        for question in (
+            "What can I personalize?",
+            "Is the preview final?",
+            "How do I order?",
+        ):
+            with self.subTest(question=question):
+                self.assertIn(f"<summary>{question}</summary>", order_html)
+        self.assertNotIn("FAQPage", self.html)
+
+    def test_document_has_one_h1_and_resolvable_local_fragments(self):
+        self.assertEqual(len(re.findall(r"<h1\b", self.html, flags=re.I)), 1)
+        ids = set(re.findall(r'\bid=["\']([^"\']+)', self.html))
+        for fragment in re.findall(r'href=["\'](#[^"\']+)', self.html):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment[1:], ids)
+        self.assertNotRegex(self.html, re.compile(r'<meta\b[^>]*name=["\']robots["\'][^>]*noindex', re.I))
+        self.assertNotIn("atishayjain20.github.io", (ROOT / "sitemap.xml").read_text(encoding="utf-8"))
+        self.assertNotIn("atishayjain20.github.io", (ROOT / "robots.txt").read_text(encoding="utf-8"))
 
     def test_contact_details_are_exact_and_visible(self):
         self.assertIn('tel:8209238541', self.html)
@@ -184,7 +253,7 @@ class StaticSiteContractTests(unittest.TestCase):
         section = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
-        self.assertIn("Art from the studio", section_html)
+        self.assertIn("Resin keepsakes from the studio", section_html)
         self.assertIn("Swipe or use the arrows to explore all 10 pieces.", section_html)
         self.assertEqual(self.html.count('id="studio-art"'), 1)
         self.assertEqual(self.html.count('id="studio-art-track"'), 1)
@@ -248,7 +317,7 @@ class StaticSiteContractTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(name, section_html)
         self.assertEqual(section_html.count('data-testimonial-card'), 5)
-        self.assertIn("Sample testimonials for layout preview", section_html)
+        self.assertNotIn("Sample testimonials for layout preview", section_html)
         self.assertNotIn('class="sample-label">Sample testimonial</span>', section_html)
         self.assertIn('aria-label="Testimonials carousel controls"', section_html)
         self.assertIn('aria-label="Testimonials"', section_html)
@@ -262,6 +331,7 @@ class StaticSiteContractTests(unittest.TestCase):
             card_text = re.sub(r'<[^>]+>', ' ', card)
             with self.subTest(card=card_text.strip()[:40]):
                 self.assertNotRegex(card_text, re.compile(r'\bsample\b', re.I))
+        self.assertNotRegex(self.html, re.compile(r'"@type"\s*:\s*"(?:Review|AggregateRating)"', re.I))
 
     def test_festive_offers_area_has_diwali_navratri_and_contact_paths(self):
         match = re.search(r'<section\b[^>]*id=["\']festive-offers["\'][\s\S]*?</section>', self.html)
