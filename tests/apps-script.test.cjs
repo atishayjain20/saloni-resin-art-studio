@@ -79,7 +79,7 @@ function makeRuntime(options = {}) {
     }),
     getDataRange: () => {
       state.dataReads += 1;
-      if (state.failRecheck && state.dataReads >= 2) throw new Error("sheet read uncertain");
+      if (state.failRecheck && state.appendCalls > 0) throw new Error("sheet read uncertain");
       return { getValues: () => [headers].concat(rows) };
     },
     appendRow: (row) => {
@@ -184,6 +184,8 @@ test("reconciles append failures without deleting a file after persisted-then-th
   assert.equal(persisted.state.trashed, 0);
   const uncertain = makeRuntime({ appendMode: "before-throw", failRecheck: true });
   assert.throws(() => uncertain.context.submitOrder(validForm({ referenceImage: imageBlob() })), /Unable to confirm/);
+  assert.equal(uncertain.state.appendCalls, 1);
+  assert.equal(uncertain.state.fileCreates, 1);
   assert.equal(uncertain.state.trashed, 0);
   const cleanupFailure = makeRuntime({ appendMode: "before-throw", cleanupThrows: true });
   assert.throws(() => cleanupFailure.context.submitOrder(validForm({ referenceImage: imageBlob() })), /Unable to confirm/);
