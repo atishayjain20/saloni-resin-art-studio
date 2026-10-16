@@ -6,6 +6,18 @@
   document.addEventListener("DOMContentLoaded", function () {
     var root = document.documentElement;
     var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var skipLink = document.querySelector(".skip-link");
+    var mainContent = document.getElementById("main-content");
+    if (skipLink && mainContent) {
+      skipLink.addEventListener("click", function (event) {
+        event.preventDefault();
+        var targetHash = skipLink.getAttribute("href") || "#main-content";
+        if (window.history && window.history.pushState) window.history.pushState({}, "", targetHash);
+        else if (window.location) window.location.hash = targetHash;
+        mainContent.focus({ preventScroll: true });
+        mainContent.scrollIntoView({ behavior: "auto", block: "start" });
+      });
+    }
 
     document.querySelectorAll("[data-carousel]").forEach(function (carousel) {
       var track = carousel.querySelector("[data-carousel-track]");
