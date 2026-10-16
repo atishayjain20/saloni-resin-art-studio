@@ -113,6 +113,7 @@ h1 em { color: var(--rose); font-style: italic; }
 .arrow-left { transform: rotate(-135deg); margin-left: 0.2rem; }.arrow-right { transform: rotate(45deg); margin-right: 0.2rem; }
 .carousel { position: relative; overflow-x: hidden; }
 .carousel-track { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(255px, 26.5vw); gap: clamp(1rem, 2vw, 1.5rem); overflow-x: auto; padding: 0.2rem 0 1rem; scroll-snap-type: x mandatory; scrollbar-color: var(--cocoa) transparent; scrollbar-width: thin; overscroll-behavior-inline: contain; }
+.carousel-track:focus-visible { outline: 3px solid var(--rose); outline-offset: -4px; }
 .carousel-track::-webkit-scrollbar { height: 0.35rem; }.carousel-track::-webkit-scrollbar-thumb { background: var(--cocoa); border-radius: 999px; }
 .work-card { min-width: 0; scroll-snap-align: start; }
 .work-card figure { margin: 0; }
