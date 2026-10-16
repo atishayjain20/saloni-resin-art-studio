@@ -10,7 +10,8 @@ var MAX_DIMENSION_INCHES = 48;
 var DEFAULT_DAILY_ACCEPTANCE_CAP = 50;
 var ORDER_HEADERS = [
   "Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID",
-  "Product name", "Quantity", "Height (in)", "Width (in)", "Design details",
+  "Product name", "Quantity", "Height value", "Height unit", "Height (in)",
+  "Width value", "Width unit", "Width (in)", "Design details",
   "Customer name", "Phone", "Email", "Fulfilment", "Shipping address",
   "City", "State", "PIN", "Requested date", "Reference file link", "Status", "Staff notes"
 ];
@@ -82,11 +83,33 @@ function submitOrder(form) {
       var receivedAt = new Date();
       sheet.appendRow(rowForPayload_(payload, fingerprint, receivedAt, referenceFile));
       return { ok: true, requestId: payload.requestId, receivedAt: receivedAt.toISOString() };
-    } catch (error) {
-      if (referenceFile) {
-        try { referenceFile.setTrashed(true); } catch (cleanupError) { /* keep the original failure */ }
+    } catch (appendError) {
+      // appendRow can persist a row and still throw. Reconcile before touching
+      // the file so a successful write is never orphaned by cleanup.
+      var afterAppend;
+      try {
+        afterAppend = findRequest_(sheet, payload.requestId);
+      } catch (reconciliationError) {
+        // The outcome is unknown. Keep the file for staff reconciliation.
+        throw new Error("Unable to confirm order request.");
       }
-      throw error;
+      if (afterAppend) {
+        if (afterAppend.fingerprint === fingerprint) {
+          return { ok: true, requestId: payload.requestId, receivedAt: afterAppend.receivedAt };
+        }
+        // A conflicting row is evidence that a write occurred; do not trash
+        // the newly-created file when the row/file relationship is uncertain.
+        throw new Error("Unable to confirm order request.");
+      }
+      if (referenceFile) {
+        try {
+          referenceFile.setTrashed(true);
+        } catch (cleanupError) {
+          // Do not hide cleanup failure behind a false success.
+          throw new Error("Unable to confirm order request.");
+        }
+      }
+      throw appendError;
     }
   } catch (error) {
     throw new Error("Unable to confirm order request.");
@@ -118,8 +141,13 @@ function collectPayload_(form) {
     pin: fulfillment.toLowerCase() === "shipping" ? stringValue_(form.pin) : "",
     requestedDate: stringValue_(form.requestedDate),
     captchaToken: stringValue_(form.captchaToken),
-    referenceImage: form.referenceImage || null
+    referenceImage: normalizeReferenceImage_(form.referenceImage)
   };
+}
+
+function normalizeReferenceImage_(blob) {
+  if (!blob || typeof blob.getBytes !== "function") return null;
+  return blob.getBytes().length ? blob : null;
 }
 
 function validatePayload_(payload) {
@@ -233,7 +261,6 @@ function openOrderSheet_(properties) {
 }
 
 function ensureSchema_(sheet) {
-  var lastColumn = Math.max(sheet.getLastColumn(), ORDER_HEADERS.length);
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, ORDER_HEADERS.length).setValues([ORDER_HEADERS]);
     return;
@@ -285,7 +312,9 @@ function rowForPayload_(payload, fingerprint, receivedAt, referenceFile) {
   return [
     neutralizeForSheet_(payload.requestId), neutralizeForSheet_(fingerprint), receivedAt,
     neutralizeForSheet_(payload.sourceKind), neutralizeForSheet_(payload.sourceId), neutralizeForSheet_(payload.productName),
-    Number(payload.quantity), validation.heightInches, validation.widthInches, neutralizeForSheet_(payload.designDetails),
+    Number(payload.quantity), neutralizeForSheet_(payload.height), neutralizeForSheet_(payload.heightUnit), validation.heightInches,
+    neutralizeForSheet_(payload.width), neutralizeForSheet_(payload.widthUnit), validation.widthInches,
+    neutralizeForSheet_(payload.designDetails),
     neutralizeForSheet_(payload.customerName), neutralizeForSheet_(payload.phone), neutralizeForSheet_(payload.email),
     neutralizeForSheet_(payload.fulfillment.toLowerCase()), neutralizeForSheet_(payload.shippingAddress),
     neutralizeForSheet_(payload.city), neutralizeForSheet_(payload.state), neutralizeForSheet_(payload.pin),

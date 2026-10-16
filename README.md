@@ -16,7 +16,7 @@ Open `http://localhost:8000` in a browser. Stop the server with `Ctrl-C`.
 
 ```sh
 python3 -m unittest discover -s tests -v
-node --test tests/customizer.test.cjs tests/apps-script.test.cjs
+node --test tests/customizer.test.cjs tests/apps-script.test.cjs tests/order-flow.test.cjs tests/form-flow.test.cjs
 node --check script.js
 node --check customizer.js
 git diff --check

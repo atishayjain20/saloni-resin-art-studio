@@ -118,37 +118,47 @@
   var anotherButton = document.getElementById("another-button");
   var shippingFields = document.getElementById("shipping-fields");
   var referenceImage = document.getElementById("reference-image");
-  var initialSnapshot = "";
   var active = false;
-  var timedOut = false;
+  var currentAttempt = null;
   var timeoutId = null;
 
   function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
-  function snapshot() {
-    return ["sourceKind", "sourceId", "productName", "quantity", "height", "heightUnit", "width", "widthUnit", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate"].map(value).join("\u001f");
-  }
-  function hasDraft() { return snapshot() !== initialSnapshot || referenceImage.files.length > 0; }
-  function postDraft() { try { window.parent.postMessage({ type: "order-form-draft", hasDraft: hasDraft(), sourceId: value("sourceId") }, "*"); } catch (error) {} }
   function setError(field, message) {
     var input = form.elements[field];
     if (!input) return;
     input.setAttribute("aria-invalid", "true");
+    var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+    if (describedBy.indexOf(field + "-error") === -1) describedBy.push(field + "-error");
+    input.setAttribute("aria-describedby", describedBy.join(" "));
     var error = document.getElementById(field + "-error");
     if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; input.parentNode.appendChild(error); }
     error.textContent = message;
   }
   function clearErrors() {
-    Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) { input.removeAttribute("aria-invalid"); });
-    Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { error.remove(); });
+    Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) {
+      input.removeAttribute("aria-invalid");
+      var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== input.name + "-error"; });
+      if (describedBy.length) input.setAttribute("aria-describedby", describedBy.join(" ")); else input.removeAttribute("aria-describedby");
+    });
+    Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); });
   }
   function setStatus(message, kind) { status.textContent = message || ""; status.className = "status" + (kind ? " " + kind : ""); }
-  function toggleShipping() { var shipping = value("fulfillment") === "shipping"; shippingFields.hidden = !shipping; shippingFields.setAttribute("aria-hidden", String(!shipping)); }
+  function toggleShipping() {
+    var shipping = value("fulfillment") === "shipping";
+    shippingFields.hidden = !shipping;
+    shippingFields.setAttribute("aria-hidden", String(!shipping));
+  }
+  function updateDimensionMaxes() {
+    ["height", "width"].forEach(function (name) {
+      var unit = value(name + "Unit");
+      form.elements[name].setAttribute("max", unit === "ft" ? "4" : "48");
+    });
+  }
   function applySeed(next) {
     var fields = ["requestId", "sourceKind", "sourceId", "productName", "quantity", "height", "heightUnit", "width", "widthUnit", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate"];
     fields.forEach(function (field) { if (form.elements[field]) form.elements[field].value = next[field] == null ? "" : next[field]; });
     toggleShipping();
-    initialSnapshot = snapshot();
-    postDraft();
+    updateDimensionMaxes();
   }
   function newRequestId() {
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -157,44 +167,122 @@
   function getCaptchaToken(done) {
     if (!captchaEnabled || !captchaSiteKey) { done(null); return; }
     if (!window.grecaptcha || !window.grecaptcha.ready) { done(null); return; }
-    window.grecaptcha.ready(function () {
-      window.grecaptcha.execute(captchaSiteKey, { action: "order_request" }).then(done).catch(function () { done(null); });
-    });
+    try {
+      window.grecaptcha.ready(function () {
+        try {
+          var result = window.grecaptcha.execute(captchaSiteKey, { action: "order_request" });
+          if (!result || typeof result.then !== "function") { done(null); return; }
+          result.then(done).catch(function () { done(null); });
+        } catch (error) { done(null); }
+      });
+    } catch (error) { done(null); }
   }
-  function restoreSubmitState() { active = false; submitButton.disabled = false; if (timeoutId) window.clearTimeout(timeoutId); timeoutId = null; postDraft(); }
-  function showFailure(message, errors) {
-    restoreSubmitState(); clearErrors();
+  function isCurrent(attempt) { return currentAttempt === attempt && active; }
+  function restoreSubmitState(attempt) {
+    if (attempt && currentAttempt !== attempt) return;
+    active = false;
+    submitButton.disabled = false;
+    if (timeoutId) window.clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  function focusFirstError(errors) {
+    var first = errors && Object.keys(errors).filter(function (field) { return field !== "form" && field !== "captcha"; })[0];
+    if (first && form.elements[first] && form.elements[first].focus) { form.elements[first].focus(); return; }
+    if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+  }
+  function showFailure(message, errors, attempt) {
+    if (attempt && !isCurrent(attempt)) return;
+    restoreSubmitState(attempt); clearErrors();
     if (errors) Object.keys(errors).forEach(function (field) { if (field !== "form" && field !== "captcha") setError(field, errors[field]); });
-    setStatus(message, "error");
+    var general = errors && (errors.form || errors.captcha);
+    setStatus(general || message, "error");
+    focusFirstError(errors);
   }
-  function showSuccess(result) {
-    restoreSubmitState();
+  function showSuccess(result, attempt) {
+    if (attempt && !isCurrent(attempt)) return;
+    restoreSubmitState(attempt);
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
     anotherButton.hidden = false;
     setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed. Request ID: " + result.requestId, "success");
-    postDraft();
+    if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
   }
-  form.addEventListener("input", function () { if (!active) { postDraft(); } });
-  form.addEventListener("change", function () { toggleShipping(); if (!active) postDraft(); });
+  function validIsoDate(text) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+    var parts = text.split("-").map(Number);
+    var date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    return date.getUTCFullYear() === parts[0] && date.getUTCMonth() === parts[1] - 1 && date.getUTCDate() === parts[2];
+  }
+  function clientValidationErrors() {
+    var errors = {};
+    function required(name, message) { if (!value(name).trim()) errors[name] = message; }
+    required("productName", "This field is required.");
+    var quantity = Number(value("quantity"));
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
+    ["height", "width"].forEach(function (name) {
+      var number = Number(value(name));
+      var unit = value(name + "Unit");
+      var inches = unit === "ft" ? number * 12 : unit === "in" ? number : NaN;
+      if (!Number.isFinite(number) || number <= 0 || !Number.isFinite(inches) || inches > 48) errors[name] = "Enter a size greater than 0 and no more than 48 inches.";
+      if (["in", "ft"].indexOf(unit) === -1) errors[name + "Unit"] = "Choose inches or feet.";
+    });
+    required("designDetails", "This field is required.");
+    required("customerName", "This field is required.");
+    if (!value("phone") || (value("phone").match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number.";
+    if (value("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("email"))) errors.email = "Enter a valid email address or leave it blank.";
+    var fulfillment = value("fulfillment");
+    if (["shipping", "pickup"].indexOf(fulfillment) === -1) errors.fulfillment = "Choose shipping or pickup.";
+    if (fulfillment === "shipping") {
+      required("shippingAddress", "Shipping address is required.");
+      required("city", "City is required.");
+      required("state", "State is required.");
+      if (!/^\d{6}$/.test(value("pin"))) errors.pin = "Enter a 6-digit PIN for shipping.";
+    }
+    if (value("requestedDate") && !validIsoDate(value("requestedDate"))) errors.requestedDate = "Use a valid requested date.";
+    var file = referenceImage.files && referenceImage.files[0];
+    if (file && file.size !== 0) {
+      var fileName = String(file.name || "").toLowerCase();
+      var fileType = String(file.type || "").toLowerCase();
+      if (file.size > 5 * 1024 * 1024) errors.referenceImage = "The reference image must be 5 MB or smaller.";
+      else if (["image/jpeg", "image/png"].indexOf(fileType) === -1 && !/\.(jpe?g|png)$/.test(fileName)) errors.referenceImage = "Attach one JPG or PNG image.";
+    }
+    return errors;
+  }
+  form.addEventListener("change", function () { toggleShipping(); updateDimensionMaxes(); });
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;
-    clearErrors(); setStatus("Checking the request…", ""); active = true; timedOut = false; submitButton.disabled = true;
+    clearErrors();
+    var validationErrors = clientValidationErrors();
+    if (Object.keys(validationErrors).length) {
+      showFailure("Please correct the highlighted fields and try again.", validationErrors);
+      return;
+    }
+    var attempt = {};
+    currentAttempt = attempt;
+    active = true;
+    submitButton.disabled = true;
+    setStatus("Checking the request…", "");
+    timeoutId = window.setTimeout(function () {
+      if (!isCurrent(attempt)) return;
+      restoreSubmitState(attempt);
+      setStatus("Unable to confirm the request yet. Your entries are still here; please try again.", "error");
+      if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+    }, 30000);
     getCaptchaToken(function (token) {
-      if (!active) return;
-      if (!token) { showFailure("We could not verify this request. Please try again.", { captcha: "Captcha verification is required." }); return; }
+      if (!isCurrent(attempt)) return;
+      if (!token) { showFailure("We could not verify this request. Please try again.", { captcha: "Captcha verification is required." }, attempt); return; }
       form.elements.captchaToken.value = token;
-      google.script.run.withSuccessHandler(function (result) {
-        if (timedOut || !active) return;
-        if (result && result.ok === true) showSuccess(result); else showFailure("Please correct the highlighted fields and try again.", result && result.errors);
-      }).withFailureHandler(function () {
-        if (timedOut || !active) return;
-        showFailure("We were unable to confirm the request. Your entries are still here; please try again.");
-      }).submitOrder(formElement);
-      timeoutId = window.setTimeout(function () {
-        if (!active) return;
-        timedOut = true; restoreSubmitState(); setStatus("Unable to confirm the request yet. Your entries are still here; please try again.", "error");
-      }, 30000);
+      try {
+        google.script.run.withSuccessHandler(function (result) {
+          if (!isCurrent(attempt)) return;
+          if (result && result.ok === true) showSuccess(result, attempt); else showFailure("Please correct the highlighted fields and try again.", result && result.errors, attempt);
+        }).withFailureHandler(function () {
+          if (!isCurrent(attempt)) return;
+          showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
+        }).submitOrder(formElement);
+      } catch (error) {
+        if (isCurrent(attempt)) showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
+      }
     });
   });
   anotherButton.addEventListener("click", function () {
@@ -202,7 +290,7 @@
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
     anotherButton.hidden = true; clearErrors(); setStatus("", "");
     form.elements.requestId.value = newRequestId(); form.elements.fulfillment.value = "shipping"; toggleShipping();
-    initialSnapshot = snapshot(); postDraft();
+    updateDimensionMaxes();
   });
   applySeed(seed);
 }());
