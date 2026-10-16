@@ -103,6 +103,7 @@ h1 em { color: var(--rose); font-style: italic; }
 .work-section { padding-block: clamp(4rem, 9vw, 8rem); }
 .work-section-warm { width: 100%; max-width: none; padding-inline: max(var(--gutter), calc((100vw - var(--max)) / 2)); background: #f1e0d8; }
 .rail-heading { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
+.rail-heading > div:first-child { min-width: 0; }
 .rail-heading h2 { max-width: 10ch; margin-bottom: 0; }
 .rail-controls { display: none; flex: none; gap: 0.55rem; }
 [data-carousel].is-ready .rail-controls { display: flex; }
@@ -110,7 +111,7 @@ h1 em { color: var(--rose); font-style: italic; }
 .carousel-button:hover:not(:disabled), .carousel-button:focus-visible:not(:disabled) { background: var(--ink); color: var(--ivory); transform: translateY(-2px); }
 .arrow { display: block; width: 0.55rem; height: 0.55rem; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; }
 .arrow-left { transform: rotate(-135deg); margin-left: 0.2rem; }.arrow-right { transform: rotate(45deg); margin-right: 0.2rem; }
-.carousel { position: relative; }
+.carousel { position: relative; overflow-x: hidden; }
 .carousel-track { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(255px, 26.5vw); gap: clamp(1rem, 2vw, 1.5rem); overflow-x: auto; padding: 0.2rem 0 1rem; scroll-snap-type: x mandatory; scrollbar-color: var(--cocoa) transparent; scrollbar-width: thin; overscroll-behavior-inline: contain; }
 .carousel-track::-webkit-scrollbar { height: 0.35rem; }.carousel-track::-webkit-scrollbar-thumb { background: var(--cocoa); border-radius: 999px; }
 .work-card { min-width: 0; scroll-snap-align: start; }
