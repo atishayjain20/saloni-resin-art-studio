@@ -91,5 +91,109 @@
     } else {
       reveals.forEach(function (element) { element.classList.add("is-visible"); });
     }
+
+    initOrderRequestFlow();
   });
+
+  function initOrderRequestFlow() {
+    var embed = document.getElementById("order-form-embed");
+    var frame = document.getElementById("order-form-frame");
+    var status = document.getElementById("order-form-status");
+    if (!embed || !frame || !status) return;
+    var orderUrl = embed.getAttribute("data-order-form-url") || "";
+    var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
+    var frameState = { hasDraft: false, sourceId: "" };
+
+    function requestId() {
+      if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+      return "request-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+    }
+
+    function scrollToForm() {
+      embed.scrollIntoView({ behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    }
+
+    function sourceSeed(source) {
+      var seed = {
+        requestId: requestId(), sourceKind: source.sourceKind || "catalogue", sourceId: source.sourceId || "",
+        productName: source.productName || "", quantity: "1", height: source.height || "", heightUnit: source.heightUnit || "in",
+        width: source.width || "", widthUnit: source.widthUnit || "in", designDetails: source.designDetails || "",
+        customerName: "", phone: "", email: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "", requestedDate: ""
+      };
+      return seed;
+    }
+
+    function submitSeed(seed) {
+      if (!configured) {
+        status.innerHTML = "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+        status.hidden = false;
+        scrollToForm();
+        return;
+      }
+      frame.hidden = false;
+      status.hidden = true;
+      // Normal POST action=seed keeps the existing iframe alive while replacing its document.
+      var postForm = document.createElement("form");
+      postForm.method = "POST";
+      postForm.action = orderUrl;
+      postForm.target = frame.name;
+      postForm.setAttribute("aria-hidden", "true");
+      var action = document.createElement("input");
+      action.type = "hidden"; action.name = "action"; action.value = "seed";
+      var seedField = document.createElement("input");
+      seedField.type = "hidden"; seedField.name = "seed"; seedField.value = JSON.stringify(seed);
+      postForm.appendChild(action); postForm.appendChild(seedField); document.body.appendChild(postForm); postForm.submit(); postForm.remove();
+      frameState.sourceId = seed.sourceId;
+      frameState.hasDraft = false;
+      scrollToForm();
+    }
+
+    function chooseSource(seed) {
+      if (frameState.hasDraft && frameState.sourceId && frameState.sourceId !== seed.sourceId) {
+        if (!window.confirm("This order form has unsent details. Replace them with the selected item?")) return;
+      }
+      if (frameState.hasDraft && frameState.sourceId === seed.sourceId) { scrollToForm(); return; }
+      submitSeed(seed);
+    }
+
+    function catalogueSeed(card) {
+      var image = card.querySelector("img[src]");
+      var title = card.querySelector("figcaption strong");
+      if (!image || !title) return null;
+      var sourceId = "catalogue:" + image.getAttribute("src").replace(/^assets\//, "");
+      var details = Array.prototype.map.call(card.querySelectorAll("figcaption p"), function (node) { return node.textContent.trim(); }).join(" ");
+      return sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details });
+    }
+
+    document.querySelectorAll("[data-carousel] .work-card").forEach(function (card) {
+      var seed = catalogueSeed(card);
+      var caption = card.querySelector("figcaption");
+      if (!seed || !caption || caption.querySelector("[data-order-prefill]")) return;
+      var button = document.createElement("button");
+      button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "catalogue");
+      button.textContent = "Start an order";
+      button.addEventListener("click", function () { chooseSource(seed); });
+      caption.appendChild(button);
+    });
+
+    var customizerButton = document.querySelector("[data-order-prefill=\"customizer\"]");
+    if (customizerButton) {
+      customizerButton.addEventListener("click", function () {
+        var summary = document.getElementById("customizer-summary");
+        var dimension = document.getElementById("preview-dimension-label");
+        var match = dimension && dimension.textContent.match(/([0-9.]+)\s*[×x]\s*([0-9.]+)\s*(in|ft)/i);
+        chooseSource(sourceSeed({
+          sourceKind: "customizer", sourceId: "customizer:resin-frame", productName: "Custom resin frame",
+          height: match ? match[1] : "8", width: match ? match[2] : "8", heightUnit: match ? match[3].toLowerCase() : "in", widthUnit: match ? match[3].toLowerCase() : "in",
+          designDetails: summary ? summary.textContent.trim() : "Custom resin frame design from the site customizer."
+        }));
+      });
+    }
+
+    window.addEventListener("message", function (event) {
+      if (event.source !== frame.contentWindow || !event.data || event.data.type !== "order-form-draft") return;
+      frameState.hasDraft = Boolean(event.data.hasDraft);
+      frameState.sourceId = String(event.data.sourceId || frameState.sourceId || "");
+    });
+  }
 }());

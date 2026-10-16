@@ -365,6 +365,8 @@
             <button class="button button-line download-button" id="share-design" type="button" aria-describedby="share-guidance">Share design</button>
             <p class="share-guidance" id="share-guidance">Optional native Share can pass the PNG and summary to the destination you choose. Some apps may omit the text or PNG; for Instagram, use the manual steps above.</p>
             <p class="customizer-status" id="share-status" role="status" aria-live="polite"></p>
+            <button class="button button-dark download-button" id="order-from-customizer" type="button" data-order-prefill="customizer">Start an order from this design</button>
+            <p class="share-guidance">The order form can receive the design summary. If you want to include the customizer PNG, download it and attach it in the form.</p>
           </div>
         </div>
       </div>
@@ -440,12 +442,12 @@
     </section>
 
     <section class="order-section shell" id="order" aria-labelledby="order-title">
-      <div class="order-copy reveal"><p class="eyebrow">Start a conversation</p><h2 id="order-title">Tell us the moment. We’ll talk through the piece.</h2><p>Every order starts with a few details. Send the occasion, who it’s for, colours or themes you like, and any words or memories you want to bring into it.</p><p>Based in Ajmer, shipping across India. Order enquiries are open 24 hours.</p><p>No form to wrestle with — just a direct conversation with the studio.</p><div class="ordering-questions" aria-label="Ordering questions"><details><summary>What can I personalize?</summary><p>Choose colours, words, and a theme; discuss the details with Saloni.</p></details><details><summary>Is the preview final?</summary><p>The customizer preview is illustrative. Saloni confirms the final size, materials, and quote.</p></details><details><summary>How do I order?</summary><p>Call or message on Instagram with the occasion and details. For a customizer design, download the PNG, copy the summary, and share them manually.</p></details></div></div>
-      <div class="order-panel reveal reveal-delay">
-        <p class="panel-label">Ready when you are</p>
-        <a class="contact-line" href="tel:8209238541"><span>Call Saloni</span><strong>8209238541</strong></a>
-        <a class="contact-line" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer"><span>Instagram</span><strong>@saloniresin_art_studio</strong></a>
-        <p class="panel-note">Share your idea by phone or Instagram, and include the occasion plus any visual cues that matter to you.</p>
+      <div class="order-copy reveal"><p class="eyebrow">Start a conversation</p><h2 id="order-title">Tell us the moment. We’ll talk through the piece.</h2><p>Every order starts with a few details. Choose a catalogue piece or start with your customizer design, then edit the visible request fields before sending.</p><p>Based in Ajmer, shipping across India. Order enquiries are open 24 hours.</p><p class="order-privacy-note">Order details and an optional image are stored in the studio’s private Google Sheet and restricted Drive folder for handling. Retention is configured by the studio. Request correction or deletion through <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p><div class="ordering-questions" aria-label="Ordering questions"><details><summary>What can I personalize?</summary><p>Choose colours, words, and a theme; discuss the details with Saloni.</p></details><details><summary>Is the preview final?</summary><p>The customizer preview is illustrative. Saloni confirms the final size, materials, and quote.</p></details><details><summary>How do I order?</summary><p>Send a request here. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed by this form.</p></details></div></div>
+      <div class="order-panel order-form-panel reveal reveal-delay" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/REPLACE_WITH_APPS_SCRIPT_DEPLOYMENT_ID/exec">
+        <p class="panel-label">Order request</p>
+        <p class="panel-note">Select “Start an order” on a catalogue card or the customizer. The request form stays here while you browse.</p>
+        <div class="order-form-status" id="order-form-status" role="status" aria-live="polite">The request form is not configured for this preview yet. You can still call Saloni at <a href="tel:8209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.</div>
+        <iframe id="order-form-frame" name="saloni-order-form-frame" title="Saloni Resin Art Studio order request form" loading="lazy" hidden></iframe>
       </div>
     </section>
   </main>
