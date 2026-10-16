@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Saloni Resin Art Studio">
+  <rect width="64" height="64" rx="16" fill="#2c2523"/>
+  <path d="M45 18c-4-4-9-6-15-6-8 0-14 4-14 10 0 5 3 8 12 10 8 2 11 3 11 7 0 4-4 7-10 7-6 0-11-2-15-6l-4 6c5 5 11 8 19 8 10 0 17-5 17-13 0-7-5-10-15-13-6-1-8-2-8-5 0-3 3-5 7-5 4 0 8 1 11 4z" fill="#f7f0e7"/>
+  <circle cx="48" cy="48" r="4" fill="#c96572"/>
+</svg>
