@@ -15,7 +15,7 @@
         if (window.history && window.history.pushState) window.history.pushState({}, "", targetHash);
         else if (window.location) window.location.hash = targetHash;
         mainContent.focus({ preventScroll: true });
-        mainContent.scrollIntoView({ behavior: "auto", block: "start" });
+        mainContent.scrollIntoView({ behavior: "instant", block: "start" });
       });
     }
 

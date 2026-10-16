@@ -55,6 +55,6 @@ test("skip link prevents smooth anchor drift and focuses the main content target
   assert.equal(prevented, true);
   assert.equal(pushedHash, "#main-content");
   assert.equal(main.focusOptions.preventScroll, true);
-  assert.equal(main.scrollOptions.behavior, "auto");
+  assert.equal(main.scrollOptions.behavior, "instant");
   assert.equal(main.scrollOptions.block, "start");
 });
