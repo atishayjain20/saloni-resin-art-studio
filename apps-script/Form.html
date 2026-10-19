@@ -5,7 +5,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Order request</title>
-  <? if (captchaEnabled && captchaSiteKey) { ?><script src="<?!= captchaScriptUrl ?>" async defer></script><? } ?>
   <style>
     :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; background: #fffaf4; color: #2b2020; }
     * { box-sizing: border-box; }
@@ -24,7 +23,7 @@
     input[readonly] { background: #f1e9e4; color: #5d4947; }
     textarea { min-height: 7rem; resize: vertical; }
     input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
-    .dimension { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; gap: .5rem; }
+    .dimension-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
     .shipping-fields { margin-top: .85rem; }
     .field-error { margin: 0; color: #a41f33; }
     [hidden] { display: none !important; }
@@ -37,7 +36,7 @@
     .status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }
     .privacy { margin: 0; padding: .75rem; border-left: 3px solid #c77d8b; color: #5d4947; }
     .privacy a { color: inherit; font-weight: 700; }
-    @media (max-width: 560px) { body { padding: .7rem; } .grid { grid-template-columns: 1fr; } .dimension { grid-template-columns: minmax(0, 1fr) 6rem; } }
+    @media (max-width: 560px) { body { padding: .7rem; } .grid, .dimension-pair { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -58,13 +57,16 @@
 
     <fieldset>
       <legend>What should Saloni make?</legend>
-      <div class="grid">
-        <label for="quantity">Quantity <input id="quantity" name="quantity" type="number" min="1" max="100" step="1" inputmode="numeric" required></label>
-        <span></span>
-        <label for="height">Height <span class="dimension"><input id="height" name="height" type="number" min="0.01" max="48" step="0.01" inputmode="decimal" required><select id="height-unit" name="heightUnit" aria-label="Height unit"><option value="in">inches</option><option value="ft">feet</option></select></span></label>
-        <label for="width">Width <span class="dimension"><input id="width" name="width" type="number" min="0.01" max="48" step="0.01" inputmode="decimal" required><select id="width-unit" name="widthUnit" aria-label="Width unit"><option value="in">inches</option><option value="ft">feet</option></select></span></label>
+      <label for="quantity">Quantity <input id="quantity" name="quantity" type="number" min="1" max="100" step="1" inputmode="numeric" required></label>
+      <div class="dimension-pair">
+        <label for="height-feet">Height feet <input id="height-feet" name="heightFeet" type="number" min="0" max="5" step="1" inputmode="numeric" required></label>
+        <label for="height-inches-part">Height inches <input id="height-inches-part" name="heightInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal" required></label>
       </div>
-      <p class="hint">Each dimension is checked after unit conversion. Maximum is 48 inches. For example, 3 ft × 4 ft is valid.</p>
+      <div class="dimension-pair">
+        <label for="width-feet">Width feet <input id="width-feet" name="widthFeet" type="number" min="0" max="5" step="1" inputmode="numeric" required></label>
+        <label for="width-inches-part">Width inches <input id="width-inches-part" name="widthInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal" required></label>
+      </div>
+      <p class="hint">Enter each dimension as feet plus an inch remainder. Each total must be greater than 0 and no more than 60 inches. For example, 3 ft × 4 ft is valid.</p>
       <label for="design-details">Design details <textarea id="design-details" name="designDetails" maxlength="2000" required placeholder="Colours, words, occasion, reference notes, or anything Saloni should know."></textarea></label>
     </fieldset>
 
@@ -95,6 +97,7 @@
       <p class="hint">For a customizer PNG, download it first, then attach it here. Files must be reattached if you start another request.</p>
     </fieldset>
 
+    <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
     <input id="captcha-token" name="captchaToken" type="hidden">
     <p id="form-status" class="status" role="status" aria-live="polite"></p>
     <div class="actions">
@@ -121,6 +124,7 @@
   var active = false;
   var currentAttempt = null;
   var timeoutId = null;
+  var PARENT_ORIGIN = "https://saloniresinart.com";
 
   function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
   function setError(field, message) {
@@ -149,13 +153,11 @@
     shippingFields.setAttribute("aria-hidden", String(!shipping));
   }
   function updateDimensionMaxes() {
-    ["height", "width"].forEach(function (name) {
-      var unit = value(name + "Unit");
-      form.elements[name].setAttribute("max", unit === "ft" ? "4" : "48");
-    });
+    ["heightFeet", "widthFeet"].forEach(function (name) { form.elements[name].setAttribute("max", "5"); });
+    ["heightInchesPart", "widthInchesPart"].forEach(function (name) { form.elements[name].setAttribute("max", "11.99"); });
   }
   function applySeed(next) {
-    var fields = ["requestId", "sourceKind", "sourceId", "productName", "quantity", "height", "heightUnit", "width", "widthUnit", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate"];
+    var fields = ["requestId", "sourceKind", "sourceId", "productName", "quantity", "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate"];
     fields.forEach(function (field) { if (form.elements[field]) form.elements[field].value = next[field] == null ? "" : next[field]; });
     toggleShipping();
     updateDimensionMaxes();
@@ -164,17 +166,20 @@
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
     return "request-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
   }
-  function getCaptchaToken(done) {
-    if (!captchaEnabled || !captchaSiteKey) { done(null); return; }
-    if (!window.grecaptcha || !window.grecaptcha.ready) { done(null); return; }
+  function getCaptchaToken(attempt, done) {
+    if (!captchaEnabled || !captchaSiteKey || !seed.channelNonce || !window.MessageChannel || !window.top || window.top === window) { done(null); return; }
+    var channel;
     try {
-      window.grecaptcha.ready(function () {
-        try {
-          var result = window.grecaptcha.execute(captchaSiteKey, { action: "order_request" });
-          if (!result || typeof result.then !== "function") { done(null); return; }
-          result.then(done).catch(function () { done(null); });
-        } catch (error) { done(null); }
-      });
+      channel = new window.MessageChannel();
+      attempt.port = channel.port1;
+      attempt.tokenDone = false;
+      channel.port1.onmessage = function (event) {
+        var data = event && event.data || {};
+        if (attempt.tokenDone || !isCurrent(attempt) || data.type !== "saloni-order-captcha-response" || data.nonce !== seed.channelNonce || data.attemptId !== attempt.id) return;
+        attempt.tokenDone = true;
+        done(data.ok === true && typeof data.token === "string" ? data.token : null);
+      };
+      window.top.postMessage({ type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: attempt.id }, PARENT_ORIGIN, [channel.port2]);
     } catch (error) { done(null); }
   }
   function isCurrent(attempt) { return currentAttempt === attempt && active; }
@@ -182,6 +187,7 @@
     if (attempt && currentAttempt !== attempt) return;
     active = false;
     submitButton.disabled = false;
+    if (currentAttempt && currentAttempt.port && currentAttempt.port.close) currentAttempt.port.close();
     if (timeoutId) window.clearTimeout(timeoutId);
     timeoutId = null;
   }
@@ -218,13 +224,19 @@
     required("productName", "This field is required.");
     var quantity = Number(value("quantity"));
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
-    ["height", "width"].forEach(function (name) {
-      var number = Number(value(name));
-      var unit = value(name + "Unit");
-      var inches = unit === "ft" ? number * 12 : unit === "in" ? number : NaN;
-      if (!Number.isFinite(number) || number <= 0 || !Number.isFinite(inches) || inches > 48) errors[name] = "Enter a size greater than 0 and no more than 48 inches.";
-      if (["in", "ft"].indexOf(unit) === -1) errors[name + "Unit"] = "Choose inches or feet.";
-    });
+    function dimension(name, label) {
+      var feetText = value(name + "Feet");
+      var inchesText = value(name + "InchesPart");
+      var feet = Number(feetText);
+      var inches = Number(inchesText);
+      if (!/^\d+$/.test(feetText) || !Number.isInteger(feet) || feet < 0) errors[name + "Feet"] = label + " feet must be a whole, non-negative number.";
+      if (!/^\d+(\.\d+)?$/.test(inchesText) || !Number.isFinite(inches) || inches < 0 || inches >= 12) errors[name + "InchesPart"] = label + " inches must be from 0 up to (but not including) 12.";
+      var total = feet * 12 + inches;
+      if (Number.isFinite(total) && total <= 0) errors[name + "Feet"] = label + " must be greater than 0 inches.";
+      if (Number.isFinite(total) && total > 60) errors[name + "Feet"] = label + " must be no more than 60 inches.";
+    }
+    dimension("height", "Height");
+    dimension("width", "Width");
     required("designDetails", "This field is required.");
     required("customerName", "This field is required.");
     if (!value("phone") || (value("phone").match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number.";
@@ -257,7 +269,7 @@
       showFailure("Please correct the highlighted fields and try again.", validationErrors);
       return;
     }
-    var attempt = {};
+    var attempt = { id: newRequestId(), port: null, tokenDone: false };
     currentAttempt = attempt;
     active = true;
     submitButton.disabled = true;
@@ -268,7 +280,7 @@
       setStatus("Unable to confirm the request yet. Your entries are still here; please try again.", "error");
       if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
     }, 30000);
-    getCaptchaToken(function (token) {
+    getCaptchaToken(attempt, function (token) {
       if (!isCurrent(attempt)) return;
       if (!token) { showFailure("We could not verify this request. Please try again.", { captcha: "Captcha verification is required." }, attempt); return; }
       form.elements.captchaToken.value = token;
@@ -293,6 +305,9 @@
     updateDimensionMaxes();
   });
   applySeed(seed);
+  if (captchaEnabled && captchaSiteKey && seed.channelNonce && window.top && window.top !== window) {
+    try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey }, PARENT_ORIGIN); } catch (error) {}
+  }
 }());
 </script>
 </body>
