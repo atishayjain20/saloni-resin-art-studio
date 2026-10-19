@@ -63,12 +63,15 @@ function makeRuntime(options = {}) {
     "Shipping address", "City", "State", "PIN", "Requested date", "Reference file link", "Status", "Staff notes",
   ];
   const rows = (options.rows || []).map((row) => row.slice());
+  const folderFiles = (options.folderFiles || []).map((file) => Object.assign({}, file));
   const state = {
     appendCalls: 0, fileCreates: 0, trashed: 0, dataReads: 0,
     appendMode: options.appendMode || "success",
     failRecheck: Boolean(options.failRecheck),
     folderAccess: options.folderAccess || "PRIVATE",
     captchaResponse: options.captchaResponse || { success: true, hostname: "expected.example", score: 0.9 },
+    driveDeletes: [], retentionTrashed: 0, rowDeletes: [], triggerCreates: 0, triggerConfig: null,
+    logs: [],
   };
   const sheet = {
     getLastColumn: () => headers.length,
@@ -88,7 +91,16 @@ function makeRuntime(options = {}) {
       rows.push(row);
       if (state.appendMode === "persisted-throw") throw new Error("append response lost");
     },
+    deleteRow: (rowNumber) => {
+      state.rowDeletes.push(rowNumber);
+      if (options.deleteRowThrows) throw new Error("row delete failed");
+      rows.splice(rowNumber - 2, 1);
+    },
   };
+  function iterator(items) {
+    let index = 0;
+    return { hasNext: () => index < items.length, next: () => items[index++] };
+  }
   const folder = {
     getSharingAccess: () => state.folderAccess,
     createFile: (blob) => {
@@ -98,6 +110,8 @@ function makeRuntime(options = {}) {
         setTrashed: () => { state.trashed += 1; if (options.cleanupThrows) throw new Error("cleanup failed"); },
       };
     },
+    getFilesByName: (name) => iterator(folderFiles.filter((file) => file.name === name)),
+    getFiles: () => iterator(folderFiles.slice()),
   };
   const properties = Object.assign({
     ORDER_SHEET_ID: "sheet", ORDER_SHEET_TAB: "Orders", ORDER_DRIVE_FOLDER_ID: "folder",
@@ -112,18 +126,49 @@ function makeRuntime(options = {}) {
     formatDate: (date) => new Date(date).toISOString().slice(0, 10),
   };
   const runtimeContext = {
-    console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array,
+    console: { log: (...values) => state.logs.push(values.join(" ")), error: (...values) => state.logs.push(values.join(" ")) },
+    Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array,
     Utilities: utilities,
     PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => properties[key] || "" }) },
     LockService: { getScriptLock: () => lock },
     SpreadsheetApp: { openById: () => ({ getSheetByName: () => sheet }) },
     DriveApp: { getFolderById: () => folder, Access: { PRIVATE: "PRIVATE" } },
+    Drive: { Files: { remove: (id) => {
+      state.driveDeletes.push(id);
+      if (options.driveDeleteThrows) throw new Error("file delete failed");
+      const index = folderFiles.findIndex((file) => file.id === id);
+      if (index >= 0) folderFiles.splice(index, 1);
+    } } },
+    ScriptApp: {
+      getProjectTriggers: () => options.triggers || [],
+      newTrigger: (handler) => {
+        const builder = {
+          timeBased() { return builder; },
+          everyDays(days) { state.triggerConfig = Object.assign(state.triggerConfig || {}, { handler, everyDays: days }); return builder; },
+          atHour(hour) { state.triggerConfig = Object.assign(state.triggerConfig || {}, { atHour: hour }); return builder; },
+          create() { state.triggerCreates += 1; (options.triggers || (options.triggers = [])).push({ getHandlerFunction: () => handler }); return options.triggers.at(-1); },
+        };
+        return builder;
+      },
+    },
     UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(state.captchaResponse) }) },
     Session: { getScriptTimeZone: () => "UTC" },
   };
   vm.createContext(runtimeContext);
   vm.runInContext(source, runtimeContext, { filename: "Code.gs" });
   return { context: runtimeContext, state, rows, headers };
+}
+
+function retentionRow(requestId, receivedAt, referenceFileLink = "") {
+  const row = new Array(26).fill("");
+  row[0] = requestId;
+  row[2] = receivedAt;
+  row[23] = referenceFileLink;
+  return row;
+}
+
+function retentionFile(id, name, createdAt) {
+  return { id, name, createdAt, getId() { return this.id; }, getName() { return this.name; }, getDateCreated() { return this.createdAt; }, setTrashed() { throw new Error("retention must use Drive API"); } };
 }
 
 function imageBlob(bytes = [-1, -40, -1, 0]) {
@@ -203,4 +248,143 @@ test("preserves original dimension values and units and treats an empty blob as 
   assert.equal(runtime.rows[0][10], "4");
   assert.equal(runtime.rows[0][11], "ft");
   assert.equal(runtime.rows[0][12], 48);
+});
+
+test("purges the ninety-day boundary bottom-up and handles no-file rows", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const fileId = "file-expired";
+  const rows = [
+    retentionRow("request-boundary", cutoff, ""),
+    retentionRow("request-newer", new Date(cutoff.getTime() + 1), ""),
+    retentionRow("request-with-file", new Date(cutoff.getTime() - 1), "https://drive.google.test/file"),
+  ];
+  const runtime = makeRuntime({
+    rows,
+    folderFiles: [retentionFile(fileId, "order-request-with-file.jpg", cutoff)],
+  });
+  const result = runtime.context.purgeExpiredOrdersAt_(now);
+  assert.equal(result.lastSuccessAt, now.toISOString());
+  assert.equal(result.deletedRows, 2);
+  assert.equal(result.deletedFiles, 1);
+  assert.deepEqual(runtime.state.rowDeletes, [4, 2]);
+  assert.deepEqual(runtime.state.driveDeletes, [fileId]);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.rows[0][0], "request-newer");
+});
+
+test("deletes no-file rows even when no Drive folder is configured", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const runtime = makeRuntime({ properties: { ORDER_DRIVE_FOLDER_ID: "" }, rows: [retentionRow("request-no-folder", cutoff, "")] });
+  const result = runtime.context.purgeExpiredOrdersAt_(now);
+  assert.equal(result.deletedRows, 1);
+  assert.equal(runtime.rows.length, 0);
+});
+
+test("deletes only old exact-name orphans in the configured private folder", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const files = [
+    retentionFile("orphan", "order-request-orphan.jpg", cutoff),
+    retentionFile("short", "order-short.jpg", cutoff),
+    retentionFile("foreign", "other-request-orphan.jpg", cutoff),
+    retentionFile("wrong-extension", "order-request-orphan.txt", cutoff),
+    retentionFile("new", "order-request-newer.png", new Date(cutoff.getTime() + 1)),
+  ];
+  const runtime = makeRuntime({ rows: [], folderFiles: files });
+  const result = runtime.context.purgeExpiredOrdersAt_(now);
+  assert.equal(result.deletedRows, 0);
+  assert.equal(result.deletedFiles, 1);
+  assert.deepEqual(runtime.state.driveDeletes, ["orphan"]);
+  assert.deepEqual(runtime.state.logs, [JSON.stringify(result)]);
+});
+
+test("refuses retention work when the configured folder is public", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const runtime = makeRuntime({
+    folderAccess: "ANYONE_WITH_LINK",
+    rows: [retentionRow("request-public-folder", cutoff, "https://drive.google.test/file")],
+    folderFiles: [retentionFile("file-public-folder", "order-request-public-folder.jpg", cutoff)],
+  });
+  assert.throws(() => runtime.context.purgeExpiredOrdersAt_(now), /Retention cleanup failed/);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.driveDeletes.length, 0);
+});
+
+test("processes valid records but refuses malformed expired rows", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const runtime = makeRuntime({ rows: [
+    retentionRow("request-valid", cutoff, ""),
+    retentionRow("bad id", cutoff, ""),
+  ] });
+  assert.throws(() => runtime.context.purgeExpiredOrdersAt_(now), /Retention cleanup failed/);
+  assert.deepEqual(runtime.state.rowDeletes, [2]);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.rows[0][0], "bad id");
+});
+
+test("keeps an attachment and row when file deletion fails, then succeeds on rerun", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const options = {
+    rows: [retentionRow("request-file-failure", cutoff, "https://drive.google.test/file")],
+    folderFiles: [retentionFile("file-failure", "order-request-file-failure.jpg", cutoff)],
+    driveDeleteThrows: true,
+  };
+  const runtime = makeRuntime(options);
+  assert.throws(() => runtime.context.purgeExpiredOrdersAt_(now), /Retention cleanup failed/);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.driveDeletes.length, 1);
+  options.driveDeleteThrows = false;
+  const result = runtime.context.purgeExpiredOrdersAt_(now);
+  assert.equal(result.deletedRows, 1);
+  assert.equal(result.deletedFiles, 1);
+  assert.equal(runtime.rows.length, 0);
+});
+
+test("deletes a row after a prior file-success/row-failure run", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const options = {
+    rows: [retentionRow("request-row-failure", cutoff, "https://drive.google.test/file")],
+    folderFiles: [retentionFile("file-row-failure", "order-request-row-failure.jpg", cutoff)],
+    deleteRowThrows: true,
+  };
+  const runtime = makeRuntime(options);
+  assert.throws(() => runtime.context.purgeExpiredOrdersAt_(now), /Retention cleanup failed/);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.driveDeletes.length, 1);
+  options.deleteRowThrows = false;
+  const result = runtime.context.purgeExpiredOrdersAt_(now);
+  assert.equal(result.deletedRows, 1);
+  assert.equal(result.deletedFiles, 0);
+  assert.equal(runtime.rows.length, 0);
+});
+
+test("runs while intake is disabled and logs only success time and counts", () => {
+  const runtime = makeRuntime({ properties: { ORDER_FORM_DISABLED: "true" }, rows: [retentionRow("request-disabled", new Date("2020-01-01T00:00:00.000Z"), "")] });
+  const result = runtime.context.purgeExpiredOrders_();
+  assert.equal(result.deletedRows, 1);
+  assert.equal(runtime.rows.length, 0);
+  assert.deepEqual(runtime.state.logs, [JSON.stringify(result)]);
+  assert.doesNotMatch(runtime.state.logs[0], /request-disabled/);
+});
+
+test("installs one daily retention trigger idempotently", () => {
+  const options = { triggers: [] };
+  const runtime = makeRuntime(options);
+  assert.equal(runtime.context.installRetentionTrigger_(), true);
+  assert.equal(runtime.context.installRetentionTrigger_(), false);
+  assert.equal(runtime.state.triggerCreates, 1);
+  assert.equal(runtime.state.triggerConfig.everyDays, 1);
+  assert.equal(runtime.state.triggerConfig.atHour, 3);
+});
+
+test("retention cleanup honors the existing script lock", () => {
+  const runtime = makeRuntime({ lockAvailable: false, rows: [retentionRow("request-locked", new Date("2020-01-01T00:00:00.000Z"), "")] });
+  assert.throws(() => runtime.context.purgeExpiredOrders_(), /Unable to start retention cleanup/);
+  assert.equal(runtime.rows.length, 1);
 });

@@ -8,6 +8,9 @@
 var MAX_FILE_BYTES = 5 * 1024 * 1024;
 var MAX_DIMENSION_INCHES = 48;
 var DEFAULT_DAILY_ACCEPTANCE_CAP = 50;
+var RETENTION_DAYS = 90;
+var RETENTION_MILLISECONDS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
+var ORDER_FILE_NAME_PATTERN = /^order-([A-Za-z0-9_-]{12,80})\.(jpg|png)$/;
 var ORDER_HEADERS = [
   "Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID",
   "Product name", "Quantity", "Height value", "Height unit", "Height (in)",
@@ -45,6 +48,172 @@ function renderForm_(state) {
   return template.evaluate()
     .setTitle("Saloni Resin Art Studio order request")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function purgeExpiredOrders_() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to start retention cleanup.");
+  try {
+    return purgeExpiredOrdersAt_(new Date());
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function installRetentionTrigger_() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to install retention trigger.");
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var index = 0; index < triggers.length; index += 1) {
+      if (triggers[index].getHandlerFunction() === "purgeExpiredOrders_") return false;
+    }
+    ScriptApp.newTrigger("purgeExpiredOrders_")
+      .timeBased()
+      .everyDays(1)
+      .atHour(3)
+      .create();
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function purgeExpiredOrdersAt_(now) {
+  var runAt = retentionDate_(now);
+  if (!runAt) throw new Error("Retention cleanup requires a valid date.");
+  var properties = PropertiesService.getScriptProperties();
+  var sheet = openOrderSheet_(properties);
+  var values = sheet.getDataRange().getValues();
+  var cutoff = new Date(runAt.getTime() - RETENTION_MILLISECONDS);
+  var knownRequestIds = {};
+  var expiredRows = [];
+  var errors = 0;
+
+  for (var index = 1; index < values.length; index += 1) {
+    var row = values[index];
+    var requestId = String(row[0] == null ? "" : row[0]);
+    if (requestId) knownRequestIds[requestId] = true;
+    var receivedAt = retentionDate_(row[2]);
+    if (!receivedAt || receivedAt.getTime() > cutoff.getTime()) continue;
+    if (!/^[A-Za-z0-9_-]{12,80}$/.test(requestId)) {
+      errors += 1;
+      continue;
+    }
+    expiredRows.push({
+      rowNumber: index + 1,
+      requestId: requestId,
+      hasReference: Boolean(String(row[23] == null ? "" : row[23]).trim())
+    });
+  }
+
+  var folderId = String(properties.getProperty("ORDER_DRIVE_FOLDER_ID") || "");
+  var folder = null;
+  if (folderId) {
+    try {
+      folder = openRetentionFolder_(properties);
+    } catch (folderError) {
+      errors += 1;
+    }
+  }
+
+  var deletedFiles = 0;
+  var deletedRows = 0;
+  expiredRows.sort(function (left, right) { return right.rowNumber - left.rowNumber; });
+  expiredRows.forEach(function (record) {
+    var fileFailure = false;
+    if (record.hasReference) {
+      if (!folder) {
+        errors += 1;
+        return;
+      }
+      var files;
+      try {
+        files = retentionFilesForRequest_(folder, record.requestId);
+      } catch (fileLookupError) {
+        errors += 1;
+        return;
+      }
+      files.forEach(function (file) {
+        try {
+          permanentlyDeleteFile_(file);
+          deletedFiles += 1;
+        } catch (fileDeleteError) {
+          errors += 1;
+          fileFailure = true;
+        }
+      });
+    }
+    if (fileFailure) return;
+    try {
+      sheet.deleteRow(record.rowNumber);
+      deletedRows += 1;
+    } catch (rowDeleteError) {
+      errors += 1;
+    }
+  });
+
+  if (folder) {
+    try {
+      var files = folder.getFiles();
+      var orphanFiles = [];
+      while (files.hasNext()) {
+        var file = files.next();
+        var match = ORDER_FILE_NAME_PATTERN.exec(String(file.getName() || ""));
+        if (!match || knownRequestIds[match[1]]) continue;
+        var createdAt = retentionDate_(file.getDateCreated());
+        if (!createdAt || createdAt.getTime() > cutoff.getTime()) continue;
+        orphanFiles.push(file);
+      }
+      orphanFiles.forEach(function (file) {
+        try {
+          permanentlyDeleteFile_(file);
+          deletedFiles += 1;
+        } catch (orphanDeleteError) {
+          errors += 1;
+        }
+      });
+    } catch (orphanLookupError) {
+      errors += 1;
+    }
+  }
+
+  var summary = { lastSuccessAt: runAt.toISOString(), deletedRows: deletedRows, deletedFiles: deletedFiles };
+  if (errors) {
+    console.error(JSON.stringify({ failedAt: runAt.toISOString(), deletedRows: deletedRows, deletedFiles: deletedFiles, errors: errors }));
+    throw new Error("Retention cleanup failed.");
+  }
+  console.log(JSON.stringify(summary));
+  return summary;
+}
+
+function openRetentionFolder_(properties) {
+  var folderId = String(properties.getProperty("ORDER_DRIVE_FOLDER_ID") || "");
+  if (!folderId) throw new Error("Order Drive folder is not configured.");
+  var folder = DriveApp.getFolderById(folderId);
+  if (folder.getSharingAccess && folder.getSharingAccess() !== DriveApp.Access.PRIVATE) throw new Error("Order Drive folder is not restricted.");
+  return folder;
+}
+
+function retentionFilesForRequest_(folder, requestId) {
+  var files = [];
+  ["jpg", "png"].forEach(function (extension) {
+    var iterator = folder.getFilesByName("order-" + requestId + "." + extension);
+    while (iterator.hasNext()) files.push(iterator.next());
+  });
+  return files;
+}
+
+function permanentlyDeleteFile_(file) {
+  var fileId = String(file.getId() || "");
+  if (!fileId) throw new Error("Retention file has no ID.");
+  Drive.Files.remove(fileId);
+}
+
+function retentionDate_(value) {
+  if (value === null || value === undefined || value === "") return null;
+  var date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
 }
 
 function submitOrder(form) {
