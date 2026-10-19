@@ -45,11 +45,11 @@ The published page embeds the HTMLService form in `apps-script/Form.html`. The p
 1. Create or open the private Sheet and a restricted Drive folder. Put the Apps Script files in a standalone Apps Script project.
 2. In **Project Settings → Script properties**, configure `ORDER_SHEET_ID`, `ORDER_SHEET_TAB`, `ORDER_DRIVE_FOLDER_ID`, `CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET`, `CAPTCHA_EXPECTED_HOSTNAME`, and `DAILY_ACCEPTANCE_CAP` (the code default is 50). Set `ORDER_FORM_DISABLED=true` to pause intake. Keep the CAPTCHA secret out of this repository.
 3. Deploy a web app that executes as the studio owner. Keep the folder restricted and set `CAPTCHA_EXPECTED_HOSTNAME` to the hostname returned by the deployed HTMLService CAPTCHA verification (often the `script.googleusercontent.com` host), not a value guessed from the static page. The deployment must allow the page to embed it; the code sets `XFrameOptionsMode.ALLOWALL`.
-4. Replace `REPLACE_WITH_APPS_SCRIPT_DEPLOYMENT_ID` in `index.html` with the deployed `/exec` URL. Publish the GitHub Pages change and verify a request in the Sheet and, when attached, the restricted Drive folder.
+4. In the Apps Script editor, enable the **Drive API** advanced service so retention can permanently remove files. Run `installRetentionTrigger()` once as the deployment owner after authorization; it installs one daily trigger. Replace `REPLACE_WITH_APPS_SCRIPT_DEPLOYMENT_ID` in `index.html` with the deployed `/exec` URL. Publish the GitHub Pages change and verify a request in the Sheet and, when attached, the restricted Drive folder.
 
 The form validates quantity, text lengths, dimensions after unit conversion (including mixed units and `3 ft × 4 ft`), JPG/PNG signatures, and a 5 MB file limit. It uses a script lock and request ID plus payload fingerprint for safe retries. A request acknowledgement means only that the request was received; Saloni still confirms the design, price, delivery, and production.
 
-Order details and an optional image are stored in Google services for order handling. Retention is configured by the studio rather than promised by this site. Customers can request correction or deletion through Instagram `@saloniresin_art_studio` or phone `8209238541`.
+Requests and uploaded images are scheduled for deletion after 90 days. Customers can request correction or deletion through Instagram `@saloniresin_art_studio` or phone `8209238541`.
 
 ### Deployment rollback
 

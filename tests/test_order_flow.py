@@ -25,6 +25,17 @@ class OrderFlowContractTests(unittest.TestCase):
         self.assertIn("var frame = document.getElementById(\"order-form-frame\")", self.script)
         self.assertNotIn("orderFrame.addEventListener(\"resize\"", self.script)
 
+    def test_order_form_uses_the_verified_apps_script_endpoint(self):
+        self.assertIn(
+            'data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"',
+            self.html,
+        )
+        self.assertNotIn("REPLACE_WITH_APPS_SCRIPT_DEPLOYMENT_ID", self.html)
+
+    def test_configured_order_form_has_current_start_instruction(self):
+        self.assertIn("Select \u201cStart an order\u201d on a catalogue card or the customizer to begin.", self.html)
+        self.assertNotIn("The request form is not configured for this preview yet.", self.html)
+
     def test_catalogue_and_customizer_actions_use_stable_source_prefills(self):
         self.assertIn("data-order-prefill", self.script)
         self.assertIn("sourceId", self.script)
