@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order request</title>
+  <? if (captchaEnabled && captchaSiteKey) { ?><script src="<?!= captchaScriptUrl ?>" async defer></script><? } ?>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; background: #fffaf4; color: #2b2020; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 1rem; background: #fffaf4; }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { margin: 0 0 .45rem; font: 700 clamp(1.6rem, 4vw, 2.3rem)/1.1 Georgia, serif; }
+    .intro, .privacy, .hint, .status, .field-error { font-size: .88rem; line-height: 1.5; }
+    .intro { margin: 0 0 1rem; color: #5d4947; }
+    form { display: grid; gap: 1rem; }
+    fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fff; }
+    legend { padding: 0 .35rem; font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+    label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; }
+    input, select, textarea, button { font: inherit; }
+    input, select, textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; }
+    input[readonly] { background: #f1e9e4; color: #5d4947; }
+    textarea { min-height: 7rem; resize: vertical; }
+    input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
+    .dimension { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; gap: .5rem; }
+    .shipping-fields { margin-top: .85rem; }
+    .field-error { margin: 0; color: #a41f33; }
+    [hidden] { display: none !important; }
+    .actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
+    button { min-height: 2.8rem; padding: .7rem 1rem; border: 1px solid #2b2020; border-radius: 999px; background: #2b2020; color: #fffaf4; font-weight: 750; cursor: pointer; }
+    button.secondary { background: transparent; color: #2b2020; }
+    button:disabled { cursor: wait; opacity: .6; }
+    .status { min-height: 1.4rem; margin: 0; }
+    .status.error { color: #a41f33; }
+    .status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }
+    .privacy { margin: 0; padding: .75rem; border-left: 3px solid #c77d8b; color: #5d4947; }
+    .privacy a { color: inherit; font-weight: 700; }
+    @media (max-width: 560px) { body { padding: .7rem; } .grid { grid-template-columns: 1fr; } .dimension { grid-template-columns: minmax(0, 1fr) 6rem; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Send an order request</h1>
+  <p class="intro">This is a request only. Saloni will contact you to confirm the design, price, and delivery before any production begins.</p>
+  <form id="order-form" novalidate>
+    <fieldset>
+      <legend>Selected design</legend>
+      <div class="grid">
+        <label for="request-id">Request ID <input id="request-id" name="requestId" readonly></label>
+        <label for="source-kind">Source <input id="source-kind" name="sourceKind" readonly></label>
+        <label for="source-id">Source ID <input id="source-id" name="sourceId" readonly></label>
+        <label for="product-name">Product name <input id="product-name" name="productName" maxlength="160" required></label>
+      </div>
+      <p class="hint">Source ID and source type identify the catalogue or customizer item. You can edit the product name.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>What should Saloni make?</legend>
+      <div class="grid">
+        <label for="quantity">Quantity <input id="quantity" name="quantity" type="number" min="1" max="100" step="1" inputmode="numeric" required></label>
+        <span></span>
+        <label for="height">Height <span class="dimension"><input id="height" name="height" type="number" min="0.01" max="48" step="0.01" inputmode="decimal" required><select id="height-unit" name="heightUnit" aria-label="Height unit"><option value="in">inches</option><option value="ft">feet</option></select></span></label>
+        <label for="width">Width <span class="dimension"><input id="width" name="width" type="number" min="0.01" max="48" step="0.01" inputmode="decimal" required><select id="width-unit" name="widthUnit" aria-label="Width unit"><option value="in">inches</option><option value="ft">feet</option></select></span></label>
+      </div>
+      <p class="hint">Each dimension is checked after unit conversion. Maximum is 48 inches. For example, 3 ft × 4 ft is valid.</p>
+      <label for="design-details">Design details <textarea id="design-details" name="designDetails" maxlength="2000" required placeholder="Colours, words, occasion, reference notes, or anything Saloni should know."></textarea></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Your details</legend>
+      <div class="grid">
+        <label for="customer-name">Customer name <input id="customer-name" name="customerName" maxlength="120" autocomplete="name" required></label>
+        <label for="phone">Phone <input id="phone" name="phone" maxlength="40" autocomplete="tel" inputmode="tel" required></label>
+        <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
+        <label for="requested-date">Requested date (optional) <input id="requested-date" name="requestedDate" type="date"></label>
+      </div>
+      <label for="fulfillment">Shipping or pickup <select id="fulfillment" name="fulfillment" required><option value="shipping">Shipping</option><option value="pickup">Pickup in Ajmer</option></select></label>
+      <div class="shipping-fields" id="shipping-fields">
+        <div class="grid">
+          <label for="shipping-address">Shipping address <textarea id="shipping-address" name="shippingAddress" maxlength="300" autocomplete="street-address"></textarea></label>
+          <div class="grid">
+            <label for="city">City <input id="city" name="city" maxlength="100" autocomplete="address-level2"></label>
+            <label for="state">State <input id="state" name="state" maxlength="100" autocomplete="address-level1"></label>
+            <label for="pin">PIN <input id="pin" name="pin" maxlength="6" inputmode="numeric" autocomplete="postal-code"></label>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Optional reference image</legend>
+      <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+      <p class="hint">For a customizer PNG, download it first, then attach it here. Files must be reattached if you start another request.</p>
+    </fieldset>
+
+    <input id="captcha-token" name="captchaToken" type="hidden">
+    <p id="form-status" class="status" role="status" aria-live="polite"></p>
+    <div class="actions">
+      <button id="submit-button" type="submit">Send request</button>
+      <button id="another-button" class="secondary" type="button" hidden>Start another request</button>
+    </div>
+    <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Retention is configured by the studio. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p>
+  </form>
+</main>
+<script id="seed-data" type="application/json"><?!= seedJson ?></script>
+<script>
+(function () {
+  "use strict";
+  var seed = JSON.parse(document.getElementById("seed-data").textContent || "{}");
+  var captchaEnabled = <?!= captchaEnabledJson ?>;
+  var captchaSiteKey = <?!= captchaSiteKeyJson ?>;
+  var form = document.getElementById("order-form");
+  var formElement = form;
+  var status = document.getElementById("form-status");
+  var submitButton = document.getElementById("submit-button");
+  var anotherButton = document.getElementById("another-button");
+  var shippingFields = document.getElementById("shipping-fields");
+  var referenceImage = document.getElementById("reference-image");
+  var active = false;
+  var currentAttempt = null;
+  var timeoutId = null;
+
+  function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
+  function setError(field, message) {
+    var input = form.elements[field];
+    if (!input) return;
+    input.setAttribute("aria-invalid", "true");
+    var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+    if (describedBy.indexOf(field + "-error") === -1) describedBy.push(field + "-error");
+    input.setAttribute("aria-describedby", describedBy.join(" "));
+    var error = document.getElementById(field + "-error");
+    if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; input.parentNode.appendChild(error); }
+    error.textContent = message;
+  }
+  function clearErrors() {
+    Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) {
+      input.removeAttribute("aria-invalid");
+      var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== input.name + "-error"; });
+      if (describedBy.length) input.setAttribute("aria-describedby", describedBy.join(" ")); else input.removeAttribute("aria-describedby");
+    });
+    Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); });
+  }
+  function setStatus(message, kind) { status.textContent = message || ""; status.className = "status" + (kind ? " " + kind : ""); }
+  function toggleShipping() {
+    var shipping = value("fulfillment") === "shipping";
+    shippingFields.hidden = !shipping;
+    shippingFields.setAttribute("aria-hidden", String(!shipping));
+  }
+  function updateDimensionMaxes() {
+    ["height", "width"].forEach(function (name) {
+      var unit = value(name + "Unit");
+      form.elements[name].setAttribute("max", unit === "ft" ? "4" : "48");
+    });
+  }
+  function applySeed(next) {
+    var fields = ["requestId", "sourceKind", "sourceId", "productName", "quantity", "height", "heightUnit", "width", "widthUnit", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate"];
+    fields.forEach(function (field) { if (form.elements[field]) form.elements[field].value = next[field] == null ? "" : next[field]; });
+    toggleShipping();
+    updateDimensionMaxes();
+  }
+  function newRequestId() {
+    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    return "request-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+  }
+  function getCaptchaToken(done) {
+    if (!captchaEnabled || !captchaSiteKey) { done(null); return; }
+    if (!window.grecaptcha || !window.grecaptcha.ready) { done(null); return; }
+    try {
+      window.grecaptcha.ready(function () {
+        try {
+          var result = window.grecaptcha.execute(captchaSiteKey, { action: "order_request" });
+          if (!result || typeof result.then !== "function") { done(null); return; }
+          result.then(done).catch(function () { done(null); });
+        } catch (error) { done(null); }
+      });
+    } catch (error) { done(null); }
+  }
+  function isCurrent(attempt) { return currentAttempt === attempt && active; }
+  function restoreSubmitState(attempt) {
+    if (attempt && currentAttempt !== attempt) return;
+    active = false;
+    submitButton.disabled = false;
+    if (timeoutId) window.clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  function focusFirstError(errors) {
+    var first = errors && Object.keys(errors).filter(function (field) { return field !== "form" && field !== "captcha"; })[0];
+    if (first && form.elements[first] && form.elements[first].focus) { form.elements[first].focus(); return; }
+    if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+  }
+  function showFailure(message, errors, attempt) {
+    if (attempt && !isCurrent(attempt)) return;
+    restoreSubmitState(attempt); clearErrors();
+    if (errors) Object.keys(errors).forEach(function (field) { if (field !== "form" && field !== "captcha") setError(field, errors[field]); });
+    var general = errors && (errors.form || errors.captcha);
+    setStatus(general || message, "error");
+    focusFirstError(errors);
+  }
+  function showSuccess(result, attempt) {
+    if (attempt && !isCurrent(attempt)) return;
+    restoreSubmitState(attempt);
+    form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
+    anotherButton.hidden = false;
+    setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed. Request ID: " + result.requestId, "success");
+    if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+  }
+  function validIsoDate(text) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+    var parts = text.split("-").map(Number);
+    var date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    return date.getUTCFullYear() === parts[0] && date.getUTCMonth() === parts[1] - 1 && date.getUTCDate() === parts[2];
+  }
+  function clientValidationErrors() {
+    var errors = {};
+    function required(name, message) { if (!value(name).trim()) errors[name] = message; }
+    required("productName", "This field is required.");
+    var quantity = Number(value("quantity"));
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
+    ["height", "width"].forEach(function (name) {
+      var number = Number(value(name));
+      var unit = value(name + "Unit");
+      var inches = unit === "ft" ? number * 12 : unit === "in" ? number : NaN;
+      if (!Number.isFinite(number) || number <= 0 || !Number.isFinite(inches) || inches > 48) errors[name] = "Enter a size greater than 0 and no more than 48 inches.";
+      if (["in", "ft"].indexOf(unit) === -1) errors[name + "Unit"] = "Choose inches or feet.";
+    });
+    required("designDetails", "This field is required.");
+    required("customerName", "This field is required.");
+    if (!value("phone") || (value("phone").match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number.";
+    if (value("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("email"))) errors.email = "Enter a valid email address or leave it blank.";
+    var fulfillment = value("fulfillment");
+    if (["shipping", "pickup"].indexOf(fulfillment) === -1) errors.fulfillment = "Choose shipping or pickup.";
+    if (fulfillment === "shipping") {
+      required("shippingAddress", "Shipping address is required.");
+      required("city", "City is required.");
+      required("state", "State is required.");
+      if (!/^\d{6}$/.test(value("pin"))) errors.pin = "Enter a 6-digit PIN for shipping.";
+    }
+    if (value("requestedDate") && !validIsoDate(value("requestedDate"))) errors.requestedDate = "Use a valid requested date.";
+    var file = referenceImage.files && referenceImage.files[0];
+    if (file && file.size !== 0) {
+      var fileName = String(file.name || "").toLowerCase();
+      var fileType = String(file.type || "").toLowerCase();
+      if (file.size > 5 * 1024 * 1024) errors.referenceImage = "The reference image must be 5 MB or smaller.";
+      else if (["image/jpeg", "image/png"].indexOf(fileType) === -1 && !/\.(jpe?g|png)$/.test(fileName)) errors.referenceImage = "Attach one JPG or PNG image.";
+    }
+    return errors;
+  }
+  form.addEventListener("change", function () { toggleShipping(); updateDimensionMaxes(); });
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (active) return;
+    clearErrors();
+    var validationErrors = clientValidationErrors();
+    if (Object.keys(validationErrors).length) {
+      showFailure("Please correct the highlighted fields and try again.", validationErrors);
+      return;
+    }
+    var attempt = {};
+    currentAttempt = attempt;
+    active = true;
+    submitButton.disabled = true;
+    setStatus("Checking the request…", "");
+    timeoutId = window.setTimeout(function () {
+      if (!isCurrent(attempt)) return;
+      restoreSubmitState(attempt);
+      setStatus("Unable to confirm the request yet. Your entries are still here; please try again.", "error");
+      if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+    }, 30000);
+    getCaptchaToken(function (token) {
+      if (!isCurrent(attempt)) return;
+      if (!token) { showFailure("We could not verify this request. Please try again.", { captcha: "Captcha verification is required." }, attempt); return; }
+      form.elements.captchaToken.value = token;
+      try {
+        google.script.run.withSuccessHandler(function (result) {
+          if (!isCurrent(attempt)) return;
+          if (result && result.ok === true) showSuccess(result, attempt); else showFailure("Please correct the highlighted fields and try again.", result && result.errors, attempt);
+        }).withFailureHandler(function () {
+          if (!isCurrent(attempt)) return;
+          showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
+        }).submitOrder(formElement);
+      } catch (error) {
+        if (isCurrent(attempt)) showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
+      }
+    });
+  });
+  anotherButton.addEventListener("click", function () {
+    form.reset();
+    form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
+    anotherButton.hidden = true; clearErrors(); setStatus("", "");
+    form.elements.requestId.value = newRequestId(); form.elements.fulfillment.value = "shipping"; toggleShipping();
+    updateDimensionMaxes();
+  });
+  applySeed(seed);
+}());
+</script>
+</body>
+</html>
