@@ -60,6 +60,15 @@ function purgeExpiredOrders_() {
   }
 }
 
+function installRetentionTrigger() {
+  var activeEmail = String(Session.getActiveUser().getEmail() || "").trim();
+  var effectiveEmail = String(Session.getEffectiveUser().getEmail() || "").trim();
+  if (!activeEmail || activeEmail.toLowerCase() !== effectiveEmail.toLowerCase()) {
+    throw new Error("Run this setup as the deployment owner.");
+  }
+  return installRetentionTrigger_();
+}
+
 function installRetentionTrigger_() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error("Unable to install retention trigger.");

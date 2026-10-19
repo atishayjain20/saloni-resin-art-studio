@@ -152,7 +152,11 @@ function makeRuntime(options = {}) {
       },
     },
     UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(state.captchaResponse) }) },
-    Session: { getScriptTimeZone: () => "UTC" },
+    Session: {
+      getScriptTimeZone: () => "UTC",
+      getActiveUser: () => ({ getEmail: () => options.activeEmail || "" }),
+      getEffectiveUser: () => ({ getEmail: () => options.effectiveEmail || "" }),
+    },
   };
   vm.createContext(runtimeContext);
   vm.runInContext(source, runtimeContext, { filename: "Code.gs" });
@@ -406,6 +410,34 @@ test("installs one daily retention trigger idempotently", () => {
   assert.equal(runtime.state.triggerCreates, 1);
   assert.equal(runtime.state.triggerConfig.everyDays, 1);
   assert.equal(runtime.state.triggerConfig.atHour, 3);
+});
+
+test("owner-gates the public retention installer and keeps cleanup private", () => {
+  const blank = makeRuntime({ activeEmail: "", effectiveEmail: "owner@example.com", triggers: [] });
+  assert.throws(() => blank.context.installRetentionTrigger(), /Run this setup as the deployment owner/);
+  assert.equal(blank.state.triggerCreates, 0);
+
+  const mismatched = makeRuntime({ activeEmail: "owner@example.com", effectiveEmail: "other@example.com", triggers: [] });
+  assert.throws(() => mismatched.context.installRetentionTrigger(), /Run this setup as the deployment owner/);
+  assert.equal(mismatched.state.triggerCreates, 0);
+
+  const owner = makeRuntime({ activeEmail: "owner@example.com", effectiveEmail: "owner@example.com", triggers: [] });
+  const originalInstaller = owner.context.installRetentionTrigger_;
+  let delegateCalls = 0;
+  owner.context.installRetentionTrigger_ = function () {
+    delegateCalls += 1;
+    return originalInstaller();
+  };
+  assert.equal(owner.context.installRetentionTrigger(), true);
+  assert.equal(delegateCalls, 1);
+  assert.equal(owner.context.installRetentionTrigger(), false);
+  assert.equal(delegateCalls, 2);
+  assert.equal(owner.state.triggerCreates, 1);
+  assert.match(source, /^function installRetentionTrigger_\(/m);
+  assert.match(source, /^function purgeExpiredOrders_\(/m);
+  assert.match(source, /^function purgeExpiredOrdersAt_\(/m);
+  assert.doesNotMatch(source, /^function (purgeExpiredOrders|purgeExpiredOrdersAt)\(/m);
+  assert.doesNotMatch(source.slice(0, source.indexOf("function renderForm_")), /purgeExpiredOrders/);
 });
 
 test("retention cleanup honors the existing script lock", () => {
