@@ -32,6 +32,10 @@ class OrderFlowContractTests(unittest.TestCase):
         )
         self.assertNotIn("REPLACE_WITH_APPS_SCRIPT_DEPLOYMENT_ID", self.html)
 
+    def test_configured_order_form_has_current_start_instruction(self):
+        self.assertIn("Select \u201cStart an order\u201d on a catalogue card or the customizer to begin.", self.html)
+        self.assertNotIn("The request form is not configured for this preview yet.", self.html)
+
     def test_catalogue_and_customizer_actions_use_stable_source_prefills(self):
         self.assertIn("data-order-prefill", self.script)
         self.assertIn("sourceId", self.script)
