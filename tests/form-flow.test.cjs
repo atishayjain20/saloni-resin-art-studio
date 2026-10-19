@@ -9,6 +9,11 @@ const formSource = html.match(/<script>\n([\s\S]*?)\n<\/script>/)[1]
   .replace(/<\?!= captchaEnabledJson \?>/g, "true")
   .replace(/<\?!= captchaSiteKeyJson \?>/g, JSON.stringify("site-key"));
 
+test("targets the top-level studio page rather than the immediate parent frame", () => {
+  assert.match(formSource, /window\.top\.postMessage/);
+  assert.doesNotMatch(formSource, /window\.parent\.postMessage/);
+});
+
 class FakeElement {
   constructor(id, value = "") {
     this.id = id; this.value = value; this.textContent = ""; this.hidden = false; this.disabled = false;
@@ -24,15 +29,28 @@ class FakeElement {
   focus() { this.focused = true; }
 }
 
+class FakePort {
+  constructor() { this.peer = null; this.onmessage = null; this.closed = false; }
+  postMessage(data) { if (!this.closed && this.peer && this.peer.onmessage) this.peer.onmessage({ data }); }
+  close() { this.closed = true; }
+}
+
+class FakeMessageChannel {
+  constructor() {
+    this.port1 = new FakePort(); this.port2 = new FakePort();
+    this.port1.peer = this.port2; this.port2.peer = this.port1;
+  }
+}
+
 function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
-  const ids = ["request-id", "source-kind", "source-id", "product-name", "quantity", "height", "height-unit", "width", "width-unit", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "requested-date", "reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
+  const ids = ["request-id", "source-kind", "source-id", "product-name", "quantity", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "requested-date", "reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
   const errors = [];
   const fields = {
     requestId: elements.get("request-id"), sourceKind: elements.get("source-kind"), sourceId: elements.get("source-id"), productName: elements.get("product-name"),
-    quantity: elements.get("quantity"), height: elements.get("height"), heightUnit: elements.get("height-unit"), width: elements.get("width"), widthUnit: elements.get("width-unit"),
+    quantity: elements.get("quantity"), heightFeet: elements.get("height-feet"), heightInchesPart: elements.get("height-inches-part"), widthFeet: elements.get("width-feet"), widthInchesPart: elements.get("width-inches-part"),
     designDetails: elements.get("design-details"), customerName: elements.get("customer-name"), phone: elements.get("phone"), email: elements.get("email"), fulfillment: elements.get("fulfillment"),
     shippingAddress: elements.get("shipping-address"), city: elements.get("city"), state: elements.get("state"), pin: elements.get("pin"), requestedDate: elements.get("requested-date"),
     referenceImage: elements.get("reference-image"), captchaToken: elements.get("captcha-token"),
@@ -46,7 +64,7 @@ function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
   };
   form.reset = () => Object.values(fields).forEach((field) => { field.value = ""; field.files = []; });
   Object.values(fields).forEach((field) => { field.parentNode = { appendChild(child) { errors.push(child); } }; });
-  elements.get("seed-data").textContent = JSON.stringify({ requestId: "request-seed", sourceKind: "catalogue", sourceId: "catalogue:test", productName: "Test frame", quantity: "1", height: "3", heightUnit: "ft", width: "4", widthUnit: "ft", designDetails: "Details", customerName: "", phone: "", email: "", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "" });
+  elements.get("seed-data").textContent = JSON.stringify({ requestId: "request-seed", channelNonce: "nonce-seed-123456", sourceKind: "catalogue", sourceId: "catalogue:test", productName: "Test frame", quantity: "1", dimensionFormat: "feet-inches", heightFeet: "3", heightInchesPart: "0", widthFeet: "4", widthInchesPart: "0", designDetails: "Details", customerName: "", phone: "", email: "", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "" });
   const status = elements.get("form-status");
   const timers = [];
   const submissions = [];
@@ -58,18 +76,20 @@ function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
     submitOrder(value) { submissions.push(value); callbacks.push({ success: this.success, failure: this.failure }); return this; },
   };
   const windowObject = {
-    parent: { postMessage(message) { parentMessages.push(message); } },
+    parent: { postMessage(message, targetOrigin, ports) { parentMessages.push({ message, targetOrigin, port: ports && ports[0] }); } },
+    top: null,
     crypto: { randomUUID: () => "request-new" },
+    MessageChannel: FakeMessageChannel,
     setTimeout(callback) { timers.push(callback); return timers.length; },
     clearTimeout() {},
-    grecaptcha: captcha === "stalled" ? { ready() {} } : { ready(callback) { callback(); }, execute() { return Promise.resolve("captcha-token"); } },
   };
+  windowObject.top = windowObject.parent;
   const documentObject = {
     getElementById(id) { return elements.get(id) || null; },
     createElement(tag) { const element = new FakeElement(tag); element.className = ""; return element; },
   };
   const context = {
-    console, document: documentObject, window: windowObject,
+    console, document: documentObject, window: windowObject, MessageChannel: FakeMessageChannel,
     google: { script: { run } },
     setTimeout: windowObject.setTimeout, clearTimeout: windowObject.clearTimeout,
   };
@@ -82,10 +102,15 @@ function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
 function fillValid(fields) {
   Object.assign(fields.productName, { value: "Test frame" });
   Object.assign(fields.quantity, { value: "1" });
-  Object.assign(fields.height, { value: "3" }); Object.assign(fields.heightUnit, { value: "ft" });
-  Object.assign(fields.width, { value: "4" }); Object.assign(fields.widthUnit, { value: "ft" });
+  Object.assign(fields.heightFeet, { value: "3" }); Object.assign(fields.heightInchesPart, { value: "0" });
+  Object.assign(fields.widthFeet, { value: "4" }); Object.assign(fields.widthInchesPart, { value: "0" });
   Object.assign(fields.designDetails, { value: "Blue and gold" }); Object.assign(fields.customerName, { value: "A Customer" });
   Object.assign(fields.phone, { value: "8209238541" }); Object.assign(fields.fulfillment, { value: "pickup" });
+}
+
+function respondToken(runtime, index, token = "captcha-token") {
+  const request = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request")[index];
+  request.port.postMessage({ type: "saloni-order-captcha-response", nonce: request.message.nonce, attemptId: request.message.attemptId, ok: true, token });
 }
 
 test("late success and failure from timed-out attempt cannot control a retry", async () => {
@@ -93,8 +118,12 @@ test("late success and failure from timed-out attempt cannot control a retry", a
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
   runtime.timers[0]();
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(runtime, 1);
   await Promise.resolve();
   runtime.callbacks[0].success({ ok: true, requestId: "old", receivedAt: "old" });
   assert.match(runtime.status.textContent, /Checking/);
@@ -113,20 +142,43 @@ test("stalled CAPTCHA is bounded and general server errors remain readable", asy
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
   runtime.callbacks[0].success({ ok: false, errors: { form: "The daily request limit has been reached." } });
   assert.match(runtime.status.textContent, /daily request limit/);
+});
+
+test("uses the exact parent origin and preserves the draft and attachment after token failure", async () => {
+  const runtime = makeFormRuntime();
+  fillValid(runtime.fields);
+  const file = { name: "reference.png", type: "image/png", size: 10 };
+  runtime.fields.referenceImage.files = [file];
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  const first = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request")[0];
+  assert.equal(first.targetOrigin, "https://saloniresinart.com");
+  first.port.postMessage({ type: "saloni-order-captcha-response", nonce: first.message.nonce, attemptId: first.message.attemptId, ok: false });
+  assert.match(runtime.status.textContent, /Captcha verification is required/);
+  assert.equal(runtime.fields.productName.value, "Test frame");
+  assert.equal(runtime.fields.referenceImage.files[0], file);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(runtime, 1);
+  await Promise.resolve();
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.fields.referenceImage.files[0], file);
 });
 
 test("client validation blocks invalid normalized dimensions and associates the focused error", () => {
   const runtime = makeFormRuntime();
   runtime.fields.productName.value = "";
   runtime.fields.quantity.value = "1";
-  runtime.fields.height.value = "5"; runtime.fields.heightUnit.value = "ft";
-  runtime.fields.width.value = "4"; runtime.fields.widthUnit.value = "ft";
+  runtime.fields.heightFeet.value = "5"; runtime.fields.heightInchesPart.value = "0.01";
+  runtime.fields.widthFeet.value = "4"; runtime.fields.widthInchesPart.value = "0";
   runtime.fields.designDetails.value = ""; runtime.fields.customerName.value = ""; runtime.fields.phone.value = ""; runtime.fields.fulfillment.value = "pickup";
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   assert.equal(runtime.submissions.length, 0);
   assert.match(runtime.status.textContent, /correct/i);
-  assert.equal(runtime.fields.height.focused || runtime.fields.productName.focused, true);
+  assert.equal(runtime.fields.heightFeet.focused || runtime.fields.productName.focused, true);
   assert.match(runtime.fields.productName.getAttribute("aria-describedby"), /productName-error/);
 });

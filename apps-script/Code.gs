@@ -6,7 +6,7 @@
  */
 
 var MAX_FILE_BYTES = 5 * 1024 * 1024;
-var MAX_DIMENSION_INCHES = 48;
+var MAX_DIMENSION_INCHES = 60;
 var DEFAULT_DAILY_ACCEPTANCE_CAP = 50;
 var RETENTION_DAYS = 90;
 var RETENTION_MILLISECONDS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -38,13 +38,8 @@ function renderForm_(state) {
   var captchaEnabled = true;
   var template = HtmlService.createTemplateFromFile("Form");
   template.seedJson = escapeSeedJson_(JSON.stringify((state && state.seed) || blankSeed_()));
-  template.captchaEnabled = captchaEnabled;
-  template.captchaSiteKey = siteKey;
   template.captchaSiteKeyJson = escapeSeedJson_(JSON.stringify(siteKey));
   template.captchaEnabledJson = captchaEnabled ? "true" : "false";
-  template.captchaScriptUrl = siteKey
-    ? "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(siteKey)
-    : "";
   return template.evaluate()
     .setTitle("Saloni Resin Art Studio order request")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -308,6 +303,11 @@ function collectPayload_(form) {
     sourceId: stringValue_(form.sourceId),
     productName: stringValue_(form.productName),
     quantity: stringValue_(form.quantity),
+    dimensionFormat: stringValue_(form.dimensionFormat),
+    heightFeet: stringValue_(form.heightFeet),
+    heightInchesPart: stringValue_(form.heightInchesPart),
+    widthFeet: stringValue_(form.widthFeet),
+    widthInchesPart: stringValue_(form.widthInchesPart),
     height: stringValue_(form.height),
     heightUnit: stringValue_(form.heightUnit),
     width: stringValue_(form.width),
@@ -345,12 +345,10 @@ function validatePayload_(payload) {
   var quantity = Number(payload.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
 
-  var height = normalizeDimension_(payload.height, payload.heightUnit);
-  var width = normalizeDimension_(payload.width, payload.widthUnit);
-  if (height === null || height <= 0 || height > MAX_DIMENSION_INCHES) errors.height = "Height must be greater than 0 and no more than 48 inches.";
-  if (width === null || width <= 0 || width > MAX_DIMENSION_INCHES) errors.width = "Width must be greater than 0 and no more than 48 inches.";
-  if (!/^(in|inch|inches|ft|feet)$/.test(payload.heightUnit.toLowerCase())) errors.heightUnit = "Choose inches or feet.";
-  if (!/^(in|inch|inches|ft|feet)$/.test(payload.widthUnit.toLowerCase())) errors.widthUnit = "Choose inches or feet.";
+  var height = dimensionValue_(payload, "height");
+  var width = dimensionValue_(payload, "width");
+  if (height.error) errors[height.field] = height.error;
+  if (width.error) errors[width.field] = width.error;
 
   bounded_(errors, "designDetails", payload.designDetails, 2000, true);
   bounded_(errors, "customerName", payload.customerName, 120, true);
@@ -371,7 +369,15 @@ function validatePayload_(payload) {
 
   var fileError = validateReferenceImage_(payload.referenceImage);
   if (fileError) errors.referenceImage = fileError;
-  return { errors: errors, heightInches: height, widthInches: width };
+  return {
+    errors: errors,
+    heightInches: height.value,
+    widthInches: width.value,
+    heightExpression: height.expression,
+    widthExpression: width.expression,
+    heightUnit: height.unit,
+    widthUnit: width.unit
+  };
 }
 
 function bounded_(errors, field, value, maxLength, required) {
@@ -386,6 +392,42 @@ function normalizeDimension_(value, unit) {
   if (["ft", "feet"].indexOf(normalizedUnit) >= 0) number *= 12;
   if (["in", "inch", "inches", "ft", "feet"].indexOf(normalizedUnit) === -1) return null;
   return number;
+}
+
+function dimensionValue_(payload, axis) {
+  var format = payload.dimensionFormat;
+  if (format && format !== "feet-inches") return { value: null, expression: "", unit: "ft+in", field: "dimensionFormat", error: "Choose feet and inches for each dimension." };
+  if (format === "feet-inches") {
+    var feetField = axis + "Feet";
+    var inchesField = axis + "InchesPart";
+    var feetText = payload[feetField];
+    var inchesText = payload[inchesField];
+    if (!/^\d+$/.test(feetText)) return { value: null, expression: "", unit: "ft+in", field: feetField, error: "Enter whole, non-negative feet." };
+    var feet = Number(feetText);
+    var inches = Number(inchesText);
+    if (!isFinite(feet) || feet < 0 || !/^\d+(\.\d+)?$/.test(inchesText) || !isFinite(inches) || inches < 0 || inches >= 12) {
+      return { value: null, expression: "", unit: "ft+in", field: inchesField, error: "Inches must be from 0 up to (but not including) 12." };
+    }
+    var total = feet * 12 + inches;
+    if (total <= 0 || total > MAX_DIMENSION_INCHES) return { value: null, expression: "", unit: "ft+in", field: feetField, error: "Each dimension must be greater than 0 and no more than 60 inches." };
+    return { value: total, expression: canonicalDimension_(total), unit: "ft+in", field: "", error: "" };
+  }
+  var legacyValue = normalizeDimension_(payload[axis], payload[axis + "Unit"]);
+  if (legacyValue === null || legacyValue <= 0 || legacyValue > MAX_DIMENSION_INCHES) {
+    return { value: legacyValue, expression: "", unit: "", field: axis, error: "Each dimension must be greater than 0 and no more than 60 inches." };
+  }
+  if (!/^(in|inch|inches|ft|feet)$/.test(String(payload[axis + "Unit"]).toLowerCase())) {
+    return { value: legacyValue, expression: "", unit: "", field: axis + "Unit", error: "Choose inches or feet." };
+  }
+  return { value: legacyValue, expression: canonicalDimension_(legacyValue), unit: "ft+in", field: "", error: "" };
+}
+
+function canonicalDimension_(inches) {
+  var rounded = Math.round(inches * 1000000) / 1000000;
+  var feet = Math.floor(rounded / 12);
+  var remainder = Math.round((rounded - feet * 12) * 1000000) / 1000000;
+  var remainderText = String(remainder).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  return feet + " ft " + (remainderText || "0") + " in";
 }
 
 function isIsoDate_(value) {
@@ -413,16 +455,18 @@ function hasImageSignature_(bytes, mime) {
 
 function verifyCaptcha_(token, properties) {
   var secret = String(properties.getProperty("CAPTCHA_SECRET") || "");
-  var expectedHostname = String(properties.getProperty("CAPTCHA_EXPECTED_HOSTNAME") || "");
-  if (!secret || !expectedHostname || !token) return { ok: false, error: "Captcha is not ready. Please contact Saloni directly." };
+  var rawThreshold = properties.getProperty("CAPTCHA_MIN_SCORE");
+  var thresholdText = String(rawThreshold == null ? "" : rawThreshold).trim();
+  var threshold = Number(thresholdText);
+  if (!secret || !token || !thresholdText || !isFinite(threshold) || threshold < 0 || threshold > 1) return { ok: false, error: "Captcha is not ready. Please contact Saloni directly." };
   try {
     var response = UrlFetchApp.fetch("https://www.google.com/recaptcha/api/siteverify", {
       method: "post", payload: { secret: secret, response: token }, muteHttpExceptions: true
     });
     var result = JSON.parse(response.getContentText() || "{}");
-    var hostnameMatches = String(result.hostname || "").toLowerCase() === expectedHostname.toLowerCase();
-    var actionMatches = !result.action || result.action === "order_request";
-    var scoreOk = result.score === undefined || Number(result.score) >= 0.5;
+    var hostnameMatches = String(result.hostname || "").toLowerCase() === "saloniresinart.com";
+    var actionMatches = result.action === "order_request";
+    var scoreOk = typeof result.score === "number" && isFinite(result.score) && result.score >= 0 && result.score <= 1 && result.score >= threshold;
     return result.success === true && hostnameMatches && actionMatches && scoreOk
       ? { ok: true }
       : { ok: false, error: "Captcha verification failed. Please try again." };
@@ -494,8 +538,8 @@ function rowForPayload_(payload, fingerprint, receivedAt, referenceFile) {
   return [
     neutralizeForSheet_(payload.requestId), neutralizeForSheet_(fingerprint), receivedAt,
     neutralizeForSheet_(payload.sourceKind), neutralizeForSheet_(payload.sourceId), neutralizeForSheet_(payload.productName),
-    Number(payload.quantity), neutralizeForSheet_(payload.height), neutralizeForSheet_(payload.heightUnit), validation.heightInches,
-    neutralizeForSheet_(payload.width), neutralizeForSheet_(payload.widthUnit), validation.widthInches,
+    Number(payload.quantity), neutralizeForSheet_(validation.heightExpression), neutralizeForSheet_(validation.heightUnit), validation.heightInches,
+    neutralizeForSheet_(validation.widthExpression), neutralizeForSheet_(validation.widthUnit), validation.widthInches,
     neutralizeForSheet_(payload.designDetails),
     neutralizeForSheet_(payload.customerName), neutralizeForSheet_(payload.phone), neutralizeForSheet_(payload.email),
     neutralizeForSheet_(payload.fulfillment.toLowerCase()), neutralizeForSheet_(payload.shippingAddress),
@@ -508,7 +552,7 @@ function rowForPayload_(payload, fingerprint, receivedAt, referenceFile) {
 function payloadFingerprint_(payload) {
   var file = payload.referenceImage;
   var fileDigest = file && typeof file.getBytes === "function" ? digestHex_(file.getBytes()) : "";
-  var canonical = JSON.stringify({
+  var canonical = {
     requestId: payload.requestId, sourceKind: payload.sourceKind, sourceId: payload.sourceId,
     productName: payload.productName, quantity: payload.quantity, height: payload.height,
     heightUnit: payload.heightUnit, width: payload.width, widthUnit: payload.widthUnit,
@@ -516,8 +560,15 @@ function payloadFingerprint_(payload) {
     email: payload.email, fulfillment: payload.fulfillment, shippingAddress: payload.shippingAddress,
     city: payload.city, state: payload.state, pin: payload.pin, requestedDate: payload.requestedDate,
     fileDigest: fileDigest
-  });
-  return digestHex_(canonical);
+  };
+  if (payload.dimensionFormat === "feet-inches") {
+    canonical.dimensionFormat = payload.dimensionFormat;
+    canonical.heightFeet = payload.heightFeet;
+    canonical.heightInchesPart = payload.heightInchesPart;
+    canonical.widthFeet = payload.widthFeet;
+    canonical.widthInchesPart = payload.widthInchesPart;
+  }
+  return digestHex_(JSON.stringify(canonical));
 }
 
 function digestHex_(value) {
@@ -537,17 +588,38 @@ function parseSeed_(json) {
   var seed;
   try { seed = JSON.parse(String(json || "{}")); } catch (error) { seed = {}; }
   if (!seed || typeof seed !== "object" || Array.isArray(seed)) seed = {};
+  var height = boundedSeed_(seed.height, 12);
+  var heightUnit = boundedSeed_(seed.heightUnit, 10) || "in";
+  var width = boundedSeed_(seed.width, 12);
+  var widthUnit = boundedSeed_(seed.widthUnit, 10) || "in";
+  var heightParts = legacyParts_(height, heightUnit);
+  var widthParts = legacyParts_(width, widthUnit);
+  var suppliedFormat = boundedSeed_(seed.dimensionFormat, 20);
+  var suppliedHeightFeet = boundedSeed_(seed.heightFeet, 12);
+  var suppliedHeightInches = boundedSeed_(seed.heightInchesPart, 20);
+  var suppliedWidthFeet = boundedSeed_(seed.widthFeet, 12);
+  var suppliedWidthInches = boundedSeed_(seed.widthInchesPart, 20);
+  var useSuppliedParts = suppliedFormat === "feet-inches" && suppliedHeightFeet && suppliedHeightInches && suppliedWidthFeet && suppliedWidthInches;
   return {
     requestId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.requestId || "")) ? String(seed.requestId) : Utilities.getUuid(),
     sourceKind: boundedSeed_(seed.sourceKind, 80), sourceId: boundedSeed_(seed.sourceId, 160),
     productName: boundedSeed_(seed.productName, 160), quantity: boundedSeed_(seed.quantity, 4) || "1",
-    height: boundedSeed_(seed.height, 12), heightUnit: boundedSeed_(seed.heightUnit, 10) || "in",
-    width: boundedSeed_(seed.width, 12), widthUnit: boundedSeed_(seed.widthUnit, 10) || "in",
+    dimensionFormat: "feet-inches",
+    height: height, heightUnit: heightUnit, heightFeet: useSuppliedParts ? suppliedHeightFeet : heightParts ? heightParts.feet : "", heightInchesPart: useSuppliedParts ? suppliedHeightInches : heightParts ? heightParts.inches : "",
+    width: width, widthUnit: widthUnit, widthFeet: useSuppliedParts ? suppliedWidthFeet : widthParts ? widthParts.feet : "", widthInchesPart: useSuppliedParts ? suppliedWidthInches : widthParts ? widthParts.inches : "",
     designDetails: boundedSeed_(seed.designDetails, 2000), customerName: boundedSeed_(seed.customerName, 120),
     phone: boundedSeed_(seed.phone, 40), email: boundedSeed_(seed.email, 254), fulfillment: boundedSeed_(seed.fulfillment, 20) || "shipping",
     shippingAddress: boundedSeed_(seed.shippingAddress, 300), city: boundedSeed_(seed.city, 100), state: boundedSeed_(seed.state, 100),
-    pin: boundedSeed_(seed.pin, 20), requestedDate: boundedSeed_(seed.requestedDate, 20)
+    pin: boundedSeed_(seed.pin, 20), requestedDate: boundedSeed_(seed.requestedDate, 20),
+    channelNonce: /^[A-Za-z0-9_-]{16,128}$/.test(String(seed.channelNonce || "")) ? String(seed.channelNonce) : ""
   };
+}
+
+function legacyParts_(value, unit) {
+  var inches = normalizeDimension_(value, unit);
+  if (inches === null || inches <= 0 || inches > MAX_DIMENSION_INCHES) return null;
+  var expression = canonicalDimension_(inches).match(/^(\d+) ft ([0-9.]+) in$/);
+  return expression ? { feet: expression[1], inches: expression[2] } : null;
 }
 
 function blankSeed_() { return parseSeed_({}); }
