@@ -114,11 +114,72 @@
     if (!embed || !frame || !status) return;
     var orderUrl = embed.getAttribute("data-order-form-url") || "";
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
-    var frameState = { loaded: false };
+    var PARENT_ORIGIN = "https://saloniresinart.com";
+    var frameState = { loaded: false, nonce: "", siteKey: "", activeCaptcha: null, pinnedSender: null, pinnedOrigin: "" };
 
     function requestId() {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
       return "request-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+    }
+
+    function channelNonce() {
+      if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+      if (window.crypto && window.crypto.getRandomValues) {
+        var bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        return Array.prototype.map.call(bytes, function (byte) { return byte.toString(16).padStart(2, "0"); }).join("");
+      }
+      return "";
+    }
+
+    function invalidateChannel() {
+      if (frameState.activeCaptcha) {
+        if (frameState.activeCaptcha.timer) window.clearTimeout(frameState.activeCaptcha.timer);
+        if (frameState.activeCaptcha.port && frameState.activeCaptcha.port.close) frameState.activeCaptcha.port.close();
+      }
+      frameState.activeCaptcha = null;
+      frameState.nonce = "";
+      frameState.siteKey = "";
+      frameState.pinnedSender = null;
+      frameState.pinnedOrigin = "";
+    }
+
+    function postCaptchaResult(request, ok, token) {
+      if (frameState.activeCaptcha !== request) return;
+      frameState.activeCaptcha = null;
+      if (request.timer) window.clearTimeout(request.timer);
+      try {
+        request.port.postMessage({ type: "saloni-order-captcha-response", nonce: frameState.nonce, attemptId: request.attemptId, ok: ok === true, token: ok ? token : "" });
+      } catch (error) {}
+      if (request.port.close) request.port.close();
+    }
+
+    function executeParentCaptcha(request) {
+      function execute() {
+        if (frameState.activeCaptcha !== request || !window.grecaptcha || !window.grecaptcha.ready) { postCaptchaResult(request, false, ""); return; }
+        try {
+          window.grecaptcha.ready(function () {
+            if (frameState.activeCaptcha !== request) return;
+            try {
+              var result = window.grecaptcha.execute(frameState.siteKey, { action: "order_request" });
+              if (!result || typeof result.then !== "function") { postCaptchaResult(request, false, ""); return; }
+              result.then(function (token) {
+                postCaptchaResult(request, typeof token === "string" && token.length > 0, token);
+              }).catch(function () { postCaptchaResult(request, false, ""); });
+            } catch (error) { postCaptchaResult(request, false, ""); }
+          });
+        } catch (error) { postCaptchaResult(request, false, ""); }
+      }
+      if (window.grecaptcha && window.grecaptcha.ready) { execute(); return; }
+      if (!frameState.siteKey) { postCaptchaResult(request, false, ""); return; }
+      var script = document.createElement("script");
+      script.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(frameState.siteKey);
+      script.async = true; script.defer = true;
+      script.onload = execute;
+      script.onerror = function () { postCaptchaResult(request, false, ""); };
+      var parent = document.head || document.body;
+      if (!parent || !parent.appendChild) { postCaptchaResult(request, false, ""); return; }
+      parent.appendChild(script);
     }
 
     function scrollToForm() {
@@ -126,10 +187,22 @@
     }
 
     function sourceSeed(source) {
+      function parts(value, unit) {
+        var number = Number(value);
+        var total = unit === "ft" ? number * 12 : unit === "in" ? number : NaN;
+        if (!Number.isFinite(total) || total <= 0) return null;
+        var feet = Math.floor(total / 12);
+        var inches = Math.round((total - feet * 12) * 100) / 100;
+        return { feet: String(feet), inches: String(inches) };
+      }
+      var heightParts = parts(source.height, source.heightUnit);
+      var widthParts = parts(source.width, source.widthUnit);
       var seed = {
         sourceKind: source.sourceKind || "catalogue", sourceId: source.sourceId || "",
-        productName: source.productName || "", quantity: "1", height: source.height || "", heightUnit: source.heightUnit || "in",
-        width: source.width || "", widthUnit: source.widthUnit || "in", designDetails: source.designDetails || "",
+        productName: source.productName || "", quantity: "1", dimensionFormat: "feet-inches",
+        heightFeet: heightParts ? heightParts.feet : "", heightInchesPart: heightParts ? heightParts.inches : "", widthFeet: widthParts ? widthParts.feet : "", widthInchesPart: widthParts ? widthParts.inches : "",
+        height: source.height || "", heightUnit: source.heightUnit || "",
+        width: source.width || "", widthUnit: source.widthUnit || "", designDetails: source.designDetails || "",
         customerName: "", phone: "", email: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "", requestedDate: ""
       };
       return seed;
@@ -159,6 +232,14 @@
         scrollToForm();
         return;
       }
+      invalidateChannel();
+      frameState.nonce = channelNonce();
+      if (!frameState.nonce) {
+        status.textContent = "This browser cannot start a secure request. Please use the latest browser or contact Saloni directly.";
+        status.hidden = false;
+        return;
+      }
+      seed.channelNonce = frameState.nonce;
       frame.hidden = false;
       status.hidden = true;
       // Normal POST action=seed keeps the existing iframe alive while replacing its document.
@@ -182,6 +263,25 @@
       seed.requestId = requestId();
       submitSeed(seed);
     }
+
+    window.addEventListener("message", function (event) {
+      var data = event.data || {};
+      if (!frameState.loaded || !frameState.nonce || data.nonce !== frameState.nonce || !event.source || !event.origin || event.origin === "null") return;
+      if (data.type === "saloni-order-form-ready") {
+        if (!frameState.pinnedSender) {
+          frameState.pinnedSender = event.source;
+          frameState.pinnedOrigin = event.origin;
+        }
+        if (event.source !== frameState.pinnedSender || event.origin !== frameState.pinnedOrigin) return;
+        if (typeof data.siteKey === "string" && data.siteKey.length > 0 && data.siteKey.length <= 200) frameState.siteKey = data.siteKey;
+        return;
+      }
+      if (event.source !== frameState.pinnedSender || event.origin !== frameState.pinnedOrigin || data.type !== "saloni-order-captcha-request" || typeof data.attemptId !== "string" || !event.ports || !event.ports[0] || frameState.activeCaptcha) return;
+      var request = { attemptId: data.attemptId, port: event.ports[0], timer: null };
+      frameState.activeCaptcha = request;
+      request.timer = window.setTimeout(function () { postCaptchaResult(request, false, ""); }, 30000);
+      executeParentCaptcha(request);
+    });
 
     function catalogueSeed(card) {
       var image = card.querySelector("img[src]");
