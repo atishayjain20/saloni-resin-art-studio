@@ -48,7 +48,7 @@ class OrderFlowContractTests(unittest.TestCase):
     def test_form_has_editable_request_fields_and_failure_safe_submission(self):
         for field in (
             "requestId", "sourceKind", "sourceId", "productName", "quantity",
-            "height", "heightUnit", "width", "widthUnit", "designDetails",
+            "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "designDetails",
             "customerName", "phone", "email", "fulfillment", "shippingAddress",
             "city", "state", "pin", "requestedDate", "referenceImage",
         ):
@@ -63,6 +63,21 @@ class OrderFlowContractTests(unittest.TestCase):
         self.assertIn("5 MB", self.form)
         self.assertIn("Google", self.form)
 
+    def test_captcha_uses_the_parent_origin_channel_and_combined_dimensions(self):
+        for field in ("heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"):
+            with self.subTest(field=field):
+                self.assertRegex(self.form, rf'name=["\']{field}["\']')
+        self.assertIn("MessageChannel", self.form)
+        self.assertIn("window.top", self.form)
+        self.assertNotIn("window.parent.postMessage", self.form)
+        self.assertIn("https://saloniresinart.com", self.form)
+        self.assertNotIn("grecaptcha.execute", self.form)
+        self.assertIn("event.ports[0]", self.script)
+        self.assertIn("https://saloniresinart.com", self.script)
+        self.assertIn("CAPTCHA_MIN_SCORE", self.code)
+        self.assertIn("order_request", self.code)
+        self.assertIn("saloniresinart.com", self.code)
+
     def test_apps_script_is_server_only_and_defends_the_sheet_boundary(self):
         self.assertIn("function doGet", self.code)
         self.assertIn("function doPost", self.code)
@@ -73,7 +88,7 @@ class OrderFlowContractTests(unittest.TestCase):
         for token in (
             "ORDER_SHEET_ID", "ORDER_DRIVE_FOLDER_ID", "LockService",
             "payloadFingerprint", "neutralizeForSheet", "getBytes",
-            "getContentType", "CAPTCHA_SECRET", "CAPTCHA_EXPECTED_HOSTNAME",
+            "getContentType", "CAPTCHA_SECRET", "CAPTCHA_MIN_SCORE",
             "ORDER_FORM_DISABLED", "DAILY_ACCEPTANCE_CAP", "setTrashed",
         ):
             with self.subTest(token=token):
@@ -83,7 +98,7 @@ class OrderFlowContractTests(unittest.TestCase):
         self.assertIn("receivedAt", self.code)
 
     def test_dimensions_and_formula_safety_are_explicitly_tested(self):
-        self.assertRegex(self.code, r'48')
+        self.assertRegex(self.code, r'60')
         self.assertRegex(self.code, r'feet|ft')
         self.assertRegex(self.code, r'5\s*\*\s*1024\s*\*\s*1024|5\s*MB')
         self.assertIn("startsWith(\"=\")", self.code)

@@ -32,6 +32,12 @@ class Element {
   scrollIntoView() {}
 }
 
+class CapturingPort {
+  constructor() { this.messages = []; this.closed = false; }
+  postMessage(message) { if (!this.closed) this.messages.push(message); }
+  close() { this.closed = true; }
+}
+
 function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [] } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
@@ -58,6 +64,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     matchMedia: () => ({ matches: true }),
     confirm: () => confirms.length ? confirms.shift() : true,
     addEventListener(type, listener) { if (type === "message") this.messageListener = listener; },
+    setTimeout: () => 1,
+    clearTimeout() {},
+    grecaptcha: { ready(callback) { callback(); }, execute() { return Promise.resolve("parent-token"); } },
   };
   const documentObject = {
     documentElement: { classList: { add() {} } },
@@ -104,6 +113,7 @@ test("reads square, round, and arch dimensions from customizer controls, includi
   square.customizer.dispatch("click");
   let seed = submittedSeed(square.posted);
   assert.deepEqual([seed.height, seed.heightUnit, seed.width, seed.widthUnit], ["8", "in", "8", "in"]);
+  assert.deepEqual([seed.dimensionFormat, seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["feet-inches", "0", "8", "0", "8"]);
 
   const round = runFlow({ frameType: "round", framePreset: "10", frameUnit: "in" });
   round.customizer.dispatch("click");
@@ -114,4 +124,50 @@ test("reads square, round, and arch dimensions from customizer controls, includi
   arch.customizer.dispatch("click");
   seed = submittedSeed(arch.posted);
   assert.deepEqual([seed.height, seed.heightUnit, seed.width, seed.widthUnit], ["0.67", "ft", "0.50", "ft"]);
+  assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["0", "8.04", "0", "6"]);
+});
+
+test("leaves catalogue dimensions blank when the catalogue has no real size", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+});
+
+test("owns CAPTCHA token requests on the exact studio origin and pinned sender", () => {
+  assert.match(source, /https:\/\/saloniresinart\.com/);
+  assert.match(source, /pinnedSender/);
+  assert.match(source, /pinnedOrigin/);
+  assert.match(source, /event\.ports\[0\]/);
+  assert.match(source, /activeCaptcha/);
+  assert.doesNotMatch(source, /CHILD_ORIGIN/);
+});
+
+test("pins a nested form sender and observed sandbox origin, then rejects stale or foreign messages", async () => {
+  const flow = runFlow({ confirms: [true] });
+  flow.catalogueButton.dispatch("click");
+  const first = submittedSeed(flow.posted);
+  const nestedSource = {};
+  const sandboxOrigin = "https://script.googleusercontent.com";
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: first.channelNonce, siteKey: "site-key" }, ports: [] });
+  const firstPort = new CapturingPort();
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-captcha-request", nonce: first.channelNonce, attemptId: "attempt-1" }, ports: [firstPort] });
+  await Promise.resolve();
+  assert.equal(firstPort.messages[0].token, "parent-token");
+  flow.catalogueButton.dispatch("click");
+  const second = submittedSeed(flow.posted);
+  assert.notEqual(second.channelNonce, first.channelNonce);
+  const stalePort = new CapturingPort();
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-captcha-request", nonce: first.channelNonce, attemptId: "stale" }, ports: [stalePort] });
+  const foreignPort = new CapturingPort();
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: {}, data: { type: "saloni-order-captcha-request", nonce: second.channelNonce, attemptId: "foreign" }, ports: [foreignPort] });
+  assert.equal(stalePort.messages.length, 0);
+  assert.equal(foreignPort.messages.length, 0);
+  const replacementSource = {};
+  const replacementOrigin = "https://1234567890-1lu-script.googleusercontent.com";
+  flow.windowObject.messageListener({ origin: replacementOrigin, source: replacementSource, data: { type: "saloni-order-form-ready", nonce: second.channelNonce, siteKey: "site-key" }, ports: [] });
+  const replacementPort = new CapturingPort();
+  flow.windowObject.messageListener({ origin: replacementOrigin, source: replacementSource, data: { type: "saloni-order-captcha-request", nonce: second.channelNonce, attemptId: "attempt-2" }, ports: [replacementPort] });
+  await Promise.resolve();
+  assert.equal(replacementPort.messages[0].token, "parent-token");
 });

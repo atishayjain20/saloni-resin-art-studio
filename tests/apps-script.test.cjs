@@ -18,6 +18,78 @@ test("normalizes independent mixed-unit dimensions and keeps the 48 inch boundar
   assert.equal(context.normalizeDimension_(1, "yards"), null);
 });
 
+test("accepts combined feet-and-inches dimensions through 60 inches", () => {
+  const runtime = makeRuntime();
+  const result = runtime.context.submitOrder(combinedForm());
+  assert.equal(result.ok, true);
+  assert.equal(runtime.rows[0][7], "4 ft 2 in");
+  assert.equal(runtime.rows[0][8], "ft+in");
+  assert.equal(runtime.rows[0][9], 50);
+  assert.equal(runtime.rows[0][10], "5 ft 0 in");
+  assert.equal(runtime.rows[0][11], "ft+in");
+  assert.equal(runtime.rows[0][12], 60);
+});
+
+test("rejects invalid combined dimension parts and unknown dimension formats", () => {
+  for (const overrides of [
+    { heightFeet: "5", heightInchesPart: "0.01" },
+    { heightFeet: "-1", heightInchesPart: "0" },
+    { heightFeet: "4", heightInchesPart: "12" },
+    { dimensionFormat: "metric" },
+  ]) {
+    const runtime = makeRuntime();
+    const result = runtime.context.submitOrder(combinedForm(overrides));
+    assert.equal(result.ok, false);
+    assert.equal(runtime.state.appendCalls, 0);
+  }
+});
+
+test("converts legacy fractional feet seeds without reversing axes", () => {
+  const seed = context.parseSeed_(JSON.stringify({
+    requestId: "request-legacy-seed", height: "0.67", heightUnit: "ft", width: "0.50", widthUnit: "ft"
+  }));
+  assert.equal(seed.dimensionFormat, "feet-inches");
+  assert.equal(seed.heightFeet, "0");
+  assert.equal(seed.heightInchesPart, "8.04");
+  assert.equal(seed.widthFeet, "0");
+  assert.equal(seed.widthInchesPart, "6");
+});
+
+test("requires exact CAPTCHA hostname, action, and finite score", () => {
+  const valid = makeRuntime({
+    properties: { CAPTCHA_MIN_SCORE: "0.7" },
+    captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.8 }
+  });
+  assert.equal(valid.context.submitOrder(validForm()).ok, true);
+  for (const captchaResponse of [
+    { success: true, hostname: "saloniresinart.com", score: 0.8 },
+    { success: true, hostname: "saloniresinart.com", action: "other", score: 0.8 },
+    { success: true, hostname: "saloniresinart.com", action: "order_request" },
+    { success: true, hostname: "saloniresinart.com", action: "order_request", score: Infinity },
+  ]) {
+    const runtime = makeRuntime({ properties: { CAPTCHA_MIN_SCORE: "0.7" }, captchaResponse });
+    assert.match(runtime.context.submitOrder(validForm()).errors.captcha, /Captcha/);
+    assert.equal(runtime.state.appendCalls, 0);
+  }
+});
+
+test("fails closed for blank thresholds and non-numeric or out-of-range CAPTCHA scores before writes", () => {
+  for (const properties of [{ CAPTCHA_MIN_SCORE: "" }, { CAPTCHA_MIN_SCORE: "not-a-number" }, { CAPTCHA_MIN_SCORE: "1.1" }]) {
+    const runtime = makeRuntime({ properties, captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 } });
+    const result = runtime.context.submitOrder(validForm({ referenceImage: imageBlob() }));
+    assert.match(result.errors.captcha, /Captcha/);
+    assert.equal(runtime.state.fileCreates, 0);
+    assert.equal(runtime.state.appendCalls, 0);
+  }
+  for (const score of [null, "0.9", true, false, 1.1, -0.1]) {
+    const runtime = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score } });
+    const result = runtime.context.submitOrder(validForm({ referenceImage: imageBlob() }));
+    assert.match(result.errors.captcha, /Captcha/);
+    assert.equal(runtime.state.fileCreates, 0);
+    assert.equal(runtime.state.appendCalls, 0);
+  }
+});
+
 test("neutralizes every spreadsheet formula prefix while leaving ordinary text unchanged", () => {
   for (const value of ["=SUM(A1:A2)", "+cmd", "-1+1", "@user"]) {
     assert.equal(context.neutralizeForSheet_(value)[0], "'");
@@ -55,6 +127,13 @@ function validForm(overrides = {}) {
   }, overrides);
 }
 
+function combinedForm(overrides = {}) {
+  return validForm(Object.assign({
+    dimensionFormat: "feet-inches", heightFeet: "4", heightInchesPart: "2", widthFeet: "5", widthInchesPart: "0",
+    height: "", heightUnit: "", width: "", widthUnit: ""
+  }, overrides));
+}
+
 function makeRuntime(options = {}) {
   const headers = [
     "Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID", "Product name", "Quantity",
@@ -69,7 +148,7 @@ function makeRuntime(options = {}) {
     appendMode: options.appendMode || "success",
     failRecheck: Boolean(options.failRecheck),
     folderAccess: options.folderAccess || "PRIVATE",
-    captchaResponse: options.captchaResponse || { success: true, hostname: "expected.example", score: 0.9 },
+    captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 },
     driveDeletes: [], retentionTrashed: 0, rowDeletes: [], triggerCreates: 0, triggerConfig: null,
     logs: [],
   };
@@ -115,7 +194,7 @@ function makeRuntime(options = {}) {
   };
   const properties = Object.assign({
     ORDER_SHEET_ID: "sheet", ORDER_SHEET_TAB: "Orders", ORDER_DRIVE_FOLDER_ID: "folder",
-    CAPTCHA_SECRET: "secret", CAPTCHA_EXPECTED_HOSTNAME: "expected.example",
+    CAPTCHA_SECRET: "secret", CAPTCHA_MIN_SCORE: "0.5",
   }, options.properties || {});
   const lock = { tryLock: () => options.lockAvailable !== false, releaseLock: () => { state.released = true; } };
   const utilities = {
@@ -187,7 +266,7 @@ test("rejects disabled intake, wrong-host CAPTCHA, daily cap, and lock contentio
   const disabled = makeRuntime({ properties: { ORDER_FORM_DISABLED: "true" } });
   assert.equal(disabled.context.submitOrder(validForm()).ok, false);
   assert.equal(disabled.state.appendCalls, 0);
-  const invalidCaptcha = makeRuntime({ captchaResponse: { success: false, hostname: "expected.example" } });
+  const invalidCaptcha = makeRuntime({ captchaResponse: { success: false, hostname: "saloniresinart.com" } });
   assert.match(invalidCaptcha.context.submitOrder(validForm()).errors.captcha, /Captcha/);
   assert.equal(invalidCaptcha.state.appendCalls, 0);
   const wrongHost = makeRuntime({ captchaResponse: { success: true, hostname: "wrong.example", score: 0.9 } });
@@ -221,6 +300,21 @@ test("returns matching duplicate success, conflicts on changed payload, and neve
   assert.equal(conflict.state.appendCalls, 0);
 });
 
+test("keeps the legacy fingerprint for retries without a dimension marker", () => {
+  const form = validForm();
+  const runtime = makeRuntime();
+  const legacyFingerprint = runtime.context.digestHex_(JSON.stringify({
+    requestId: form.requestId, sourceKind: form.sourceKind, sourceId: form.sourceId, productName: form.productName,
+    quantity: form.quantity, height: form.height, heightUnit: form.heightUnit, width: form.width, widthUnit: form.widthUnit,
+    designDetails: form.designDetails, customerName: form.customerName, phone: form.phone, email: form.email,
+    fulfillment: form.fulfillment, shippingAddress: form.shippingAddress, city: form.city, state: form.state, pin: form.pin,
+    requestedDate: form.requestedDate, fileDigest: ""
+  }));
+  const retry = makeRuntime({ rows: [[form.requestId, legacyFingerprint, new Date(), form.sourceKind, form.sourceId]] });
+  assert.equal(retry.context.submitOrder(form).ok, true);
+  assert.equal(retry.state.appendCalls, 0);
+});
+
 test("reconciles append failures without deleting a file after persisted-then-threw", () => {
   const before = makeRuntime({ appendMode: "before-throw" });
   assert.throws(() => before.context.submitOrder(validForm({ referenceImage: imageBlob() })), /Unable to confirm/);
@@ -246,11 +340,11 @@ test("preserves original dimension values and units and treats an empty blob as 
   const result = runtime.context.submitOrder(validForm({ referenceImage: imageBlob([]) }));
   assert.equal(result.ok, true);
   assert.equal(runtime.state.fileCreates, 0);
-  assert.equal(runtime.rows[0][7], "3");
-  assert.equal(runtime.rows[0][8], "ft");
+  assert.equal(runtime.rows[0][7], "3 ft 0 in");
+  assert.equal(runtime.rows[0][8], "ft+in");
   assert.equal(runtime.rows[0][9], 36);
-  assert.equal(runtime.rows[0][10], "4");
-  assert.equal(runtime.rows[0][11], "ft");
+  assert.equal(runtime.rows[0][10], "4 ft 0 in");
+  assert.equal(runtime.rows[0][11], "ft+in");
   assert.equal(runtime.rows[0][12], 48);
 });
 
