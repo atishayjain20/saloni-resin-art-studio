@@ -94,8 +94,13 @@ function purgeExpiredOrdersAt_(now) {
     var row = values[index];
     var requestId = String(row[0] == null ? "" : row[0]);
     if (requestId) knownRequestIds[requestId] = true;
-    var receivedAt = retentionDate_(row[2]);
-    if (!receivedAt || receivedAt.getTime() > cutoff.getTime()) continue;
+    var rawReceivedAt = row[2];
+    var receivedAt = retentionDate_(rawReceivedAt);
+    if (!receivedAt) {
+      if (rawReceivedAt !== null && rawReceivedAt !== undefined && rawReceivedAt !== "") errors += 1;
+      continue;
+    }
+    if (receivedAt.getTime() > cutoff.getTime()) continue;
     if (!/^[A-Za-z0-9_-]{12,80}$/.test(requestId)) {
       errors += 1;
       continue;
@@ -211,9 +216,8 @@ function permanentlyDeleteFile_(file) {
 }
 
 function retentionDate_(value) {
-  if (value === null || value === undefined || value === "") return null;
-  var date = new Date(value);
-  return isNaN(date.getTime()) ? null : date;
+  if (Object.prototype.toString.call(value) !== "[object Date]" || isNaN(value.getTime())) return null;
+  return new Date(value.getTime());
 }
 
 function submitOrder(form) {

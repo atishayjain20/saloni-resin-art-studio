@@ -326,6 +326,31 @@ test("processes valid records but refuses malformed expired rows", () => {
   assert.equal(runtime.rows[0][0], "bad id");
 });
 
+test("preserves rows and attachments for non-Date Received at values", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  for (const [index, receivedAt] of [true, 12345, "not-a-date", "2020-01-01T00:00:00.000Z"].entries()) {
+    const requestId = `request-malformed-${index}`;
+    const runtime = makeRuntime({
+      rows: [retentionRow(requestId, receivedAt, "https://drive.google.test/file")],
+      folderFiles: [retentionFile(`file-malformed-${index}`, `order-${requestId}.jpg`, new Date("2020-01-01T00:00:00.000Z"))],
+    });
+    assert.throws(() => runtime.context.purgeExpiredOrdersAt_(now), /Retention cleanup failed/);
+    assert.equal(runtime.rows.length, 1);
+    assert.deepEqual(runtime.state.rowDeletes, []);
+    assert.deepEqual(runtime.state.driveDeletes, []);
+    assert.deepEqual(runtime.state.logs, [JSON.stringify({ failedAt: now.toISOString(), deletedRows: 0, deletedFiles: 0, errors: 1 })]);
+  }
+});
+
+test("accepts a valid Date Received at cell at the retention boundary", () => {
+  const now = new Date("2026-10-19T00:00:00.000Z");
+  const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const runtime = makeRuntime({ rows: [retentionRow("request-valid-date", cutoff, "")] });
+  const result = runtime.context.purgeExpiredOrdersAt_(now);
+  assert.equal(result.deletedRows, 1);
+  assert.equal(runtime.rows.length, 0);
+});
+
 test("keeps an attachment and row when file deletion fails, then succeeds on rerun", () => {
   const now = new Date("2026-10-19T00:00:00.000Z");
   const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
