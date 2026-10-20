@@ -20,7 +20,8 @@ class Element {
   remove() {}
   querySelector(selector) {
     if (selector === "img[src]") return this.image;
-    if (selector === "figcaption strong") return this.title;
+    if (selector === "figcaption strong") return this.titleTag === "strong" ? this.title : null;
+    if (selector === "figcaption h3") return this.titleTag === "h3" ? this.title : null;
     if (selector === "figcaption") return this.caption;
     if (selector === "[data-order-prefill]") return null;
     return null;
@@ -56,7 +57,14 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
   card.title = { textContent: "Test frame" };
+  card.titleTag = "strong";
   card.detailNodes = [{ textContent: "Blue and gold" }];
+  const highlightCard = new Element("romantic-keepsake-card");
+  highlightCard.caption = new Element("figcaption");
+  highlightCard.image = { getAttribute: () => "assets/studio-red-rose-resin-display.jpeg" };
+  highlightCard.title = { textContent: "Preserved rose display" };
+  highlightCard.titleTag = "h3";
+  highlightCard.detailNodes = [{ textContent: "Preserved red roses, held close for a lasting moment." }];
   const posted = [];
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
@@ -73,7 +81,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     body,
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
-    querySelectorAll(selector) { return selector === "[data-carousel] .work-card" ? [card] : []; },
+    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, highlightCard] : []; },
     querySelector(selector) { return selector === '[data-order-prefill="customizer"]' ? customizer : null; },
     createElement(tag) {
       const element = new Element(tag);
@@ -88,7 +96,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   vm.runInContext(source, context, { filename: "script.js" });
   documentObject.ready();
   const catalogueButton = card.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
-  return { elements, card, catalogueButton, customizer, posted, windowObject };
+  const highlightCatalogueButton = highlightCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
+  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, customizer, posted, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -106,6 +115,15 @@ test("starts two orders for the same catalogue item with new IDs only after conf
   flow.catalogueButton.dispatch("click");
   const second = submittedSeed(flow.posted);
   assert.notEqual(second.requestId, first.requestId);
+});
+
+test("adds the catalogue order control to highlighted keepsake cards", () => {
+  const flow = runFlow();
+  assert.ok(flow.highlightCatalogueButton);
+  flow.highlightCatalogueButton.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.productName, "Preserved rose display");
+  assert.equal(seed.sourceId, "catalogue:studio-red-rose-resin-display.jpeg");
 });
 
 test("reads square, round, and arch dimensions from customizer controls, including feet", () => {
