@@ -285,14 +285,14 @@
 
     function catalogueSeed(card) {
       var image = card.querySelector("img[src]");
-      var title = card.querySelector("figcaption strong");
+      var title = card.querySelector("figcaption strong") || card.querySelector("figcaption h3");
       if (!image || !title) return null;
       var sourceId = "catalogue:" + image.getAttribute("src").replace(/^assets\//, "");
       var details = Array.prototype.map.call(card.querySelectorAll("figcaption p"), function (node) { return node.textContent.trim(); }).join(" ");
       return sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details });
     }
 
-    document.querySelectorAll("[data-carousel] .work-card").forEach(function (card) {
+    document.querySelectorAll("[data-carousel] .work-card, .romantic-keepsake-card").forEach(function (card) {
       var seed = catalogueSeed(card);
       var caption = card.querySelector("figcaption");
       if (!seed || !caption || caption.querySelector("[data-order-prefill]")) return;

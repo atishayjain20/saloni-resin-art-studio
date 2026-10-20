@@ -100,6 +100,25 @@ h1 em { color: var(--rose); font-style: italic; }
 .offering-dot { display: block; width: 0.7rem; height: 0.7rem; margin-top: 0.55rem; border-radius: 50%; }
 .dot-rose { background: var(--rose); }.dot-orchid { background: var(--orchid); }.dot-marigold { background: var(--marigold); }.dot-leaf { background: var(--leaf); }
 
+.romantic-keepsakes { margin-block: clamp(1.5rem, 4vw, 3.5rem); padding: clamp(1.25rem, 3.5vw, 3rem); border: 1px solid rgba(166, 70, 83, 0.18); border-radius: 1.5rem; background: linear-gradient(135deg, #f5e4dc 0%, #f0d5d3 100%); box-shadow: var(--shadow); }
+.romantic-keepsakes-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.8fr); align-items: end; gap: 1.5rem clamp(2rem, 6vw, 5rem); margin-bottom: 1.8rem; }
+.romantic-keepsakes-heading h2 { max-width: 10ch; margin-bottom: 0; font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 0.98; }
+.romantic-keepsakes-intro { max-width: 36ch; color: var(--ink); }
+.romantic-keepsakes-intro p { margin-bottom: 1rem; font-size: 0.95rem; }
+.romantic-keepsake-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; overflow-x: hidden; scroll-snap-type: x mandatory; }
+.romantic-keepsake-card { min-width: 0; padding: 0.8rem; border: 1px solid rgba(166, 70, 83, 0.16); border-radius: 1rem; background: rgba(255, 250, 244, 0.72); scroll-snap-align: start; }
+.romantic-keepsake-card figure { margin: 0; }
+.romantic-keepsake-card img { width: 100%; height: clamp(9rem, 15vw, 11rem); aspect-ratio: 4 / 3; object-fit: contain; object-position: center; border-radius: 0.75rem; background: rgba(247, 240, 231, 0.72); }
+.romantic-keepsake-card figcaption { padding: 0.85rem 0.15rem 0.25rem; }
+.romantic-keepsake-card figcaption span { display: block; margin-bottom: 0.35rem; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.romantic-keepsake-card h3 { margin-bottom: 0.35rem; font-size: clamp(1.35rem, 2.1vw, 1.7rem); line-height: 1; }
+.romantic-keepsake-card p { max-width: 29ch; margin: 0; color: var(--ink); font-size: 0.8rem; }
+.romantic-keepsake-notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.25rem; padding-top: 1.2rem; border-top: 1px solid rgba(166, 70, 83, 0.18); }
+.romantic-keepsake-notes-label { grid-column: 1 / -1; margin: 0; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; }
+.romantic-keepsake-note { margin: 0; padding: 0.25rem 0.15rem; }
+.romantic-keepsake-note blockquote { max-width: 38ch; margin: 0 0 0.65rem; font: 500 clamp(1.05rem, 1.7vw, 1.35rem)/1.15 var(--display); letter-spacing: -0.025em; }
+.romantic-keepsake-note cite { color: var(--cocoa); font-size: 0.76rem; font-style: normal; font-weight: 800; }
+
 .work-section { padding-block: clamp(4rem, 9vw, 8rem); }
 .work-section-warm { width: 100%; max-width: none; padding-inline: max(var(--gutter), calc((100vw - var(--max)) / 2)); background: #f1e0d8; }
 .rail-heading { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
@@ -128,13 +147,13 @@ h1 em { color: var(--rose); font-style: italic; }
 .work-card figcaption .keepsake-story { max-width: 30ch; margin-top: 0.45rem; color: var(--cocoa); font-size: 0.78rem; }
 .work-card figcaption .keepsake-story-label { display: inline; margin-right: 0.3rem; color: var(--rose-ink); font-size: 0.64rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .rail-heading .catalogue-note { max-width: 42ch; margin: 0.9rem 0 0; color: var(--muted); font-size: 0.8rem; }
-.work-card figcaption .product-pricing { display: grid; gap: 0.4rem; margin: 1rem 0 0; padding-top: 0.8rem; border-top: 1px solid var(--line); }
-.work-card figcaption .product-pricing > div { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; min-width: 0; }
-.work-card figcaption .product-pricing dt { color: var(--muted); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
-.work-card figcaption .product-pricing dd { margin: 0; color: var(--ink); font-size: 0.82rem; font-weight: 800; text-align: right; overflow-wrap: anywhere; }
-.work-card figcaption .product-pricing > div:nth-child(2) dd { color: var(--cocoa); font: 500 1.35rem/1 var(--display); letter-spacing: -0.02em; }
-.work-card figcaption .product-pricing > div:last-child dt, .work-card figcaption .product-pricing > div:last-child dd { color: var(--rose-ink); }
-.work-card figcaption .product-pricing s { color: var(--muted); font-weight: 500; }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing { display: grid; gap: 0.4rem; margin: 1rem 0 0; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; min-width: 0; }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dt { color: var(--muted); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dd { margin: 0; color: var(--ink); font-size: 0.82rem; font-weight: 800; text-align: right; overflow-wrap: anywhere; }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:nth-child(2) dd { color: var(--cocoa); font: 500 1.35rem/1 var(--display); letter-spacing: -0.02em; }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dt, :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dd { color: var(--rose-ink); }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing s { color: var(--muted); font-weight: 500; }
 
 dialog.lightbox-dialog:not([open]) { display: none; }
 dialog.lightbox-dialog { width: min(78vw, 720px); max-width: calc(100vw - 2rem); max-height: 65dvh; padding: 0; border: 0; background: transparent; color: var(--ink); }
@@ -220,6 +239,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   .hero { grid-template-columns: 1fr; min-height: auto; padding-top: 4.5rem; }.hero-copy { max-width: 44rem; }.hero-collage { min-height: min(88vw, 570px); }.hero-image-main { inset: 2% 22% 0 7%; }.hero-image-clock { inset: 39% 0 3% 66%; }
   .intro-band { grid-template-columns: 1fr 1fr; gap: 2rem; }.offering-list { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 1.5rem; }
   .carousel-track { grid-auto-columns: minmax(245px, 38vw); }
+  .romantic-keepsake-rail { grid-auto-flow: column; grid-auto-columns: minmax(78%, 78%); grid-template-columns: none; gap: 0.75rem; overflow-x: auto; padding: 0.15rem 18% 0.65rem 0.1rem; scrollbar-width: thin; }
   .offers-section { grid-template-columns: 1fr; align-items: start; }.offers-actions { justify-content: flex-start; }.process-section { grid-template-columns: 1fr; }.process-lead { position: static; }.process-lead h2 { max-width: 12ch; }.storyboard { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }.story-step, .story-step-offset { display: block; transform: none; }.story-step img { aspect-ratio: 0.72; max-height: none; object-fit: cover; margin-bottom: 1rem; }.story-step > div { padding: 0; }.story-step h3 { font-size: 1.5rem; }.story-step p { font-size: 0.78rem; }
   .customizer-heading { grid-template-columns: 1fr 1fr; gap: 1.5rem; }.customizer-heading .eyebrow { grid-column: 1 / -1; }.customizer-layout { grid-template-columns: 1fr; }.customizer-preview-panel { position: static; }.customizer-preview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr); gap: 1rem; align-items: center; }.customizer-preview .preview-label, .customizer-preview figcaption { grid-column: 1 / -1; }.customizer-summary-card { margin-top: 0; }
   .order-section { grid-template-columns: 1fr 1fr; gap: 2rem; }
@@ -228,6 +248,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 @media (max-width: 620px) {
   :root { --gutter: 1rem; }.header-inner { display: block; padding-block: 0.85rem; }.site-nav { justify-content: flex-start; margin-top: 0.9rem; font-size: 0.75rem; }.site-nav .nav-cta { margin-left: auto; }.hero { padding-block: 3.5rem 4rem; }.hero h1 { font-size: clamp(3.2rem, 16vw, 5rem); }.hero-actions { align-items: stretch; flex-direction: column; max-width: 15rem; }.button { justify-content: space-between; }.hero-collage { min-height: 105vw; max-height: 31rem; }.hero-image-main { inset: 1% 15% 0 0; }.hero-image-clock { inset: 37% -1% 4% 64%; border-width: 0.45rem; }.hero-note { right: 0; top: 4%; font-size: 0.9rem; }
   .intro-band { display: block; padding-block: 4.5rem; }.intro-copy { margin-bottom: 2.4rem; }.section-heading h2, .rail-heading h2, .process-lead h2, .gallery-heading h2, .order-copy h2 { font-size: clamp(2.5rem, 12vw, 4rem); }.offering-list { display: grid; grid-template-columns: 1fr; margin-top: 2.5rem; padding-top: 1.4rem; }.offering-list li { max-width: 29rem; }
+  .romantic-keepsakes { margin-block: 1.25rem; padding: 1.2rem; border-radius: 1.1rem; }.romantic-keepsakes-heading { display: block; margin-bottom: 1.35rem; }.romantic-keepsakes-heading h2 { font-size: clamp(2.35rem, 12vw, 3.8rem); }.romantic-keepsakes-intro { margin-top: 1rem; }.romantic-keepsake-card { padding: 0.7rem; }.romantic-keepsake-card img { height: 11rem; }.romantic-keepsake-card figcaption .product-pricing > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0.75rem; }.romantic-keepsake-card figcaption .product-pricing dd { white-space: nowrap; overflow-wrap: normal; }.romantic-keepsake-notes { grid-template-columns: 1fr; gap: 0.7rem; margin-top: 0.8rem; padding-top: 1rem; }
   .work-section, .work-section-warm { padding-block: 4.5rem; }.offers-section { margin-bottom: 4.5rem; padding: 2rem 1.2rem; }.offers-section h2 { font-size: clamp(2.5rem, 12vw, 4rem); }.offers-actions { flex-direction: column; align-items: stretch; max-width: 16rem; }.rail-heading { align-items: end; }.rail-heading h2 { max-width: 9ch; }.carousel-track { grid-auto-columns: minmax(78vw, 78vw); gap: 1rem; padding-bottom: 0.8rem; }.work-card img { aspect-ratio: 0.76; }.work-card figcaption strong { font-size: 1.8rem; }
   dialog.lightbox-dialog { width: calc(100vw - 1rem); max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }.lightbox-panel { max-height: calc(100dvh - 1rem); padding: 3rem 0.7rem 0.8rem; border-radius: 0.8rem; }.lightbox-image { max-height: calc(100dvh - 6rem); }.lightbox-caption { font-size: 0.76rem; }
   .storyboard { grid-template-columns: 1fr; gap: 2.8rem; }.story-step { display: grid; grid-template-columns: 0.72fr 1fr; align-items: end; gap: 1rem; }.story-step img { margin-bottom: 0; }.story-step h3 { font-size: 1.6rem; }.story-step p { font-size: 0.82rem; }
