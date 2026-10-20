@@ -105,14 +105,16 @@ h1 em { color: var(--rose); font-style: italic; }
 .romantic-keepsakes-heading h2 { max-width: 10ch; margin-bottom: 0; font-size: clamp(2.3rem, 5vw, 4.2rem); line-height: 0.98; }
 .romantic-keepsakes-intro { max-width: 36ch; color: var(--ink); }
 .romantic-keepsakes-intro p { margin-bottom: 1rem; font-size: 0.95rem; }
-.romantic-keepsake-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; overflow-x: hidden; scroll-snap-type: x mandatory; }
+.romantic-keepsakes-catalogue-note { max-width: 42ch; margin: 0.8rem 0 1rem; color: var(--muted); font-size: 0.8rem !important; }
+.romantic-keepsakes .rail-controls { justify-content: flex-start; margin-top: 1rem; }
 .romantic-keepsake-card { min-width: 0; padding: 0.8rem; border: 1px solid rgba(166, 70, 83, 0.16); border-radius: 1rem; background: rgba(255, 250, 244, 0.72); scroll-snap-align: start; }
 .romantic-keepsake-card figure { margin: 0; }
 .romantic-keepsake-card img { width: 100%; height: clamp(9rem, 15vw, 11rem); aspect-ratio: 4 / 3; object-fit: contain; object-position: center; border-radius: 0.75rem; background: rgba(247, 240, 231, 0.72); }
 .romantic-keepsake-card figcaption { padding: 0.85rem 0.15rem 0.25rem; }
 .romantic-keepsake-card figcaption span { display: block; margin-bottom: 0.35rem; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .romantic-keepsake-card h3 { margin-bottom: 0.35rem; font-size: clamp(1.35rem, 2.1vw, 1.7rem); line-height: 1; }
-.romantic-keepsake-card p { max-width: 29ch; margin: 0; color: var(--ink); font-size: 0.8rem; }
+.romantic-keepsake-card figcaption p { max-width: 29ch; margin: 0; color: var(--ink); font-size: 0.8rem; }
+.romantic-keepsake-card figcaption > p:first-of-type, .studio-art-section .work-card figcaption > p:first-of-type { font-size: 0.75rem; }
 .romantic-keepsake-notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.25rem; padding-top: 1.2rem; border-top: 1px solid rgba(166, 70, 83, 0.18); }
 .romantic-keepsake-notes-label { grid-column: 1 / -1; margin: 0; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; }
 .romantic-keepsake-note { margin: 0; padding: 0.25rem 0.15rem; }
@@ -239,7 +241,6 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   .hero { grid-template-columns: 1fr; min-height: auto; padding-top: 4.5rem; }.hero-copy { max-width: 44rem; }.hero-collage { min-height: min(88vw, 570px); }.hero-image-main { inset: 2% 22% 0 7%; }.hero-image-clock { inset: 39% 0 3% 66%; }
   .intro-band { grid-template-columns: 1fr 1fr; gap: 2rem; }.offering-list { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 1.5rem; }
   .carousel-track { grid-auto-columns: minmax(245px, 38vw); }
-  .romantic-keepsake-rail { grid-auto-flow: column; grid-auto-columns: minmax(78%, 78%); grid-template-columns: none; gap: 0.75rem; overflow-x: auto; padding: 0.15rem 18% 0.65rem 0.1rem; scrollbar-width: thin; }
   .offers-section { grid-template-columns: 1fr; align-items: start; }.offers-actions { justify-content: flex-start; }.process-section { grid-template-columns: 1fr; }.process-lead { position: static; }.process-lead h2 { max-width: 12ch; }.storyboard { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }.story-step, .story-step-offset { display: block; transform: none; }.story-step img { aspect-ratio: 0.72; max-height: none; object-fit: cover; margin-bottom: 1rem; }.story-step > div { padding: 0; }.story-step h3 { font-size: 1.5rem; }.story-step p { font-size: 0.78rem; }
   .customizer-heading { grid-template-columns: 1fr 1fr; gap: 1.5rem; }.customizer-heading .eyebrow { grid-column: 1 / -1; }.customizer-layout { grid-template-columns: 1fr; }.customizer-preview-panel { position: static; }.customizer-preview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr); gap: 1rem; align-items: center; }.customizer-preview .preview-label, .customizer-preview figcaption { grid-column: 1 / -1; }.customizer-summary-card { margin-top: 0; }
   .order-section { grid-template-columns: 1fr 1fr; gap: 2rem; }

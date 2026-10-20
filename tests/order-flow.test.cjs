@@ -24,6 +24,7 @@ class Element {
     if (selector === "figcaption strong") return this.titleTag === "strong" ? this.title : null;
     if (selector === "figcaption h3") return this.titleTag === "h3" ? this.title : null;
     if (selector === "figcaption") return this.caption;
+    if (selector === "figcaption span") return this.disclosure || null;
     if (selector === ".product-pricing dt") return this.priceLabel || null;
     if (selector === ".product-pricing dd") return this.priceValue || null;
     if (selector === "[data-order-prefill]") return null;
@@ -31,6 +32,7 @@ class Element {
   }
   querySelectorAll(selector) {
     if (selector === "figcaption p") return this.detailNodes || [];
+    if (selector === ".product-pricing > div") return this.priceRows || [];
     return [];
   }
   scrollIntoView() {}
@@ -62,19 +64,29 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   card.title = { textContent: "Test frame" };
   card.titleTag = "strong";
   card.detailNodes = [{ textContent: "Blue and gold" }];
-  const highlightCard = new Element("romantic-keepsake-card");
-  highlightCard.caption = new Element("figcaption");
-  highlightCard.image = { getAttribute: () => "assets/studio-red-rose-resin-display.jpeg" };
-  highlightCard.title = { textContent: "Preserved rose display" };
-  highlightCard.titleTag = "h3";
-  highlightCard.detailNodes = [{ textContent: "Preserved red roses, held close for a lasting moment." }];
-  const generatedCatalogue = [
-    ["concept-floral-memory-frame.webp", "Your flowers, held close", "6,749"],
-    ["concept-ocean-clock.webp", "A little blue hour", "2,749"],
-    ["concept-tray-hamper.webp", "A tray full of celebration", "2,199"],
-    ["concept-floral-coasters.webp", "Little messages, shared", "1,549"],
+  const romanticExistingCatalogue = [
+    ["studio-rose-hexagon-keepsake.jpeg", "Rose hexagon", "First rose from a boyfriend, held in love."],
+    ["studio-personalized-photo-clock.jpeg", "Personalized photo clock", "A favourite couple photo, held in a clock."],
+    ["romantic-hamper.jpg", "Say it without a speech", "Photos, flowers, and the little words that are better kept close."],
+    ["studio-red-rose-resin-display.jpeg", "Preserved rose display", "Preserved red roses, held close for a lasting moment."],
   ];
-  const generatedCards = generatedCatalogue.map(([asset, title, price]) => {
+  const romanticExistingCards = romanticExistingCatalogue.map(([asset, title, copy]) => {
+    const existingCard = new Element("romantic-keepsake-card");
+    existingCard.caption = new Element("figcaption");
+    existingCard.image = { getAttribute: () => `assets/${asset}` };
+    existingCard.title = { textContent: title };
+    existingCard.titleTag = "h3";
+    existingCard.detailNodes = [{ textContent: copy }];
+    return existingCard;
+  });
+  const highlightCard = romanticExistingCards[3];
+  const generatedCatalogue = [
+    ["concept-floral-memory-frame.webp", "Your flowers, held close", "8,999", "6,749", 25],
+    ["concept-ocean-clock.webp", "A little blue hour", "3,999", "2,749", 31],
+    ["concept-tray-hamper.webp", "A tray full of celebration", "2,999", "2,199", 27],
+    ["concept-floral-coasters.webp", "Little messages, shared", "2,199", "1,549", 30],
+  ];
+  const generatedCards = generatedCatalogue.map(([asset, title, regular, festive, discount]) => {
     const generatedCard = new Element("generated-catalogue-card");
     generatedCard.caption = new Element("figcaption");
     generatedCard.image = { getAttribute: () => `assets/${asset}` };
@@ -84,9 +96,42 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
       { textContent: "Flowers from a favourite day, held in a soft arch." },
       { textContent: "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery." },
     ];
-    generatedCard.priceLabel = { textContent: "Average listed price" };
-    generatedCard.priceValue = { textContent: `₹${price}` };
+    generatedCard.priceRows = [
+      ["Regular price", `₹${regular}`],
+      ["Festive price", `₹${festive}`],
+      ["Discount", `${discount}% off`],
+    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return generatedCard;
+  });
+  const romanticCatalogue = [
+    ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "899", "599", 33],
+    ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "1,199", "799", 33],
+    ["romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,499", "1,099", 27],
+    ["romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "999", "699", 30],
+    ["romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "699", "399", 43],
+    ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "1,299", "899", 31],
+    ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "899", "599", 33],
+    ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,999", "1,499", 25],
+    ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "1,299", "899", 31],
+    ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "3,499", "2,499", 29],
+  ];
+  const romanticConceptCards = romanticCatalogue.map(([asset, title, copy, regular, festive, discount]) => {
+    const romanticCard = new Element("romantic-keepsake-card");
+    romanticCard.caption = new Element("figcaption");
+    romanticCard.image = { getAttribute: () => `assets/${asset}` };
+    romanticCard.title = { textContent: title };
+    romanticCard.titleTag = "h3";
+    romanticCard.disclosure = { textContent: "Concept preview · made to order" };
+    romanticCard.detailNodes = [
+      { textContent: copy },
+      { textContent: "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery." },
+    ];
+    romanticCard.priceRows = [
+      ["Regular price", `₹${regular}`],
+      ["Festive price", `₹${festive}`],
+      ["Discount", `${discount}% off`],
+    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
+    return romanticCard;
   });
   const posted = [];
   const body = { appendChild() {}, removeChild() {} };
@@ -104,7 +149,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     body,
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
-    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, highlightCard, ...generatedCards] : []; },
+    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards] : []; },
     querySelector(selector) { return selector === '[data-order-prefill="customizer"]' ? customizer : null; },
     createElement(tag) {
       const element = new Element(tag);
@@ -120,8 +165,10 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   documentObject.ready();
   const catalogueButton = card.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
   const highlightCatalogueButton = highlightCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
+  const romanticExistingButtons = romanticExistingCards.map((existingCard) => existingCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const generatedCatalogueButtons = generatedCards.map((generatedCard) => generatedCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], customizer, posted, windowObject };
+  const romanticConceptButtons = romanticConceptCards.map((romanticCard) => romanticCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
+  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, customizer, posted, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -190,19 +237,71 @@ test("uses the shared catalogue CTA and preserves generated-design details in a 
   assert.match(seed.designDetails, /Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery\./);
 });
 
-test("includes each generated design average listed price in order seed details", () => {
+test("includes each generated design pricing in order seed details", () => {
   const flow = runFlow();
   const expected = [
-    ["concept-floral-memory-frame.webp", "6,749"],
-    ["concept-ocean-clock.webp", "2,749"],
-    ["concept-tray-hamper.webp", "2,199"],
-    ["concept-floral-coasters.webp", "1,549"],
+    ["concept-floral-memory-frame.webp", "8,999", "6,749", 25],
+    ["concept-ocean-clock.webp", "3,999", "2,749", 31],
+    ["concept-tray-hamper.webp", "2,999", "2,199", 27],
+    ["concept-floral-coasters.webp", "2,199", "1,549", 30],
   ];
-  expected.forEach(([asset, price], index) => {
+  expected.forEach(([asset, regular, festive, discount], index) => {
     flow.generatedCatalogueButtons[index].dispatch("click");
     const seed = submittedSeed(flow.posted);
     assert.equal(seed.sourceId, `catalogue:${asset}`);
-    assert.ok(seed.designDetails.includes(`Average listed price: ₹${price}`));
+    assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+    assert.ok(seed.designDetails.includes(`Regular price: ₹${regular}`));
+    assert.ok(seed.designDetails.includes(`Festive price: ₹${festive}`));
+    assert.ok(seed.designDetails.includes(`Discount: ${discount}% off`));
+    assert.doesNotMatch(seed.designDetails, /Average listed price/);
+  });
+});
+
+test("seeds every romantic concept with its disclosure, exact price, and blank dimensions", () => {
+  const flow = runFlow();
+  const expected = [
+    ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "899", "599", 33],
+    ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "1,199", "799", 33],
+    ["romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,499", "1,099", 27],
+    ["romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "999", "699", 30],
+    ["romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "699", "399", 43],
+    ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "1,299", "899", 31],
+    ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "899", "599", 33],
+    ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,999", "1,499", 25],
+    ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "1,299", "899", 31],
+    ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "3,499", "2,499", 29],
+  ];
+  expected.forEach(([asset, title, copy, regular, festive, discount], index) => {
+    const button = flow.romanticConceptButtons[index];
+    assert.equal(button.textContent, "Start an order");
+    button.dispatch("click");
+    const seed = submittedSeed(flow.posted);
+    assert.equal(seed.sourceId, `catalogue:${asset}`);
+    assert.equal(seed.productName, title);
+    assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(seed.designDetails, /Concept preview · made to order/);
+    assert.match(seed.designDetails, new RegExp(`Regular price: ₹${regular}`));
+    assert.match(seed.designDetails, new RegExp(`Festive price: ₹${festive}`));
+    assert.match(seed.designDetails, new RegExp(`Discount: ${discount}% off`));
+    assert.doesNotMatch(seed.designDetails, /Average listed price/);
+    assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+  });
+});
+
+test("keeps order seeds correct at the first, tenth, eleventh, and fourteenth romantic cards", () => {
+  const flow = runFlow();
+  const selected = [
+    [flow.romanticConceptButtons[0], "catalogue:romantic-us-keychain-pair.webp", "Two keys, one little us"],
+    [flow.romanticConceptButtons[9], "catalogue:romantic-couple-miniature.webp", "Your story, in 3D"],
+    [flow.romanticExistingButtons[0], "catalogue:studio-rose-hexagon-keepsake.jpeg", "Rose hexagon"],
+    [flow.romanticExistingButtons[3], "catalogue:studio-red-rose-resin-display.jpeg", "Preserved rose display"],
+  ];
+  selected.forEach(([button, sourceId, productName]) => {
+    button.dispatch("click");
+    const seed = submittedSeed(flow.posted);
+    assert.equal(seed.sourceId, sourceId);
+    assert.equal(seed.productName, productName);
+    assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
   });
 });
 
