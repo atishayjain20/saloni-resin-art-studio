@@ -289,11 +289,16 @@
       if (!image || !title) return null;
       var sourceId = "catalogue:" + image.getAttribute("src").replace(/^assets\//, "");
       var details = Array.prototype.map.call(card.querySelectorAll("figcaption p"), function (node) { return node.textContent.trim(); }).join(" ");
-      var priceLabel = card.querySelector(".product-pricing dt");
-      var priceValue = card.querySelector(".product-pricing dd");
-      if (priceLabel && priceValue && priceLabel.textContent.trim() === "Average listed price") {
-        details += (details ? " " : "") + priceLabel.textContent.trim() + ": " + priceValue.textContent.trim();
+      var disclosure = card.querySelector("figcaption span");
+      if (disclosure && disclosure.textContent.trim() === "Concept preview · made to order") {
+        details += (details ? " " : "") + disclosure.textContent.trim();
       }
+      var pricingDetails = Array.prototype.map.call(card.querySelectorAll(".product-pricing > div"), function (row) {
+        var priceLabel = row.querySelector("dt");
+        var priceValue = row.querySelector("dd");
+        return priceLabel && priceValue ? priceLabel.textContent.trim() + ": " + priceValue.textContent.trim() : "";
+      }).filter(function (detail) { return detail; });
+      if (pricingDetails.length) details += (details ? " " : "") + pricingDetails.join(" ");
       return sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details });
     }
 
