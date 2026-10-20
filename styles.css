@@ -166,21 +166,6 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .lightbox-close { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--ivory); color: var(--ink); font-size: 1.4rem; line-height: 1; }
 .lightbox-close:hover, .lightbox-close:focus-visible { background: var(--ink); color: var(--ivory); }
 
-.concept-section { padding-block: 2rem; }
-.concept-section .rail-heading { margin-bottom: 1.25rem; }
-.concept-section .rail-heading h2 { max-width: 14ch; }
-.concept-section .rail-heading > div:first-child > p:last-child { max-width: 42ch; margin: 0.8rem 0 0; color: var(--muted); font-size: 0.82rem; }
-.concept-section .carousel-track { grid-auto-columns: minmax(260px, 300px); }
-.concept-card { min-width: 0; padding: 0.7rem; border: 1px solid var(--soft-line); border-radius: 1rem; background: var(--paper); }
-.concept-card img { width: 100%; height: 210px; aspect-ratio: 1; object-fit: contain; object-position: center; border-radius: 0.8rem; background: rgba(247, 240, 231, 0.72); }
-.concept-card figcaption { padding: 0.85rem 0.15rem 0.2rem; }
-.concept-card figcaption span { display: block; margin-bottom: 0.35rem; color: var(--cocoa); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.11em; text-transform: uppercase; }
-.concept-card figcaption strong { display: block; margin-bottom: 0.4rem; font: 500 1.5rem/1.05 var(--display); letter-spacing: -0.03em; }
-.concept-card figcaption p { max-width: 32ch; margin: 0.45rem 0 0; color: var(--muted); font-size: 0.78rem; }
-.concept-card figcaption p:nth-of-type(2) { color: var(--cocoa); font-weight: 700; }
-.concept-card figcaption p:nth-of-type(3), .concept-card figcaption p:nth-of-type(4) { color: var(--ink); font-size: 0.74rem; }
-.concept-section .concept-note { margin: 1.25rem 0 0; color: var(--muted); font-size: 0.76rem; }
-
 .offers-section { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr); align-items: end; gap: 2rem; margin-bottom: clamp(4rem, 8vw, 7rem); padding: clamp(2rem, 6vw, 5rem); border-radius: 1.2rem; background: var(--cocoa); color: var(--ivory); }
 .offers-section .eyebrow { color: #f2b0b9; }.offers-section h2 { max-width: 11ch; margin-bottom: 1.1rem; font-size: clamp(2.5rem, 5vw, 4.6rem); line-height: 0.98; }.offers-section .offers-copy > p:last-child { max-width: 34ch; margin: 0; color: #f0ddd4; font-size: 1.05rem; }.offers-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: flex-end; }.offers-section .button-dark { background: var(--ivory); color: var(--ink); }.offers-section .button-dark:hover, .offers-section .button-dark:focus-visible { background: #fff; }.offers-section .button-line { border-color: var(--ivory); color: var(--ivory); }.offers-section .button-line:hover, .offers-section .button-line:focus-visible { background: var(--ivory); color: var(--cocoa); }
 .offers-section :focus-visible { outline-color: var(--ivory); }
@@ -265,7 +250,6 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   .intro-band { display: block; padding-block: 4.5rem; }.intro-copy { margin-bottom: 2.4rem; }.section-heading h2, .rail-heading h2, .process-lead h2, .gallery-heading h2, .order-copy h2 { font-size: clamp(2.5rem, 12vw, 4rem); }.offering-list { display: grid; grid-template-columns: 1fr; margin-top: 2.5rem; padding-top: 1.4rem; }.offering-list li { max-width: 29rem; }
   .romantic-keepsakes { margin-block: 1.25rem; padding: 1.2rem; border-radius: 1.1rem; }.romantic-keepsakes-heading { display: block; margin-bottom: 1.35rem; }.romantic-keepsakes-heading h2 { font-size: clamp(2.35rem, 12vw, 3.8rem); }.romantic-keepsakes-intro { margin-top: 1rem; }.romantic-keepsake-card { padding: 0.7rem; }.romantic-keepsake-card img { height: 11rem; }.romantic-keepsake-card figcaption .product-pricing > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0.75rem; }.romantic-keepsake-card figcaption .product-pricing dd { white-space: nowrap; overflow-wrap: normal; }.romantic-keepsake-notes { grid-template-columns: 1fr; gap: 0.7rem; margin-top: 0.8rem; padding-top: 1rem; }
   .work-section, .work-section-warm { padding-block: 4.5rem; }.offers-section { margin-bottom: 4.5rem; padding: 2rem 1.2rem; }.offers-section h2 { font-size: clamp(2.5rem, 12vw, 4rem); }.offers-actions { flex-direction: column; align-items: stretch; max-width: 16rem; }.rail-heading { align-items: end; }.rail-heading h2 { max-width: 9ch; }.carousel-track { grid-auto-columns: minmax(78vw, 78vw); gap: 1rem; padding-bottom: 0.8rem; }.work-card img { aspect-ratio: 0.76; }.work-card figcaption strong { font-size: 1.8rem; }
-  .concept-section { padding-block: 2rem; }.concept-section .rail-heading h2 { max-width: 12ch; }.concept-section .carousel-track { grid-auto-columns: minmax(78vw, 78vw); padding-right: 14vw; }.concept-card img { height: 210px; }.concept-card figcaption strong { font-size: 1.65rem; }
   dialog.lightbox-dialog { width: calc(100vw - 1rem); max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }.lightbox-panel { max-height: calc(100dvh - 1rem); padding: 3rem 0.7rem 0.8rem; border-radius: 0.8rem; }.lightbox-image { max-height: calc(100dvh - 6rem); }.lightbox-caption { font-size: 0.76rem; }
   .storyboard { grid-template-columns: 1fr; gap: 2.8rem; }.story-step { display: grid; grid-template-columns: 0.72fr 1fr; align-items: end; gap: 1rem; }.story-step img { margin-bottom: 0; }.story-step h3 { font-size: 1.6rem; }.story-step p { font-size: 0.82rem; }
   .gallery-heading { display: block; }.gallery-heading > p { margin-top: 1rem; }.gallery-grid { grid-template-columns: 1fr 1fr; grid-auto-rows: 11rem; gap: 0.65rem; }.gallery-item-wide { grid-column: span 2; grid-row: span 2; }.gallery-item figcaption { right: 0.45rem; bottom: 0.45rem; left: 0.45rem; padding: 0.35rem 0.45rem; font-size: 0.72rem; }

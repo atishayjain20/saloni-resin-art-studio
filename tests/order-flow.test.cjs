@@ -24,6 +24,8 @@ class Element {
     if (selector === "figcaption strong") return this.titleTag === "strong" ? this.title : null;
     if (selector === "figcaption h3") return this.titleTag === "h3" ? this.title : null;
     if (selector === "figcaption") return this.caption;
+    if (selector === ".product-pricing dt") return this.priceLabel || null;
+    if (selector === ".product-pricing dd") return this.priceValue || null;
     if (selector === "[data-order-prefill]") return null;
     return null;
   }
@@ -66,17 +68,26 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   highlightCard.title = { textContent: "Preserved rose display" };
   highlightCard.titleTag = "h3";
   highlightCard.detailNodes = [{ textContent: "Preserved red roses, held close for a lasting moment." }];
-  const conceptCard = new Element("concept-card");
-  conceptCard.attributes["data-concept"] = "";
-  conceptCard.caption = new Element("figcaption");
-  conceptCard.image = { getAttribute: () => "assets/concept-floral-memory-frame.webp" };
-  conceptCard.title = { textContent: "Your flowers, held close" };
-  conceptCard.titleTag = "strong";
-  conceptCard.detailNodes = [
-    { textContent: "Flowers from a favourite day, held in a soft arch." },
-    { textContent: "Market reference in India: ₹2,499–₹10,999" },
-    { textContent: "Concept preview. Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery." },
+  const generatedCatalogue = [
+    ["concept-floral-memory-frame.webp", "Your flowers, held close", "6,749"],
+    ["concept-ocean-clock.webp", "A little blue hour", "2,749"],
+    ["concept-tray-hamper.webp", "A tray full of celebration", "2,199"],
+    ["concept-floral-coasters.webp", "Little messages, shared", "1,549"],
   ];
+  const generatedCards = generatedCatalogue.map(([asset, title, price]) => {
+    const generatedCard = new Element("generated-catalogue-card");
+    generatedCard.caption = new Element("figcaption");
+    generatedCard.image = { getAttribute: () => `assets/${asset}` };
+    generatedCard.title = { textContent: title };
+    generatedCard.titleTag = "strong";
+    generatedCard.detailNodes = [
+      { textContent: "Flowers from a favourite day, held in a soft arch." },
+      { textContent: "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery." },
+    ];
+    generatedCard.priceLabel = { textContent: "Average listed price" };
+    generatedCard.priceValue = { textContent: `₹${price}` };
+    return generatedCard;
+  });
   const posted = [];
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
@@ -93,7 +104,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     body,
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
-    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, highlightCard, conceptCard] : []; },
+    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, highlightCard, ...generatedCards] : []; },
     querySelector(selector) { return selector === '[data-order-prefill="customizer"]' ? customizer : null; },
     createElement(tag) {
       const element = new Element(tag);
@@ -109,8 +120,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   documentObject.ready();
   const catalogueButton = card.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
   const highlightCatalogueButton = highlightCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
-  const conceptCatalogueButton = conceptCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
-  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, conceptCard, conceptCatalogueButton, customizer, posted, windowObject };
+  const generatedCatalogueButtons = generatedCards.map((generatedCard) => generatedCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
+  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], customizer, posted, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -165,18 +176,34 @@ test("leaves catalogue dimensions blank when the catalogue has no real size", ()
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
 });
 
-test("uses concept CTA and preserves concept details in a catalogue seed", () => {
+test("uses the shared catalogue CTA and preserves generated-design details in a catalogue seed", () => {
   const flow = runFlow();
-  assert.equal(flow.conceptCatalogueButton.textContent, "Check feasibility & quote");
+  assert.equal(flow.generatedCatalogueButton.textContent, "Start an order");
   assert.equal(flow.catalogueButton.textContent, "Start an order");
-  flow.conceptCatalogueButton.dispatch("click");
+  flow.generatedCatalogueButton.dispatch("click");
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.sourceKind, "catalogue");
   assert.equal(seed.sourceId, "catalogue:concept-floral-memory-frame.webp");
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
-  assert.match(seed.designDetails, /Market reference in India: ₹2,499–₹10,999/);
-  assert.match(seed.designDetails, /Concept preview\. Final quote after size, materials and delivery\./);
+  assert.doesNotMatch(seed.designDetails, /Market reference/);
+  assert.match(seed.designDetails, /Final quote after size, materials and delivery\./);
   assert.match(seed.designDetails, /Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery\./);
+});
+
+test("includes each generated design average listed price in order seed details", () => {
+  const flow = runFlow();
+  const expected = [
+    ["concept-floral-memory-frame.webp", "6,749"],
+    ["concept-ocean-clock.webp", "2,749"],
+    ["concept-tray-hamper.webp", "2,199"],
+    ["concept-floral-coasters.webp", "1,549"],
+  ];
+  expected.forEach(([asset, price], index) => {
+    flow.generatedCatalogueButtons[index].dispatch("click");
+    const seed = submittedSeed(flow.posted);
+    assert.equal(seed.sourceId, `catalogue:${asset}`);
+    assert.ok(seed.designDetails.includes(`Average listed price: ₹${price}`));
+  });
 });
 
 test("owns CAPTCHA token requests on the exact studio origin and pinned sender", () => {

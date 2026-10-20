@@ -289,6 +289,11 @@
       if (!image || !title) return null;
       var sourceId = "catalogue:" + image.getAttribute("src").replace(/^assets\//, "");
       var details = Array.prototype.map.call(card.querySelectorAll("figcaption p"), function (node) { return node.textContent.trim(); }).join(" ");
+      var priceLabel = card.querySelector(".product-pricing dt");
+      var priceValue = card.querySelector(".product-pricing dd");
+      if (priceLabel && priceValue && priceLabel.textContent.trim() === "Average listed price") {
+        details += (details ? " " : "") + priceLabel.textContent.trim() + ": " + priceValue.textContent.trim();
+      }
       return sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details });
     }
 
@@ -298,7 +303,7 @@
       if (!seed || !caption || caption.querySelector("[data-order-prefill]")) return;
       var button = document.createElement("button");
       button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "catalogue");
-      button.textContent = card.hasAttribute("data-concept") ? "Check feasibility & quote" : "Start an order";
+      button.textContent = "Start an order";
       button.addEventListener("click", function () { chooseSource(seed); });
       caption.appendChild(button);
     });
