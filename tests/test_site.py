@@ -259,6 +259,27 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(self.html.count('id="studio-art-track"'), 1)
         self.assertEqual(section_html.count('aria-controls="studio-art-track"'), 2)
 
+    def test_studio_art_has_labeled_keepsake_ideas_on_floral_cards(self):
+        section = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        section_html = section.group(0)
+        story_notes = re.findall(r'<p\b[^>]*class=["\'][^"\']*keepsake-story[^"\']*["\'][^>]*>[\s\S]*?</p>', section_html)
+        self.assertEqual(len(story_notes), 4)
+        for note in story_notes:
+            with self.subTest(note=note):
+                self.assertIn("Keepsake idea", note)
+                self.assertIn("</span> ", note)
+                self.assertNotRegex(note, re.compile(r'customer|testimonial|review|said|★★★★★', re.I))
+        for phrase in (
+            "first rose",
+            "boyfriend",
+            "first bouquet",
+            "handwritten note",
+            "special-day flower",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section_html.lower())
+
         asset_names = (
             "studio-blue-mantra-frame.jpeg",
             "studio-lilac-symbol-rakhi.jpeg",
