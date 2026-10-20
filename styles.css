@@ -123,8 +123,9 @@ h1 em { color: var(--rose); font-style: italic; }
 .work-card:nth-child(2) img { object-position: center; }.work-card:nth-child(3) img { object-position: center; }
 .work-card figcaption { padding: 1rem 0.2rem 0; }
 .work-card figcaption span { display: block; margin-bottom: 0.42rem; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; }
-.work-card figcaption strong { display: block; margin-bottom: 0.35rem; font: 500 1.65rem/1.05 var(--display); letter-spacing: -0.03em; }
-.work-card figcaption p { max-width: 28ch; margin: 0; color: var(--muted); font-size: 0.8rem; }
+.work-card figcaption strong { display: block; margin-bottom: 0.35rem; font: 500 1.65rem/1.05 var(--display); letter-spacing: -0.03em; }.work-card figcaption p { max-width: 28ch; margin: 0; color: var(--muted); font-size: 0.8rem; }
+.work-card figcaption .keepsake-story { max-width: 30ch; margin-top: 0.45rem; color: var(--cocoa); font-size: 0.78rem; }
+.work-card figcaption .keepsake-story-label { display: inline; margin-right: 0.3rem; color: var(--rose-ink); font-size: 0.64rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .rail-heading .catalogue-note { max-width: 42ch; margin: 0.9rem 0 0; color: var(--muted); font-size: 0.8rem; }
 .work-card figcaption .product-pricing { display: grid; gap: 0.4rem; margin: 1rem 0 0; padding-top: 0.8rem; border-top: 1px solid var(--line); }
 .work-card figcaption .product-pricing > div { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; min-width: 0; }
