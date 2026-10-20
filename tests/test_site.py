@@ -61,6 +61,8 @@ def find_nodes(node, attr):
 
 ROOT = Path(__file__).resolve().parents[1]
 
+FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery."
+
 ROMANTIC_CONCEPTS = (
     ("romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "899", "599", 33),
     ("romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "1,199", "799", 33),
@@ -339,8 +341,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(copy, card)
                 self.assertIn("Concept preview · made to order", card)
                 self.assertIn("Original concept preview:", card)
-                self.assertIn("Final quote after size, materials and delivery.", card)
-                self.assertIn("Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.", card)
+                self.assertNotIn(FINAL_QUOTE_NOTE, card)
                 self.assertNotIn("Market reference", card)
                 self.assertNotIn("Average listed price", card)
                 self.assertIn("Regular price", card)
@@ -697,6 +698,20 @@ class StaticSiteContractTests(unittest.TestCase):
                     self.assertNotRegex(section_match.group(0), r'<dl\b')
         self.assertNotIn("schema.org/Offer", self.html)
 
+    def test_final_quote_note_lives_once_before_the_order_form(self):
+        self.assertEqual(self.html.count(FINAL_QUOTE_NOTE), 1)
+        order = re.search(r'<section\b[^>]*id=["\']order["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(order)
+        order_html = order.group(0)
+        self.assertEqual(order_html.count(FINAL_QUOTE_NOTE), 1)
+        form_position = order_html.index('<p class="panel-label">Order request</p>')
+        note_position = order_html.index(FINAL_QUOTE_NOTE)
+        self.assertLess(note_position, form_position)
+        cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*(?:work-card|romantic-keepsake-card)[^"\']*["\'][\s\S]*?</article>', self.html)
+        for card in cards:
+            with self.subTest(card=card[:80]):
+                self.assertNotIn(FINAL_QUOTE_NOTE, card)
+
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
         self.assertEqual(len(triggers), 33)
@@ -748,8 +763,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertNotIn('data-concept', card)
                 self.assertIn("Concept preview · made to order", card)
                 self.assertNotIn("Market reference", card)
-                self.assertIn("Final quote after size, materials and delivery.", card)
-                self.assertIn("Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.", card)
+                self.assertNotIn(FINAL_QUOTE_NOTE, card)
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)

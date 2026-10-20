@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
+const FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.";
 
 class Element {
   constructor(id, value = "") {
@@ -94,7 +95,6 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     generatedCard.titleTag = "strong";
     generatedCard.detailNodes = [
       { textContent: "Flowers from a favourite day, held in a soft arch." },
-      { textContent: "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery." },
     ];
     generatedCard.priceRows = [
       ["Regular price", `₹${regular}`],
@@ -124,7 +124,6 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     romanticCard.disclosure = { textContent: "Concept preview · made to order" };
     romanticCard.detailNodes = [
       { textContent: copy },
-      { textContent: "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery." },
     ];
     romanticCard.priceRows = [
       ["Regular price", `₹${regular}`],
@@ -233,8 +232,7 @@ test("uses the shared catalogue CTA and preserves generated-design details in a 
   assert.equal(seed.sourceId, "catalogue:concept-floral-memory-frame.webp");
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
   assert.doesNotMatch(seed.designDetails, /Market reference/);
-  assert.match(seed.designDetails, /Final quote after size, materials and delivery\./);
-  assert.match(seed.designDetails, /Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery\./);
+  assert.doesNotMatch(seed.designDetails, new RegExp(FINAL_QUOTE_NOTE));
 });
 
 test("includes each generated design pricing in order seed details", () => {
@@ -253,6 +251,7 @@ test("includes each generated design pricing in order seed details", () => {
     assert.ok(seed.designDetails.includes(`Regular price: ₹${regular}`));
     assert.ok(seed.designDetails.includes(`Festive price: ₹${festive}`));
     assert.ok(seed.designDetails.includes(`Discount: ${discount}% off`));
+    assert.doesNotMatch(seed.designDetails, new RegExp(FINAL_QUOTE_NOTE));
     assert.doesNotMatch(seed.designDetails, /Average listed price/);
   });
 });
