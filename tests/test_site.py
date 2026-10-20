@@ -7,6 +7,25 @@ import unittest
 import xml.etree.ElementTree as ET
 
 
+def webp_dimensions(path):
+    """Read dimensions from a lossless/lossy WebP header without dependencies."""
+    data = path.read_bytes()
+    if data[:4] != b"RIFF" or data[8:12] != b"WEBP":
+        raise AssertionError(f"Not a WebP file: {path}")
+    chunk = data[12:16]
+    if chunk == b"VP8X":
+        return (1 + int.from_bytes(data[24:27], "little"), 1 + int.from_bytes(data[27:30], "little"))
+    if chunk == b"VP8 ":
+        start = data.find(b"\x9d\x01\x2a")
+        if start < 0:
+            raise AssertionError(f"Missing VP8 frame header: {path}")
+        return (int.from_bytes(data[start + 3:start + 5], "little") & 0x3fff, int.from_bytes(data[start + 5:start + 7], "little") & 0x3fff)
+    if chunk == b"VP8L" and data[20] == 0x2f:
+        bits = int.from_bytes(data[21:25], "little")
+        return ((bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1)
+    raise AssertionError(f"Unsupported WebP header: {path}")
+
+
 class MarkupTreeParser(HTMLParser):
     VOID_ELEMENTS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 
@@ -233,8 +252,8 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(f"<cite>{attribution}</cite>", section_html)
 
         self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#romantic-keepsakes["\']')
-        self.assertEqual(self.html.count('data-carousel='), 4)
-        self.assertEqual(self.html.count('data-lightbox-trigger'), 19)
+        self.assertEqual(self.html.count('data-carousel='), 5)
+        self.assertEqual(self.html.count('data-lightbox-trigger'), 23)
         self.assertEqual(self.html.count('class="product-pricing"'), 19)
         self.assertEqual(self.html.count('data-testimonial-card'), 5)
 
@@ -350,7 +369,7 @@ class StaticSiteContractTests(unittest.TestCase):
         owners = []
         for root in parser.roots:
             owners.extend(find_nodes(root, "data-carousel"))
-        self.assertEqual(len(owners), 4)
+        self.assertEqual(len(owners), 5)
         for owner in owners:
             with self.subTest(carousel=owner["attrs"].get("data-carousel")):
                 self.assertEqual(len(find_nodes(owner, "data-carousel-track")), 1)
@@ -559,7 +578,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
-        self.assertEqual(len(triggers), 19)
+        self.assertEqual(len(triggers), 23)
         for trigger in triggers:
             with self.subTest(trigger=trigger):
                 self.assertRegex(trigger, r'href=["\']assets/[^"\']+["\']')
@@ -584,6 +603,56 @@ class StaticSiteContractTests(unittest.TestCase):
                 card_class = 'class="work-card' if section_id != "romantic-keepsakes" else 'class="romantic-keepsake-card'
                 self.assertEqual(section.group(0).count(card_class), cards)
                 self.assertEqual(section.group(0).count('class="product-pricing"'), pricing_blocks)
+
+    def test_commission_concepts_contract(self):
+        match = re.search(r'<section\b[^>]*id=["\']commission-concepts["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(match)
+        section = match.group(0)
+        self.assertIn('class="work-section concept-section shell"', section)
+        self.assertIn('data-carousel="commission-concepts"', section)
+        self.assertIn('aria-labelledby="commission-concepts-title"', section)
+        self.assertIn("Four ideas to make your own. Explore sideways, not endlessly down.", section)
+        self.assertIn("Each design is an original concept preview, not photographed studio inventory.", section)
+        self.assertIn("Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.", section)
+        self.assertNotIn("Made-to-order concept", section)
+        self.assertNotIn("Ask about this concept", section)
+
+        expected = {
+            "Your flowers, held close": ("2,499", "10,999"),
+            "A little blue hour": ("1,799", "3,699"),
+            "A tray full of celebration": ("1,399", "3,000"),
+            "Little messages, shared": ("599", "2,500"),
+        }
+        cards = re.findall(r'<article\b[^>]*data-concept[\s\S]*?</article>', section)
+        self.assertEqual(len(cards), 4)
+        self.assertEqual(section.count('data-lightbox-trigger'), 4)
+        self.assertNotIn("product-pricing", section)
+        self.assertNotIn("<s>", section)
+        self.assertNotRegex(section, re.compile(r'\b(?:discount|festive price|available now|in stock)\b', re.I))
+        for title, (low, high) in expected.items():
+            with self.subTest(title=title):
+                card = next((card for card in cards if f">{title}</" in card), None)
+                self.assertIsNotNone(card)
+                self.assertIn("Concept to discuss", card)
+                self.assertRegex(card, rf'Market reference in India:\s*₹{re.escape(low)}–₹{re.escape(high)}')
+                self.assertIn("Concept preview. Final quote after size, materials and delivery.", card)
+                self.assertIn("Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.", card)
+                if title == "A tray full of celebration":
+                    self.assertIn("Contents chosen separately; pictured styling is not included by default.", card)
+                image = re.search(r'<img\b[^>]*>', card)
+                self.assertIsNotNone(image)
+                image_tag = image.group(0)
+                self.assertRegex(image_tag, r'alt=["\']Concept preview: [^"\']+["\']')
+                self.assertIn('loading="lazy"', image_tag)
+                self.assertIn('decoding="async"', image_tag)
+                asset = re.search(r'src=["\'](assets/concept-[^"\']+\.webp)["\']', image_tag).group(1)
+                self.assertEqual(webp_dimensions(ROOT / asset), (1024, 1024))
+                self.assertLessEqual((ROOT / asset).stat().st_size, 250 * 1024)
+                href = re.search(r'<a\b[^>]*data-lightbox-trigger[^>]*href=["\']([^"\']+)["\']', card).group(1)
+                self.assertEqual(href, asset)
+
+        self.assertEqual(self.html.count('class="product-pricing"'), 19)
+        self.assertEqual(self.html.count('data-carousel='), 5)
 
     def test_carousel_enhancement_is_progressive(self):
         self.assertGreaterEqual(self.html.count('data-carousel'), 2)
