@@ -16,6 +16,7 @@ class Element {
   dispatch(type, event = {}) { if (this.listeners[type]) this.listeners[type](Object.assign({ target: this }, event)); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] || ""; }
+  hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }
   appendChild(child) { this.children.push(child); return child; }
   remove() {}
   querySelector(selector) {
@@ -65,6 +66,17 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   highlightCard.title = { textContent: "Preserved rose display" };
   highlightCard.titleTag = "h3";
   highlightCard.detailNodes = [{ textContent: "Preserved red roses, held close for a lasting moment." }];
+  const conceptCard = new Element("concept-card");
+  conceptCard.attributes["data-concept"] = "";
+  conceptCard.caption = new Element("figcaption");
+  conceptCard.image = { getAttribute: () => "assets/concept-floral-memory-frame.webp" };
+  conceptCard.title = { textContent: "Your flowers, held close" };
+  conceptCard.titleTag = "strong";
+  conceptCard.detailNodes = [
+    { textContent: "Flowers from a favourite day, held in a soft arch." },
+    { textContent: "Market reference in India: ₹2,499–₹10,999" },
+    { textContent: "Concept preview. Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery." },
+  ];
   const posted = [];
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
@@ -81,7 +93,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     body,
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
-    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, highlightCard] : []; },
+    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, highlightCard, conceptCard] : []; },
     querySelector(selector) { return selector === '[data-order-prefill="customizer"]' ? customizer : null; },
     createElement(tag) {
       const element = new Element(tag);
@@ -97,7 +109,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   documentObject.ready();
   const catalogueButton = card.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
   const highlightCatalogueButton = highlightCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
-  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, customizer, posted, windowObject };
+  const conceptCatalogueButton = conceptCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue");
+  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, conceptCard, conceptCatalogueButton, customizer, posted, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -150,6 +163,20 @@ test("leaves catalogue dimensions blank when the catalogue has no real size", ()
   flow.catalogueButton.dispatch("click");
   const seed = submittedSeed(flow.posted);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+});
+
+test("uses concept CTA and preserves concept details in a catalogue seed", () => {
+  const flow = runFlow();
+  assert.equal(flow.conceptCatalogueButton.textContent, "Check feasibility & quote");
+  assert.equal(flow.catalogueButton.textContent, "Start an order");
+  flow.conceptCatalogueButton.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.sourceKind, "catalogue");
+  assert.equal(seed.sourceId, "catalogue:concept-floral-memory-frame.webp");
+  assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+  assert.match(seed.designDetails, /Market reference in India: ₹2,499–₹10,999/);
+  assert.match(seed.designDetails, /Concept preview\. Final quote after size, materials and delivery\./);
+  assert.match(seed.designDetails, /Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery\./);
 });
 
 test("owns CAPTCHA token requests on the exact studio origin and pinned sender", () => {
