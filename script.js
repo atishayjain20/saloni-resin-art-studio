@@ -298,7 +298,7 @@
       if (!seed || !caption || caption.querySelector("[data-order-prefill]")) return;
       var button = document.createElement("button");
       button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "catalogue");
-      button.textContent = "Start an order";
+      button.textContent = card.hasAttribute("data-concept") ? "Check feasibility & quote" : "Start an order";
       button.addEventListener("click", function () { chooseSource(seed); });
       caption.appendChild(button);
     });
