@@ -171,6 +171,14 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertEqual(len(list(url)), 1)
         self.assertNotIn("#", sitemap_path.read_text(encoding="utf-8"))
 
+    def test_collection_card_height_follows_content_on_desktop(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        figure_rule = re.search(r"(?m)^\.collection-card figure \{([^}]*)\}", css).group(1)
+        caption_rule = re.search(r"(?m)^\.collection-card figcaption \{([^}]*)\}", css).group(1)
+
+        self.assertIn("height: auto", figure_rule)
+        self.assertIn("height: auto", caption_rule)
+
     def test_collection_pages_have_distinct_buying_guidance(self):
         guidance = {
             "resin-photo-frames": [

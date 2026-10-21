@@ -255,9 +255,9 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .collection-list-heading > p:last-child { max-width: 38ch; margin: 0; color: var(--muted); }
 .collection-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1.2rem, 3vw, 2.2rem); }
 .collection-card { min-width: 0; }
-.collection-card figure { height: 100%; margin: 0; padding: 0.75rem; border: 1px solid var(--soft-line); border-radius: 1.2rem; background: rgba(255, 250, 244, 0.56); }
+.collection-card figure { height: auto; margin: 0; padding: 0.75rem; border: 1px solid var(--soft-line); border-radius: 1.2rem; background: rgba(255, 250, 244, 0.56); }
 .collection-card img { width: 100%; aspect-ratio: 0.84; object-fit: cover; border-radius: 0.9rem; box-shadow: 0 9px 25px rgba(86, 57, 45, 0.08); }
-.collection-card figcaption { display: flex; flex-direction: column; align-items: flex-start; height: calc(100% - 1rem); padding: 1.1rem 0.35rem 0.35rem; }
+.collection-card figcaption { display: flex; flex-direction: column; align-items: flex-start; height: auto; padding: 1.1rem 0.35rem 0.35rem; }
 .collection-card-kicker { margin-bottom: 0.5rem; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
 .collection-card h2 { margin-bottom: 0.5rem; font-size: clamp(1.7rem, 2.7vw, 2.35rem); line-height: 1; }
 .collection-card figcaption > p:not(.collection-card-kicker) { max-width: 30ch; margin-bottom: 0; color: var(--muted); font-size: 0.84rem; }
