@@ -128,28 +128,30 @@ class StaticSiteContractTests(unittest.TestCase):
         verification_tag = '<meta name="google-site-verification" content="DabWPBofb7rmKPDncFwmqhELfgYwyiXGu0IxJCXR0SE" />'
         self.assertEqual(self.html.count(verification_tag), 1)
 
-    def test_organization_jsonld_and_sitemap_match_canonical(self):
+    def test_local_business_jsonld_and_sitemap_match_canonical(self):
         canonical = "https://saloniresinart.com/"
         script = re.search(r'<script\b[^>]*type=["\']application/ld\+json["\']>([\s\S]*?)</script>', self.html)
         self.assertIsNotNone(script)
-        organization = json.loads(script.group(1))
-        self.assertEqual(set(organization), {"@context", "@type", "name", "url", "sameAs", "description", "telephone", "address", "areaServed"})
-        self.assertEqual(organization["@context"], "https://schema.org")
-        self.assertEqual(organization["@type"], "Organization")
-        self.assertEqual(organization["name"], "Saloni Resin Art Studio")
-        self.assertEqual(organization["telephone"], "+91-8209238541")
-        self.assertEqual(organization["address"], {
+        business = json.loads(script.group(1))
+        self.assertEqual(set(business), {"@context", "@type", "name", "url", "sameAs", "description", "telephone", "address", "areaServed", "openingHours"})
+        self.assertEqual(business["@context"], "https://schema.org")
+        self.assertEqual(business["@type"], "LocalBusiness")
+        self.assertEqual(business["name"], "Saloni Resin Art Studio")
+        self.assertEqual(business["telephone"], "+91-8209238541")
+        self.assertEqual(business["address"], {
             "@type": "PostalAddress",
+            "streetAddress": "House No. 61, Hathi Bhata",
             "addressLocality": "Ajmer",
             "addressRegion": "Rajasthan",
             "addressCountry": "IN",
         })
-        self.assertEqual(organization["areaServed"], "IN")
+        self.assertEqual(business["areaServed"], "IN")
+        self.assertEqual(business["openingHours"], "Mo-Su 11:00-16:00")
         self.assertIn(f'<link rel="canonical" href="{canonical}">', self.html)
         self.assertIn(f'<meta property="og:url" content="{canonical}">', self.html)
-        self.assertEqual(organization["url"], canonical)
-        self.assertEqual(organization["sameAs"], ["https://www.instagram.com/saloniresin_art_studio/"])
-        self.assertNotRegex(script.group(1), re.compile(r"Review|AggregateRating|rating|Offer|LocalBusiness|streetAddress|postalCode|openingHours", re.I))
+        self.assertEqual(business["url"], canonical)
+        self.assertEqual(business["sameAs"], ["https://www.instagram.com/saloniresin_art_studio/"])
+        self.assertNotRegex(script.group(1), re.compile(r"Review|AggregateRating|rating|Offer|postalCode|geo|hasMap", re.I))
 
         sitemap_path = ROOT / "sitemap.xml"
         self.assertTrue(sitemap_path.is_file())
@@ -157,10 +159,105 @@ class StaticSiteContractTests(unittest.TestCase):
         namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
         self.assertEqual(sitemap.tag, "{http://www.sitemaps.org/schemas/sitemap/0.9}urlset")
         urls = sitemap.findall("sm:url", namespace)
-        self.assertEqual(len(urls), 1)
-        self.assertEqual(urls[0].findtext("sm:loc", namespaces=namespace), canonical)
-        self.assertEqual(len(list(urls[0])), 1)
+        expected_urls = [
+            canonical,
+            "https://saloniresinart.com/resin-photo-frames/",
+            "https://saloniresinart.com/customised-hampers/",
+            "https://saloniresinart.com/namokar-mantra-frames/",
+        ]
+        self.assertEqual([url.findtext("sm:loc", namespaces=namespace) for url in urls], expected_urls)
+        self.assertEqual(len(urls), len(expected_urls))
+        for url in urls:
+            self.assertEqual(len(list(url)), 1)
         self.assertNotIn("#", sitemap_path.read_text(encoding="utf-8"))
+
+    def test_collection_pages_have_unique_metadata_jsonld_and_order_links(self):
+        collection_specs = {
+            "resin-photo-frames": {
+                "title": "Resin Photo Frames and Floral Keepsakes | Saloni Resin Art Studio",
+                "description": "Explore resin photo frames and floral keepsakes made in Ajmer by Saloni Resin Art Studio.",
+                "heading": "Resin photo frames for the moments worth keeping",
+                "ids": ["floral-memory-frame", "personalized-photo-clock", "rose-hexagon"],
+            },
+            "customised-hampers": {
+                "title": "Customised Hampers for Every Occasion | Saloni Resin Art Studio",
+                "description": "Explore customised birthday, theme, and festive hampers from Saloni Resin Art Studio in Ajmer.",
+                "heading": "Customised hampers, built around their occasion",
+                "ids": ["birthday-hamper", "car-theme-hamper", "holi-hamper"],
+            },
+            "namokar-mantra-frames": {
+                "title": "Namokar Mantra Resin Frames | Saloni Resin Art Studio",
+                "description": "Explore Namokar mantra resin frames with textured finishes and gold detail from Saloni Resin Art Studio.",
+                "heading": "Namokar mantra frames for a meaningful home",
+                "ids": ["blue-mantra-frame", "white-mantra-frame", "navkar-resin-frame"],
+            },
+        }
+        titles = set()
+        descriptions = set()
+        headings = set()
+        for slug, spec in collection_specs.items():
+            page_path = ROOT / slug / "index.html"
+            self.assertTrue(page_path.is_file(), slug)
+            html = page_path.read_text(encoding="utf-8")
+            titles.add(re.search(r"<title>([^<]+)</title>", html).group(1))
+            descriptions.add(re.search(r'<meta name="description" content="([^"]+)">', html).group(1))
+            headings.add(re.search(r"<h1[^>]*>([^<]+)</h1>", html).group(1))
+            canonical = f"https://saloniresinart.com/{slug}/"
+            self.assertIn(f'<link rel="canonical" href="{canonical}">', html)
+            self.assertIn(f'<meta property="og:url" content="{canonical}">', html)
+            self.assertIn(f'<meta property="og:title" content="{spec["title"]}">', html)
+            self.assertIn(f'<meta property="og:description" content="{spec["description"]}">', html)
+            self.assertIn(f'<meta name="twitter:title" content="{spec["title"]}">', html)
+            self.assertIn(f'<meta name="twitter:description" content="{spec["description"]}">', html)
+            self.assertIn(f'<h1', html)
+            self.assertIn(spec["heading"], html)
+            scripts = re.findall(r'<script\b[^>]*type="application/ld\+json"[^>]*>([\s\S]*?)</script>', html)
+            self.assertEqual(len(scripts), 1, slug)
+            collection = json.loads(scripts[0])
+            self.assertEqual(collection["@context"], "https://schema.org")
+            self.assertEqual(collection["@type"], "CollectionPage")
+            self.assertEqual(collection["url"], canonical)
+            self.assertEqual(collection["name"], spec["title"].split(" | ")[0])
+            self.assertTrue(collection.get("mainEntity"))
+            self.assertNotRegex(scripts[0], re.compile(r"Product|Offer|AggregateRating|Review|rating|price|availability|stock", re.I))
+            self.assertNotRegex(html, re.compile(r'<script\b[^>]+src=', re.I), slug)
+            self.assertNotIn("₹", html, slug)
+            image_tags = re.findall(r"<img\b[^>]*>", html)
+            self.assertGreaterEqual(len(image_tags), 3, slug)
+            for image in image_tags:
+                self.assertRegex(image, r'\balt="[^"]+"')
+                self.assertRegex(image, r'\bwidth="\d+"')
+                self.assertRegex(image, r'\bheight="\d+"')
+                self.assertIn('loading="lazy"', image)
+                source = re.search(r'\bsrc="([^"]+)"', image).group(1)
+                self.assertTrue((page_path.parent / source).resolve().is_file(), source)
+            for card_id in spec["ids"]:
+                self.assertIn("View this piece and order", html)
+                self.assertIn(f'href="../#{card_id}"', html)
+            self.assertIn('href="../"', html)
+            self.assertIn('href="../resin-photo-frames/"', html)
+            self.assertIn('href="../customised-hampers/"', html)
+            self.assertIn('href="../namokar-mantra-frames/"', html)
+        self.assertEqual(len(titles), len(collection_specs))
+        self.assertEqual(len(descriptions), len(collection_specs))
+        self.assertEqual(len(headings), len(collection_specs))
+
+    def test_homepage_links_collections_and_stable_catalogue_cards(self):
+        for slug in ("resin-photo-frames", "customised-hampers", "namokar-mantra-frames"):
+            self.assertIn(f'href="{slug}/"', self.html)
+        for card_id in (
+            "floral-memory-frame", "personalized-photo-clock", "rose-hexagon",
+            "birthday-hamper", "car-theme-hamper", "holi-hamper",
+            "blue-mantra-frame", "white-mantra-frame", "navkar-resin-frame",
+        ):
+            self.assertRegex(self.html, rf'<article\b[^>]*\bid="{card_id}"')
+
+    def test_homepage_uses_approved_visit_copy_without_stale_online_only_claim(self):
+        self.assertIn("Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India.", self.html)
+        self.assertIn("Open every day, 11:00 AM–4:00 PM.", self.html)
+        self.assertIn("Shipping across India.", self.html)
+        self.assertNotIn("Online orders only", self.html)
+        self.assertNotIn("no customer visits", self.html)
 
     def test_hero_copy_names_searchable_offerings(self):
         hero = re.search(r'<p\b[^>]*class=["\']hero-intro["\'][\s\S]*?</p>', self.html)
@@ -426,7 +523,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "Personalized message coasters",
             "Namokar mantra resin frame",
             "Personalized photo clock",
-            "Based in Ajmer, Rajasthan · Shipping across India · Online orders only (no customer visits) · Order enquiries open 24 hours.",
+            "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM. Shipping across India.",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.html)
