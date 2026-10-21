@@ -426,7 +426,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "Personalized message coasters",
             "Namokar mantra resin frame",
             "Personalized photo clock",
-            "Based in Ajmer, shipping across India. Order enquiries are open 24 hours.",
+            "Based in Ajmer, Rajasthan · Shipping across India · Online orders only (no customer visits) · Order enquiries open 24 hours.",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.html)
