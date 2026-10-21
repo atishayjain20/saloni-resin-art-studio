@@ -171,6 +171,16 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertEqual(len(list(url)), 1)
         self.assertNotIn("#", sitemap_path.read_text(encoding="utf-8"))
 
+    def test_photo_frame_concept_preview_disclosure_matches_homepage(self):
+        html = (ROOT / "resin-photo-frames" / "index.html").read_text(encoding="utf-8")
+        concept_alt = "Concept preview: Soft-arch clear resin memory frame with dried blush roses and restrained gold flecks"
+
+        self.assertIn(f'<meta property="og:image:alt" content="{concept_alt}">', html)
+        self.assertIn(f'<meta name="twitter:image:alt" content="{concept_alt}">', html)
+        self.assertEqual(html.count(f'alt="{concept_alt}"'), 2)
+        self.assertEqual(html.count("Concept preview · made to order"), 2)
+        self.assertNotIn("Made in Ajmer, with care.", html)
+
     def test_collection_pages_have_unique_metadata_jsonld_and_order_links(self):
         collection_specs = {
             "resin-photo-frames": {
