@@ -124,6 +124,10 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn("<strong>Namokar mantra frame</strong>", card)
         self.assertNotIn("<strong>Blue mantra frame</strong>", card)
 
+    def test_search_console_ownership_verification_tag(self):
+        verification_tag = '<meta name="google-site-verification" content="DabWPBofb7rmKPDncFwmqhELfgYwyiXGu0IxJCXR0SE" />'
+        self.assertEqual(self.html.count(verification_tag), 1)
+
     def test_organization_jsonld_and_sitemap_match_canonical(self):
         canonical = "https://saloniresinart.com/"
         script = re.search(r'<script\b[^>]*type=["\']application/ld\+json["\']>([\s\S]*?)</script>', self.html)
