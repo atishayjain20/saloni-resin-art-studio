@@ -171,6 +171,29 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertEqual(len(list(url)), 1)
         self.assertNotIn("#", sitemap_path.read_text(encoding="utf-8"))
 
+    def test_collection_pages_have_distinct_buying_guidance(self):
+        guidance = {
+            "resin-photo-frames": [
+                "Choose a photo clock for a displayed portrait and everyday timepiece, or a flower-preservation frame or keepsake when the bouquet or petals are the main memory.",
+                "Share the photo, flowers, date, and preferred dimensions when you enquire.",
+            ],
+            "customised-hampers": [
+                "Tell the studio the recipient, occasion, theme, and budget; agree the contents and confirm timing before preparation.",
+            ],
+            "namokar-mantra-frames": [
+                "Compare the three finishes—blue, white, and Navkar—then share the intended location and size.",
+                "Confirm the inscription and design before production.",
+            ],
+        }
+        for slug, required_copy in guidance.items():
+            html = (ROOT / slug / "index.html").read_text(encoding="utf-8")
+            self.assertIn("See current pricing, then request this design.", html)
+            for sentence in required_copy:
+                self.assertIn(sentence, html)
+            self.assertNotIn("the existing order flow keeps the item details together", html)
+            self.assertNotIn("homepage card", html)
+            self.assertNotIn("order flow", html)
+
     def test_photo_frame_concept_preview_disclosure_matches_homepage(self):
         html = (ROOT / "resin-photo-frames" / "index.html").read_text(encoding="utf-8")
         concept_alt = "Concept preview: Soft-arch clear resin memory frame with dried blush roses and restrained gold flecks"
