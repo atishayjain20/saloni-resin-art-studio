@@ -96,6 +96,29 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-label="Next', self.html)
         self.assertIn('class="site-script"', self.html)
 
+    def test_primary_navigation_has_partner_circle_link_and_clickable_pills(self):
+        nav_match = re.search(r'<nav class="site-nav"[\s\S]*?</nav>', self.html)
+        self.assertIsNotNone(nav_match)
+        nav = nav_match.group(0)
+        self.assertRegex(
+            nav,
+            r'<a href="#customizer">Design a frame</a>\s*'
+            r'<a href="partners/">Join Partner Circle</a>\s*'
+            r'<a href="#process">The process</a>',
+        )
+        self.assertIn('class="nav-cta" href="#order"', nav)
+
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        nav_link_rule = re.search(r"(?m)^\.site-nav a:not\(\.nav-cta\) \{([^}]*)\}", css)
+        self.assertIsNotNone(nav_link_rule)
+        for declaration in ("border: 1px solid", "border-radius: 999px"):
+            self.assertIn(declaration, nav_link_rule.group(1))
+        self.assertIn(".site-nav a:not(.nav-cta):hover", css)
+        self.assertIn(".site-nav a:not(.nav-cta):focus-visible", css)
+        self.assertIn("background: var(--paper)", css)
+        self.assertRegex(css, r"\.site-nav \{[^}]*flex-wrap: wrap")
+        self.assertRegex(css, r"@media \(max-width: 620px\) \{[\s\S]*?html \{ scroll-padding-top: 7\.5rem; \}")
+
     def test_seo_metadata_and_studio_namokar_label(self):
         title = "Custom Resin Art &amp; Gifts | Saloni Resin Art Studio"
         description = "Explore custom resin frames, personalized gifts and customized hampers from Saloni Resin Art Studio. Share your colours, theme and occasion with Saloni."
