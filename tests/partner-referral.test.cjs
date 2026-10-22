@@ -330,6 +330,77 @@ test("monthly sync is the one resumable ledger path and permits first known subt
   assert.throws(() => conflict.context.syncOrderCommission_("request-123456"), /mismatch|conflict/i);
 });
 
+test("writes the commission month as literal text when appending a ledger row", () => {
+  const runtime = partnerRuntime({ setup: true, migrated: true, coerceSheetDates: true, orderRows: [referredOrderRow({ commissionStatus: "Pending" })] });
+  runtime.context.setupPartnerProgram();
+  assert.deepEqual(JSON.parse(JSON.stringify(runtime.context.syncOrderCommission_("request-123456"))), { commissionId: "commission-request-123456", status: "Eligible" });
+  assert.equal(runtime.commissionRows[0][3], "2026-10");
+  const append = runtime.commissionSheet.writePayloads.find((write) => write.method === "appendRow");
+  assert.equal(append.values[3], "'2026-10");
+});
+
+test("reconciles a matching Sheet Date month with the Sheet timezone and stays idempotent", () => {
+  const existingMonth = new Date("2026-09-30T19:00:00.000Z");
+  const commission = ["commission-request-123456", "partner-1", "Studio", existingMonth, "catalogue", 1000, 0.05, "", "Pending", "", "", "", ""];
+  const runtime = partnerRuntime({ sheetTimezone: "Asia/Kolkata", coerceSheetDates: true, orderRows: [referredOrderRow({ commissionStatus: "Pending" })], commissionRows: [commission] });
+  assert.equal(runtime.context.syncOrderCommission_("request-123456").status, "Eligible");
+  assert.equal(runtime.commissionRows.length, 1);
+  assert.equal(runtime.commissionRows[0][3], "2026-10");
+  assert.equal(runtime.formatDateCalls.some((call) => call.timezone === "Asia/Kolkata" && call.pattern === "yyyy-MM"), true);
+  const update = runtime.commissionSheet.writePayloads.filter((write) => write.method === "setValues").at(-1);
+  assert.equal(update.values[0][3], "'2026-10");
+  assert.equal(runtime.context.syncOrderCommission_("request-123456").status, "Eligible");
+  assert.equal(runtime.commissionRows.length, 1);
+});
+
+test("rejects invalid, numeric, malformed, and different Date commission months", () => {
+  [new Date("invalid"), 45200, new Date("2026-09-30T00:00:00.000Z"), "2026-9", "2026-99"].forEach((month) => {
+    const commission = ["commission-request-123456", "partner-1", "Studio", month, "catalogue", 1000, 0.05, "", "Pending", "", "", "", ""];
+    const runtime = partnerRuntime({ sheetTimezone: "UTC", orderRows: [referredOrderRow({ commissionStatus: "Pending" })], commissionRows: [commission] });
+    assert.throws(() => runtime.context.syncOrderCommission_("request-123456"), /Commission ledger snapshot mismatch/);
+  });
+});
+
+test("keeps commission identity, rate, subtotal, and amount conflict checks", () => {
+  [
+    { index: 1, value: "wrong-partner", pattern: /Commission ledger snapshot mismatch/ },
+    { index: 6, value: 0.07, pattern: /Commission ledger snapshot mismatch/ },
+    { index: 5, value: 900, pattern: /Commission ledger snapshot mismatch/ },
+    { index: 7, value: 45, status: "Eligible", pattern: /Commission amount mismatch/ },
+  ].forEach((conflict) => {
+    const commission = ["commission-request-123456", "partner-1", "Studio", "2026-10", "catalogue", 1000, 0.05, 50, conflict.status || "Pending", "", "", "", ""];
+    commission[conflict.index] = conflict.value;
+    const runtime = partnerRuntime({ orderRows: [referredOrderRow({ commissionStatus: "Pending" })], commissionRows: [commission] });
+    assert.throws(() => runtime.context.syncOrderCommission_("request-123456"), conflict.pattern);
+  });
+});
+
+test("keeps an append-then-throw idempotent and persists the recovered month as text", () => {
+  const runtime = partnerRuntime({ appendCommissionThrowsOnce: true, coerceSheetDates: true, orderRows: [referredOrderRow({ commissionStatus: "Pending" })] });
+  assert.equal(runtime.context.syncOrderCommission_("request-123456").status, "Eligible");
+  assert.equal(runtime.commissionRows.length, 1);
+  assert.equal(runtime.commissionRows[0][3], "2026-10");
+  assert.equal(runtime.context.syncOrderCommission_("request-123456").status, "Eligible");
+  assert.equal(runtime.commissionRows.length, 1);
+});
+
+test("preserves literal commission months across status and attribution updates", () => {
+  const runtime = partnerRuntime({ setup: true, migrated: true, coerceSheetDates: true, orderRows: [referredOrderRow({ commissionStatus: "Pending" })] });
+  runtime.context.setupPartnerProgram();
+  runtime.context.syncOrderCommission_("request-123456");
+  runtime.orderSheet.rows[0][34] = "Paid"; runtime.orderSheet.rows[0][33] = 50; runtime.orderSheet.rows[0][35] = "batch-9"; runtime.orderSheet.rows[0][36] = new Date("2026-10-30");
+  assert.equal(runtime.context.syncOrderCommission_("request-123456").status, "Paid");
+  assert.equal(runtime.commissionRows[0][3], "2026-10");
+  assert.equal(runtime.commissionSheet.writePayloads.filter((write) => write.method === "setValues").at(-1).values[0][3], "'2026-10");
+
+  const order = referredOrderRow({ commissionStatus: "Pending" }); order[1] = "=CUSTOM(A2)"; order[14] = "=1+1";
+  const attribution = partnerRuntime({ setup: true, migrated: true, coerceSheetDates: true, orderRows: [order], partnerRows: [["partner-1", "AJMERPHOTO01", "Studio", "Asha", "photographer", "Ajmer", "8209238541", "asha@example.com", "https://example.com", 0.05, "Active", new Date("2026-10-01"), "https://saloniresinart.com/?ref=AJMERPHOTO01", "", ""], ["partner-2", "NEWCODE01", "New Studio", "Nina", "photographer", "Ajmer", "8209238542", "nina@example.com", "https://example.com", 0.07, "Active", new Date("2026-10-01"), "https://saloniresinart.com/?ref=NEWCODE01", "", ""]], commissionRows: [["commission-request-123456", "partner-1", "Studio", "2026-10", "catalogue", 1000, 0.05, 50, "Pending", "", "", "", ""]] });
+  attribution.context.setupPartnerProgram();
+  attribution.context.correctOrderAttribution_("request-123456", "NEWCODE01", "attribute direct");
+  assert.equal(attribution.commissionRows[0][3], "2026-10");
+  assert.equal(attribution.commissionSheet.writePayloads.filter((write) => write.method === "setValues").at(-1).values[0][3], "'2026-10");
+});
+
 test("default Pending refunded orders archive as frozen Void, while refunded Paid is retained", () => {
   const refunded = partnerRuntime({ setup: true, migrated: true, orderRows: [referredOrderRow({ payment: "Refunded", delivery: "Delivered", commissionStatus: "Pending" })] });
   refunded.context.setupPartnerProgram();
@@ -412,15 +483,22 @@ function partnerRuntime(options = {}) {
   const orderFormulas = options.orderFormulas ? options.orderFormulas.map((row) => row.slice()) : [];
   const protections = [];
   const lock = { calls: 0, tryLock: () => { lock.calls += 1; return options.lockAvailable !== false; }, releaseLock() {} };
+  const formatDateCalls = [];
+  function sheetCellValue(value) {
+    if (typeof value !== "string") return value;
+    if (/^'\d{4}-\d{2}$/.test(value)) return value.slice(1);
+    if (options.coerceSheetDates && /^\d{4}-\d{2}$/.test(value)) return new Date(value + "-01T00:00:00.000Z");
+    return value;
+  }
   function sheet(name, headers, dataRows, maxRows = 1000, formulaRows = [], maxColumns = headers.length) {
-    const target = { name, headers, rows: dataRows.map((row) => row.slice()), formulas: formulaRows.map((row) => row.slice()), maxRows, maxColumns, insertions: [], getLastRow: () => target.rows.length + 1, getLastColumn: () => target.headers.length, getMaxRows: () => target.maxRows, getMaxColumns: () => target.maxColumns };
+    const target = { name, headers, rows: dataRows.map((row) => row.slice()), formulas: formulaRows.map((row) => row.slice()), maxRows, maxColumns, insertions: [], writePayloads: [], getLastRow: () => target.rows.length + 1, getLastColumn: () => target.headers.length, getMaxRows: () => target.maxRows, getMaxColumns: () => target.maxColumns, getParent: () => spreadsheet };
     while (target.formulas.length < target.rows.length) target.formulas.push([]);
     target.getDataRange = () => ({ getValues: () => [target.headers].concat(target.rows.map((row) => { const padded = row.slice(); while (padded.length < target.headers.length) padded.push(""); return padded; })) });
     target.getRange = (row, column, rowCount, columnCount) => {
       const range = {
         getValues: () => row === 1 ? [target.headers.slice(column - 1, column - 1 + (columnCount || target.headers.length))] : [((target.rows[row - 2] || []).slice(column - 1, column - 1 + (columnCount || target.headers.length)))],
         getFormulas: () => row === 1 ? [new Array(columnCount || target.headers.length).fill("")] : [((target.formulas[row - 2] || []).slice(column - 1, column - 1 + (columnCount || target.headers.length)))],
-        setValues(valuesToSet) { if (column + (valuesToSet[0] || []).length - 1 > target.maxColumns) throw new Error("range exceeds sheet capacity"); for (let r = 0; r < valuesToSet.length; r += 1) { if (row === 1) { valuesToSet[r].forEach((value, c) => { target.headers[column - 1 + c] = value; }); } else { const destination = target.rows[row - 2 + r] || []; const formulaDestination = target.formulas[row - 2 + r] || []; while (destination.length < target.headers.length) destination.push(""); while (formulaDestination.length < target.headers.length) formulaDestination.push(""); valuesToSet[r].forEach((value, c) => { destination[column - 1 + c] = value; formulaDestination[column - 1 + c] = typeof value === "string" && value.charAt(0) === "=" ? value : ""; }); target.rows[row - 2 + r] = destination; target.formulas[row - 2 + r] = formulaDestination; if (options.failApplicationUpdateOnce && target.name === applicationTab && row > 1 && column === 1 && !options._applicationUpdateFailed) { options._applicationUpdateFailed = true; throw new Error("application update failed after write"); } if (options.failPartnerUpdateOnce && target.name === partnerTab && row > 1 && column === 1 && !options._partnerUpdateFailed) { options._partnerUpdateFailed = true; throw new Error("partner status update failed after write"); } } } },
+        setValues(valuesToSet) { if (column + (valuesToSet[0] || []).length - 1 > target.maxColumns) throw new Error("range exceeds sheet capacity"); target.writePayloads.push({ method: "setValues", values: valuesToSet.map((values) => values.slice()) }); for (let r = 0; r < valuesToSet.length; r += 1) { if (row === 1) { valuesToSet[r].forEach((value, c) => { target.headers[column - 1 + c] = value; }); } else { const destination = target.rows[row - 2 + r] || []; const formulaDestination = target.formulas[row - 2 + r] || []; while (destination.length < target.headers.length) destination.push(""); while (formulaDestination.length < target.headers.length) formulaDestination.push(""); valuesToSet[r].forEach((value, c) => { const storedValue = sheetCellValue(value); destination[column - 1 + c] = storedValue; formulaDestination[column - 1 + c] = typeof storedValue === "string" && storedValue.charAt(0) === "=" ? storedValue : ""; }); target.rows[row - 2 + r] = destination; target.formulas[row - 2 + r] = formulaDestination; if (options.failApplicationUpdateOnce && target.name === applicationTab && row > 1 && column === 1 && !options._applicationUpdateFailed) { options._applicationUpdateFailed = true; throw new Error("application update failed after write"); } if (options.failPartnerUpdateOnce && target.name === partnerTab && row > 1 && column === 1 && !options._partnerUpdateFailed) { options._partnerUpdateFailed = true; throw new Error("partner status update failed after write"); } } } },
         setValue(value) { range.setValues([[value]]); },
         protect() { if (options.protectFailure) throw new Error("protection failed"); const protection = { sheet: target, warningOnly: true, numRows: rowCount || 1, numColumns: columnCount || 1, setWarningOnly(value) { protection.warningOnly = value; }, setDescription(value) { protection.description = value; }, getDescription() { return protection.description || ""; }, setRange(rangeToSet) { protection.numRows = rangeToSet.rowCount || target.maxRows; protection.numColumns = rangeToSet.columnCount || protection.numColumns; }, getEditors() { return []; }, removeEditors() { protection.removedEditors = true; }, addEditor() { protection.addedEditor = true; }, canDomainEdit: () => true, setDomainEdit(value) { protection.domainEdit = value; } }; protections.push(protection); return protection; },
       };
@@ -433,7 +511,7 @@ function partnerRuntime(options = {}) {
       target.insertions.push({ after, count });
     };
     target.getProtections = () => protections.filter((protection) => protection.sheet === target);
-    target.appendRow = (row) => { const next = row.slice(); while (next.length < target.headers.length) next.push(""); target.rows.push(next); target.formulas.push(new Array(target.headers.length).fill("")); if (options.appendPartnerThrowsOnce && target.name === partnerTab && !options._partnerAppendFailed) { options._partnerAppendFailed = true; throw new Error("partner append failed after write"); } };
+    target.appendRow = (row) => { target.writePayloads.push({ method: "appendRow", values: row.slice() }); const next = row.map(sheetCellValue); while (next.length < target.headers.length) next.push(""); target.rows.push(next); target.formulas.push(new Array(target.headers.length).fill("")); if (options.appendPartnerThrowsOnce && target.name === partnerTab && !options._partnerAppendFailed) { options._partnerAppendFailed = true; throw new Error("partner append failed after write"); } if (options.appendCommissionThrowsOnce && target.name === commissionTab && !options._commissionAppendFailed) { options._commissionAppendFailed = true; throw new Error("commission append failed after write"); } };
     target.deleteRow = (rowNumber) => target.rows.splice(rowNumber - 2, 1);
     return target;
   }
@@ -446,12 +524,12 @@ function partnerRuntime(options = {}) {
   const partnerSheet = sheet(partnerTab, partnerHeaders, partnerRows);
   const commissionSheet = sheet(commissionTab, commissionHeaders, commissionRows);
   const sheets = { Orders: orderSheet }; sheets[applicationTab] = applicationSheet; sheets[partnerTab] = partnerSheet; sheets[commissionTab] = commissionSheet;
-  const spreadsheet = { getSheetByName: (name) => sheets[name] || null, insertSheet: (name) => { const headers = name === applicationTab ? applicationHeaders : name === partnerTab ? partnerHeaders : commissionHeaders; const created = sheet(name, headers, []); sheets[name] = created; return created; } };
+  const spreadsheet = { getSpreadsheetTimeZone: () => options.sheetTimezone || "UTC", getSheetByName: (name) => sheets[name] || null, insertSheet: (name) => { const headers = name === applicationTab ? applicationHeaders : name === partnerTab ? partnerHeaders : commissionHeaders; const created = sheet(name, headers, []); sheets[name] = created; return created; } };
   const properties = { values, getProperty: (key) => values[key] || "", setProperty: (key, value) => { values[key] = String(value); } };
-  const utilities = { getUuid: () => "00000000-0000-4000-8000-000000000000", formatDate: (date) => new Date(date).toISOString().slice(0, 7), newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(String(value))) }), DigestAlgorithm: { SHA_256: "SHA-256" }, computeDigest: (_algorithm, bytes) => Array.from(require("node:crypto").createHash("sha256").update(Buffer.from(bytes)).digest()).map((byte) => byte > 127 ? byte - 256 : byte) };
-  const context = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array, Utilities: utilities, PropertiesService: { getScriptProperties: () => properties }, LockService: { getScriptLock: () => lock }, SpreadsheetApp: { openById: () => spreadsheet, ProtectionType: { RANGE: "RANGE" } }, Session: { getScriptTimeZone: () => "UTC", getActiveUser: () => ({ getEmail: () => "owner@example.com" }), getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) }, UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 }) }) } };
+  const utilities = { getUuid: () => "00000000-0000-4000-8000-000000000000", formatDate: (date, timezone, pattern) => { formatDateCalls.push({ date, timezone, pattern }); const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, year: "numeric", month: "2-digit" }).formatToParts(new Date(date)); const year = parts.find((part) => part.type === "year").value; const month = parts.find((part) => part.type === "month").value; return `${year}-${month}`; }, newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(String(value))) }), DigestAlgorithm: { SHA_256: "SHA-256" }, computeDigest: (_algorithm, bytes) => Array.from(require("node:crypto").createHash("sha256").update(Buffer.from(bytes)).digest()).map((byte) => byte > 127 ? byte - 256 : byte) };
+  const context = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array, Intl, Utilities: utilities, PropertiesService: { getScriptProperties: () => properties }, LockService: { getScriptLock: () => lock }, SpreadsheetApp: { openById: () => spreadsheet, ProtectionType: { RANGE: "RANGE" } }, Session: { getScriptTimeZone: () => options.scriptTimezone || "UTC", getActiveUser: () => ({ getEmail: () => "owner@example.com" }), getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) }, UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 }) }) } };
   if (options.partnerLookupThrows) context.SpreadsheetApp.openById = () => { throw new Error("sheet unavailable"); };
   vm.createContext(context);
   vm.runInContext(code, context, { filename: "Code.gs" });
-  return { context, properties, orderSheet, applicationRows: applicationSheet.rows, partnerRows: partnerSheet.rows, protections, lock, commissionRows: commissionSheet.rows };
+  return { context, properties, orderSheet, applicationRows: applicationSheet.rows, partnerRows: partnerSheet.rows, protections, lock, commissionRows: commissionSheet.rows, commissionSheet, formatDateCalls };
 }
