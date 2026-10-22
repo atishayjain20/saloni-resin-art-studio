@@ -104,6 +104,7 @@ class StaticSiteContractTests(unittest.TestCase):
             nav,
             r'<a href="#customizer">Design a frame</a>\s*'
             r'<a href="partners/">Join Partner Circle</a>\s*'
+            r'<a href="corporate-gifting/">Corporate gifting</a>\s*'
             r'<a href="#process">The process</a>',
         )
         self.assertIn('class="nav-cta" href="#order"', nav)
@@ -188,6 +189,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "https://saloniresinart.com/customised-hampers/",
             "https://saloniresinart.com/namokar-mantra-frames/",
             "https://saloniresinart.com/partners/",
+            "https://saloniresinart.com/corporate-gifting/",
         ]
         self.assertEqual([url.findtext("sm:loc", namespaces=namespace) for url in urls], expected_urls)
         self.assertEqual(len(urls), len(expected_urls))
