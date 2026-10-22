@@ -170,6 +170,11 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   assert.match(page, /<title>Corporate Gifting &amp; Organisation Partnerships/);
   assert.match(page, /property="og:url" content="https:\/\/saloniresinart\.com\/corporate-gifting\/"/);
   assert.match(page, /data-form-mode="corporate"/);
+  assert.match(page, /data-intake-ready="false"/);
+  assert.match(page, /Corporate gifting enquiries are being prepared/);
+  assert.match(page, /8209238541/);
+  assert.match(page, /saloniresin_art_studio/);
+  assert.doesNotMatch(page, /Your entries stay in the form/);
   assert.match(page, /title="Saloni Resin Art Studio organisation gifting enquiry form"/);
   assert.match(page, /Organisation discounts available on quotation\./);
   assert.match(page, /Bulk and recurring resin art/);
