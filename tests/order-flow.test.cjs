@@ -9,10 +9,12 @@ const FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery. Saloni
 
 class Element {
   constructor(id, value = "") {
-    this.id = id; this.value = value; this.textContent = ""; this.hidden = false; this.name = id;
+    this.id = id; this.value = value; this.textContent = ""; this._innerHTML = ""; this.hidden = false; this.name = id;
     this.listeners = {}; this.children = []; this.attributes = {}; this.files = [];
     this.contentWindow = {}; this.classList = { add() {}, remove() {} };
   }
+  get innerHTML() { return this._innerHTML; }
+  set innerHTML(value) { this._innerHTML = String(value); this.textContent = this._innerHTML.replace(/<[^>]*>/g, ""); }
   addEventListener(type, listener) { this.listeners[type] = listener; }
   dispatch(type, event = {}) { if (this.listeners[type]) this.listeners[type](Object.assign({ target: this }, event)); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
@@ -45,11 +47,13 @@ class CapturingPort {
   close() { this.closed = true; }
 }
 
-function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [] } = {}) {
+function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
-  const frame = new Element("order-form-frame"); frame.name = "order-frame";
+  if (mode !== "order") embed.attributes["data-form-mode"] = mode;
+  if (intakeReady !== undefined) embed.attributes["data-intake-ready"] = String(intakeReady);
+  const frame = new Element("order-form-frame"); frame.name = "order-frame"; frame.hidden = true;
   const status = new Element("order-form-status");
   const customizer = new Element("order-from-customizer");
   const summary = new Element("customizer-summary"); summary.textContent = "Custom details";
@@ -175,6 +179,39 @@ function submittedSeed(posted) {
   const seedInput = form.children.find((child) => child.name === "seed");
   return JSON.parse(seedInput.value);
 }
+
+test("keeps the corporate page pending without seeding or loading the old form", () => {
+  const flow = runFlow({ mode: "corporate", intakeReady: false });
+  assert.equal(flow.posted.length, 0);
+  assert.equal(flow.elements.get("order-form-frame").hidden, true);
+  assert.match(flow.elements.get("order-form-status").textContent, /Corporate gifting enquiries are being prepared/);
+  assert.match(flow.elements.get("order-form-status").textContent, /8209238541/);
+  assert.match(flow.elements.get("order-form-status").textContent, /saloniresin_art_studio/);
+  const unconfigured = runFlow({ mode: "corporate", intakeReady: true, configured: false });
+  assert.equal(unconfigured.posted.length, 0);
+  assert.match(unconfigured.elements.get("order-form-status").textContent, /Corporate gifting enquiries are being prepared/);
+  assert.doesNotMatch(unconfigured.elements.get("order-form-status").textContent, /not configured for this preview/i);
+});
+
+test("keeps the corporate page pending when intake readiness is missing or unknown", () => {
+  for (const intakeReady of [undefined, "unknown"]) {
+    const options = { mode: "corporate" };
+    if (intakeReady !== undefined) options.intakeReady = intakeReady;
+    const flow = runFlow(options);
+    assert.equal(flow.posted.length, 0);
+    assert.equal(flow.elements.get("order-form-frame").hidden, true);
+    assert.match(flow.elements.get("order-form-status").textContent, /Corporate gifting enquiries are being prepared/);
+  }
+});
+
+test("keeps the existing order and Partner Circle seed paths active", () => {
+  const order = runFlow();
+  order.catalogueButton.dispatch("click");
+  assert.equal(order.posted.length, 1);
+  const partner = runFlow({ mode: "partner", intakeReady: false });
+  assert.equal(partner.posted.length, 1);
+  assert.equal(partner.posted[0].children.find((child) => child.name === "mode").value, "partner");
+});
 
 test("starts two orders for the same catalogue item with new IDs only after confirmed replacement", () => {
   const flow = runFlow({ confirms: [false, true] });
