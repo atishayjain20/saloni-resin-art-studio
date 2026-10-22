@@ -146,6 +146,60 @@ test("applications, setup, and protection use the configured default contract", 
   assert.deepEqual(JSON.parse(JSON.stringify(custom.context.setupPartnerProgram().tabs)), ["Applications", "Partner Directory", "Commission Ledger"]);
 });
 
+test("order migration expands sheet capacity without changing legacy rows", () => {
+  const legacyRows = [
+    ["request-legacy-1", "fingerprint-1", new Date("2026-10-01"), "catalogue", "source-1", "Frame", 1, 12, "in", 12, 18, "in", 18, "details-1", "Asha", "8209238541", "asha@example.com", "Ship", "Ajmer", "Ajmer", "Rajasthan", "305001", "2026-11-01", "", "New", "note-1"],
+    ["request-legacy-2", "fingerprint-2", new Date("2026-10-02"), "custom", "source-2", "Plaque", 2, 8, "in", 8, 10, "in", 10, "details-2", "Nina", "8209238542", "nina@example.com", "Pickup", "Jaipur", "Jaipur", "Rajasthan", "302001", "2026-11-02", "", "Confirmed", "note-2"]
+  ];
+  const runtime = partnerRuntime({ orderRows: legacyRows, orderMaxColumns: 26 });
+  const beforeRows = runtime.orderSheet.rows.map((row) => row.slice());
+  const migration = runtime.context.setupPartnerProgram();
+  assert.equal(migration.orderColumns, 37);
+  assert.equal(runtime.orderSheet.maxColumns, 37);
+  assert.deepEqual(runtime.orderSheet.insertions, [{ after: 26, count: 11 }]);
+  assert.equal(runtime.orderSheet.headers.length, 37);
+  assert.deepEqual(runtime.orderSheet.headers, Array.from(runtime.context.ORDER_HEADERS));
+  assert.deepEqual(runtime.orderSheet.rows, beforeRows);
+  assert.equal(runtime.properties.values.PARTNER_PROGRAM_CONFIGURED, "true");
+
+  runtime.context.setupPartnerProgram();
+  assert.deepEqual(runtime.orderSheet.insertions, [{ after: 26, count: 11 }]);
+  assert.deepEqual(runtime.orderSheet.rows, beforeRows);
+});
+
+test("order migration uses spare capacity and skips insertion when capacity is sufficient", () => {
+  const spare = partnerRuntime({ orderMaxColumns: 30 });
+  spare.context.setupPartnerProgram();
+  assert.equal(spare.orderSheet.maxColumns, 37);
+  assert.deepEqual(spare.orderSheet.insertions, [{ after: 30, count: 7 }]);
+
+  const enough = partnerRuntime({ orderMaxColumns: 40 });
+  enough.context.setupPartnerProgram();
+  assert.equal(enough.orderSheet.maxColumns, 40);
+  assert.deepEqual(enough.orderSheet.insertions, []);
+  assert.deepEqual(enough.orderSheet.headers, Array.from(enough.context.ORDER_HEADERS));
+});
+
+test("order migration rejects invalid headers before insertion and leaves readiness unset on insertion failure", () => {
+  const invalidHeaders = ["Wrong Request ID"].concat(partnerRuntime().context.ORDER_HEADERS.slice(1, 26));
+  const invalid = partnerRuntime({ orderHeaders: invalidHeaders, orderMaxColumns: 26 });
+  assert.throws(() => invalid.context.setupPartnerProgram(), /schema/i);
+  assert.deepEqual(invalid.orderSheet.insertions, []);
+  assert.deepEqual(invalid.orderSheet.headers, invalidHeaders);
+  assert.equal(invalid.properties.values.PARTNER_PROGRAM_CONFIGURED || "", "");
+
+  const legacyRows = [["request-legacy-1", "fingerprint-1", new Date("2026-10-01"), "catalogue", "source-1", "Frame", 1, 12, "in", 12, 18, "in", 18, "details-1", "Asha", "8209238541", "asha@example.com", "Ship", "Ajmer", "Ajmer", "Rajasthan", "305001", "2026-11-01", "", "New", "note-1"]];
+  const failed = partnerRuntime({ orderRows: legacyRows, orderMaxColumns: 26, failOrderColumnInsertion: true });
+  const beforeRows = failed.orderSheet.rows.map((row) => row.slice());
+  const beforeHeaders = failed.orderSheet.headers.slice();
+  assert.throws(() => failed.context.setupPartnerProgram(), /column insertion failed/i);
+  assert.deepEqual(failed.orderSheet.insertions, []);
+  assert.equal(failed.orderSheet.maxColumns, 26);
+  assert.deepEqual(failed.orderSheet.rows, beforeRows);
+  assert.deepEqual(failed.orderSheet.headers, beforeHeaders);
+  assert.equal(failed.properties.values.PARTNER_PROGRAM_CONFIGURED || "", "");
+});
+
 test("correction is locked, audited with old and new rates, and rejects frozen rows", () => {
   const runtime = partnerRuntime({ setup: true, migrated: true, orderRows: [referredOrderRow({ commissionStatus: "Pending", rate: 0.05 })], partnerRows: [["partner-1", "AJMERPHOTO01", "Studio", "Asha", "photographer", "Ajmer", "8209238541", "asha@example.com", "https://example.com", 0.05, "Active", new Date("2026-10-01"), "https://saloniresinart.com/?ref=AJMERPHOTO01", "", ""], ["partner-2", "NEWCODE01", "New Studio", "Nina", "photographer", "Ajmer", "8209238542", "nina@example.com", "https://example.com", 0.07, "Active", new Date("2026-10-01"), "https://saloniresinart.com/?ref=NEWCODE01", "", ""]] });
   const result = runtime.context.correctOrderAttribution_("request-123456", "NEWCODE01", "staff correction");
@@ -358,26 +412,33 @@ function partnerRuntime(options = {}) {
   const orderFormulas = options.orderFormulas ? options.orderFormulas.map((row) => row.slice()) : [];
   const protections = [];
   const lock = { calls: 0, tryLock: () => { lock.calls += 1; return options.lockAvailable !== false; }, releaseLock() {} };
-  function sheet(name, headers, dataRows, maxRows = 1000, formulaRows = []) {
-    const target = { name, headers, rows: dataRows.map((row) => row.slice()), formulas: formulaRows.map((row) => row.slice()), maxRows, getLastRow: () => target.rows.length + 1, getLastColumn: () => target.headers.length, getMaxRows: () => target.maxRows };
+  function sheet(name, headers, dataRows, maxRows = 1000, formulaRows = [], maxColumns = headers.length) {
+    const target = { name, headers, rows: dataRows.map((row) => row.slice()), formulas: formulaRows.map((row) => row.slice()), maxRows, maxColumns, insertions: [], getLastRow: () => target.rows.length + 1, getLastColumn: () => target.headers.length, getMaxRows: () => target.maxRows, getMaxColumns: () => target.maxColumns };
     while (target.formulas.length < target.rows.length) target.formulas.push([]);
     target.getDataRange = () => ({ getValues: () => [target.headers].concat(target.rows.map((row) => { const padded = row.slice(); while (padded.length < target.headers.length) padded.push(""); return padded; })) });
     target.getRange = (row, column, rowCount, columnCount) => {
       const range = {
         getValues: () => row === 1 ? [target.headers.slice(column - 1, column - 1 + (columnCount || target.headers.length))] : [((target.rows[row - 2] || []).slice(column - 1, column - 1 + (columnCount || target.headers.length)))],
         getFormulas: () => row === 1 ? [new Array(columnCount || target.headers.length).fill("")] : [((target.formulas[row - 2] || []).slice(column - 1, column - 1 + (columnCount || target.headers.length)))],
-        setValues(valuesToSet) { for (let r = 0; r < valuesToSet.length; r += 1) { if (row === 1) { valuesToSet[r].forEach((value, c) => { target.headers[column - 1 + c] = value; }); } else { const destination = target.rows[row - 2 + r] || []; const formulaDestination = target.formulas[row - 2 + r] || []; while (destination.length < target.headers.length) destination.push(""); while (formulaDestination.length < target.headers.length) formulaDestination.push(""); valuesToSet[r].forEach((value, c) => { destination[column - 1 + c] = value; formulaDestination[column - 1 + c] = typeof value === "string" && value.charAt(0) === "=" ? value : ""; }); target.rows[row - 2 + r] = destination; target.formulas[row - 2 + r] = formulaDestination; if (options.failApplicationUpdateOnce && target.name === applicationTab && row > 1 && column === 1 && !options._applicationUpdateFailed) { options._applicationUpdateFailed = true; throw new Error("application update failed after write"); } if (options.failPartnerUpdateOnce && target.name === partnerTab && row > 1 && column === 1 && !options._partnerUpdateFailed) { options._partnerUpdateFailed = true; throw new Error("partner status update failed after write"); } } } },
+        setValues(valuesToSet) { if (column + (valuesToSet[0] || []).length - 1 > target.maxColumns) throw new Error("range exceeds sheet capacity"); for (let r = 0; r < valuesToSet.length; r += 1) { if (row === 1) { valuesToSet[r].forEach((value, c) => { target.headers[column - 1 + c] = value; }); } else { const destination = target.rows[row - 2 + r] || []; const formulaDestination = target.formulas[row - 2 + r] || []; while (destination.length < target.headers.length) destination.push(""); while (formulaDestination.length < target.headers.length) formulaDestination.push(""); valuesToSet[r].forEach((value, c) => { destination[column - 1 + c] = value; formulaDestination[column - 1 + c] = typeof value === "string" && value.charAt(0) === "=" ? value : ""; }); target.rows[row - 2 + r] = destination; target.formulas[row - 2 + r] = formulaDestination; if (options.failApplicationUpdateOnce && target.name === applicationTab && row > 1 && column === 1 && !options._applicationUpdateFailed) { options._applicationUpdateFailed = true; throw new Error("application update failed after write"); } if (options.failPartnerUpdateOnce && target.name === partnerTab && row > 1 && column === 1 && !options._partnerUpdateFailed) { options._partnerUpdateFailed = true; throw new Error("partner status update failed after write"); } } } },
         setValue(value) { range.setValues([[value]]); },
         protect() { if (options.protectFailure) throw new Error("protection failed"); const protection = { sheet: target, warningOnly: true, numRows: rowCount || 1, numColumns: columnCount || 1, setWarningOnly(value) { protection.warningOnly = value; }, setDescription(value) { protection.description = value; }, getDescription() { return protection.description || ""; }, setRange(rangeToSet) { protection.numRows = rangeToSet.rowCount || target.maxRows; protection.numColumns = rangeToSet.columnCount || protection.numColumns; }, getEditors() { return []; }, removeEditors() { protection.removedEditors = true; }, addEditor() { protection.addedEditor = true; }, canDomainEdit: () => true, setDomainEdit(value) { protection.domainEdit = value; } }; protections.push(protection); return protection; },
       };
       return range;
+    };
+    target.insertColumnsAfter = (after, count) => {
+      if (options.failOrderColumnInsertion && target.name === "Orders") throw new Error("column insertion failed");
+      if (after !== target.maxColumns) throw new Error("column insertion position mismatch");
+      target.maxColumns += count;
+      target.insertions.push({ after, count });
     };
     target.getProtections = () => protections.filter((protection) => protection.sheet === target);
     target.appendRow = (row) => { const next = row.slice(); while (next.length < target.headers.length) next.push(""); target.rows.push(next); target.formulas.push(new Array(target.headers.length).fill("")); if (options.appendPartnerThrowsOnce && target.name === partnerTab && !options._partnerAppendFailed) { options._partnerAppendFailed = true; throw new Error("partner append failed after write"); } };
     target.deleteRow = (rowNumber) => target.rows.splice(rowNumber - 2, 1);
     return target;
   }
-  const orderSheet = sheet("Orders", options.migrated ? fullHeaders : legacyHeaders, rows, 1000, orderFormulas);
+  const orderHeaders = options.orderHeaders || (options.migrated ? fullHeaders : legacyHeaders);
+  const orderSheet = sheet("Orders", orderHeaders, rows, 1000, orderFormulas, options.orderMaxColumns || orderHeaders.length);
   const applicationTab = values.PARTNER_APPLICATIONS_SHEET_TAB || "Partner Applications";
   const partnerTab = values.PARTNERS_SHEET_TAB || "Partners";
   const commissionTab = values.PARTNER_COMMISSIONS_SHEET_TAB || "Partner Commissions";
