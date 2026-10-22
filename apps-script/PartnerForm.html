@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Partner application</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; background: #fffaf4; color: #2b2020; }
+    * { box-sizing: border-box; } body { margin: 0; padding: 1rem; background: #fffaf4; } main { max-width: 760px; margin: 0 auto; }
+    h1 { margin: 0 0 .45rem; font: 700 clamp(1.6rem, 4vw, 2.3rem)/1.1 Georgia, serif; }.intro, .privacy, .hint, .status, .field-error { font-size: .88rem; line-height: 1.5; }.intro { margin: 0 0 1rem; color: #5d4947; }
+    form { display: grid; gap: 1rem; } fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fff; } legend { padding: 0 .35rem; font-weight: 700; }.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+    label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; } input, select, textarea, button { font: inherit; } input, select, textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; } textarea { min-height: 6rem; resize: vertical; } input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
+    .field-error { margin: 0; color: #a41f33; } [hidden] { display: none !important; }.actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; } button { min-height: 2.8rem; padding: .7rem 1rem; border: 1px solid #2b2020; border-radius: 999px; background: #2b2020; color: #fffaf4; font-weight: 750; cursor: pointer; } button:disabled { cursor: wait; opacity: .6; }.status { min-height: 1.4rem; margin: 0; }.status.error { color: #a41f33; }.status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }.privacy { margin: 0; padding: .75rem; border-left: 3px solid #c77d8b; color: #5d4947; }.privacy a { color: inherit; font-weight: 700; }
+    @media (max-width: 560px) { body { padding: .7rem; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Apply to the Partner Circle</h1>
+  <p class="intro">Tell Saloni a little about your work. Applications are reviewed manually; approval is not automatic.</p>
+  <form id="partner-form" novalidate>
+    <fieldset><legend>About you</legend><div class="grid">
+      <label for="applicant-name">Your name <input id="applicant-name" name="applicantName" maxlength="120" autocomplete="name" required></label>
+      <label for="business-name">Business or public name <input id="business-name" name="businessName" maxlength="160" autocomplete="organization" required></label>
+      <label for="category">Your category <select id="category" name="category" required><option value="">Choose one</option><option>Photographer</option><option>Planner</option><option>Decorator</option><option>Florist</option><option>Gift shop</option><option>Creator</option><option>Other</option></select></label>
+      <label for="service-area">City or service area <input id="service-area" name="serviceArea" maxlength="160" autocomplete="address-level2" required></label>
+      <label for="phone">Phone or WhatsApp <input id="phone" name="phone" maxlength="40" autocomplete="tel" inputmode="tel" required></label>
+      <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
+      <label for="website">Instagram or website (optional) <input id="website" name="website" maxlength="500" type="url" inputmode="url" placeholder="https://"></label>
+    </div></fieldset>
+    <fieldset><legend>Your referrals</legend>
+      <label for="typical-customers">Who do you usually help? <textarea id="typical-customers" name="typicalCustomers" maxlength="1000" required></textarea></label>
+      <label for="referral-plan">How would you share Saloni's work? <textarea id="referral-plan" name="referralPlan" maxlength="1000" required></textarea></label>
+    </fieldset>
+    <fieldset><legend>Consent</legend>
+      <div class="hint"><strong>Partner Circle rules:</strong> Saloni approves applications manually; eligible commission is 5% of the final product subtotal excluding shipping after payment and delivery; review and payout happen monthly by hand; cancelled, refunded, duplicate, test, self-referred, and void orders earn nothing; supported basic personalisation is free when the design allows it; a paused or closed code stops new credit without rewriting past orders. <a href="https://saloniresinart.com/partners/#rules" target="_blank" rel="noreferrer">Read the full rules</a>.</div>
+      <label><input id="rules-accepted" name="rulesAccepted" type="checkbox" value="true" required> I accept these Partner Circle rules and the privacy notice. I understand approval, commission review, and payout are manual.</label>
+      <p class="hint">Please do not send bank or UPI details, identity documents, passwords, or payment credentials here.</p>
+    </fieldset>
+    <input id="application-id" name="applicationId" type="hidden">
+    <input id="captcha-token" name="captchaToken" type="hidden">
+    <p id="form-status" class="status" role="status" aria-live="polite"></p>
+    <div class="actions"><button id="submit-button" type="submit">Send application</button><button id="another-button" type="button" hidden>Start another application</button></div>
+    <p class="privacy">Application contact details are kept in the studio's private Google Sheet for review. Pending, rejected, and withdrawn applications follow a status-based 90-day cleanup; approved application details are copied to the private Partners tab and then removed from the application tab within 7 days. Active partner contact details remain while the relationship is active. Retained commission and payout records are private business records.</p>
+  </form>
+</main>
+<script id="seed-data" type="application/json"><?!= seedJson ?></script>
+<script>
+(function () {
+  "use strict";
+  var seed = JSON.parse(document.getElementById("seed-data").textContent || "{}");
+  var captchaEnabled = <?!= captchaEnabledJson ?>;
+  var captchaSiteKey = <?!= captchaSiteKeyJson ?>;
+  var form = document.getElementById("partner-form");
+  var status = document.getElementById("form-status");
+  var submitButton = document.getElementById("submit-button");
+  var anotherButton = document.getElementById("another-button");
+  var active = false; var currentAttempt = null; var timeoutId = null;
+  var PARENT_ORIGIN = "https://saloniresinart.com";
+  function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
+  function setStatus(message, kind) { status.textContent = message || ""; status.className = "status" + (kind ? " " + kind : ""); }
+  function setError(field, message) { var input = form.elements[field]; if (!input) return; input.setAttribute("aria-invalid", "true"); var id = field + "-error"; input.setAttribute("aria-describedby", id); var error = document.getElementById(id); if (!error) { error = document.createElement("p"); error.id = id; error.className = "field-error"; input.parentNode.appendChild(error); } error.textContent = message; }
+  function clearErrors() { Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) { input.removeAttribute("aria-invalid"); input.removeAttribute("aria-describedby"); }); Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); }); }
+  function focusError(errors) { var first = errors && Object.keys(errors)[0]; if (first && form.elements[first] && form.elements[first].focus) form.elements[first].focus(); else { status.setAttribute("tabindex", "-1"); status.focus(); } }
+  function newId() { if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID(); return "application-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10); }
+  function valid() { var errors = {}; ["applicantName", "businessName", "serviceArea", "typicalCustomers", "referralPlan"].forEach(function (field) { if (!value(field).trim()) errors[field] = "This field is required."; }); if (!value("category")) errors.category = "Choose a partner category."; if (!value("phone") || (value("phone").match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number."; if (value("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("email"))) errors.email = "Enter a valid email address or leave it blank."; if (value("website") && !/^https?:\/\/[^\s]+$/i.test(value("website"))) errors.website = "Use an http or https website address, or leave it blank."; if (!form.elements.rulesAccepted.checked) errors.rulesAccepted = "Accept the partner rules and privacy notice to apply."; return errors; }
+  function current(attempt) { return currentAttempt === attempt && active; }
+  function restore(attempt) { if (attempt && !current(attempt)) return; active = false; submitButton.disabled = false; if (timeoutId) window.clearTimeout(timeoutId); timeoutId = null; if (currentAttempt && currentAttempt.port && currentAttempt.port.close) currentAttempt.port.close(); }
+  function captcha(attempt, done) { if (!captchaEnabled || !captchaSiteKey || !seed.channelNonce || !window.MessageChannel || !window.top || window.top === window) { done(null); return; } try { var channel = new window.MessageChannel(); attempt.port = channel.port1; channel.port1.onmessage = function (event) { var data = event && event.data || {}; if (!current(attempt) || data.type !== "saloni-order-captcha-response" || data.nonce !== seed.channelNonce || data.attemptId !== attempt.id) return; done(data.ok === true && typeof data.token === "string" ? data.token : null); }; window.top.postMessage({ type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: attempt.id, mode: "partner" }, PARENT_ORIGIN, [channel.port2]); } catch (error) { done(null); } }
+  function success(result, attempt) { if (!current(attempt)) return; restore(attempt); form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; }); anotherButton.hidden = false; setStatus("Application received. Saloni will review it and contact you if the Partner Circle is a fit. Application ID: " + result.applicationId, "success"); status.setAttribute("tabindex", "-1"); status.focus(); }
+  form.addEventListener("submit", function (event) { event.preventDefault(); if (active) return; clearErrors(); var errors = valid(); if (Object.keys(errors).length) { Object.keys(errors).forEach(function (field) { setError(field, errors[field]); }); setStatus("Please correct the highlighted fields and try again.", "error"); focusError(errors); return; } var attempt = { id: newId(), port: null }; currentAttempt = attempt; active = true; submitButton.disabled = true; setStatus("Checking the application…", ""); timeoutId = window.setTimeout(function () { if (!current(attempt)) return; restore(attempt); setStatus("Unable to send the application yet. Your entries are still here; please try again.", "error"); status.focus(); }, 30000); captcha(attempt, function (token) { if (!current(attempt)) return; if (!token) { restore(attempt); setStatus("Captcha verification is required. Please try again.", "error"); return; } form.elements.captchaToken.value = token; try { google.script.run.withSuccessHandler(function (result) { if (!current(attempt)) return; if (result && result.ok === true) success(result, attempt); else { restore(attempt); var resultErrors = result && result.errors || { form: "Please correct the highlighted fields and try again." }; Object.keys(resultErrors).forEach(function (field) { setError(field, resultErrors[field]); }); setStatus(resultErrors.form || "Please correct the highlighted fields and try again.", "error"); focusError(resultErrors); } }).withFailureHandler(function () { if (!current(attempt)) return; restore(attempt); setStatus("We were unable to send the application. Your entries are still here; please try again.", "error"); }).submitPartnerApplication(form); } catch (error) { restore(attempt); setStatus("We were unable to send the application. Your entries are still here; please try again.", "error"); } }); });
+  anotherButton.addEventListener("click", function () { form.reset(); form.elements.applicationId.value = newId(); form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; }); anotherButton.hidden = true; clearErrors(); setStatus("", ""); });
+  form.elements.applicationId.value = seed.applicationId || newId();
+  if (captchaEnabled && captchaSiteKey && seed.channelNonce && window.top && window.top !== window) { try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey, mode: "partner" }, PARENT_ORIGIN); } catch (error) {} }
+}());
+</script>
+</body>
+</html>

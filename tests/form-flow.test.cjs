@@ -43,7 +43,7 @@ class FakeMessageChannel {
 }
 
 function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
-  const ids = ["request-id", "source-kind", "source-id", "product-name", "quantity", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "requested-date", "reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
+  const ids = ["request-id", "source-kind", "source-id", "product-name", "quantity", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "requested-date", "referral-code", "referral-status", "check-referral", "reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
@@ -53,7 +53,7 @@ function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
     quantity: elements.get("quantity"), heightFeet: elements.get("height-feet"), heightInchesPart: elements.get("height-inches-part"), widthFeet: elements.get("width-feet"), widthInchesPart: elements.get("width-inches-part"),
     designDetails: elements.get("design-details"), customerName: elements.get("customer-name"), phone: elements.get("phone"), email: elements.get("email"), fulfillment: elements.get("fulfillment"),
     shippingAddress: elements.get("shipping-address"), city: elements.get("city"), state: elements.get("state"), pin: elements.get("pin"), requestedDate: elements.get("requested-date"),
-    referenceImage: elements.get("reference-image"), captchaToken: elements.get("captcha-token"),
+    referenceImage: elements.get("reference-image"), captchaToken: elements.get("captcha-token"), referralCode: elements.get("referral-code"),
   };
   form.elements = fields;
   form.querySelectorAll = (selector) => {
@@ -69,11 +69,13 @@ function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
   const timers = [];
   const submissions = [];
   const callbacks = [];
+  const lookupCallbacks = [];
   const parentMessages = [];
   const run = {
     withSuccessHandler(callback) { this.success = callback; return this; },
     withFailureHandler(callback) { this.failure = callback; return this; },
     submitOrder(value) { submissions.push(value); callbacks.push({ success: this.success, failure: this.failure }); return this; },
+    validateReferralCode(value) { lookupCallbacks.push({ value, success: this.success, failure: this.failure }); return this; },
   };
   const windowObject = {
     parent: { postMessage(message, targetOrigin, ports) { parentMessages.push({ message, targetOrigin, port: ports && ports[0] }); } },
@@ -83,6 +85,7 @@ function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
     setTimeout(callback) { timers.push(callback); return timers.length; },
     clearTimeout() {},
   };
+  windowObject.google = { script: { run } };
   windowObject.top = windowObject.parent;
   const documentObject = {
     getElementById(id) { return elements.get(id) || null; },
@@ -96,7 +99,7 @@ function makeFormRuntime({ captcha = "ready", timeout = 1 } = {}) {
   vm.createContext(context);
   vm.runInContext(formSource, context, { filename: "Form.html" });
   elements.get("submit-button").dispatch("click");
-  return { elements, fields, status, timers, submissions, callbacks, parentMessages, windowObject };
+  return { elements, fields, status, timers, submissions, callbacks, lookupCallbacks, parentMessages, windowObject };
 }
 
 function fillValid(fields) {
@@ -112,6 +115,22 @@ function respondToken(runtime, index, token = "captcha-token") {
   const request = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request")[index];
   request.port.postMessage({ type: "saloni-order-captcha-response", nonce: request.message.nonce, attemptId: request.message.attemptId, ok: true, token });
 }
+
+test("clears accepted referral status on edits and ignores stale lookup responses", () => {
+  const runtime = makeFormRuntime();
+  const code = runtime.elements.get("referral-code");
+  const check = runtime.elements.get("check-referral");
+  code.value = "STUDIOA";
+  check.dispatch("click");
+  assert.equal(runtime.lookupCallbacks.length, 1);
+  runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA", displayName: "Studio A" });
+  assert.match(runtime.elements.get("referral-status").textContent, /accepted for Studio A/);
+  code.value = "UNKNOWN";
+  code.dispatch("input");
+  assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /accepted for Studio A/);
+  runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA", displayName: "Studio A" });
+  assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /accepted for Studio A/);
+});
 
 test("late success and failure from timed-out attempt cannot control a retry", async () => {
   const runtime = makeFormRuntime();

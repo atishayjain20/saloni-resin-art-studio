@@ -78,6 +78,11 @@
         <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
         <label for="requested-date">Requested date (optional) <input id="requested-date" name="requestedDate" type="date"></label>
       </div>
+      <div class="referral-box">
+        <label for="referral-code">Partner referral code (optional) <input id="referral-code" name="referralCode" maxlength="32" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="referral-status"></label>
+        <button id="check-referral" class="secondary" type="button">Check code</button>
+        <p id="referral-status" class="hint" role="status" aria-live="polite">A code is optional. You can continue without partner credit.</p>
+      </div>
       <label for="fulfillment">Shipping or pickup <select id="fulfillment" name="fulfillment" required><option value="shipping">Shipping</option><option value="pickup">Pickup in Ajmer</option></select></label>
       <div class="shipping-fields" id="shipping-fields">
         <div class="grid">
@@ -104,7 +109,7 @@
       <button id="submit-button" type="submit">Send request</button>
       <button id="another-button" class="secondary" type="button" hidden>Start another request</button>
     </div>
-    <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Requests and uploaded images are scheduled for deletion after 90 days. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p>
+    <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p>
   </form>
 </main>
 <script id="seed-data" type="application/json"><?!= seedJson ?></script>
@@ -121,9 +126,14 @@
   var anotherButton = document.getElementById("another-button");
   var shippingFields = document.getElementById("shipping-fields");
   var referenceImage = document.getElementById("reference-image");
+  var referralInput = form.elements.referralCode || document.getElementById("referral-code");
+  var referralStatus = document.getElementById("referral-status");
+  var checkReferral = document.getElementById("check-referral");
   var active = false;
   var currentAttempt = null;
   var timeoutId = null;
+  var referralCheckVersion = 0;
+  var referralAcceptedCode = "";
   var PARENT_ORIGIN = "https://saloniresinart.com";
 
   function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
@@ -157,10 +167,50 @@
     ["heightInchesPart", "widthInchesPart"].forEach(function (name) { form.elements[name].setAttribute("max", "11.99"); });
   }
   function applySeed(next) {
-    var fields = ["requestId", "sourceKind", "sourceId", "productName", "quantity", "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate"];
+    var fields = ["requestId", "sourceKind", "sourceId", "productName", "quantity", "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate", "referralCode"];
     fields.forEach(function (field) { if (form.elements[field]) form.elements[field].value = next[field] == null ? "" : next[field]; });
     toggleShipping();
     updateDimensionMaxes();
+  }
+  function normalizeReferralCode(value) { var code = String(value || "").trim().toUpperCase(); return /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code) ? code : ""; }
+  function showReferralStatus(message, kind) { if (!referralStatus) return; referralStatus.textContent = message; referralStatus.className = "hint" + (kind ? " " + kind : ""); }
+  function clearReferralStatus() {
+    referralCheckVersion += 1;
+    referralAcceptedCode = "";
+    if (checkReferral) checkReferral.disabled = false;
+    var code = referralInput ? normalizeReferralCode(referralInput.value) : "";
+    showReferralStatus(code ? "Code changed. Check it again before submitting." : "No code entered. The order can continue without partner credit.", "");
+  }
+  function checkReferralCode() {
+    if (!referralInput || !checkReferral || !window.google || !google.script || !google.script.run) return;
+    var code = normalizeReferralCode(referralInput.value);
+    referralInput.value = code;
+    var requestVersion = referralCheckVersion + 1;
+    referralCheckVersion = requestVersion;
+    referralAcceptedCode = "";
+    if (!code) { showReferralStatus("No code entered. The order can continue without partner credit.", ""); return; }
+    checkReferral.disabled = true; showReferralStatus("Checking this code…", "");
+    var requested = code;
+    try {
+      google.script.run.withSuccessHandler(function (result) {
+        if (requestVersion !== referralCheckVersion || normalizeReferralCode(referralInput.value) !== requested) return;
+        checkReferral.disabled = false;
+        if (result && result.status === "active") { referralAcceptedCode = requested; showReferralStatus("Code accepted for " + String(result.displayName || "this partner") + ".", "success"); }
+        else if (result && result.status === "error") { referralAcceptedCode = ""; showReferralStatus("Could not check the code; retry or clear it to continue without partner credit.", "error"); }
+        else if (result && result.status === "paused") { referralAcceptedCode = ""; showReferralStatus("This code is paused. The order can continue without partner credit.", "error"); }
+        else { referralAcceptedCode = ""; showReferralStatus("This code is not active. The order can continue without partner credit.", "error"); }
+      }).withFailureHandler(function () {
+        if (requestVersion !== referralCheckVersion || normalizeReferralCode(referralInput.value) !== requested) return;
+        checkReferral.disabled = false;
+        referralAcceptedCode = "";
+        showReferralStatus("Could not check the code; retry or clear it to continue without partner credit.", "error");
+      }).validateReferralCode(code);
+    } catch (error) {
+      if (requestVersion !== referralCheckVersion || normalizeReferralCode(referralInput.value) !== requested) return;
+      checkReferral.disabled = false;
+      referralAcceptedCode = "";
+      showReferralStatus("Could not check the code; retry or clear it to continue without partner credit.", "error");
+    }
   }
   function newRequestId() {
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -209,7 +259,8 @@
     restoreSubmitState(attempt);
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
     anotherButton.hidden = false;
-    setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed. Request ID: " + result.requestId, "success");
+    var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
+    setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed." + referralMessage + " Request ID: " + result.requestId, "success");
     if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
   }
   function validIsoDate(text) {
@@ -260,6 +311,8 @@
     return errors;
   }
   form.addEventListener("change", function () { toggleShipping(); updateDimensionMaxes(); });
+  if (referralInput) { referralInput.addEventListener("input", clearReferralStatus); referralInput.addEventListener("change", clearReferralStatus); }
+  if (checkReferral) checkReferral.addEventListener("click", checkReferralCode);
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;
@@ -299,6 +352,7 @@
   });
   anotherButton.addEventListener("click", function () {
     form.reset();
+    clearReferralStatus();
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
     anotherButton.hidden = true; clearErrors(); setStatus("", "");
     form.elements.requestId.value = newRequestId(); form.elements.fulfillment.value = "shipping"; toggleShipping();

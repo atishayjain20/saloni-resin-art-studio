@@ -2,48 +2,89 @@
  * Google Apps Script web app for the static site's order-request iframe.
  *
  * The web app intentionally has no public read/list endpoint. doGet and doPost
- * only render the form; submitOrder is the single write path.
+ * only render a bounded order or partner form; public writes stay in the two
+ * validated submission functions below.
  */
 
 var MAX_FILE_BYTES = 5 * 1024 * 1024;
 var MAX_DIMENSION_INCHES = 60;
 var DEFAULT_DAILY_ACCEPTANCE_CAP = 50;
+var DEFAULT_PARTNER_DAILY_ACCEPTANCE_CAP = 20;
+var PARTNER_APPLICATION_CAPTCHA_ACTION = "partner_application";
+var ORDER_CAPTCHA_ACTION = "order_request";
 var RETENTION_DAYS = 90;
 var RETENTION_MILLISECONDS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 var ORDER_FILE_NAME_PATTERN = /^order-([A-Za-z0-9_-]{12,80})\.(jpg|png)$/;
-var ORDER_HEADERS = [
+var LEGACY_ORDER_HEADERS = [
   "Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID",
   "Product name", "Quantity", "Height value", "Height unit", "Height (in)",
   "Width value", "Width unit", "Width (in)", "Design details",
   "Customer name", "Phone", "Email", "Fulfilment", "Shipping address",
   "City", "State", "PIN", "Requested date", "Reference file link", "Status", "Staff notes"
 ];
+var PARTNER_ORDER_HEADERS = [
+  "Referral code", "Partner ID", "Partner name snapshot", "Final product subtotal", "Payment status",
+  "Delivery status", "Commission rate snapshot", "Commission amount", "Commission status",
+  "Payout batch ID", "Payout date"
+];
+var ORDER_HEADERS = LEGACY_ORDER_HEADERS.concat(PARTNER_ORDER_HEADERS);
+var PARTNER_APPLICATION_HEADERS = [
+  "Application ID", "Received at", "Applicant name", "Business name", "Category", "City / service area",
+  "Phone / WhatsApp", "Email", "Instagram / website", "Typical customers", "Referral plan", "Rules accepted",
+  "Status", "Review notes", "Reviewed at", "Payload fingerprint", "Partner ID"
+];
+var PARTNER_HEADERS = [
+  "Partner ID", "Referral code", "Partner display name", "Contact name", "Category", "City / service area",
+  "Phone / WhatsApp", "Email", "Instagram / website", "Commission rate", "Status", "Approved at",
+  "Referral link", "Staff notes", "Closed at"
+];
+var COMMISSION_HEADERS = [
+  "Commission ID", "Partner ID / code", "Partner name snapshot", "Order month", "Product category",
+  "Final product subtotal", "Commission rate", "Commission amount", "Commission status", "Payout batch ID",
+  "Paid at", "Payment reference", "Staff notes"
+];
+var PARTNER_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,31}$/;
+var PARTNER_PROGRAM_READY_PROPERTY = "PARTNER_PROGRAM_CONFIGURED";
+var COMMISSION_STATUSES = ["Pending", "Eligible", "Approved", "Paid", "Void"];
+var PAYMENT_STATUSES = ["Pending", "Paid", "Refunded", "Not applicable"];
+var DELIVERY_STATUSES = ["New", "Confirmed", "In production", "Shipped", "Delivered", "Cancelled", "Test"];
 
-function doGet() {
-  return renderForm_({ seed: blankSeed_() });
+function doGet(event) {
+  var parameters = event && event.parameter ? event.parameter : {};
+  return renderForm_({ seed: blankSeed_(), mode: boundedMode_(parameters.mode) });
 }
 
 function doPost(event) {
   var parameters = event && event.parameter ? event.parameter : {};
   var action = String(parameters.action || "");
+  var mode = boundedMode_(parameters.mode);
   if (action === "seed") {
-    return renderForm_({ seed: parseSeed_(parameters.seed) });
+    var seed = parseSeed_(parameters.seed);
+    seed.formMode = mode;
+    if (mode === "partner") seed.applicationId = boundedSeed_(parameters.applicationId || seed.applicationId, 80);
+    return renderForm_({ seed: seed, mode: mode });
   }
-  return renderForm_({ seed: blankSeed_() });
+  return renderForm_({ seed: blankSeed_(), mode: mode });
 }
 
 function renderForm_(state) {
   var properties = PropertiesService.getScriptProperties();
   var siteKey = String(properties.getProperty("CAPTCHA_SITE_KEY") || "");
   var captchaEnabled = true;
-  var template = HtmlService.createTemplateFromFile("Form");
-  template.seedJson = escapeSeedJson_(JSON.stringify((state && state.seed) || blankSeed_()));
+  var mode = boundedMode_(state && state.mode);
+  var seed = (state && state.seed) || blankSeed_();
+  seed.formMode = mode;
+  var template = HtmlService.createTemplateFromFile(mode === "partner" ? "PartnerForm" : "Form");
+  template.seedJson = escapeSeedJson_(JSON.stringify(seed));
   template.captchaSiteKeyJson = escapeSeedJson_(JSON.stringify(siteKey));
   template.captchaEnabledJson = captchaEnabled ? "true" : "false";
+  template.formModeJson = escapeSeedJson_(JSON.stringify(mode));
   return template.evaluate()
-    .setTitle("Saloni Resin Art Studio order request")
+    .setTitle(mode === "partner" ? "Saloni Resin Art partner application" : "Saloni Resin Art Studio order request")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
+
+function boundedMode_(value) { return String(value || "").toLowerCase() === "partner" ? "partner" : "order"; }
 
 function purgeExpiredOrders_() {
   var lock = LockService.getScriptLock();
@@ -88,6 +129,7 @@ function purgeExpiredOrdersAt_(now) {
   if (!runAt) throw new Error("Retention cleanup requires a valid date.");
   var properties = PropertiesService.getScriptProperties();
   var sheet = openOrderSheet_(properties);
+  var orderColumns = orderSchemaLength_(sheet);
   var values = sheet.getDataRange().getValues();
   var cutoff = new Date(runAt.getTime() - RETENTION_MILLISECONDS);
   var knownRequestIds = {};
@@ -112,6 +154,7 @@ function purgeExpiredOrdersAt_(now) {
     expiredRows.push({
       rowNumber: index + 1,
       requestId: requestId,
+      row: row,
       hasReference: Boolean(String(row[23] == null ? "" : row[23]).trim())
     });
   }
@@ -130,6 +173,14 @@ function purgeExpiredOrdersAt_(now) {
   var deletedRows = 0;
   expiredRows.sort(function (left, right) { return right.rowNumber - left.rowNumber; });
   expiredRows.forEach(function (record) {
+    if (orderColumns === ORDER_HEADERS.length && (String(record.row[26] || "").trim() || String(record.row[27] || "").trim())) {
+      try {
+        ensureCommissionRecord_(record.row, record.requestId, properties, runAt);
+      } catch (ledgerError) {
+        errors += 1;
+        return;
+      }
+    }
     var fileFailure = false;
     if (record.hasReference) {
       if (!folder) {
@@ -187,6 +238,14 @@ function purgeExpiredOrdersAt_(now) {
     }
   }
 
+  if (partnerProgramConfigured_(properties)) {
+    try {
+      var partnerCleanup = purgePartnerRecords_(runAt, properties);
+      deletedRows += partnerCleanup.deletedRows;
+    } catch (partnerCleanupError) {
+      errors += 1;
+    }
+  }
   var summary = { lastSuccessAt: runAt.toISOString(), deletedRows: deletedRows, deletedFiles: deletedFiles };
   if (errors) {
     console.error(JSON.stringify({ failedAt: runAt.toISOString(), deletedRows: deletedRows, deletedFiles: deletedFiles, errors: errors }));
@@ -202,6 +261,220 @@ function openRetentionFolder_(properties) {
   var folder = DriveApp.getFolderById(folderId);
   if (folder.getSharingAccess && folder.getSharingAccess() !== DriveApp.Access.PRIVATE) throw new Error("Order Drive folder is not restricted.");
   return folder;
+}
+
+function partnerProgramConfigured_(properties) {
+  return Boolean(partnerProgramConfig_(properties) && isTrue_(properties.getProperty(PARTNER_PROGRAM_READY_PROPERTY)));
+}
+
+function partnerProgramConfig_(properties) {
+  var sheetId = String(properties.getProperty("PARTNER_SHEET_ID") || properties.getProperty("ORDER_SHEET_ID") || "").trim();
+  if (!sheetId) return null;
+  return {
+    sheetId: sheetId,
+    applicationsTab: String(properties.getProperty("PARTNER_APPLICATIONS_SHEET_TAB") || "Partner Applications"),
+    partnersTab: String(properties.getProperty("PARTNERS_SHEET_TAB") || "Partners"),
+    commissionsTab: String(properties.getProperty("PARTNER_COMMISSIONS_SHEET_TAB") || "Partner Commissions")
+  };
+}
+
+function ensureCommissionRecord_(orderRow, requestId, properties, now) {
+  var sheet = openPartnerTab_(properties, "PARTNER_COMMISSIONS_SHEET_TAB", "Partner Commissions");
+  ensurePartnerTabSchema_(sheet, COMMISSION_HEADERS);
+  var commissionId = "commission-" + requestId;
+  var values = sheet.getDataRange().getValues();
+  var index = headerIndex_(values[0].map(String));
+  var matches = [];
+  for (var rowIndex = 1; rowIndex < values.length; rowIndex += 1) if (String(values[rowIndex][index["Commission ID"]]) === commissionId) matches.push(values[rowIndex]);
+  if (matches.length > 1) throw new Error("Commission ledger has duplicate records.");
+  var code = String(orderRow[26] || "").trim();
+  var partnerId = String(orderRow[27] || "").trim();
+  var name = String(orderRow[28] || "");
+  if (!code && !partnerId) throw new Error("Commission source has no partner attribution.");
+  var rawSubtotal = orderRow[29];
+  var subtotalText = String(rawSubtotal == null ? "" : rawSubtotal).trim();
+  var subtotal = subtotalText ? Number(rawSubtotal) : NaN;
+  if (subtotalText && (!isFinite(subtotal) || subtotal < 0)) throw new Error("Commission subtotal is not valid.");
+  var rawRate = orderRow[32];
+  var rate = Number(rawRate);
+  if (rawRate === "" || rawRate === null || rawRate === undefined || !isFinite(rate) || rate < 0 || rate > 1) throw new Error("Commission rate snapshot is not valid.");
+  var payment = String(orderRow[30] || "");
+  var delivery = String(orderRow[31] || "");
+  var explicitStatus = commissionStatus_(orderRow[34]);
+  if (PAYMENT_STATUSES.indexOf(payment) === -1) throw new Error("Payment status is not valid.");
+  if (DELIVERY_STATUSES.indexOf(delivery) === -1) throw new Error("Delivery status is not valid.");
+  var eligible = payment === "Paid" && delivery === "Delivered" && isFinite(subtotal) && subtotal > 0;
+  var voidFacts = isCommissionVoid_(payment, delivery);
+  if (voidFacts && explicitStatus === "Paid") throw new Error("Paid commission cannot be refunded or voided.");
+  if (!voidFacts && explicitStatus === "Paid" && !eligible) throw new Error("Paid commission is not eligible.");
+  if (!voidFacts && explicitStatus === "Approved" && !eligible) throw new Error("Approved commission is not eligible.");
+  if (!voidFacts && explicitStatus === "Eligible" && !eligible) throw new Error("Eligible commission is not eligible.");
+  var status = voidFacts ? "Void" : (!explicitStatus || explicitStatus === "Pending" ? eligible ? "Eligible" : "Pending" : explicitStatus);
+  var sourceAmountText = String(orderRow[33] == null ? "" : orderRow[33]).trim();
+  var sourceAmount = sourceAmountText ? Number(orderRow[33]) : NaN;
+  if (sourceAmountText && (!isFinite(sourceAmount) || sourceAmount < 0)) throw new Error("Commission amount is not valid.");
+  var amount = status === "Void" ? 0 : status === "Paid"
+    ? (isFinite(sourceAmount) ? Math.round(sourceAmount * 100) / 100 : eligible ? Math.round(subtotal * rate * 100) / 100 : NaN)
+    : (status === "Eligible" || status === "Approved") && eligible ? Math.round(subtotal * rate * 100) / 100 : "";
+  if (status === "Paid" && !isFinite(amount)) throw new Error("Paid commission amount is not known.");
+  var payoutBatch = String(orderRow[35] || "");
+  var payoutDate = orderRow[36] || "";
+  if (status === "Paid" && (!payoutBatch || !payoutDate)) throw new Error("Paid commission payout is incomplete.");
+  var month = retentionDate_(orderRow[2]) ? Utilities.formatDate(retentionDate_(orderRow[2]), Session.getScriptTimeZone(), "yyyy-MM") : Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM");
+  var expected = [commissionId, neutralizeForSheet_(partnerId || code), neutralizeForSheet_(name), month, neutralizeForSheet_(orderRow[3] || ""),
+    subtotalText ? subtotal : "", rate, amount, status, neutralizeForSheet_(payoutBatch), payoutDate, "", ""];
+  if (matches.length === 1) return reconcileCommissionRecord_(sheet, matches[0], expected, index);
+  try {
+    sheet.appendRow(expected);
+  } catch (appendError) {
+    var after = sheet.getDataRange().getValues();
+    var afterMatches = after.slice(1).filter(function (candidate) { return String(candidate[0]) === commissionId; });
+    if (afterMatches.length === 1) return reconcileCommissionRecord_(sheet, afterMatches[0], expected, index);
+    if (afterMatches.length > 1) throw new Error("Commission ledger has duplicate records.");
+    throw appendError;
+  }
+  var finalValues = sheet.getDataRange().getValues();
+  var finalMatches = finalValues.slice(1).filter(function (candidate) { return String(candidate[0]) === commissionId; });
+  if (finalMatches.length === 1) return reconcileCommissionRecord_(sheet, finalMatches[0], expected, index);
+  if (finalMatches.length > 1) throw new Error("Commission ledger has duplicate records.");
+  throw new Error("Commission ledger write could not be verified.");
+}
+
+function commissionStatus_(value) {
+  var status = String(value == null ? "" : value).trim();
+  if (!status) return "";
+  if (COMMISSION_STATUSES.indexOf(status) === -1) throw new Error("Commission status is not valid.");
+  return status;
+}
+
+function isCommissionVoid_(payment, delivery) {
+  return payment === "Refunded" || delivery === "Cancelled" || delivery === "Test";
+}
+
+function reconcileCommissionRecord_(sheet, existing, expected, index) {
+  [1, 2, 3, 4, 6].forEach(function (position) {
+    var existingValue = typeof existing[position] === "string" ? neutralizeForSheet_(existing[position]) : existing[position];
+    var expectedValue = typeof expected[position] === "string" ? neutralizeForSheet_(expected[position]) : expected[position];
+    if (String(existingValue == null ? "" : existingValue) !== String(expectedValue == null ? "" : expectedValue)) throw new Error("Commission ledger snapshot mismatch.");
+  });
+  var currentStatus = commissionStatus_(existing[8]);
+  if (!currentStatus) throw new Error("Commission ledger status is not valid.");
+  var expectedStatus = commissionStatus_(expected[8]);
+  var existingSubtotal = String(existing[5] == null ? "" : existing[5]).trim();
+  var expectedSubtotal = String(expected[5] == null ? "" : expected[5]).trim();
+  if (existingSubtotal && expectedSubtotal && Number(existing[5]) !== Number(expected[5])) throw new Error("Commission ledger snapshot mismatch.");
+  if ((currentStatus === "Paid" || currentStatus === "Void") && existingSubtotal !== expectedSubtotal) throw new Error("Commission ledger snapshot mismatch.");
+  if (String(existing[7] == null ? "" : existing[7]) !== String(expected[7] == null ? "" : expected[7]) && (currentStatus === "Paid" || currentStatus === "Void") && String(expected[7] == null ? "" : expected[7]) !== "") throw new Error("Commission amount mismatch.");
+  if (String(existing[9] == null ? "" : existing[9]) !== String(expected[9] == null ? "" : expected[9]) && (currentStatus === "Paid" || currentStatus === "Void") && String(expected[9] || "").trim()) throw new Error("Payout batch mismatch.");
+  if (String(existing[10] == null ? "" : existing[10]) !== String(expected[10] == null ? "" : expected[10]) && (currentStatus === "Paid" || currentStatus === "Void") && expected[10]) throw new Error("Payout date mismatch.");
+  if (currentStatus === "Paid" || currentStatus === "Void") {
+    if (expectedStatus !== currentStatus && ["Pending", "Eligible", "Approved"].indexOf(expectedStatus) !== -1) return existing;
+    if (expectedStatus !== currentStatus) throw new Error("Commission ledger frozen status mismatch.");
+    return existing;
+  }
+  if (!existingSubtotal && expectedSubtotal) {
+    // An unresolved Pending row can learn its first final subtotal exactly once.
+  } else if (existingSubtotal && !expectedSubtotal) {
+    expected[5] = existing[5];
+  }
+  var nextStatus = expectedStatus;
+  if (expectedStatus === "Pending" && (currentStatus === "Eligible" || currentStatus === "Approved")) nextStatus = currentStatus;
+  if (currentStatus === "Approved" && expectedStatus === "Eligible") nextStatus = "Approved";
+  var merged = existing.slice().map(function (value) { return typeof value === "string" ? neutralizeForSheet_(value) : value; });
+  if (!existingSubtotal && expectedSubtotal) merged[5] = expected[5];
+  merged[8] = nextStatus;
+  if (nextStatus === "Void") merged[7] = 0;
+  else if (String(existing[7] == null ? "" : existing[7]) !== "" && String(expected[7] == null ? "" : expected[7]) !== "" && Number(existing[7]) !== Number(expected[7])) throw new Error("Commission amount mismatch.");
+  else if (String(existing[7] == null ? "" : existing[7]) === "" && String(expected[7] == null ? "" : expected[7]) !== "") merged[7] = expected[7];
+  if ((nextStatus === "Paid" || nextStatus === "Void") && String(expected[9] || "").trim() && !String(existing[9] || "").trim()) merged[9] = expected[9];
+  if ((nextStatus === "Paid" || nextStatus === "Void") && expected[10] && !existing[10]) merged[10] = expected[10];
+  if (merged.join("\u001f") !== existing.join("\u001f")) {
+    sheet.getRange(commissionRowNumber_(sheet, expected[0]), 1, 1, COMMISSION_HEADERS.length).setValues([merged]);
+    var verified = sheet.getDataRange().getValues().filter(function (candidate) { return String(candidate[0]) === String(expected[0]); });
+    if (verified.length !== 1 || verified[0].join("\u001f") !== merged.join("\u001f")) throw new Error("Commission ledger update could not be verified.");
+    return verified[0];
+  }
+  return existing;
+}
+
+function commissionRowNumber_(sheet, commissionId) {
+  var values = sheet.getDataRange().getValues();
+  for (var rowIndex = 1; rowIndex < values.length; rowIndex += 1) if (String(values[rowIndex][0]) === String(commissionId)) return rowIndex + 1;
+  throw new Error("Commission ledger row was not found.");
+}
+
+function purgePartnerRecords_(now, properties) {
+  var deletedRows = 0;
+  var errors = 0;
+  try {
+    var applications = openPartnerTab_(properties, "PARTNER_APPLICATIONS_SHEET_TAB", "Partner Applications");
+    ensurePartnerTabSchema_(applications, PARTNER_APPLICATION_HEADERS);
+    var appValues = applications.getDataRange().getValues();
+    var appIndex = headerIndex_(appValues[0].map(String));
+    for (var appRow = appValues.length - 1; appRow >= 1; appRow -= 1) {
+      var received = retentionDate_(appValues[appRow][appIndex["Received at"]]);
+      var reviewed = retentionDate_(appValues[appRow][appIndex["Reviewed at"]]);
+      var status = String(appValues[appRow][appIndex.Status] || "Pending");
+      var expiry = status === "Approved" ? (reviewed && new Date(reviewed.getTime() + 7 * 24 * 60 * 60 * 1000)) : status === "Rejected" || status === "Withdrawn" ? (reviewed && new Date(reviewed.getTime() + RETENTION_MILLISECONDS)) : (received && new Date(received.getTime() + RETENTION_MILLISECONDS));
+      var partnerId = String(appValues[appRow][appIndex["Partner ID"]] || "").trim();
+      var approvedTransfer = status !== "Approved" ? true : Boolean(partnerId && partnerTransferVerified_(partnerId, properties, appValues[appRow], appIndex));
+      if (expiry && expiry.getTime() <= now.getTime() && approvedTransfer) {
+        applications.deleteRow(appRow + 1);
+        deletedRows += 1;
+      } else if (status === "Approved" && !approvedTransfer) errors += 1;
+      else if ((status === "Approved" || status === "Rejected" || status === "Withdrawn") && !reviewed) errors += 1;
+      else if (status === "Pending" && !received) errors += 1;
+    }
+  } catch (applicationError) { errors += 1; }
+  try {
+    var partners = openPartnerTab_(properties, "PARTNERS_SHEET_TAB", "Partners");
+    ensurePartnerTabSchema_(partners, PARTNER_HEADERS);
+    var partnerValues = partners.getDataRange().getValues();
+    var partnerIndex = headerIndex_(partnerValues[0].map(String));
+    for (var partnerRow = 1; partnerRow < partnerValues.length; partnerRow += 1) {
+      var closedRaw = partnerValues[partnerRow][partnerIndex["Closed at"]];
+      var closed = retentionDate_(closedRaw);
+      var partnerStatus = String(partnerValues[partnerRow][partnerIndex.Status] || "");
+      if (partnerStatus === "Closed" && !closed) { errors += 1; continue; }
+      if (partnerStatus === "Closed" && closed && closed.getTime() + RETENTION_MILLISECONDS <= now.getTime()) {
+        ["Contact name", "City / service area", "Phone / WhatsApp", "Email", "Instagram / website", "Staff notes"].forEach(function (field) {
+          if (partnerIndex[field] !== undefined) partners.getRange(partnerRow + 1, partnerIndex[field] + 1).setValue("");
+        });
+      }
+    }
+  } catch (partnerError) { errors += 1; }
+  if (errors) throw new Error("Partner retention cleanup failed.");
+  return { deletedRows: deletedRows };
+}
+
+function partnerTransferVerified_(partnerId, properties, applicationRow, applicationIndex) {
+  if (!applicationRow || !applicationIndex || String(applicationRow[applicationIndex.Status] || "") !== "Approved" || applicationRow[applicationIndex["Rules accepted"]] !== true || !String(applicationRow[applicationIndex["Referral plan"]] || "").trim()) return false;
+  var partners = openPartnerTab_(properties, "PARTNERS_SHEET_TAB", "Partners");
+  ensurePartnerTabSchema_(partners, PARTNER_HEADERS);
+  var values = partners.getDataRange().getValues();
+  var index = headerIndex_(values[0].map(String));
+  for (var rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    var row = values[rowIndex];
+    if (String(row[index["Partner ID"]] || "").trim() !== partnerId) continue;
+    var code = normalizeReferralCode_(row[index["Referral code"]]);
+    var link = String(row[index["Referral link"]] || "");
+    var required = ["Partner display name", "Contact name", "Category", "City / service area", "Phone / WhatsApp"];
+    var complete = required.every(function (field) { return String(row[index[field]] == null ? "" : row[index[field]]).trim(); });
+    var displayName = String(row[index["Partner display name"]] || "");
+    var applicationName = String(applicationRow[applicationIndex["Business name"]] || "");
+    var applicantName = String(applicationRow[applicationIndex["Applicant name"]] || "");
+    var copied = (displayName === applicationName || displayName === applicantName) &&
+      String(row[index["Contact name"]] || "") === String(applicationRow[applicationIndex["Applicant name"]] || "") &&
+      String(row[index.Category] || "") === String(applicationRow[applicationIndex.Category] || "") &&
+      String(row[index["City / service area"]] || "") === String(applicationRow[applicationIndex["City / service area"]] || "") &&
+      String(row[index["Phone / WhatsApp"]] || "") === String(applicationRow[applicationIndex["Phone / WhatsApp"]] || "") &&
+      String(row[index.Email] || "") === String(applicationRow[applicationIndex.Email] || "") &&
+      String(row[index["Instagram / website"]] || "") === String(applicationRow[applicationIndex["Instagram / website"]] || "");
+    var rate = Number(row[index["Commission rate"]]);
+    var approvedAt = retentionDate_(row[index["Approved at"]]);
+    return Boolean(code && link === "https://saloniresinart.com/?ref=" + encodeURIComponent(code) && complete && copied && isFinite(rate) && rate >= 0 && rate <= 1 && approvedAt);
+  }
+  return false;
 }
 
 function retentionFilesForRequest_(folder, requestId) {
@@ -248,18 +521,37 @@ function submitOrder(form) {
       if (existing.fingerprint !== fingerprint) {
         return validationFailure_({ requestId: "Request ID conflict: these details differ from the saved request. Start another request." });
       }
-      return { ok: true, requestId: payload.requestId, receivedAt: existing.receivedAt };
+      return {
+        ok: true, requestId: payload.requestId, receivedAt: existing.receivedAt,
+        referralCode: existing.referralCode, partnerName: existing.partnerName,
+        referralStatus: existing.partnerId ? "active" : "invalid"
+      };
     }
     if (dailyCapReached_(sheet, properties)) {
       return validationFailure_({ form: "The studio's daily request limit has been reached. Please try again tomorrow." });
     }
 
+    var attribution = null;
+    if (payload.referralCode) attribution = resolveReferralForOrder_(payload.referralCode, properties);
+    var schemaLength = orderSchemaLength_(sheet);
+    if (attribution && attribution.active && schemaLength === LEGACY_ORDER_HEADERS.length) {
+      throw new Error("Partner referral setup is not complete.");
+    }
     var referenceFile = null;
     try {
       referenceFile = createReferenceFile_(payload);
       var receivedAt = new Date();
-      sheet.appendRow(rowForPayload_(payload, fingerprint, receivedAt, referenceFile));
-      return { ok: true, requestId: payload.requestId, receivedAt: receivedAt.toISOString() };
+      var rowNumber = Number(sheet.getLastRow && sheet.getLastRow()) + 1;
+      var row = schemaLength === ORDER_HEADERS.length
+        ? rowForPayload_(payload, fingerprint, receivedAt, referenceFile, attribution || { active: false }, rowNumber)
+        : rowForPayload_(payload, fingerprint, receivedAt, referenceFile);
+      sheet.appendRow(row);
+      return {
+        ok: true, requestId: payload.requestId, receivedAt: receivedAt.toISOString(),
+        referralCode: attribution && attribution.active ? attribution.code : "",
+        partnerName: attribution && attribution.active ? attribution.displayName : "",
+        referralStatus: attribution && attribution.active ? "active" : payload.referralCode ? attribution.status : "invalid"
+      };
     } catch (appendError) {
       // appendRow can persist a row and still throw. Reconcile before touching
       // the file so a successful write is never orphaned by cleanup.
@@ -272,7 +564,11 @@ function submitOrder(form) {
       }
       if (afterAppend) {
         if (afterAppend.fingerprint === fingerprint) {
-          return { ok: true, requestId: payload.requestId, receivedAt: afterAppend.receivedAt };
+          return {
+            ok: true, requestId: payload.requestId, receivedAt: afterAppend.receivedAt,
+            referralCode: afterAppend.referralCode, partnerName: afterAppend.partnerName,
+            referralStatus: afterAppend.partnerId ? "active" : "invalid"
+          };
         }
         // A conflicting row is evidence that a write occurred; do not trash
         // the newly-created file when the row/file relationship is uncertain.
@@ -293,6 +589,405 @@ function submitOrder(form) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function submitPartnerApplication(form) {
+  var properties = PropertiesService.getScriptProperties();
+  if (isTrue_(properties.getProperty("PARTNER_FORM_DISABLED"))) {
+    return validationFailure_({ form: "Partner applications are paused. Please contact Saloni directly." });
+  }
+  var payload = collectApplication_(form || {});
+  var validation = validateApplication_(payload);
+  if (Object.keys(validation).length) return validationFailure_(validation);
+  var captcha = verifyCaptcha_(payload.captchaToken, properties, PARTNER_APPLICATION_CAPTCHA_ACTION);
+  if (!captcha.ok) return validationFailure_({ captcha: captcha.error });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to receive the partner application.");
+  try {
+    var sheet = openPartnerTab_(properties, "PARTNER_APPLICATIONS_SHEET_TAB", "Partner Applications");
+    ensurePartnerTabSchema_(sheet, PARTNER_APPLICATION_HEADERS);
+    var fingerprint = applicationFingerprint_(payload);
+    var existing = findApplication_(sheet, payload.applicationId);
+    if (existing) {
+      if (existing.fingerprint !== fingerprint) return validationFailure_({ applicationId: "Application ID conflict: these details differ from the saved application." });
+      return { ok: true, applicationId: payload.applicationId, receivedAt: existing.receivedAt };
+    }
+    if (partnerDailyCapReached_(sheet, properties)) return validationFailure_({ form: "The studio's partner application limit has been reached. Please try again tomorrow." });
+    var receivedAt = new Date();
+    var row = [
+      neutralizeForSheet_(payload.applicationId), receivedAt, neutralizeForSheet_(payload.applicantName),
+      neutralizeForSheet_(payload.businessName), neutralizeForSheet_(payload.category), neutralizeForSheet_(payload.serviceArea),
+      neutralizeForSheet_(payload.phone), neutralizeForSheet_(payload.email), neutralizeForSheet_(payload.website),
+      neutralizeForSheet_(payload.typicalCustomers), neutralizeForSheet_(payload.referralPlan), true, "Pending", "", "",
+      neutralizeForSheet_(fingerprint), ""
+    ];
+    try {
+      sheet.appendRow(row);
+    } catch (appendError) {
+      var afterAppend = findApplication_(sheet, payload.applicationId);
+      if (afterAppend && afterAppend.fingerprint === fingerprint) return { ok: true, applicationId: payload.applicationId, receivedAt: afterAppend.receivedAt };
+      if (afterAppend) return validationFailure_({ applicationId: "Application ID conflict: these details differ from the saved application." });
+      throw appendError;
+    }
+    return { ok: true, applicationId: payload.applicationId, receivedAt: receivedAt.toISOString() };
+  } catch (error) {
+    throw new Error("Unable to receive the partner application.");
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function collectApplication_(form) {
+  return {
+    applicationId: stringValue_(form.applicationId), applicantName: stringValue_(form.applicantName),
+    businessName: stringValue_(form.businessName), category: stringValue_(form.category),
+    serviceArea: stringValue_(form.serviceArea), phone: stringValue_(form.phone), email: stringValue_(form.email),
+    website: stringValue_(form.website), typicalCustomers: stringValue_(form.typicalCustomers),
+    referralPlan: stringValue_(form.referralPlan), rulesAccepted: isTrue_(form.rulesAccepted),
+    captchaToken: stringValue_(form.captchaToken)
+  };
+}
+
+function validateApplication_(payload) {
+  var errors = {};
+  if (!/^[A-Za-z0-9_-]{12,80}$/.test(payload.applicationId)) errors.applicationId = "Please reload the form and try again.";
+  bounded_(errors, "applicantName", payload.applicantName, 120, true);
+  bounded_(errors, "businessName", payload.businessName, 160, true);
+  bounded_(errors, "serviceArea", payload.serviceArea, 160, true);
+  bounded_(errors, "typicalCustomers", payload.typicalCustomers, 1000, true);
+  bounded_(errors, "referralPlan", payload.referralPlan, 1000, true);
+  if (["photographer", "planner", "decorator", "florist", "gift shop", "creator", "other"].indexOf(payload.category.toLowerCase()) === -1) errors.category = "Choose a partner category.";
+  if (!payload.phone || payload.phone.length > 40 || (payload.phone.match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number.";
+  if (payload.email && (payload.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))) errors.email = "Enter a valid email address or leave it blank.";
+  if (payload.website && (payload.website.length > 500 || !/^https?:\/\/[^\s]+$/i.test(payload.website))) errors.website = "Use an http or https website address, or leave it blank.";
+  if (payload.rulesAccepted !== true) errors.rulesAccepted = "Accept the partner rules and privacy notice to apply.";
+  return errors;
+}
+
+function applicationFingerprint_(payload) {
+  return digestHex_(JSON.stringify({
+    applicationId: payload.applicationId, applicantName: payload.applicantName, businessName: payload.businessName,
+    category: payload.category, serviceArea: payload.serviceArea, phone: payload.phone, email: payload.email,
+    website: payload.website, typicalCustomers: payload.typicalCustomers, referralPlan: payload.referralPlan,
+    rulesAccepted: payload.rulesAccepted
+  }));
+}
+
+function findApplication_(sheet, applicationId) {
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+  for (var index = 1; index < values.length; index += 1) {
+    if (String(values[index][0]) === applicationId) return {
+      fingerprint: String(values[index][15] || ""),
+      receivedAt: values[index][1] instanceof Date ? values[index][1].toISOString() : String(values[index][1])
+    };
+  }
+  return null;
+}
+
+function partnerDailyCapReached_(sheet, properties) {
+  var configured = Number(properties.getProperty("PARTNER_DAILY_ACCEPTANCE_CAP"));
+  var cap = Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_PARTNER_DAILY_ACCEPTANCE_CAP;
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  var values = sheet.getDataRange().getValues();
+  var count = 0;
+  for (var index = 1; index < values.length; index += 1) {
+    var received = values[index][1];
+    if (received && Utilities.formatDate(new Date(received), Session.getScriptTimeZone(), "yyyy-MM-dd") === today) count += 1;
+  }
+  return count >= cap;
+}
+
+function setupPartnerProgram() {
+  var activeEmail = String(Session.getActiveUser().getEmail() || "").trim();
+  var effectiveEmail = String(Session.getEffectiveUser().getEmail() || "").trim();
+  if (!activeEmail || activeEmail.toLowerCase() !== effectiveEmail.toLowerCase()) throw new Error("Run this setup as the deployment owner.");
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to start partner setup.");
+  try { return setupPartnerProgram_(); } finally { lock.releaseLock(); }
+}
+
+function setupPartnerProgram_() {
+  var properties = PropertiesService.getScriptProperties();
+  var orderSheet = openOrderSheet_(properties);
+  migrateOrdersSchema_(orderSheet);
+  var config = partnerProgramConfig_(properties);
+  if (!config) throw new Error("Partner sheet is not configured.");
+  var spreadsheet = SpreadsheetApp.openById(config.sheetId);
+  var tabs = [
+    [config.applicationsTab, PARTNER_APPLICATION_HEADERS], [config.partnersTab, PARTNER_HEADERS], [config.commissionsTab, COMMISSION_HEADERS]
+  ];
+  tabs.forEach(function (entry) {
+    var sheet = spreadsheet.getSheetByName(entry[0]);
+    if (!sheet && spreadsheet.insertSheet) sheet = spreadsheet.insertSheet(entry[0]);
+    if (!sheet) throw new Error("Partner sheet tab is not configured: " + entry[0]);
+    ensurePartnerTabSchema_(sheet, entry[1]);
+    if (!protectPartnerTab_(sheet, entry[0])) throw new Error("Unable to protect partner sheet tab: " + entry[0]);
+  });
+  if (!protectPartnerOrderColumns_(orderSheet)) throw new Error("Unable to protect order partner columns.");
+  if (properties.setProperty) properties.setProperty(PARTNER_PROGRAM_READY_PROPERTY, "true");
+  return { orderColumns: ORDER_HEADERS.length, tabs: tabs.map(function (entry) { return entry[0]; }) };
+}
+
+function protectPartnerOrderColumns_(sheet) {
+  return protectRange_(sheet, LEGACY_ORDER_HEADERS.length + 1, PARTNER_ORDER_HEADERS.length, "Partner attribution and payout fields: staff-only");
+}
+
+function protectPartnerTab_(sheet, description) {
+  return protectRange_(sheet, 1, sheet.getLastColumn(), description + ": staff-only");
+}
+
+function protectRange_(sheet, startColumn, columnCount, description) {
+  if (!sheet.getRange || !sheet.getMaxRows || !columnCount) return false;
+  try {
+    var targetRange = sheet.getRange(1, startColumn, sheet.getMaxRows(), columnCount);
+    var protection = null;
+    if (sheet.getProtections && SpreadsheetApp.ProtectionType && SpreadsheetApp.ProtectionType.RANGE) {
+      var existing = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE) || [];
+      for (var protectionIndex = 0; protectionIndex < existing.length; protectionIndex += 1) {
+        if (existing[protectionIndex].getDescription && existing[protectionIndex].getDescription() === description) {
+          protection = existing[protectionIndex];
+          break;
+        }
+      }
+    }
+    if (!protection) protection = targetRange.protect();
+    if (protection.setRange) protection.setRange(targetRange);
+    if (!protection || !protection.setWarningOnly || !protection.removeEditors || !protection.addEditor) return false;
+    protection.setWarningOnly(false);
+    var owner = Session.getEffectiveUser();
+    if (!owner || !owner.getEmail || !String(owner.getEmail() || "").trim()) return false;
+    var ownerEmail = String(owner.getEmail()).trim().toLowerCase();
+    var editors = protection.getEditors ? protection.getEditors().filter(function (editor) {
+      return !editor || !editor.getEmail || String(editor.getEmail() || "").trim().toLowerCase() !== ownerEmail;
+    }) : [];
+    if (editors.length) protection.removeEditors(editors);
+    protection.addEditor(owner);
+    if (protection.canDomainEdit && protection.canDomainEdit() && protection.setDomainEdit) protection.setDomainEdit(false);
+    if (protection.setDescription) protection.setDescription(description);
+    return true;
+  } catch (error) { return false; }
+}
+
+function approvePartner_(applicationId, partnerFields) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to approve partner.");
+  try {
+    var properties = PropertiesService.getScriptProperties();
+    var applications = openPartnerTab_(properties, "PARTNER_APPLICATIONS_SHEET_TAB", "Partner Applications");
+    var partners = openPartnerTab_(properties, "PARTNERS_SHEET_TAB", "Partners");
+    ensurePartnerTabSchema_(applications, PARTNER_APPLICATION_HEADERS);
+    ensurePartnerTabSchema_(partners, PARTNER_HEADERS);
+    var values = applications.getDataRange().getValues();
+    var index = headerIndex_(values[0].map(String));
+    var matches = [];
+    for (var i = 1; i < values.length; i += 1) if (String(values[i][index["Application ID"]]) === String(applicationId)) matches.push({ row: i + 1, values: values[i] });
+    if (matches.length !== 1) throw new Error(matches.length ? "Partner application ID is duplicated." : "Partner application was not found.");
+    var found = matches[0];
+    var fields = partnerFields || {};
+    var code = normalizeReferralCode_(fields.referralCode);
+    var partnerId = "partner-" + String(applicationId);
+    var displayName = String(found.values[index["Business name"]] || found.values[index["Applicant name"]] || "").trim();
+    var rate = Number(fields.rate == null ? 0.05 : fields.rate);
+    if (!PARTNER_CODE_PATTERN.test(code) || !displayName || !isFinite(rate) || rate < 0 || rate > 1) throw new Error("Partner approval values are not valid.");
+    var partnerValues = partners.getDataRange().getValues();
+    var partnerIndex = headerIndex_(partnerValues[0].map(String));
+    var partnerMatches = [];
+    for (var rowIndex = 1; rowIndex < partnerValues.length; rowIndex += 1) {
+      var candidate = partnerValues[rowIndex];
+      if (String(candidate[partnerIndex["Partner ID"]]) === partnerId || String(candidate[partnerIndex["Referral code"]]).toUpperCase() === code) partnerMatches.push({ row: rowIndex + 1, values: candidate });
+    }
+    if (partnerMatches.length > 1) throw new Error("Partner ID or referral code is duplicated.");
+    var intended = [neutralizeForSheet_(partnerId), neutralizeForSheet_(code), neutralizeForSheet_(displayName), neutralizeForSheet_(String(found.values[index["Applicant name"]] || "")), neutralizeForSheet_(String(found.values[index.Category] || "")), neutralizeForSheet_(String(found.values[index["City / service area"]] || "")), neutralizeForSheet_(String(found.values[index["Phone / WhatsApp"]] || "")), neutralizeForSheet_(String(found.values[index.Email] || "")), neutralizeForSheet_(String(found.values[index["Instagram / website"]] || "")), rate];
+    var existingPartner = partnerMatches.length ? partnerMatches[0].values : null;
+    if (existingPartner && !partnerApprovalMatches_(existingPartner, intended, partnerIndex)) throw new Error("Existing partner approval conflicts with the requested fields.");
+    var approvedAt = existingPartner && retentionDate_(existingPartner[partnerIndex["Approved at"]]) || new Date();
+    if (!existingPartner) {
+      var partnerRow = [neutralizeForSheet_(partnerId), neutralizeForSheet_(code), neutralizeForSheet_(displayName), neutralizeForSheet_(found.values[index["Applicant name"]]),
+        neutralizeForSheet_(found.values[index.Category]), neutralizeForSheet_(found.values[index["City / service area"]]), neutralizeForSheet_(found.values[index["Phone / WhatsApp"]]), neutralizeForSheet_(found.values[index.Email]),
+        neutralizeForSheet_(found.values[index["Instagram / website"]]), rate, "Active", approvedAt, "https://saloniresinart.com/?ref=" + encodeURIComponent(code), neutralizeForSheet_(fields.staffNotes || ""), ""];
+      try {
+        partners.appendRow(partnerRow);
+      } catch (appendError) {
+        var afterValues = partners.getDataRange().getValues();
+        var afterMatches = afterValues.slice(1).filter(function (candidate) { return String(candidate[partnerIndex["Partner ID"]]) === partnerId && String(candidate[partnerIndex["Referral code"]]).toUpperCase() === code; });
+        if (afterMatches.length !== 1 || !partnerApprovalMatches_(afterMatches[0], intended, partnerIndex)) throw appendError;
+        existingPartner = afterMatches[0];
+        approvedAt = retentionDate_(existingPartner[partnerIndex["Approved at"]]) || approvedAt;
+      }
+    }
+    var currentStatus = String(found.values[index.Status] || "");
+    var currentPartnerId = String(found.values[index["Partner ID"]] || "");
+    if (currentStatus === "Approved" && currentPartnerId && currentPartnerId !== partnerId) throw new Error("Application is already linked to another partner.");
+    var applicationUpdated = found.values.slice().map(function (value) { return typeof value === "string" ? neutralizeForSheet_(value) : value; });
+    applicationUpdated[index.Status] = "Approved";
+    applicationUpdated[index["Review notes"]] = currentStatus === "Approved" ? applicationUpdated[index["Review notes"]] : neutralizeForSheet_(fields.reviewNotes || "");
+    applicationUpdated[index["Reviewed at"]] = currentStatus === "Approved" && retentionDate_(applicationUpdated[index["Reviewed at"]]) || approvedAt;
+    applicationUpdated[index["Partner ID"]] = neutralizeForSheet_(partnerId);
+    applications.getRange(found.row, 1, 1, PARTNER_APPLICATION_HEADERS.length).setValues([applicationUpdated]);
+    var verifiedApplication = applications.getDataRange().getValues()[found.row - 1];
+    if (!verifiedApplication || String(verifiedApplication[index.Status]) !== "Approved" || String(verifiedApplication[index["Partner ID"]]) !== String(applicationUpdated[index["Partner ID"]])) throw new Error("Partner approval link could not be verified.");
+    return { partnerId: partnerId, code: code };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function partnerApprovalMatches_(row, intended, index) {
+  return neutralizeForSheet_(String(row[index["Partner ID"]] || "")) === intended[0] && neutralizeForSheet_(String(row[index["Referral code"]] || "").toUpperCase()) === intended[1] &&
+    neutralizeForSheet_(String(row[index["Partner display name"]] || "")) === intended[2] && neutralizeForSheet_(String(row[index["Contact name"]] || "")) === intended[3] &&
+    neutralizeForSheet_(String(row[index.Category] || "")) === intended[4] && neutralizeForSheet_(String(row[index["City / service area"]] || "")) === intended[5] &&
+    neutralizeForSheet_(String(row[index["Phone / WhatsApp"]] || "")) === intended[6] && neutralizeForSheet_(String(row[index.Email] || "")) === intended[7] &&
+    neutralizeForSheet_(String(row[index["Instagram / website"]] || "")) === intended[8] && Number(row[index["Commission rate"]]) === intended[9] &&
+    String(row[index["Referral link"]] || "") === "https://saloniresinart.com/?ref=" + encodeURIComponent(intended[1]);
+}
+
+function pausePartner_(partnerId, status, note) {
+  var normalized = String(status || "Paused");
+  if (["Active", "Paused", "Closed"].indexOf(normalized) === -1) throw new Error("Partner status is not valid.");
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to update partner status.");
+  try {
+    var sheet = openPartnerTab_(PropertiesService.getScriptProperties(), "PARTNERS_SHEET_TAB", "Partners");
+    var values = sheet.getDataRange().getValues();
+    var index = headerIndex_(values[0].map(String));
+    var matches = [];
+    for (var row = 1; row < values.length; row += 1) if (String(values[row][index["Partner ID"]]) === String(partnerId)) matches.push({ row: row + 1, values: values[row] });
+    if (matches.length !== 1) throw new Error(matches.length ? "Partner ID is duplicated." : "Partner was not found.");
+    var found = matches[0];
+    var updated = found.values.slice().map(function (value) { return typeof value === "string" ? neutralizeForSheet_(value) : value; });
+    updated[index.Status] = normalized;
+    if (note !== undefined) updated[index["Staff notes"]] = neutralizeForSheet_(note);
+    if (index["Closed at"] !== undefined) {
+      if (normalized === "Closed") updated[index["Closed at"]] = retentionDate_(updated[index["Closed at"]]) || new Date();
+      else updated[index["Closed at"]] = "";
+    }
+    sheet.getRange(found.row, 1, 1, PARTNER_HEADERS.length).setValues([updated]);
+    var verified = sheet.getDataRange().getValues()[found.row - 1];
+    if (!verified || String(verified[index.Status]) !== normalized || (index["Closed at"] !== undefined && normalized === "Closed" && !retentionDate_(verified[index["Closed at"]]))) throw new Error("Partner status update could not be verified.");
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function correctOrderAttribution_(requestId, referralCode, reason) {
+  if (!String(reason || "").trim() || String(reason).length > 500) throw new Error("A correction reason is required.");
+  var properties = PropertiesService.getScriptProperties();
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to correct order attribution.");
+  try {
+    var sheet = openOrderSheet_(properties);
+    if (orderSchemaLength_(sheet) !== ORDER_HEADERS.length) migrateOrdersSchema_(sheet);
+    var values = sheet.getDataRange().getValues();
+    var headers = headerIndex_(values[0].map(String));
+    var target = null;
+    for (var row = 1; row < values.length; row += 1) if (String(values[row][0]) === String(requestId)) target = { row: row + 1, values: values[row] };
+    if (!target) throw new Error("Order was not found.");
+    while (target.values.length < ORDER_HEADERS.length) target.values.push("");
+    var existingStatus = commissionStatus_(target.values[headers["Commission status"]]);
+    if (existingStatus === "Paid" || existingStatus === "Void" || frozenCommissionExists_(requestId, properties)) throw new Error("The order commission is frozen.");
+    var partner = resolveReferralForOrder_(referralCode, properties);
+    if (!partner.active) throw new Error("The replacement referral code is not active.");
+    var oldCode = String(target.values[headers["Referral code"]] || "");
+    var oldRate = target.values[headers["Commission rate snapshot"]];
+    var notes = String(target.values[headers["Staff notes"]] || "");
+    var audit = new Date().toISOString() + " attribution " + oldCode + " (rate " + String(oldRate) + ") -> " + partner.code + " (rate " + String(partner.rate) + "): " + String(reason).trim();
+    var updated = target.values.slice().map(function (value) { return typeof value === "string" ? neutralizeForSheet_(value) : value; });
+    var targetRange = sheet.getRange(target.row, 1, 1, ORDER_HEADERS.length);
+    updated[headers["Referral code"]] = neutralizeForSheet_(partner.code);
+    updated[headers["Partner ID"]] = neutralizeForSheet_(partner.partnerId);
+    updated[headers["Partner name snapshot"]] = neutralizeForSheet_(partner.displayName);
+    updated[headers["Commission rate snapshot"]] = Number(partner.rate);
+    updated[headers["Staff notes"]] = neutralizeForSheet_((notes ? notes + " | " : "") + audit);
+    var paymentStatus = String(updated[headers["Payment status"]] || "").trim();
+    var deliveryStatus = String(updated[headers["Delivery status"]] || "").trim();
+    var commissionStatus = String(updated[headers["Commission status"]] || "").trim();
+    if (!paymentStatus) paymentStatus = "Pending";
+    if (!deliveryStatus) deliveryStatus = "New";
+    if (!commissionStatus) commissionStatus = "Pending";
+    if (PAYMENT_STATUSES.indexOf(paymentStatus) === -1 || DELIVERY_STATUSES.indexOf(deliveryStatus) === -1 || COMMISSION_STATUSES.indexOf(commissionStatus) === -1) throw new Error("Order commission status is not valid.");
+    updated[headers["Payment status"]] = paymentStatus;
+    updated[headers["Delivery status"]] = deliveryStatus;
+    updated[headers["Commission status"]] = commissionStatus;
+    updated[headers["Commission amount"]] = commissionAmountFormula_(target.row);
+    updateCommissionAttribution_(target.values, updated, requestId, audit, properties);
+    targetRange.setValues([updated]);
+    var verified = sheet.getDataRange().getValues()[target.row - 1];
+    var verifiedFormulas = targetRange.getFormulas ? targetRange.getFormulas()[0] : [];
+    if (!verified || String(verified[headers["Referral code"]]) !== String(updated[headers["Referral code"]]) || Number(verified[headers["Commission rate snapshot"]]) !== Number(updated[headers["Commission rate snapshot"]]) || String(verified[headers["Staff notes"]]) !== String(updated[headers["Staff notes"]]) || String(verifiedFormulas[headers["Commission amount"]] || "") !== String(updated[headers["Commission amount"]])) throw new Error("Order attribution correction could not be verified.");
+    return { requestId: requestId, referralCode: partner.code };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateCommissionAttribution_(before, desired, requestId, audit, properties) {
+  if (!partnerProgramConfigured_(properties)) return false;
+  var sheet = openPartnerTab_(properties, "PARTNER_COMMISSIONS_SHEET_TAB", "Partner Commissions");
+  ensurePartnerTabSchema_(sheet, COMMISSION_HEADERS);
+  var values = sheet.getDataRange().getValues();
+  var matches = values.slice(1).filter(function (row) { return String(row[0]) === "commission-" + String(requestId); });
+  if (matches.length > 1) throw new Error("Commission ledger has duplicate records.");
+  if (!matches.length) return false;
+  var existing = matches[0];
+  var status = commissionStatus_(existing[8]);
+  if (status === "Paid" || status === "Void") throw new Error("The order commission is frozen.");
+  var oldIdentity = neutralizeForSheet_(String(before[27] || before[26] || ""));
+  var newIdentity = neutralizeForSheet_(String(desired[27] || desired[26] || ""));
+  var oldName = neutralizeForSheet_(String(before[28] || ""));
+  var newName = neutralizeForSheet_(String(desired[28] || ""));
+  var oldRate = Number(before[32]);
+  var newRate = Number(desired[32]);
+  var existingIdentity = neutralizeForSheet_(String(existing[1] || ""));
+  var existingName = neutralizeForSheet_(String(existing[2] || ""));
+  var matchesOld = existingIdentity === oldIdentity && existingName === oldName && Number(existing[6]) === oldRate;
+  var matchesNew = existingIdentity === newIdentity && existingName === newName && Number(existing[6]) === newRate;
+  if (!matchesOld && !matchesNew) throw new Error("Commission ledger snapshot mismatch.");
+  var updated = existing.slice().map(function (value) { return typeof value === "string" ? neutralizeForSheet_(value) : value; });
+  updated[1] = newIdentity;
+  updated[2] = newName;
+  updated[6] = newRate;
+  if (status === "Eligible" || status === "Approved") {
+    var subtotal = Number(desired[29]);
+    if (!isFinite(subtotal) || subtotal <= 0) throw new Error("Commission subtotal is not valid.");
+    updated[7] = Math.round(subtotal * newRate * 100) / 100;
+  }
+  if (String(updated[12] || "").indexOf(audit) === -1) updated[12] = neutralizeForSheet_((updated[12] ? String(updated[12]) + " | " : "") + audit);
+  if (matchesNew && updated.join("\u001f") === existing.join("\u001f")) return true;
+  sheet.getRange(commissionRowNumber_(sheet, "commission-" + String(requestId)), 1, 1, COMMISSION_HEADERS.length).setValues([updated]);
+  var verified = sheet.getDataRange().getValues().filter(function (row) { return String(row[0]) === "commission-" + String(requestId); });
+  if (verified.length !== 1 || String(verified[0][1]) !== newIdentity || String(verified[0][2]) !== newName || Number(verified[0][6]) !== newRate) throw new Error("Commission correction could not be verified.");
+  return true;
+}
+
+function syncOrderCommission_(requestId) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to sync order commission.");
+  try {
+    var properties = PropertiesService.getScriptProperties();
+    var sheet = openOrderSheet_(properties);
+    var values = sheet.getDataRange().getValues();
+    var matches = [];
+    for (var row = 1; row < values.length; row += 1) if (String(values[row][0]) === String(requestId)) matches.push(values[row]);
+    if (matches.length !== 1) throw new Error(matches.length ? "Order request ID is duplicated." : "Order was not found.");
+    var result = ensureCommissionRecord_(matches[0], requestId, properties, new Date());
+    return { commissionId: "commission-" + String(requestId), status: result[8] };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function frozenCommissionExists_(requestId, properties) {
+  if (!partnerProgramConfigured_(properties)) return false;
+  var sheet = openPartnerTab_(properties, "PARTNER_COMMISSIONS_SHEET_TAB", "Partner Commissions");
+  ensurePartnerTabSchema_(sheet, COMMISSION_HEADERS);
+  var values = sheet.getDataRange().getValues();
+  for (var row = 1; row < values.length; row += 1) if (String(values[row][0]) === "commission-" + requestId) {
+    var status = commissionStatus_(values[row][8]);
+    return status === "Paid" || status === "Void";
+  }
+  return false;
 }
 
 function collectPayload_(form) {
@@ -322,6 +1017,7 @@ function collectPayload_(form) {
     state: fulfillment.toLowerCase() === "shipping" ? stringValue_(form.state) : "",
     pin: fulfillment.toLowerCase() === "shipping" ? stringValue_(form.pin) : "",
     requestedDate: stringValue_(form.requestedDate),
+    referralCode: normalizeReferralCode_(form.referralCode),
     captchaToken: stringValue_(form.captchaToken),
     referenceImage: normalizeReferenceImage_(form.referenceImage)
   };
@@ -366,6 +1062,7 @@ function validatePayload_(payload) {
     });
   }
   if (payload.requestedDate && !isIsoDate_(payload.requestedDate)) errors.requestedDate = "Use a valid requested date.";
+  if (payload.referralCode && !PARTNER_CODE_PATTERN.test(payload.referralCode)) errors.referralCode = "Enter a valid referral code or clear this field.";
 
   var fileError = validateReferenceImage_(payload.referenceImage);
   if (fileError) errors.referenceImage = fileError;
@@ -378,6 +1075,11 @@ function validatePayload_(payload) {
     heightUnit: height.unit,
     widthUnit: width.unit
   };
+}
+
+function normalizeReferralCode_(value) {
+  var code = String(value == null ? "" : value).trim().toUpperCase();
+  return PARTNER_CODE_PATTERN.test(code) ? code : "";
 }
 
 function bounded_(errors, field, value, maxLength, required) {
@@ -453,7 +1155,7 @@ function hasImageSignature_(bytes, mime) {
   return bytes.length >= png.length && png.every(function (value, index) { return (bytes[index] + 256) % 256 === value; });
 }
 
-function verifyCaptcha_(token, properties) {
+function verifyCaptcha_(token, properties, expectedAction) {
   var secret = String(properties.getProperty("CAPTCHA_SECRET") || "");
   var rawThreshold = properties.getProperty("CAPTCHA_MIN_SCORE");
   var thresholdText = String(rawThreshold == null ? "" : rawThreshold).trim();
@@ -465,7 +1167,7 @@ function verifyCaptcha_(token, properties) {
     });
     var result = JSON.parse(response.getContentText() || "{}");
     var hostnameMatches = String(result.hostname || "").toLowerCase() === "saloniresinart.com";
-    var actionMatches = result.action === "order_request";
+    var actionMatches = result.action === (expectedAction || ORDER_CAPTCHA_ACTION);
     var scoreOk = typeof result.score === "number" && isFinite(result.score) && result.score >= 0 && result.score <= 1 && result.score >= threshold;
     return result.success === true && hostnameMatches && actionMatches && scoreOk
       ? { ok: true }
@@ -473,6 +1175,84 @@ function verifyCaptcha_(token, properties) {
   } catch (error) {
     return { ok: false, error: "Captcha verification is unavailable. Please try again." };
   }
+}
+
+function validateReferralCode(code) {
+  var normalized = normalizeReferralCode_(code);
+  if (!normalized || !PARTNER_CODE_PATTERN.test(normalized)) return { status: "invalid", code: normalized };
+  try {
+    var partner = lookupPartner_(normalized, PropertiesService.getScriptProperties());
+    var response = { status: partner.status, code: normalized };
+    if (partner.status === "active") response.displayName = partner.displayName;
+    return response;
+  } catch (error) {
+    return { status: "error", code: normalized };
+  }
+}
+
+function resolveReferralForOrder_(code, properties) {
+  var normalized = normalizeReferralCode_(code);
+  if (!normalized || !PARTNER_CODE_PATTERN.test(normalized)) return { status: "invalid", code: normalized, active: false };
+  var partner = lookupPartner_(normalized, properties);
+  partner.active = partner.status === "active";
+  return partner;
+}
+
+function lookupPartner_(code, properties) {
+  var normalized = normalizeReferralCode_(code);
+  var sheet = openPartnerTab_(properties, "PARTNERS_SHEET_TAB", "Partners");
+  ensurePartnerTabSchema_(sheet, PARTNER_HEADERS);
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { status: "invalid", code: normalized, active: false };
+  var headers = values[0].map(String);
+  var index = headerIndex_(headers);
+  var matches = [];
+  for (var rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    var row = values[rowIndex];
+    if (String(row[index["Referral code"]] == null ? "" : row[index["Referral code"]]).trim().toUpperCase() === normalized) matches.push(row);
+  }
+  if (matches.length > 1) throw new Error("Referral code is duplicated in the Partners tab.");
+  if (!matches.length) return { status: "invalid", code: normalized, active: false };
+  var row = matches[0];
+  var status = String(row[index.Status] == null ? "" : row[index.Status]).trim();
+  if (["Active", "Paused", "Closed"].indexOf(status) === -1) throw new Error("Partner status is not configured.");
+  var rawRate = row[index["Commission rate"]];
+  var rate = Number(rawRate);
+  if (rawRate === "" || rawRate === null || rawRate === undefined || !isFinite(rate) || rate < 0 || rate > 1) throw new Error("Partner commission rate is not valid.");
+  return {
+    status: status.toLowerCase(), code: normalized, active: status === "Active",
+    partnerId: String(row[index["Partner ID"]] == null ? "" : row[index["Partner ID"]]),
+    displayName: String(row[index["Partner display name"]] == null ? "" : row[index["Partner display name"]]).slice(0, 120),
+    rate: rate
+  };
+}
+
+function headerIndex_(headers) {
+  var index = {};
+  headers.forEach(function (header, position) { index[header] = position; });
+  return index;
+}
+
+function openPartnerTab_(properties, propertyName, defaultName) {
+  var config = partnerProgramConfig_(properties);
+  if (!config) throw new Error("Partner sheet is not configured.");
+  var tabName = propertyName === "PARTNER_APPLICATIONS_SHEET_TAB" ? config.applicationsTab : propertyName === "PARTNERS_SHEET_TAB" ? config.partnersTab : propertyName === "PARTNER_COMMISSIONS_SHEET_TAB" ? config.commissionsTab : String(defaultName || "");
+  var spreadsheet = SpreadsheetApp.openById(config.sheetId);
+  var sheet = spreadsheet.getSheetByName(tabName);
+  if (!sheet) throw new Error("Partner sheet tab is not configured.");
+  return sheet;
+}
+
+function ensurePartnerTabSchema_(sheet, expected) {
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
+    return true;
+  }
+  var columns = Number(sheet.getLastColumn && sheet.getLastColumn()) || expected.length;
+  if (columns !== expected.length) throw new Error("Partner sheet schema does not match the allowlist.");
+  var existing = sheet.getRange(1, 1, 1, expected.length).getValues()[0].map(String);
+  if (existing.join("\u001f") !== expected.join("\u001f")) throw new Error("Partner sheet schema does not match the allowlist.");
+  return false;
 }
 
 function openOrderSheet_(properties) {
@@ -488,11 +1268,30 @@ function openOrderSheet_(properties) {
 
 function ensureSchema_(sheet) {
   if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, ORDER_HEADERS.length).setValues([ORDER_HEADERS]);
-    return;
+    sheet.getRange(1, 1, 1, LEGACY_ORDER_HEADERS.length).setValues([LEGACY_ORDER_HEADERS]);
+    return LEGACY_ORDER_HEADERS.length;
   }
-  var existing = sheet.getRange(1, 1, 1, ORDER_HEADERS.length).getValues()[0].map(String);
-  if (existing.join("\u001f") !== ORDER_HEADERS.join("\u001f")) throw new Error("Order sheet schema does not match the allowlist.");
+  var columns = Number(sheet.getLastColumn && sheet.getLastColumn()) || LEGACY_ORDER_HEADERS.length;
+  var expected = columns === LEGACY_ORDER_HEADERS.length ? LEGACY_ORDER_HEADERS : columns === ORDER_HEADERS.length ? ORDER_HEADERS : null;
+  if (!expected) throw new Error("Order sheet schema does not match the allowlist.");
+  var existing = sheet.getRange(1, 1, 1, expected.length).getValues()[0].map(String);
+  if (existing.join("\u001f") !== expected.join("\u001f")) throw new Error("Order sheet schema does not match the allowlist.");
+  return expected.length;
+}
+
+function migrateOrdersSchema_(sheet) {
+  var columns = ensureSchema_(sheet);
+  if (columns === ORDER_HEADERS.length) return false;
+  var range = sheet.getRange(1, columns + 1, 1, PARTNER_ORDER_HEADERS.length);
+  range.setValues([PARTNER_ORDER_HEADERS]);
+  if (sheet.getRange(1, 1, 1, ORDER_HEADERS.length).getValues()[0].map(String).join("\u001f") !== ORDER_HEADERS.join("\u001f")) {
+    throw new Error("Order sheet migration could not verify the appended headers.");
+  }
+  return true;
+}
+
+function orderSchemaLength_(sheet) {
+  return ensureSchema_(sheet);
 }
 
 function findRequest_(sheet, requestId) {
@@ -500,7 +1299,14 @@ function findRequest_(sheet, requestId) {
   if (values.length < 2) return null;
   for (var index = 1; index < values.length; index += 1) {
     if (String(values[index][0]) === requestId) {
-      return { fingerprint: String(values[index][1]), receivedAt: values[index][2] instanceof Date ? values[index][2].toISOString() : String(values[index][2]) };
+      return {
+        fingerprint: String(values[index][1]),
+        receivedAt: values[index][2] instanceof Date ? values[index][2].toISOString() : String(values[index][2]),
+        referralCode: String(values[index][26] == null ? "" : values[index][26]),
+        partnerId: String(values[index][27] == null ? "" : values[index][27]),
+        partnerName: String(values[index][28] == null ? "" : values[index][28]),
+        commissionRate: values[index][32] == null ? "" : values[index][32]
+      };
     }
   }
   return null;
@@ -533,9 +1339,9 @@ function createReferenceFile_(payload) {
   return folder.createFile(blob);
 }
 
-function rowForPayload_(payload, fingerprint, receivedAt, referenceFile) {
+function rowForPayload_(payload, fingerprint, receivedAt, referenceFile, attribution, rowNumber) {
   var validation = validatePayload_(payload);
-  return [
+  var row = [
     neutralizeForSheet_(payload.requestId), neutralizeForSheet_(fingerprint), receivedAt,
     neutralizeForSheet_(payload.sourceKind), neutralizeForSheet_(payload.sourceId), neutralizeForSheet_(payload.productName),
     Number(payload.quantity), neutralizeForSheet_(validation.heightExpression), neutralizeForSheet_(validation.heightUnit), validation.heightInches,
@@ -547,6 +1353,25 @@ function rowForPayload_(payload, fingerprint, receivedAt, referenceFile) {
     neutralizeForSheet_(payload.requestedDate), referenceFile ? neutralizeForSheet_(referenceFile.getUrl()) : "",
     "New request", ""
   ];
+  if (attribution) {
+    var rowIndex = Number(rowNumber) || 2;
+    var attributed = attribution.active === true;
+    row = row.concat([
+      attributed ? neutralizeForSheet_(attribution.code) : "",
+      attributed ? neutralizeForSheet_(attribution.partnerId) : "",
+      attributed ? neutralizeForSheet_(attribution.displayName) : "",
+      "", attributed ? "Pending" : "", attributed ? "New" : "",
+      attributed ? Number(attribution.rate) : "",
+      attributed ? commissionAmountFormula_(rowIndex) : "",
+      attributed ? "Pending" : "", "", ""
+    ]);
+  }
+  return row;
+}
+
+function commissionAmountFormula_(rowNumber) {
+  var rowIndex = Number(rowNumber) || 2;
+  return '=IF(AND(AD' + rowIndex + '>0,AE' + rowIndex + '=\"Paid\",AF' + rowIndex + '=\"Delivered\",AG' + rowIndex + '>0,AI' + rowIndex + '<>\"Void\"),ROUND(AD' + rowIndex + '*AG' + rowIndex + ',2),0)';
 }
 
 function payloadFingerprint_(payload) {
@@ -568,6 +1393,7 @@ function payloadFingerprint_(payload) {
     canonical.widthFeet = payload.widthFeet;
     canonical.widthInchesPart = payload.widthInchesPart;
   }
+  if (payload.referralCode) canonical.referralCode = payload.referralCode;
   return digestHex_(JSON.stringify(canonical));
 }
 
@@ -580,7 +1406,7 @@ function digestHex_(value) {
 function neutralizeForSheet_(value) {
   var text = String(value == null ? "" : value);
   // A leading apostrophe makes untrusted text display literally instead of executing as a formula.
-  if (text.startsWith("=") || text.startsWith("+") || text.startsWith("-") || text.startsWith("@")) return "'" + text;
+  if (text.startsWith("=") || text.startsWith("+") || text.startsWith("-") || text.startsWith("@") || /^[\s\u0000-\u001f]*[=+\-@]/.test(text)) return "'" + text;
   return text;
 }
 
@@ -611,6 +1437,9 @@ function parseSeed_(json) {
     phone: boundedSeed_(seed.phone, 40), email: boundedSeed_(seed.email, 254), fulfillment: boundedSeed_(seed.fulfillment, 20) || "shipping",
     shippingAddress: boundedSeed_(seed.shippingAddress, 300), city: boundedSeed_(seed.city, 100), state: boundedSeed_(seed.state, 100),
     pin: boundedSeed_(seed.pin, 20), requestedDate: boundedSeed_(seed.requestedDate, 20),
+    referralCode: normalizeReferralCode_(seed.referralCode),
+    applicationId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.applicationId || "")) ? String(seed.applicationId) : "",
+    formMode: boundedMode_(seed.formMode),
     channelNonce: /^[A-Za-z0-9_-]{16,128}$/.test(String(seed.channelNonce || "")) ? String(seed.channelNonce) : ""
   };
 }
