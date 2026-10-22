@@ -1,9 +1,74 @@
 (function () {
   "use strict";
 
+  var REFERRAL_STORAGE_KEY = "saloniReferralCode";
+  var REFERRAL_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,31}$/;
+  var referralFallbackCode = "";
+
+  function normalizeReferralCode(value) {
+    var code = String(value == null ? "" : value).trim().toUpperCase();
+    return REFERRAL_PATTERN.test(code) ? code : "";
+  }
+
+  function readReferralCode() {
+    try {
+      if (window.sessionStorage) return normalizeReferralCode(window.sessionStorage.getItem(REFERRAL_STORAGE_KEY)) || referralFallbackCode;
+    } catch (error) {}
+    return referralFallbackCode;
+  }
+
+  function saveReferralCode(code) {
+    var normalized = normalizeReferralCode(code);
+    referralFallbackCode = normalized;
+    try {
+      if (window.sessionStorage) {
+        if (normalized) window.sessionStorage.setItem(REFERRAL_STORAGE_KEY, normalized);
+        else window.sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
+      }
+    } catch (error) {}
+    return normalized;
+  }
+
+  function appendReferralToHref(href, code) {
+    var normalized = normalizeReferralCode(code);
+    if (!normalized || !href || /^(?:#|mailto:|tel:|javascript:|data:|blob:)/i.test(href)) return href;
+    var base = window.location && window.location.href;
+    if (!base || /script\.google\.com|googleusercontent\.com/i.test(href)) return href;
+    try {
+      var url = new URL(href, base);
+      if (url.origin !== window.location.origin || /\.(?:jpg|jpeg|png|webp|svg|pdf|zip)$/i.test(url.pathname)) return href;
+      if (!url.searchParams.has("ref")) url.searchParams.set("ref", normalized);
+      return url.pathname + (url.search ? url.search : "") + (url.hash ? url.hash : "");
+    } catch (error) { return href; }
+  }
+
+  function initReferralAttribution() {
+    var location = window.location;
+    if (!location) return "";
+    var explicit = false;
+    var value = "";
+    try {
+      var params = new URLSearchParams(location.search || "");
+      explicit = params.has("ref");
+      value = params.get("ref") || "";
+    } catch (error) {}
+    var code = explicit ? saveReferralCode(value) : readReferralCode();
+    if (code && document.querySelectorAll) {
+      document.querySelectorAll("a[href]").forEach(function (link) {
+        if (link.hasAttribute && link.hasAttribute("download")) return;
+        var href = link.getAttribute("href");
+        var next = appendReferralToHref(href, code);
+        if (next !== href) link.setAttribute("href", next);
+      });
+    }
+    return code;
+  }
+
+  if (typeof window !== "undefined") window.saloniReferral = { normalize: normalizeReferralCode, read: readReferralCode, save: saveReferralCode, init: initReferralAttribution, append: appendReferralToHref };
+
   document.documentElement.classList.add("js");
 
-  document.addEventListener("DOMContentLoaded", function () {
+  function initializePage() {
     var root = document.documentElement;
     var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var skipLink = document.querySelector(".skip-link");
@@ -104,8 +169,9 @@
       reveals.forEach(function (element) { element.classList.add("is-visible"); });
     }
 
+    initReferralAttribution();
     initOrderRequestFlow();
-  });
+  }
 
   function initOrderRequestFlow() {
     var embed = document.getElementById("order-form-embed");
@@ -115,7 +181,7 @@
     var orderUrl = embed.getAttribute("data-order-form-url") || "";
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
-    var frameState = { loaded: false, nonce: "", siteKey: "", activeCaptcha: null, pinnedSender: null, pinnedOrigin: "" };
+    var frameState = { loaded: false, nonce: "", siteKey: "", activeCaptcha: null, pinnedSender: null, pinnedOrigin: "", mode: embed.getAttribute("data-form-mode") === "partner" ? "partner" : "order" };
 
     function requestId() {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -161,7 +227,7 @@
           window.grecaptcha.ready(function () {
             if (frameState.activeCaptcha !== request) return;
             try {
-              var result = window.grecaptcha.execute(frameState.siteKey, { action: "order_request" });
+              var result = window.grecaptcha.execute(frameState.siteKey, { action: frameState.mode === "partner" ? "partner_application" : "order_request" });
               if (!result || typeof result.then !== "function") { postCaptchaResult(request, false, ""); return; }
               result.then(function (token) {
                 postCaptchaResult(request, typeof token === "string" && token.length > 0, token);
@@ -203,7 +269,7 @@
         heightFeet: heightParts ? heightParts.feet : "", heightInchesPart: heightParts ? heightParts.inches : "", widthFeet: widthParts ? widthParts.feet : "", widthInchesPart: widthParts ? widthParts.inches : "",
         height: source.height || "", heightUnit: source.heightUnit || "",
         width: source.width || "", widthUnit: source.widthUnit || "", designDetails: source.designDetails || "",
-        customerName: "", phone: "", email: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "", requestedDate: ""
+        customerName: "", phone: "", email: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "", referralCode: readReferralCode()
       };
       return seed;
     }
@@ -225,11 +291,11 @@
       return { height: format(heightInches), width: format(widthInches), heightUnit: unit, widthUnit: unit };
     }
 
-    function submitSeed(seed) {
+    function submitSeed(seed, shouldScroll) {
       if (!configured) {
         status.innerHTML = "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
         status.hidden = false;
-        scrollToForm();
+        if (shouldScroll !== false) scrollToForm();
         return;
       }
       invalidateChannel();
@@ -240,6 +306,7 @@
         return;
       }
       seed.channelNonce = frameState.nonce;
+      seed.formMode = frameState.mode;
       frame.hidden = false;
       status.hidden = true;
       // Normal POST action=seed keeps the existing iframe alive while replacing its document.
@@ -250,11 +317,19 @@
       postForm.setAttribute("aria-hidden", "true");
       var action = document.createElement("input");
       action.type = "hidden"; action.name = "action"; action.value = "seed";
+      var modeField = document.createElement("input");
+      modeField.type = "hidden"; modeField.name = "mode"; modeField.value = frameState.mode;
       var seedField = document.createElement("input");
       seedField.type = "hidden"; seedField.name = "seed"; seedField.value = JSON.stringify(seed);
-      postForm.appendChild(action); postForm.appendChild(seedField); document.body.appendChild(postForm); postForm.submit(); postForm.remove();
+      postForm.appendChild(action); postForm.appendChild(modeField); postForm.appendChild(seedField);
+      if (frameState.mode === "partner") {
+        var applicationId = document.createElement("input");
+        applicationId.type = "hidden"; applicationId.name = "applicationId"; applicationId.value = seed.applicationId || requestId();
+        postForm.appendChild(applicationId);
+      }
+      document.body.appendChild(postForm); postForm.submit(); postForm.remove();
       frameState.loaded = true;
-      scrollToForm();
+      if (shouldScroll !== false) scrollToForm();
     }
 
     function chooseSource(source) {
@@ -282,6 +357,11 @@
       request.timer = window.setTimeout(function () { postCaptchaResult(request, false, ""); }, 30000);
       executeParentCaptcha(request);
     });
+
+    if (frameState.mode === "partner") {
+      submitSeed({ sourceKind: "partner", sourceId: "partner-application", productName: "", applicationId: requestId() }, false);
+      return;
+    }
 
     function catalogueSeed(card) {
       var image = card.querySelector("img[src]");
@@ -335,4 +415,6 @@
       });
     }
   }
+  if (document.readyState === "loading" || document.readyState === undefined) document.addEventListener("DOMContentLoaded", initializePage);
+  else initializePage();
 }());

@@ -164,6 +164,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "https://saloniresinart.com/resin-photo-frames/",
             "https://saloniresinart.com/customised-hampers/",
             "https://saloniresinart.com/namokar-mantra-frames/",
+            "https://saloniresinart.com/partners/",
         ]
         self.assertEqual([url.findtext("sm:loc", namespaces=namespace) for url in urls], expected_urls)
         self.assertEqual(len(urls), len(expected_urls))
