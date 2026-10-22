@@ -1282,6 +1282,8 @@ function ensureSchema_(sheet) {
 function migrateOrdersSchema_(sheet) {
   var columns = ensureSchema_(sheet);
   if (columns === ORDER_HEADERS.length) return false;
+  var maxColumns = Number(sheet.getMaxColumns && sheet.getMaxColumns()) || columns;
+  if (maxColumns < ORDER_HEADERS.length) sheet.insertColumnsAfter(maxColumns, ORDER_HEADERS.length - maxColumns);
   var range = sheet.getRange(1, columns + 1, 1, PARTNER_ORDER_HEADERS.length);
   range.setValues([PARTNER_ORDER_HEADERS]);
   if (sheet.getRange(1, 1, 1, ORDER_HEADERS.length).getValues()[0].map(String).join("\u001f") !== ORDER_HEADERS.join("\u001f")) {
