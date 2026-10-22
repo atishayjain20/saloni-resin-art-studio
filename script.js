@@ -183,6 +183,7 @@
     var PARENT_ORIGIN = "https://saloniresinart.com";
     var requestedMode = embed.getAttribute("data-form-mode");
     var frameState = { loaded: false, nonce: "", siteKey: "", activeCaptcha: null, pinnedSender: null, pinnedOrigin: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
+    var corporateIntakeReady = embed.getAttribute("data-intake-ready") === "true";
 
     function requestId() {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -295,7 +296,9 @@
 
     function submitSeed(seed, shouldScroll) {
       if (!configured) {
-        status.innerHTML = "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+        status.innerHTML = frameState.mode === "corporate"
+          ? "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>."
+          : "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
         status.hidden = false;
         if (shouldScroll !== false) scrollToForm();
         return;
@@ -360,6 +363,11 @@
       executeParentCaptcha(request);
     });
 
+    if (frameState.mode === "corporate" && !corporateIntakeReady) {
+      status.innerHTML = "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+      status.hidden = false;
+      return;
+    }
     if (frameState.mode === "partner") {
       submitSeed({ sourceKind: "partner", sourceId: "partner-application", productName: "", applicationId: requestId() }, false);
       return;
