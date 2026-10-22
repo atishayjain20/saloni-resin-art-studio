@@ -170,7 +170,7 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   assert.match(page, /<title>Corporate Gifting &amp; Organisation Partnerships/);
   assert.match(page, /property="og:url" content="https:\/\/saloniresinart\.com\/corporate-gifting\/"/);
   assert.match(page, /data-form-mode="corporate"/);
-  assert.match(page, /data-intake-ready="false"/);
+  assert.match(page, /data-intake-ready="true"/);
   assert.match(page, /Corporate gifting enquiries are being prepared/);
   assert.match(page, /8209238541/);
   assert.match(page, /saloniresin_art_studio/);
