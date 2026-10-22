@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Organisation gifting enquiry</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; background: #fffaf4; color: #2b2020; }
+    * { box-sizing: border-box; } body { margin: 0; padding: 1rem; background: #fffaf4; } main { max-width: 760px; margin: 0 auto; }
+    .skip-link { position: absolute; left: .8rem; top: .5rem; padding: .45rem .7rem; background: #2b2020; color: #fffaf4; transform: translateY(-160%); } .skip-link:focus { transform: translateY(0); }
+    h1 { margin: 0 0 .45rem; font: 700 clamp(1.6rem, 4vw, 2.3rem)/1.1 Georgia, serif; }.intro, .privacy, .hint, .status, .field-error { font-size: .88rem; line-height: 1.5; }.intro { margin: 0 0 1rem; color: #5d4947; }
+    form { display: grid; gap: 1rem; } fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fff; } legend { padding: 0 .35rem; font-weight: 700; }.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+    label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; } input, select, textarea, button { font: inherit; } input, select, textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; } textarea { min-height: 6rem; resize: vertical; } input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
+    .field-error { margin: 0; color: #a41f33; } [hidden] { display: none !important; }.actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; } button { min-height: 2.8rem; padding: .7rem 1rem; border: 1px solid #2b2020; border-radius: 999px; background: #2b2020; color: #fffaf4; font-weight: 750; cursor: pointer; } button:disabled { cursor: wait; opacity: .6; }.status { min-height: 1.4rem; margin: 0; }.status.error { color: #a41f33; }.status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }.privacy { margin: 0; padding: .75rem; border-left: 3px solid #c77d8b; color: #5d4947; }.privacy a { color: inherit; font-weight: 700; }
+    @media (max-width: 560px) { body { padding: .7rem; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <a class="skip-link" href="#corporate-form">Skip to enquiry form</a>
+  <h1>Plan gifting for your organisation</h1>
+  <p class="intro">Tell Saloni what you are planning. This is an enquiry for a review and quotation, not an order or delivery promise.</p>
+  <form id="corporate-form" novalidate>
+    <fieldset><legend>Your organisation</legend><div class="grid">
+      <label for="organisation-name">Organisation name <input id="organisation-name" name="organisationName" maxlength="160" autocomplete="organization" required></label>
+      <label for="contact-name">Your name <input id="contact-name" name="contactName" maxlength="120" autocomplete="name" required></label>
+      <label for="phone">Phone or WhatsApp <input id="phone" name="phone" maxlength="40" autocomplete="tel" inputmode="tel" required></label>
+      <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
+    </div></fieldset>
+    <fieldset><legend>What are you planning?</legend><div class="grid">
+      <label for="enquiry-type">Enquiry type <select id="enquiry-type" name="enquiryType" required><option value="">Choose one</option><option value="one-off">One-off gifting</option><option value="recurring">Recurring gifting</option><option value="exploring">Just exploring</option></select></label>
+      <label for="occasion">Occasion <select id="occasion" name="occasion" required><option value="">Choose one</option><option value="festival">Festival</option><option value="employee birthday">Employee birthday</option><option value="5-year milestone">5-year service milestone</option><option value="10-year milestone">10-year service milestone</option><option value="event">Event</option><option value="mixed occasions">Mixed occasions</option><option value="other">Other</option></select></label>
+      <label for="approximate-quantity">Approximate quantity (optional) <input id="approximate-quantity" name="approximateQuantity" maxlength="9" inputmode="numeric" pattern="[0-9]*" aria-describedby="quantity-hint"></label>
+      <label for="budget-range">Budget (optional) <input id="budget-range" name="budgetRange" maxlength="120" placeholder="Currency + total or per-gift"></label>
+      <label for="required-date">Required date (optional) <input id="required-date" name="requiredDate" type="date"></label>
+    </div>
+      <p id="quantity-hint" class="hint">Leave quantity blank if it is not decided yet. Please share a currency and whether a budget is total or per gift; Saloni will quote after review.</p>
+      <label for="delivery-scope">Delivery scope <textarea id="delivery-scope" name="deliveryScope" maxlength="300" required placeholder="Cities, regions, or whether this is one or multiple locations. Do not include recipient addresses."></textarea></label>
+      <label for="brief">What would you like Saloni to make? <textarea id="brief" name="brief" maxlength="1000" required placeholder="Tell us about the style, colours, hamper or resin art idea, and any useful context."></textarea></label>
+    </fieldset>
+    <fieldset><legend>Review and privacy</legend>
+      <p class="hint">Saloni will review feasibility, design, materials, quotation, and delivery with you. Sending this form does not confirm an order, recurring schedule, price, or delivery date.</p>
+      <p class="hint">Please do not include employee names or lists, birth dates, recipient addresses, payment details, account credentials, or uploads in this form.</p>
+      <label><input id="privacy-accepted" name="privacyAccepted" type="checkbox" value="true" required> I accept the privacy notice and agree that these enquiry details may be kept in Saloni's private business Sheet for review.</label>
+    </fieldset>
+    <input id="enquiry-id" name="enquiryId" type="hidden">
+    <input id="captcha-token" name="captchaToken" type="hidden">
+    <p id="form-status" class="status" role="status" aria-live="polite" tabindex="-1"></p>
+    <div class="actions"><button id="submit-button" type="submit">Send enquiry</button><button id="another-button" type="button" hidden>Start another enquiry</button></div>
+    <p class="privacy">Organisation discounts available on quotation. Enquiry details are kept in the studio's private Sheet for up to 90 days. Contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a> for a correction request.</p>
+  </form>
+</main>
+<script id="seed-data" type="application/json"><?!= seedJson ?></script>
+<script>
+(function () {
+  "use strict";
+  var seed = JSON.parse(document.getElementById("seed-data").textContent || "{}");
+  var captchaEnabled = <?!= captchaEnabledJson ?>;
+  var captchaSiteKey = <?!= captchaSiteKeyJson ?>;
+  var form = document.getElementById("corporate-form");
+  var status = document.getElementById("form-status");
+  var submitButton = document.getElementById("submit-button");
+  var anotherButton = document.getElementById("another-button");
+  var active = false; var currentAttempt = null; var uncertainAttempt = null; var timeoutId = null;
+  var PARENT_ORIGIN = "https://saloniresinart.com";
+  var BUSINESS_FIELDS = ["enquiryId", "organisationName", "contactName", "phone", "email", "enquiryType", "occasion", "approximateQuantity", "budgetRange", "requiredDate", "deliveryScope", "brief"];
+  function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
+  function snapshot() { var payload = {}; BUSINESS_FIELDS.forEach(function (field) { payload[field] = value(field); }); payload.privacyAccepted = Boolean(form.elements.privacyAccepted && form.elements.privacyAccepted.checked); return payload; }
+  function samePayload(first, second) { return JSON.stringify(first) === JSON.stringify(second); }
+  function setStatus(message, kind) { status.textContent = message || ""; status.className = "status" + (kind ? " " + kind : ""); }
+  function setError(field, message) { var input = form.elements[field]; if (!input) return; input.setAttribute("aria-invalid", "true"); var ids = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean); if (ids.indexOf(field + "-error") === -1) ids.push(field + "-error"); input.setAttribute("aria-describedby", ids.join(" ")); var error = document.getElementById(field + "-error"); if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; input.parentNode.appendChild(error); } error.textContent = message; }
+  function clearErrors() { Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) { input.removeAttribute("aria-invalid"); var ids = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== input.name + "-error"; }); if (ids.length) input.setAttribute("aria-describedby", ids.join(" ")); else input.removeAttribute("aria-describedby"); }); Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); }); }
+  function focusError(errors) { var field = errors && Object.keys(errors)[0]; if (field && form.elements[field] && form.elements[field].focus) form.elements[field].focus(); else { status.setAttribute("tabindex", "-1"); status.focus(); } }
+  function newId() { if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID(); return "enquiry-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10); }
+  function valid() { var errors = {}; ["organisationName", "contactName", "deliveryScope", "brief"].forEach(function (field) { if (!value(field).trim()) errors[field] = "This field is required."; }); if (!value("enquiryType")) errors.enquiryType = "Choose the type of gifting enquiry."; if (!value("occasion")) errors.occasion = "Choose the occasion that fits best."; if (!value("phone") || (value("phone").match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone or WhatsApp number."; if (value("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("email"))) errors.email = "Enter a valid email address or leave it blank."; if (value("approximateQuantity") && (!/^\d{1,9}$/.test(value("approximateQuantity")) || Number(value("approximateQuantity")) < 1)) errors.approximateQuantity = "Enter a positive whole number, or leave it blank."; if (value("requiredDate") && !/^\d{4}-\d{2}-\d{2}$/.test(value("requiredDate"))) errors.requiredDate = "Use a valid required date."; if (!form.elements.privacyAccepted.checked) errors.privacyAccepted = "Accept the privacy notice to send an enquiry."; return errors; }
+  function current(attempt) { return currentAttempt === attempt && active; }
+  function restore(attempt) { if (attempt && !current(attempt)) return; active = false; submitButton.disabled = false; if (timeoutId) window.clearTimeout(timeoutId); timeoutId = null; if (attempt && attempt.port && attempt.port.close) attempt.port.close(); }
+  function captcha(attempt, done) { if (!captchaEnabled || !captchaSiteKey || !seed.channelNonce || !window.MessageChannel || !window.top || window.top === window) { done(null); return; } try { var channel = new window.MessageChannel(); attempt.port = channel.port1; channel.port1.onmessage = function (event) { var data = event && event.data || {}; if (!current(attempt) || data.type !== "saloni-order-captcha-response" || data.nonce !== seed.channelNonce || data.attemptId !== attempt.id) return; done(data.ok === true && typeof data.token === "string" ? data.token : null); }; window.top.postMessage({ type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: attempt.id, mode: "corporate" }, PARENT_ORIGIN, [channel.port2]); } catch (error) { done(null); } }
+  function showConflict() { anotherButton.hidden = false; setStatus("These entries changed while an earlier enquiry was still being confirmed. To protect the original enquiry, it was not resent with a different ID or payload. Choose Start another enquiry to send the changed details.", "error"); status.focus(); }
+  function uncertain(attempt) { if (!attempt.sent) return; attempt.uncertain = true; uncertainAttempt = attempt; if (!samePayload(snapshot(), attempt.payload)) showConflict(); else { setStatus("We could not confirm the enquiry yet. Your entries are still here; check them and try again.", "error"); status.focus(); } }
+  function success(result, attempt) { if (!current(attempt)) return; restore(attempt); uncertainAttempt = null; form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; }); anotherButton.hidden = false; setStatus("Enquiry received. Saloni will review feasibility, design, materials, quotation, and delivery with you. This does not confirm an order, schedule, price, or delivery date. Enquiry ID: " + result.enquiryId, "success"); status.focus(); }
+  form.addEventListener("submit", function (event) { event.preventDefault(); if (active) return; clearErrors(); var errors = valid(); if (Object.keys(errors).length) { Object.keys(errors).forEach(function (field) { setError(field, errors[field]); }); setStatus("Please correct the highlighted fields and try again.", "error"); focusError(errors); return; } var requestedPayload = snapshot(); if (uncertainAttempt && !samePayload(requestedPayload, uncertainAttempt.payload)) { showConflict(); return; } var retryingUncertain = Boolean(uncertainAttempt); var attempt = { id: newId(), payload: retryingUncertain ? JSON.parse(JSON.stringify(uncertainAttempt.payload)) : requestedPayload, port: null, sent: false, uncertain: false }; currentAttempt = attempt; active = true; submitButton.disabled = true; setStatus("Checking the enquiry…", ""); timeoutId = window.setTimeout(function () { if (!current(attempt)) return; restore(attempt); uncertain(attempt); if (!attempt.sent) { setStatus("Unable to verify the enquiry yet. Your entries are still here; please try again.", "error"); status.focus(); } }, 30000); captcha(attempt, function (token) { if (!current(attempt)) return; if (!token) { restore(attempt); setStatus("Captcha verification is required. Please try again.", "error"); status.focus(); return; } if (retryingUncertain) uncertainAttempt = attempt; var request = JSON.parse(JSON.stringify(attempt.payload)); request.captchaToken = token; attempt.sent = true; try { google.script.run.withSuccessHandler(function (result) { if (!current(attempt)) return; if (result && result.ok === true) success(result, attempt); else { restore(attempt); var resultErrors = result && result.errors || { form: "Please correct the highlighted fields and try again." }; Object.keys(resultErrors).forEach(function (field) { setError(field, resultErrors[field]); }); setStatus(resultErrors.form || "Please correct the highlighted fields and try again.", "error"); focusError(resultErrors); } }).withFailureHandler(function () { if (!current(attempt)) return; restore(attempt); uncertain(attempt); if (!attempt.uncertain) setStatus("We were unable to send the enquiry. Your entries are still here; please try again.", "error"); status.focus(); }).submitCorporateEnquiry(request); } catch (error) { restore(attempt); uncertain(attempt); if (!attempt.uncertain) setStatus("We were unable to send the enquiry. Your entries are still here; please try again.", "error"); status.focus(); } }); });
+  anotherButton.addEventListener("click", function () { uncertainAttempt = null; currentAttempt = null; form.reset(); form.elements.enquiryId.value = newId(); form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; }); anotherButton.hidden = true; clearErrors(); setStatus("", ""); });
+  form.elements.enquiryId.value = seed.enquiryId || newId();
+  if (captchaEnabled && captchaSiteKey && seed.channelNonce && window.top && window.top !== window) { try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey, mode: "corporate" }, PARENT_ORIGIN); } catch (error) {} }
+}());
+</script>
+</body>
+</html>
