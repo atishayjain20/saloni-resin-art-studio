@@ -59,6 +59,8 @@ Requests and uploaded images are scheduled for deletion after 90 days. Customers
 
 Corporate enquiry rows contain only the stated business fields, consent, status, staff notes, and a payload fingerprint. The existing daily retention trigger removes rows after 90 days, including while corporate intake is paused. Do not migrate order or Partner Circle rows into this tab. There are no uploads, payment records, employee lists, or Partner Circle commission fields in this flow.
 
+The Corporate Gifting page stays at `data-intake-ready="false"` while the published page is ahead of the unchanged production Apps Script. Deploy the compatible Apps Script, run `setupCorporateGifting()`, prove isolated embedded rendering/CAPTCHA/Sheet read-back, and only then flip the page flag to `true` in the same release. Until then, the page does not load an iframe or submit a seed and directs current large-order enquiries to Saloni's phone and Instagram.
+
 For rollback, pause the corporate page/intake with `CORPORATE_FORM_DISABLED=true` and keep a backend that can run the corporate 90-day retention cleanup while any corporate rows remain. Do **not** restore or deploy a backend that lacks corporate retention, and do not delete or overwrite the tab with an older Sheet copy. Keep the retention-capable backend until every corporate row has expired or been deliberately deleted, then re-run the setup/readiness check before re-enabling intake.
 
 ## Partner Circle
