@@ -325,7 +325,7 @@ function ensureCommissionRecord_(orderRow, requestId, properties, now) {
     subtotalText ? subtotal : "", rate, amount, status, neutralizeForSheet_(payoutBatch), payoutDate, "", ""];
   if (matches.length === 1) return reconcileCommissionRecord_(sheet, matches[0], expected, index);
   try {
-    sheet.appendRow(expected);
+    sheet.appendRow(commissionWritePayload_(sheet, expected));
   } catch (appendError) {
     var after = sheet.getDataRange().getValues();
     var afterMatches = after.slice(1).filter(function (candidate) { return String(candidate[0]) === commissionId; });
@@ -351,9 +351,25 @@ function isCommissionVoid_(payment, delivery) {
   return payment === "Refunded" || delivery === "Cancelled" || delivery === "Test";
 }
 
+function commissionMonthValue_(sheet, value) {
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    var date = retentionDate_(value);
+    return date ? Utilities.formatDate(date, sheet.getParent().getSpreadsheetTimeZone(), "yyyy-MM") : null;
+  }
+  return typeof value === "string" ? value : null;
+}
+
+function commissionWritePayload_(sheet, values) {
+  var payload = values.slice();
+  var month = commissionMonthValue_(sheet, payload[3]);
+  if (month === null) throw new Error("Commission ledger month is not valid.");
+  payload[3] = month ? "'" + month : month;
+  return payload;
+}
+
 function reconcileCommissionRecord_(sheet, existing, expected, index) {
   [1, 2, 3, 4, 6].forEach(function (position) {
-    var existingValue = typeof existing[position] === "string" ? neutralizeForSheet_(existing[position]) : existing[position];
+    var existingValue = position === 3 ? commissionMonthValue_(sheet, existing[position]) : typeof existing[position] === "string" ? neutralizeForSheet_(existing[position]) : existing[position];
     var expectedValue = typeof expected[position] === "string" ? neutralizeForSheet_(expected[position]) : expected[position];
     if (String(existingValue == null ? "" : existingValue) !== String(expectedValue == null ? "" : expectedValue)) throw new Error("Commission ledger snapshot mismatch.");
   });
@@ -381,6 +397,7 @@ function reconcileCommissionRecord_(sheet, existing, expected, index) {
   if (expectedStatus === "Pending" && (currentStatus === "Eligible" || currentStatus === "Approved")) nextStatus = currentStatus;
   if (currentStatus === "Approved" && expectedStatus === "Eligible") nextStatus = "Approved";
   var merged = existing.slice().map(function (value) { return typeof value === "string" ? neutralizeForSheet_(value) : value; });
+  merged[3] = expected[3];
   if (!existingSubtotal && expectedSubtotal) merged[5] = expected[5];
   merged[8] = nextStatus;
   if (nextStatus === "Void") merged[7] = 0;
@@ -389,7 +406,7 @@ function reconcileCommissionRecord_(sheet, existing, expected, index) {
   if ((nextStatus === "Paid" || nextStatus === "Void") && String(expected[9] || "").trim() && !String(existing[9] || "").trim()) merged[9] = expected[9];
   if ((nextStatus === "Paid" || nextStatus === "Void") && expected[10] && !existing[10]) merged[10] = expected[10];
   if (merged.join("\u001f") !== existing.join("\u001f")) {
-    sheet.getRange(commissionRowNumber_(sheet, expected[0]), 1, 1, COMMISSION_HEADERS.length).setValues([merged]);
+    sheet.getRange(commissionRowNumber_(sheet, expected[0]), 1, 1, COMMISSION_HEADERS.length).setValues([commissionWritePayload_(sheet, merged)]);
     var verified = sheet.getDataRange().getValues().filter(function (candidate) { return String(candidate[0]) === String(expected[0]); });
     if (verified.length !== 1 || verified[0].join("\u001f") !== merged.join("\u001f")) throw new Error("Commission ledger update could not be verified.");
     return verified[0];
@@ -955,7 +972,7 @@ function updateCommissionAttribution_(before, desired, requestId, audit, propert
   }
   if (String(updated[12] || "").indexOf(audit) === -1) updated[12] = neutralizeForSheet_((updated[12] ? String(updated[12]) + " | " : "") + audit);
   if (matchesNew && updated.join("\u001f") === existing.join("\u001f")) return true;
-  sheet.getRange(commissionRowNumber_(sheet, "commission-" + String(requestId)), 1, 1, COMMISSION_HEADERS.length).setValues([updated]);
+  sheet.getRange(commissionRowNumber_(sheet, "commission-" + String(requestId)), 1, 1, COMMISSION_HEADERS.length).setValues([commissionWritePayload_(sheet, updated)]);
   var verified = sheet.getDataRange().getValues().filter(function (row) { return String(row[0]) === "commission-" + String(requestId); });
   if (verified.length !== 1 || String(verified[0][1]) !== newIdentity || String(verified[0][2]) !== newName || Number(verified[0][6]) !== newRate) throw new Error("Commission correction could not be verified.");
   return true;
