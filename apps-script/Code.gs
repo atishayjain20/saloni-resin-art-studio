@@ -2,7 +2,7 @@
  * Google Apps Script web app for the static site's order-request iframe.
  *
  * The web app intentionally has no public read/list endpoint. doGet and doPost
- * only render a bounded order or partner form; public writes stay in the two
+ * only render a bounded order, partner, or corporate form; public writes stay in the three
  * validated submission functions below.
  */
 
@@ -10,7 +10,9 @@ var MAX_FILE_BYTES = 5 * 1024 * 1024;
 var MAX_DIMENSION_INCHES = 60;
 var DEFAULT_DAILY_ACCEPTANCE_CAP = 50;
 var DEFAULT_PARTNER_DAILY_ACCEPTANCE_CAP = 20;
+var DEFAULT_CORPORATE_DAILY_ACCEPTANCE_CAP = 20;
 var PARTNER_APPLICATION_CAPTCHA_ACTION = "partner_application";
+var CORPORATE_ENQUIRY_CAPTCHA_ACTION = "corporate_enquiry";
 var ORDER_CAPTCHA_ACTION = "order_request";
 var RETENTION_DAYS = 90;
 var RETENTION_MILLISECONDS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -43,8 +45,14 @@ var COMMISSION_HEADERS = [
   "Final product subtotal", "Commission rate", "Commission amount", "Commission status", "Payout batch ID",
   "Paid at", "Payment reference", "Staff notes"
 ];
+var CORPORATE_ENQUIRY_HEADERS = [
+  "Enquiry ID", "Received at", "Organisation name", "Contact name", "Phone / WhatsApp", "Email",
+  "Enquiry type", "Occasion", "Approximate quantity", "Budget range", "Required date", "Delivery scope",
+  "Brief", "Privacy accepted", "Status", "Staff notes", "Payload fingerprint"
+];
 var PARTNER_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,31}$/;
 var PARTNER_PROGRAM_READY_PROPERTY = "PARTNER_PROGRAM_CONFIGURED";
+var CORPORATE_PROGRAM_READY_PROPERTY = "CORPORATE_PROGRAM_CONFIGURED";
 var COMMISSION_STATUSES = ["Pending", "Eligible", "Approved", "Paid", "Void"];
 var PAYMENT_STATUSES = ["Pending", "Paid", "Refunded", "Not applicable"];
 var DELIVERY_STATUSES = ["New", "Confirmed", "In production", "Shipped", "Delivered", "Cancelled", "Test"];
@@ -62,6 +70,7 @@ function doPost(event) {
     var seed = parseSeed_(parameters.seed);
     seed.formMode = mode;
     if (mode === "partner") seed.applicationId = boundedSeed_(parameters.applicationId || seed.applicationId, 80);
+    if (mode === "corporate") seed.enquiryId = boundedSeed_(parameters.enquiryId || seed.enquiryId, 80);
     return renderForm_({ seed: seed, mode: mode });
   }
   return renderForm_({ seed: blankSeed_(), mode: mode });
@@ -74,17 +83,21 @@ function renderForm_(state) {
   var mode = boundedMode_(state && state.mode);
   var seed = (state && state.seed) || blankSeed_();
   seed.formMode = mode;
-  var template = HtmlService.createTemplateFromFile(mode === "partner" ? "PartnerForm" : "Form");
+  var templateName = mode === "partner" ? "PartnerForm" : mode === "corporate" ? "CorporateForm" : "Form";
+  var template = HtmlService.createTemplateFromFile(templateName);
   template.seedJson = escapeSeedJson_(JSON.stringify(seed));
   template.captchaSiteKeyJson = escapeSeedJson_(JSON.stringify(siteKey));
   template.captchaEnabledJson = captchaEnabled ? "true" : "false";
   template.formModeJson = escapeSeedJson_(JSON.stringify(mode));
   return template.evaluate()
-    .setTitle(mode === "partner" ? "Saloni Resin Art partner application" : "Saloni Resin Art Studio order request")
+    .setTitle(mode === "partner" ? "Saloni Resin Art partner application" : mode === "corporate" ? "Saloni Resin Art organisation enquiry" : "Saloni Resin Art Studio order request")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function boundedMode_(value) { return String(value || "").toLowerCase() === "partner" ? "partner" : "order"; }
+function boundedMode_(value) {
+  var mode = String(value || "").toLowerCase();
+  return mode === "partner" || mode === "corporate" ? mode : "order";
+}
 
 function purgeExpiredOrders_() {
   var lock = LockService.getScriptLock();
@@ -246,6 +259,14 @@ function purgeExpiredOrdersAt_(now) {
       errors += 1;
     }
   }
+  if (corporateProgramConfigured_(properties)) {
+    try {
+      var corporateCleanup = purgeCorporateRecords_(runAt, properties);
+      deletedRows += corporateCleanup.deletedRows;
+    } catch (corporateCleanupError) {
+      errors += 1;
+    }
+  }
   var summary = { lastSuccessAt: runAt.toISOString(), deletedRows: deletedRows, deletedFiles: deletedFiles };
   if (errors) {
     console.error(JSON.stringify({ failedAt: runAt.toISOString(), deletedRows: deletedRows, deletedFiles: deletedFiles, errors: errors }));
@@ -253,6 +274,35 @@ function purgeExpiredOrdersAt_(now) {
   }
   console.log(JSON.stringify(summary));
   return summary;
+}
+
+function purgeCorporateRecords_(now, properties) {
+  var sheet = openCorporateTab_(properties, false);
+  if (!sheet) return { deletedRows: 0 };
+  ensureCorporateTabSchema_(sheet, false);
+  var values = sheet.getDataRange().getValues();
+  var cutoff = new Date(now.getTime() - RETENTION_MILLISECONDS);
+  var deletedRows = 0;
+  var errors = 0;
+  for (var rowIndex = values.length - 1; rowIndex >= 1; rowIndex -= 1) {
+    var row = values[rowIndex];
+    var receivedAt = retentionDate_(row[1]);
+    if (!receivedAt) {
+      if (row[1] !== null && row[1] !== undefined && row[1] !== "") errors += 1;
+      continue;
+    }
+    if (receivedAt.getTime() > cutoff.getTime()) continue;
+    if (!/^[A-Za-z0-9_-]{12,80}$/.test(String(row[0] || ""))) {
+      errors += 1;
+      continue;
+    }
+    try {
+      sheet.deleteRow(rowIndex + 1);
+      deletedRows += 1;
+    } catch (deleteError) { errors += 1; }
+  }
+  if (errors) throw new Error("Corporate retention cleanup failed.");
+  return { deletedRows: deletedRows };
 }
 
 function openRetentionFolder_(properties) {
@@ -652,6 +702,155 @@ function submitPartnerApplication(form) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function submitCorporateEnquiry(form) {
+  var properties = PropertiesService.getScriptProperties();
+  if (isTrue_(properties.getProperty("CORPORATE_FORM_DISABLED"))) {
+    return validationFailure_({ form: "Organisation enquiries are paused. Please contact Saloni directly." });
+  }
+  if (!corporateProgramConfigured_(properties)) throw new Error("Unable to receive the organisation enquiry.");
+  var payload = collectCorporateEnquiry_(form || {});
+  var validation = validateCorporateEnquiry_(payload);
+  if (Object.keys(validation).length) return validationFailure_(validation);
+  var captcha = verifyCaptcha_(payload.captchaToken, properties, CORPORATE_ENQUIRY_CAPTCHA_ACTION);
+  if (!captcha.ok) return validationFailure_({ captcha: captcha.error });
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to receive the organisation enquiry.");
+  try {
+    var sheet = openCorporateTab_(properties, true);
+    ensureCorporateTabSchema_(sheet, false);
+    var fingerprint = corporateEnquiryFingerprint_(payload);
+    var existing = findCorporateEnquiry_(sheet, payload.enquiryId);
+    if (existing) {
+      if (existing.fingerprint !== fingerprint) return validationFailure_({ enquiryId: "Enquiry ID conflict: these details differ from the saved enquiry." });
+      return { ok: true, enquiryId: payload.enquiryId, receivedAt: existing.receivedAt };
+    }
+    if (corporateDailyCapReached_(sheet, properties)) return validationFailure_({ form: "The studio's organisation enquiry limit has been reached. Please try again tomorrow." });
+    var receivedAt = new Date();
+    var row = [
+      neutralizeForSheet_(payload.enquiryId), receivedAt, neutralizeForSheet_(payload.organisationName),
+      neutralizeForSheet_(payload.contactName), neutralizeForSheet_(payload.phone), neutralizeForSheet_(payload.email),
+      neutralizeForSheet_(payload.enquiryType), neutralizeForSheet_(payload.occasion),
+      payload.approximateQuantity === "" ? "" : Number(payload.approximateQuantity),
+      neutralizeForSheet_(payload.budgetRange), neutralizeForSheet_(payload.requiredDate),
+      neutralizeForSheet_(payload.deliveryScope), neutralizeForSheet_(payload.brief), true, "New enquiry", "",
+      neutralizeForSheet_(fingerprint)
+    ];
+    try {
+      sheet.appendRow(row);
+    } catch (appendError) {
+      var afterAppend;
+      try { afterAppend = findCorporateEnquiry_(sheet, payload.enquiryId); }
+      catch (reconciliationError) { throw new Error("Unable to confirm organisation enquiry."); }
+      if (afterAppend && afterAppend.fingerprint === fingerprint) return { ok: true, enquiryId: payload.enquiryId, receivedAt: afterAppend.receivedAt };
+      if (afterAppend) return validationFailure_({ enquiryId: "Enquiry ID conflict: these details differ from the saved enquiry." });
+      throw appendError;
+    }
+    return { ok: true, enquiryId: payload.enquiryId, receivedAt: receivedAt.toISOString() };
+  } catch (error) {
+    if (error && error.message && /Enquiry ID conflict/.test(error.message)) throw error;
+    throw new Error("Unable to receive the organisation enquiry.");
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function collectCorporateEnquiry_(form) {
+  return {
+    enquiryId: stringValue_(form.enquiryId), organisationName: stringValue_(form.organisationName),
+    contactName: stringValue_(form.contactName), phone: stringValue_(form.phone), email: stringValue_(form.email),
+    enquiryType: stringValue_(form.enquiryType), occasion: stringValue_(form.occasion),
+    approximateQuantity: stringValue_(form.approximateQuantity), budgetRange: stringValue_(form.budgetRange),
+    requiredDate: stringValue_(form.requiredDate), deliveryScope: stringValue_(form.deliveryScope),
+    brief: stringValue_(form.brief), privacyAccepted: isTrue_(form.privacyAccepted),
+    captchaToken: stringValue_(form.captchaToken)
+  };
+}
+
+function validateCorporateEnquiry_(payload) {
+  var errors = {};
+  if (!/^[A-Za-z0-9_-]{12,80}$/.test(payload.enquiryId)) errors.enquiryId = "Please reload the form and try again.";
+  bounded_(errors, "organisationName", payload.organisationName, 160, true);
+  bounded_(errors, "contactName", payload.contactName, 120, true);
+  if (!payload.phone || payload.phone.length > 40 || (payload.phone.match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone or WhatsApp number.";
+  if (payload.email && (payload.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))) errors.email = "Enter a valid email address or leave it blank.";
+  if (["one-off", "recurring", "exploring"].indexOf(payload.enquiryType) === -1) errors.enquiryType = "Choose the type of gifting enquiry.";
+  if (["festival", "employee birthday", "5-year milestone", "10-year milestone", "event", "mixed occasions", "other"].indexOf(payload.occasion) === -1) errors.occasion = "Choose the occasion that fits best.";
+  if (payload.approximateQuantity && (!/^\d{1,9}$/.test(payload.approximateQuantity) || Number(payload.approximateQuantity) < 1)) errors.approximateQuantity = "Enter a positive whole number, or leave it blank.";
+  bounded_(errors, "budgetRange", payload.budgetRange, 120, false);
+  if (payload.requiredDate && !isIsoDate_(payload.requiredDate)) errors.requiredDate = "Use a valid required date.";
+  bounded_(errors, "deliveryScope", payload.deliveryScope, 300, true);
+  bounded_(errors, "brief", payload.brief, 1000, true);
+  if (payload.privacyAccepted !== true) errors.privacyAccepted = "Accept the privacy notice to send an enquiry.";
+  return errors;
+}
+
+function corporateEnquiryFingerprint_(payload) {
+  return digestHex_(JSON.stringify({
+    enquiryId: payload.enquiryId, organisationName: payload.organisationName, contactName: payload.contactName,
+    phone: payload.phone, email: payload.email, enquiryType: payload.enquiryType, occasion: payload.occasion,
+    approximateQuantity: payload.approximateQuantity, budgetRange: payload.budgetRange, requiredDate: payload.requiredDate,
+    deliveryScope: payload.deliveryScope, brief: payload.brief, privacyAccepted: payload.privacyAccepted
+  }));
+}
+
+function findCorporateEnquiry_(sheet, enquiryId) {
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+  var match = null;
+  for (var index = 1; index < values.length; index += 1) {
+    if (String(values[index][0]) !== enquiryId) continue;
+    if (match) throw new Error("Corporate enquiry ID is duplicated.");
+    match = {
+      fingerprint: String(values[index][16] || ""),
+      receivedAt: values[index][1] instanceof Date ? values[index][1].toISOString() : String(values[index][1])
+    };
+  }
+  return match;
+}
+
+function corporateDailyCapReached_(sheet, properties) {
+  var configured = Number(properties.getProperty("CORPORATE_DAILY_ACCEPTANCE_CAP"));
+  var cap = Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_CORPORATE_DAILY_ACCEPTANCE_CAP;
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  var values = sheet.getDataRange().getValues();
+  var count = 0;
+  for (var index = 1; index < values.length; index += 1) {
+    var received = values[index][1];
+    if (received && Utilities.formatDate(new Date(received), Session.getScriptTimeZone(), "yyyy-MM-dd") === today) count += 1;
+  }
+  return count >= cap;
+}
+
+function corporateProgramConfig_(properties) {
+  var sheetId = String(properties.getProperty("ORDER_SHEET_ID") || "").trim();
+  return sheetId ? { sheetId: sheetId, tabName: "Corporate Enquiries" } : null;
+}
+
+function corporateProgramConfigured_(properties) {
+  return Boolean(corporateProgramConfig_(properties) && isTrue_(properties.getProperty(CORPORATE_PROGRAM_READY_PROPERTY)));
+}
+
+function setupCorporateGifting() {
+  var activeEmail = String(Session.getActiveUser().getEmail() || "").trim();
+  var effectiveEmail = String(Session.getEffectiveUser().getEmail() || "").trim();
+  if (!activeEmail || activeEmail.toLowerCase() !== effectiveEmail.toLowerCase()) throw new Error("Run this setup as the deployment owner.");
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to start corporate setup.");
+  try {
+    var properties = PropertiesService.getScriptProperties();
+    var config = corporateProgramConfig_(properties);
+    if (!config) throw new Error("Corporate sheet is not configured.");
+    var spreadsheet = SpreadsheetApp.openById(config.sheetId);
+    var sheet = spreadsheet.getSheetByName(config.tabName);
+    if (!sheet && spreadsheet.insertSheet) sheet = spreadsheet.insertSheet(config.tabName);
+    if (!sheet) throw new Error("Corporate sheet tab is not configured.");
+    ensureCorporateTabSchema_(sheet);
+    if (!protectCorporateTab_(sheet)) throw new Error("Unable to protect corporate sheet tab.");
+    if (properties.setProperty) properties.setProperty(CORPORATE_PROGRAM_READY_PROPERTY, "true");
+    return { tab: config.tabName, columns: CORPORATE_ENQUIRY_HEADERS.length };
+  } finally { lock.releaseLock(); }
 }
 
 function collectApplication_(form) {
@@ -1260,6 +1459,35 @@ function openPartnerTab_(properties, propertyName, defaultName) {
   return sheet;
 }
 
+function openCorporateTab_(properties, required) {
+  var config = corporateProgramConfig_(properties);
+  if (!config) {
+    if (required) throw new Error("Corporate sheet is not configured.");
+    return null;
+  }
+  var spreadsheet = SpreadsheetApp.openById(config.sheetId);
+  var sheet = spreadsheet.getSheetByName(config.tabName);
+  if (!sheet && required) throw new Error("Corporate sheet tab is not configured.");
+  return sheet || null;
+}
+
+function ensureCorporateTabSchema_(sheet, allowCreate) {
+  if (sheet.getLastRow() === 0) {
+    if (allowCreate === false) throw new Error("Corporate sheet schema is not ready.");
+    sheet.getRange(1, 1, 1, CORPORATE_ENQUIRY_HEADERS.length).setValues([CORPORATE_ENQUIRY_HEADERS]);
+    return true;
+  }
+  var columns = Number(sheet.getLastColumn && sheet.getLastColumn()) || CORPORATE_ENQUIRY_HEADERS.length;
+  if (columns !== CORPORATE_ENQUIRY_HEADERS.length) throw new Error("Corporate sheet schema does not match the allowlist.");
+  var existing = sheet.getRange(1, 1, 1, CORPORATE_ENQUIRY_HEADERS.length).getValues()[0].map(String);
+  if (existing.join("\u001f") !== CORPORATE_ENQUIRY_HEADERS.join("\u001f")) throw new Error("Corporate sheet schema does not match the allowlist.");
+  return false;
+}
+
+function protectCorporateTab_(sheet) {
+  return protectRange_(sheet, 1, CORPORATE_ENQUIRY_HEADERS.length, "Corporate enquiries: staff-only");
+}
+
 function ensurePartnerTabSchema_(sheet, expected) {
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
@@ -1458,6 +1686,7 @@ function parseSeed_(json) {
     pin: boundedSeed_(seed.pin, 20), requestedDate: boundedSeed_(seed.requestedDate, 20),
     referralCode: normalizeReferralCode_(seed.referralCode),
     applicationId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.applicationId || "")) ? String(seed.applicationId) : "",
+    enquiryId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.enquiryId || "")) ? String(seed.enquiryId) : Utilities.getUuid(),
     formMode: boundedMode_(seed.formMode),
     channelNonce: /^[A-Za-z0-9_-]{16,128}$/.test(String(seed.channelNonce || "")) ? String(seed.channelNonce) : ""
   };
