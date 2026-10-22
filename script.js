@@ -181,7 +181,8 @@
     var orderUrl = embed.getAttribute("data-order-form-url") || "";
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
-    var frameState = { loaded: false, nonce: "", siteKey: "", activeCaptcha: null, pinnedSender: null, pinnedOrigin: "", mode: embed.getAttribute("data-form-mode") === "partner" ? "partner" : "order" };
+    var requestedMode = embed.getAttribute("data-form-mode");
+    var frameState = { loaded: false, nonce: "", siteKey: "", activeCaptcha: null, pinnedSender: null, pinnedOrigin: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
 
     function requestId() {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -227,7 +228,8 @@
           window.grecaptcha.ready(function () {
             if (frameState.activeCaptcha !== request) return;
             try {
-              var result = window.grecaptcha.execute(frameState.siteKey, { action: frameState.mode === "partner" ? "partner_application" : "order_request" });
+              var captchaAction = frameState.mode === "partner" ? "partner_application" : frameState.mode === "corporate" ? "corporate_enquiry" : "order_request";
+              var result = window.grecaptcha.execute(frameState.siteKey, { action: captchaAction });
               if (!result || typeof result.then !== "function") { postCaptchaResult(request, false, ""); return; }
               result.then(function (token) {
                 postCaptchaResult(request, typeof token === "string" && token.length > 0, token);
@@ -360,6 +362,10 @@
 
     if (frameState.mode === "partner") {
       submitSeed({ sourceKind: "partner", sourceId: "partner-application", productName: "", applicationId: requestId() }, false);
+      return;
+    }
+    if (frameState.mode === "corporate") {
+      submitSeed({ sourceKind: "corporate", sourceId: "corporate-enquiry", productName: "", enquiryId: requestId() }, false);
       return;
     }
 
