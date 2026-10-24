@@ -7,6 +7,7 @@ const crypto = require("node:crypto");
 
 const source = fs.readFileSync(path.join(__dirname, "..", "apps-script", "Code.gs"), "utf8");
 const page = fs.readFileSync(path.join(__dirname, "..", "corporate-gifting", "index.html"), "utf8");
+const styles = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 const formHtml = fs.readFileSync(path.join(__dirname, "..", "apps-script", "CorporateForm.html"), "utf8");
 const browserScript = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
 
@@ -185,6 +186,28 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   assert.match(formHtml, /Please do not include employee names or lists, birth dates, recipient addresses, payment details/);
   assert.doesNotMatch(formHtml, /type="file"|name="employeeNames"|name="birthDate"|name="paymentDetails"|localStorage|sessionStorage/);
   assert.match(browserScript, /corporate_enquiry/);
+});
+
+test("corporate page names resin-art gifts and keeps a compact studio photo strip", () => {
+  assert.match(page, /resin-art gifts/i);
+  assert.match(page, /hamper/i);
+  assert.match(page, /class="corporate-gift-strip"/);
+  assert.match(page, /aria-label="Resin-art gift examples"/);
+  for (const asset of [
+    "studio-floral-handled-tray.jpeg",
+    "studio-rose-hexagon-keepsake.jpeg",
+    "studio-lilac-scalloped-tray.jpeg"
+  ]) {
+    assert.match(page, new RegExp(`src="\\.\\./assets/${asset}"`));
+    assert.equal(fs.existsSync(path.join(__dirname, "..", "assets", asset)), true, `${asset} must remain a local studio asset`);
+  }
+  assert.match(page, /alt="Pressed-flower resin tray with a gold handle"/);
+  assert.match(page, /alt="Pressed-flower resin hexagon keepsake"/);
+  assert.match(page, /alt="Lilac resin trinket tray with gold details"/);
+  assert.match(page, /corporate-gift-strip/);
+  assert.doesNotMatch(page, /<section[^>]+corporate-gift-strip/);
+  assert.match(styles, /\.corporate-gift-strip \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(3/);
+  assert.match(styles, /@media \(max-width: 620px\)[\s\S]*\.corporate-gift-strip \{/);
 });
 
 class CorporateFakeElement {
