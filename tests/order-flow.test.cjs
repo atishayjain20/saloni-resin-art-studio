@@ -85,6 +85,21 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     return existingCard;
   });
   const highlightCard = romanticExistingCards[3];
+  const movedStudioCatalogue = [
+    ["resin-clock.jpg", "Blue hour resin clock", "A little sky, a little shoreline, and a moment that keeps time."],
+    ["resin-message-coasters.jpg", "Personalized message coasters", "Playful coasters for the person who makes ordinary days better."],
+    ["navkar-resin-frame.jpg", "Namokar mantra resin frame", "Soft white texture, gold detail, and words that belong at home."],
+    ["personalized-floral-hoop.jpg", "A tiny beginning", "Floral detail arranged around a memory worth marking."],
+  ];
+  const movedStudioCards = movedStudioCatalogue.map(([asset, title, copy]) => {
+    const studioCard = new Element("work-card");
+    studioCard.caption = new Element("figcaption");
+    studioCard.image = { getAttribute: () => `assets/${asset}` };
+    studioCard.title = { textContent: title };
+    studioCard.titleTag = "strong";
+    studioCard.detailNodes = [{ textContent: copy }];
+    return studioCard;
+  });
   const generatedCatalogue = [
     ["concept-floral-memory-frame.webp", "Your flowers, held close", "8,999", "6,749", 25],
     ["concept-ocean-clock.webp", "A little blue hour", "3,999", "2,749", 31],
@@ -152,7 +167,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     body,
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
-    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards] : []; },
+    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards] : []; },
     querySelector(selector) { return selector === '[data-order-prefill="customizer"]' ? customizer : null; },
     createElement(tag) {
       const element = new Element(tag);
@@ -171,7 +186,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const romanticExistingButtons = romanticExistingCards.map((existingCard) => existingCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const generatedCatalogueButtons = generatedCards.map((generatedCard) => generatedCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const romanticConceptButtons = romanticConceptCards.map((romanticCard) => romanticCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, customizer, posted, windowObject };
+  const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
+  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, customizer, posted, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -231,6 +247,23 @@ test("adds the catalogue order control to highlighted keepsake cards", () => {
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.productName, "Preserved rose display");
   assert.equal(seed.sourceId, "catalogue:studio-red-rose-resin-display.jpeg");
+});
+
+test("keeps moved studio art cards on the shared catalogue order path", () => {
+  const flow = runFlow();
+  const expected = [
+    ["resin-clock.jpg", "Blue hour resin clock"],
+    ["resin-message-coasters.jpg", "Personalized message coasters"],
+    ["navkar-resin-frame.jpg", "Namokar mantra resin frame"],
+    ["personalized-floral-hoop.jpg", "A tiny beginning"],
+  ];
+  expected.forEach(([asset, title], index) => {
+    assert.equal(flow.movedStudioButtons[index].textContent, "Start an order");
+    flow.movedStudioButtons[index].dispatch("click");
+    const seed = submittedSeed(flow.posted);
+    assert.equal(seed.sourceId, `catalogue:${asset}`);
+    assert.equal(seed.productName, title);
+  });
 });
 
 test("reads square, round, and arch dimensions from customizer controls, including feet", () => {
