@@ -127,7 +127,7 @@ h1 em { color: var(--rose); font-style: italic; }
 
 .work-section { padding-block: clamp(4rem, 9vw, 8rem); }
 .work-section-warm { width: 100%; max-width: none; padding-inline: max(var(--gutter), calc((100vw - var(--max)) / 2)); background: #f1e0d8; }
-.diwali-section { scroll-margin-top: 1rem; background: #fff8e6; border-block: 1px solid rgba(201, 139, 58, 0.28); }
+.diwali-section { scroll-margin-top: 1rem; padding: clamp(4rem, 9vw, 8rem) clamp(1rem, 4vw, 3.5rem); background: #fff8e6; border-block: 1px solid rgba(201, 139, 58, 0.28); }
 .diwali-section .eyebrow, .diwali-section .work-card figcaption span { color: var(--cocoa); }
 .diwali-section .rail-heading h2 { max-width: 13ch; }
 .diwali-section .work-card img { aspect-ratio: 1 / 1; object-fit: contain; object-position: center; padding: 0.5rem; background: var(--ivory); border: 1px solid rgba(201, 139, 58, 0.3); }
