@@ -202,6 +202,15 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(css, r"@media \(max-width: 840px\) \{[\s\S]*?\.diwali-section\s*\{[^}]*scroll-margin-top:\s*3rem")
         self.assertRegex(css, r"@media \(max-width: 620px\) \{[\s\S]*?\.diwali-section\s*\{[^}]*scroll-margin-top:\s*2rem")
 
+    def test_diwali_section_has_responsive_inner_spacing(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        section_rule = re.search(r"\.diwali-section\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(section_rule)
+        self.assertRegex(
+            section_rule.group(1),
+            r"padding:\s*clamp\(4rem,\s*9vw,\s*8rem\)\s+clamp\(1rem,\s*4vw,\s*3\.5rem\)",
+        )
+
     def test_primary_navigation_has_partner_circle_link_and_clickable_pills(self):
         nav_match = re.search(r'<nav class="site-nav"[\s\S]*?</nav>', self.html)
         self.assertIsNotNone(nav_match)
