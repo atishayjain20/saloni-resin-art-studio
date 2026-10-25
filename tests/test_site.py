@@ -85,7 +85,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_page_has_required_sections_and_accessibility_hooks(self):
         required_ids = [
-            "main-content", "hero", "offerings", "studio-art", "hamper-rail",
+            "main-content", "hero", "diwali", "offerings", "studio-art", "hamper-rail",
             "festive-offers", "testimonials", "order", "footer",
         ]
         for section_id in required_ids:
@@ -96,12 +96,119 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-label="Next', self.html)
         self.assertIn('class="site-script"', self.html)
 
+    def test_diwali_collection_contract(self):
+        assets = [
+            "diwali-jewel-glow-tealight.jpg",
+            "diwali-happy-diwali-glow.webp",
+            "diwali-shubh-labh-welcome-pair.jpg",
+            "diwali-festive-welcome-hamper.jpeg",
+            "diwali-rose-gold-festive-set.jpeg",
+            "diwali-lotus-blue-festive-set.jpeg",
+            "diwali-gold-fleck-lotus-light.jpeg",
+            "diwali-pastel-lotus-tealight.jpeg",
+            "diwali-ocean-bloom-pooja-platter.jpg",
+            "diwali-golden-ganesha-pooja-plate.jpg",
+        ]
+        section = re.search(r'<section\b[^>]*id=["\']diwali["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        section_html = section.group(0)
+        hero_start = self.html.index('<section class="hero shell"')
+        hero_end = self.html.index('</section>', hero_start) + len('</section>')
+        diwali_start = self.html.index(section_html)
+        self.assertLess(hero_end, diwali_start)
+        self.assertNotRegex(self.html[hero_end:diwali_start], r'<section\b')
+        self.assertLess(diwali_start, self.html.index('<section class="intro-band shell reveal"'))
+        self.assertIn('<a href="#diwali">Diwali</a>', self.html)
+        self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
+        self.assertIn("Ten festive designs for your home and your people. Diwali prices ₹299–₹499.", section_html)
+        self.assertRegex(section_html, r"Reference images are shown for inspiration")
+        self.assertIn('data-carousel="diwali"', section_html)
+        self.assertIn('id="diwali-track"', section_html)
+        self.assertIn('data-carousel-track', section_html)
+        self.assertIn('tabindex="0"', section_html)
+        self.assertIn('aria-label="Diwali designs"', section_html)
+        self.assertIn('aria-controls="diwali-track"', section_html)
+        self.assertIn('aria-label="Previous Diwali designs"', section_html)
+        self.assertIn('aria-label="Next Diwali designs"', section_html)
+        cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
+        self.assertEqual(len(cards), 10)
+        self.assertEqual(section_html.count('data-lightbox-trigger'), 10)
+        self.assertEqual(section_html.count('class="product-pricing"'), 10)
+        self.assertNotIn('data-order-prefill="catalogue"', section_html)
+        reference_notes = {
+            "diwali-jewel-glow-tealight.jpg": "Reference design · price per holder.",
+            "diwali-happy-diwali-glow.webp": "Reference design · price per holder.",
+            "diwali-shubh-labh-welcome-pair.jpg": "Reference design · price for the pair.",
+            "diwali-festive-welcome-hamper.jpeg": "Reference design · contents are confirmed before ordering.",
+            "diwali-rose-gold-festive-set.jpeg": "Reference design · contents are confirmed before ordering.",
+            "diwali-lotus-blue-festive-set.jpeg": "Reference design · contents are confirmed before ordering.",
+            "diwali-gold-fleck-lotus-light.jpeg": "Reference design · price per holder.",
+            "diwali-pastel-lotus-tealight.jpeg": "Reference design · price per holder.",
+            "diwali-ocean-bloom-pooja-platter.jpg": "Reference design · price per platter.",
+            "diwali-golden-ganesha-pooja-plate.jpg": "Reference design · price per plate.",
+        }
+        price_matrix = {
+            "Jewel Glow Tealight": ("449", "299", "33"),
+            "Happy Diwali Glow": ("499", "349", "30"),
+            "Shubh Labh Welcome Pair": ("599", "399", "33"),
+            "Festive Welcome Hamper": ("699", "499", "29"),
+            "Rose &amp; Gold Festive Set": ("699", "499", "29"),
+            "Lotus Blue Festive Set": ("699", "499", "29"),
+            "Gold-Fleck Lotus Light": ("499", "349", "30"),
+            "Pastel Lotus Tealight": ("449", "299", "33"),
+            "Ocean Bloom Pooja Platter": ("649", "449", "31"),
+            "Golden Ganesha Pooja Plate": ("599", "399", "33"),
+        }
+        for asset in assets:
+            with self.subTest(asset=asset):
+                self.assertEqual(section_html.count(f'src="assets/{asset}"'), 1)
+                self.assertTrue((ROOT / "assets" / asset).is_file())
+                card = next((card for card in cards if f'assets/{asset}' in card), None)
+                self.assertIsNotNone(card)
+                image = re.search(r'<img\b[^>]*>', card).group(0)
+                self.assertRegex(image, r'\balt=["\'][^"\']{9,}["\']')
+                self.assertIn('loading="lazy"', image)
+                self.assertIn('decoding="async"', image)
+                self.assertRegex(image, r'\bwidth=["\']\d+["\']')
+                self.assertRegex(image, r'\bheight=["\']\d+["\']')
+                trigger = re.search(r'<a\b[^>]*data-lightbox-trigger[^>]*href=["\']assets/' + re.escape(asset) + r'["\'][\s\S]*?</a>', card)
+                self.assertIsNotNone(trigger)
+                self.assertRegex(trigger.group(0), r'aria-label=["\']Open larger view: [^"\']+["\']')
+                self.assertEqual(card.count('class="diwali-card-note"'), 1)
+                self.assertIn(reference_notes[asset], card)
+        for title, (regular, festive, discount) in price_matrix.items():
+            with self.subTest(title=title):
+                card = next((card for card in cards if f">{title}</strong>" in card), None)
+                self.assertIsNotNone(card)
+                pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card).group(0)
+                self.assertRegex(pricing, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{regular}</s></dd>')
+                self.assertRegex(pricing, rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{festive}</dd>')
+                self.assertRegex(pricing, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+                self.assertEqual(pricing.count("<dt"), 3)
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertIn(".diwali-section", css)
+        self.assertRegex(css, r"\.diwali-section \.work-card img\s*\{[^}]*aspect-ratio:\s*1\s*[/]?\s*1[^}]*object-fit:\s*contain")
+        self.assertRegex(css, r"\.diwali-section \.eyebrow, \.diwali-section \.work-card figcaption span\s*\{[^}]*color:\s*var\(--cocoa\)")
+        self.assertNotRegex(css, r"\.diwali-section \.eyebrow, \.diwali-section \.work-card figcaption span\s*\{[^}]*var\(--marigold\)")
+        self.assertRegex(css, r"\.diwali-section \.diwali-card-note\s*\{[^}]*color:\s*var\(--cocoa\)")
+        script = (ROOT / "script.js").read_text(encoding="utf-8")
+        self.assertIn('document.querySelectorAll("[data-carousel] .work-card, .romantic-keepsake-card")', script)
+        self.assertIn('card.querySelectorAll("figcaption p")', script)
+        self.assertIn('button.textContent = "Start an order"', script)
+
+    def test_diwali_anchor_offset_clears_sticky_header_at_responsive_breakpoints(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertRegex(css, r"\.diwali-section\s*\{[^}]*scroll-margin-top:\s*1rem")
+        self.assertRegex(css, r"@media \(max-width: 840px\) \{[\s\S]*?\.diwali-section\s*\{[^}]*scroll-margin-top:\s*3rem")
+        self.assertRegex(css, r"@media \(max-width: 620px\) \{[\s\S]*?\.diwali-section\s*\{[^}]*scroll-margin-top:\s*2rem")
+
     def test_primary_navigation_has_partner_circle_link_and_clickable_pills(self):
         nav_match = re.search(r'<nav class="site-nav"[\s\S]*?</nav>', self.html)
         self.assertIsNotNone(nav_match)
         nav = nav_match.group(0)
         self.assertRegex(
             nav,
+            r'<a href="#diwali">Diwali</a>\s*'
             r'<a href="#romantic-keepsakes">Resin art</a>\s*'
             r'<a href="#hamper-rail">Hampers</a>\s*'
             r'<button[^>]*type="button"[^>]*aria-haspopup="dialog"[^>]*aria-controls="festive-offers"[^>]*>Festive offers</button>\s*'
@@ -467,9 +574,9 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(f"<cite>{attribution}</cite>", section_html)
 
         self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#romantic-keepsakes["\']')
-        self.assertEqual(self.html.count('data-carousel='), 4)
-        self.assertEqual(self.html.count('data-lightbox-trigger'), 33)
-        self.assertEqual(self.html.count('class="product-pricing"'), 33)
+        self.assertEqual(self.html.count('data-carousel='), 5)
+        self.assertEqual(self.html.count('data-lightbox-trigger'), 43)
+        self.assertEqual(self.html.count('class="product-pricing"'), 43)
         self.assertEqual(self.html.count('data-testimonial-card'), 5)
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -680,7 +787,7 @@ class StaticSiteContractTests(unittest.TestCase):
         owners = []
         for root in parser.roots:
             owners.extend(find_nodes(root, "data-carousel"))
-        self.assertEqual(len(owners), 4)
+        self.assertEqual(len(owners), 5)
         for owner in owners:
             with self.subTest(carousel=owner["attrs"].get("data-carousel")):
                 self.assertEqual(len(find_nodes(owner, "data-carousel-track")), 1)
@@ -924,7 +1031,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
-        self.assertEqual(len(triggers), 33)
+        self.assertEqual(len(triggers), 43)
         for trigger in triggers:
             with self.subTest(trigger=trigger):
                 self.assertRegex(trigger, r'href=["\']assets/[^"\']+["\']')
@@ -942,7 +1049,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(dialog_image)
         self.assertNotRegex(dialog_image.group(0), r'\bsrc=')
 
-        for section_id, cards, pricing_blocks in (("romantic-keepsakes", 14, 14), ("studio-art", 16, 16), ("hamper-rail", 3, 3)):
+        for section_id, cards, pricing_blocks in (("romantic-keepsakes", 14, 14), ("studio-art", 16, 16), ("hamper-rail", 3, 3), ("diwali", 10, 10)):
             section = re.search(rf'<section\b[^>]*id=["\']{section_id}["\'][\s\S]*?</section>', self.html)
             self.assertIsNotNone(section)
             with self.subTest(section=section_id):
