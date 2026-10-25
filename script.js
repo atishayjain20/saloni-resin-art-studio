@@ -154,6 +154,65 @@
       });
     }
 
+    function initFestiveOffers() {
+      var dialog = document.getElementById("festive-offers");
+      var trigger = document.querySelector('[aria-controls="festive-offers"]');
+      if (!dialog || !trigger) return;
+
+      var storageKey = "saloniFestiveOfferSeen";
+      var restoreTarget = null;
+
+      function meaningfulFocusTarget(target) {
+        if (!target || target === document.body || target === document.documentElement || typeof target.focus !== "function") return null;
+        return target;
+      }
+
+      function contactFallback() {
+        try {
+          if (window.location) window.location.href = "tel:8209238541";
+        } catch (error) {}
+      }
+
+      function openDialog(manual) {
+        if (typeof dialog.showModal !== "function") {
+          if (manual) contactFallback();
+          return false;
+        }
+        restoreTarget = manual ? trigger : meaningfulFocusTarget(document.activeElement);
+        try {
+          dialog.showModal();
+        } catch (error) {
+          restoreTarget = null;
+          if (manual) contactFallback();
+          return false;
+        }
+        if (!manual) {
+          try {
+            if (window.localStorage) window.localStorage.setItem(storageKey, "1");
+          } catch (error) {}
+        }
+        return true;
+      }
+
+      dialog.addEventListener("close", function () {
+        var target = restoreTarget;
+        restoreTarget = null;
+        if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
+      });
+      trigger.addEventListener("click", function (event) {
+        event.preventDefault();
+        openDialog(true);
+      });
+
+      var seen = false;
+      try {
+        seen = !!window.localStorage && window.localStorage.getItem(storageKey) === "1";
+      } catch (error) {}
+      if (!seen) openDialog(false);
+    }
+
+    initFestiveOffers();
+
     var reveals = document.querySelectorAll(".reveal");
     if ("IntersectionObserver" in window) {
       root.classList.add("reveal-ready");
