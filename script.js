@@ -88,11 +88,14 @@
     var siteNav = document.getElementById("primary-navigation");
     if (navToggle && siteNav) {
       var festiveDialog = document.getElementById("festive-offers");
-      var navLabel = navToggle.querySelector(".nav-toggle-label");
+      var navClosedIcon = navToggle.querySelector(".nav-toggle-closed");
+      var navOpenIcon = navToggle.querySelector(".nav-toggle-open");
       function setNavOpen(open, restoreFocus) {
         siteNav.classList.toggle("is-open", open);
         navToggle.setAttribute("aria-expanded", String(open));
-        if (navLabel) navLabel.textContent = open ? "Close" : "Menu";
+        navToggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+        if (navClosedIcon) navClosedIcon.hidden = open;
+        if (navOpenIcon) navOpenIcon.hidden = !open;
         if (!open && restoreFocus) navToggle.focus({ preventScroll: true });
       }
       navToggle.addEventListener("click", function () { setNavOpen(navToggle.getAttribute("aria-expanded") !== "true"); });
