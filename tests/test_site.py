@@ -64,16 +64,16 @@ ROOT = Path(__file__).resolve().parents[1]
 FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery."
 
 ROMANTIC_CONCEPTS = (
-    ("romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "899", "599", 33),
-    ("romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "1,199", "799", 33),
-    ("romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,499", "1,099", 27),
-    ("romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "999", "699", 30),
-    ("romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "699", "399", 43),
-    ("romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "1,299", "899", 31),
-    ("romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "899", "599", 33),
-    ("romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,999", "1,499", 25),
-    ("romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "1,299", "899", 31),
-    ("romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "3,499", "2,499", 29),
+    ("romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "599", "399", 33),
+    ("romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "999", "699", 30),
+    ("romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25),
+    ("romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "899", "599", 33),
+    ("romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30),
+    ("romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30),
+    ("romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33),
+    ("romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28),
+    ("romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "999", "699", 30),
+    ("romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20),
 )
 
 
@@ -124,7 +124,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertLess(diwali_start, self.html.index('<section class="intro-band shell reveal"'))
         self.assertIn('<a href="#diwali">Diwali</a>', self.html)
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
-        self.assertIn("Fourteen festive designs for your home and your people. Diwali prices ₹299–₹499.", section_html)
+        self.assertIn("Fourteen festive designs for your home and your people. Diwali prices ₹249–₹449.", section_html)
         self.assertRegex(section_html, r"Reference images are shown for inspiration")
         self.assertIn('data-carousel="diwali"', section_html)
         self.assertIn('id="diwali-track"', section_html)
@@ -167,20 +167,20 @@ class StaticSiteContractTests(unittest.TestCase):
             "diwali-floral-swastik-tealight-set.webp": "Concept preview · made to order · price for the three-piece set",
         }
         price_matrix = {
-            "Jewel Glow Tealight": ("449", "299", "33"),
-            "Happy Diwali Glow": ("499", "349", "30"),
-            "Shubh Labh Welcome Pair": ("599", "399", "33"),
-            "Festive Welcome Hamper": ("699", "499", "29"),
-            "Rose &amp; Gold Festive Set": ("699", "499", "29"),
-            "Lotus Blue Festive Set": ("699", "499", "29"),
-            "Gold-Fleck Lotus Light": ("499", "349", "30"),
-            "Pastel Lotus Tealight": ("449", "299", "33"),
-            "Ocean Bloom Pooja Platter": ("649", "449", "31"),
-            "Golden Ganesha Pooja Plate": ("599", "399", "33"),
-            "Om Mini Tilak Plate": ("399", "299", "25"),
-            "Lotus Diya Pair": ("599", "399", "33"),
-            "Peacock Mini Pooja Thali": ("699", "499", "29"),
-            "Floral Swastik Tealight Set": ("599", "449", "25"),
+            "Jewel Glow Tealight": ("349", "249", "29"),
+            "Happy Diwali Glow": ("399", "299", "25"),
+            "Shubh Labh Welcome Pair": ("499", "399", "20"),
+            "Festive Welcome Hamper": ("549", "399", "27"),
+            "Rose &amp; Gold Festive Set": ("549", "399", "27"),
+            "Lotus Blue Festive Set": ("549", "399", "27"),
+            "Gold-Fleck Lotus Light": ("399", "299", "25"),
+            "Pastel Lotus Tealight": ("349", "249", "29"),
+            "Ocean Bloom Pooja Platter": ("499", "399", "20"),
+            "Golden Ganesha Pooja Plate": ("499", "349", "30"),
+            "Om Mini Tilak Plate": ("349", "249", "29"),
+            "Lotus Diya Pair": ("449", "349", "22"),
+            "Peacock Mini Pooja Thali": ("599", "449", "25"),
+            "Floral Swastik Tealight Set": ("499", "399", "20"),
         }
         for asset in assets:
             with self.subTest(asset=asset):
@@ -557,10 +557,10 @@ class StaticSiteContractTests(unittest.TestCase):
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*romantic-keepsake-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 14)
         highlight_matrix = {
-            "studio-rose-hexagon-keepsake.jpeg": ("3,999", "2,999", 25),
-            "studio-personalized-photo-clock.jpeg": ("5,499", "3,999", 27),
-            "romantic-hamper.jpg": ("3,999", "2,399", 40),
-            "studio-red-rose-resin-display.jpeg": ("999", "699", 30),
+            "studio-rose-hexagon-keepsake.jpeg": ("2,999", "2,499", 17),
+            "studio-personalized-photo-clock.jpeg": ("2,999", "2,499", 17),
+            "romantic-hamper.jpg": ("2,499", "1,999", 20),
+            "studio-red-rose-resin-display.jpeg": ("899", "599", 33),
         }
         for asset, (regular, festive, discount) in highlight_matrix.items():
             with self.subTest(asset=asset):
@@ -998,21 +998,21 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(studio, r'Size, materials, and personalisation can change the final quote; Saloni confirms the final quote')
 
         studio_matrix = {
-            "studio-blue-mantra-frame.jpeg": ("4,499", "3,099", 31),
-            "studio-lilac-symbol-rakhi.jpeg": ("899", "649", 28),
-            "studio-little-brother-rakhi.jpeg": ("999", "699", 30),
-            "studio-white-mantra-frame.jpeg": ("7,499", "3,999", 47),
-            "studio-lilac-scalloped-tray.jpeg": ("899", "499", 44),
-            "studio-floral-square-keepsake.jpeg": ("3,499", "2,699", 23),
-            "studio-floral-hexagon-keepsake.jpeg": ("3,299", "2,499", 24),
-            "studio-floral-handled-tray.jpeg": ("4,499", "3,399", 24),
-            "concept-floral-memory-frame.webp": ("8,999", "6,749", 25),
-            "concept-ocean-clock.webp": ("3,999", "2,749", 31),
-            "concept-tray-hamper.webp": ("2,999", "2,199", 27),
-            "concept-floral-coasters.webp": ("2,199", "1,549", 30),
-            "resin-clock.jpg": ("3,999", "2,999", 25),
-            "resin-message-coasters.jpg": ("2,499", "1,899", 24),
-            "navkar-resin-frame.jpg": ("5,499", "3,999", 27),
+            "studio-blue-mantra-frame.jpeg": ("3,999", "2,999", 25),
+            "studio-lilac-symbol-rakhi.jpeg": ("499", "349", 30),
+            "studio-little-brother-rakhi.jpeg": ("599", "399", 33),
+            "studio-white-mantra-frame.jpeg": ("4,499", "3,499", 22),
+            "studio-lilac-scalloped-tray.jpeg": ("599", "399", 33),
+            "studio-floral-square-keepsake.jpeg": ("2,499", "1,999", 20),
+            "studio-floral-hexagon-keepsake.jpeg": ("2,499", "1,999", 20),
+            "studio-floral-handled-tray.jpeg": ("2,999", "2,299", 23),
+            "concept-floral-memory-frame.webp": ("4,999", "3,999", 20),
+            "concept-ocean-clock.webp": ("2,999", "2,199", 27),
+            "concept-tray-hamper.webp": ("1,999", "1,499", 25),
+            "concept-floral-coasters.webp": ("1,299", "999", 23),
+            "resin-clock.jpg": ("2,999", "2,199", 27),
+            "resin-message-coasters.jpg": ("1,799", "1,299", 28),
+            "navkar-resin-frame.jpg": ("4,499", "3,499", 22),
             "personalized-floral-hoop.jpg": ("999", "599", 40),
         }
         hamper_match = re.search(r'<section\b[^>]*id=["\']hamper-rail["\'][\s\S]*?</section>', self.html)
@@ -1021,9 +1021,9 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(hamper, r'Displayed prices are for pictured/base designs')
         self.assertRegex(hamper, r'Size, materials, and personalisation can change the final quote; Saloni confirms the final quote')
         hamper_matrix = {
-            "birthday-hamper.jpg": ("3,499", "2,299", 34),
-            "car-theme-hamper.jpg": ("3,999", "2,499", 38),
-            "holi-hamper.webp": ("3,499", "2,199", 37),
+            "birthday-hamper.jpg": ("2,499", "1,799", 28),
+            "car-theme-hamper.jpg": ("2,499", "1,799", 28),
+            "holi-hamper.webp": ("2,199", "1,499", 32),
         }
         def assert_matrix(section_html, matrix, expected_cards=None, expected_pricing_blocks=None):
             cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
@@ -1103,10 +1103,10 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(studio_match)
         studio = studio_match.group(0)
         expected = {
-            "concept-floral-memory-frame.webp": ("Your flowers, held close", "8,999", "6,749", 25),
-            "concept-ocean-clock.webp": ("A little blue hour", "3,999", "2,749", 31),
-            "concept-tray-hamper.webp": ("A tray full of celebration", "2,999", "2,199", 27),
-            "concept-floral-coasters.webp": ("Little messages, shared", "2,199", "1,549", 30),
+            "concept-floral-memory-frame.webp": ("Your flowers, held close", "4,999", "3,999", 20),
+            "concept-ocean-clock.webp": ("A little blue hour", "2,999", "2,199", 27),
+            "concept-tray-hamper.webp": ("A tray full of celebration", "1,999", "1,499", 25),
+            "concept-floral-coasters.webp": ("Little messages, shared", "1,299", "999", 23),
         }
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', studio)
         self.assertEqual(len(cards), 16)

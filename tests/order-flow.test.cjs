@@ -101,10 +101,10 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     return studioCard;
   });
   const generatedCatalogue = [
-    ["concept-floral-memory-frame.webp", "Your flowers, held close", "8,999", "6,749", 25],
-    ["concept-ocean-clock.webp", "A little blue hour", "3,999", "2,749", 31],
-    ["concept-tray-hamper.webp", "A tray full of celebration", "2,999", "2,199", 27],
-    ["concept-floral-coasters.webp", "Little messages, shared", "2,199", "1,549", 30],
+    ["concept-floral-memory-frame.webp", "Your flowers, held close", "4,999", "3,999", 20],
+    ["concept-ocean-clock.webp", "A little blue hour", "2,999", "2,199", 27],
+    ["concept-tray-hamper.webp", "A tray full of celebration", "1,999", "1,499", 25],
+    ["concept-floral-coasters.webp", "Little messages, shared", "1,299", "999", 23],
   ];
   const generatedCards = generatedCatalogue.map(([asset, title, regular, festive, discount]) => {
     const generatedCard = new Element("generated-catalogue-card");
@@ -123,16 +123,16 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     return generatedCard;
   });
   const romanticCatalogue = [
-    ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "899", "599", 33],
-    ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "1,199", "799", 33],
-    ["romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,499", "1,099", 27],
-    ["romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "999", "699", 30],
-    ["romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "699", "399", 43],
-    ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "1,299", "899", 31],
-    ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "899", "599", 33],
-    ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,999", "1,499", 25],
-    ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "1,299", "899", 31],
-    ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "3,499", "2,499", 29],
+    ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "599", "399", 33],
+    ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "999", "699", 30],
+    ["romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25],
+    ["romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "899", "599", 33],
+    ["romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30],
+    ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30],
+    ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33],
+    ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28],
+    ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "999", "699", 30],
+    ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20],
   ];
   const romanticConceptCards = romanticCatalogue.map(([asset, title, copy, regular, festive, discount]) => {
     const romanticCard = new Element("romantic-keepsake-card");
@@ -308,10 +308,10 @@ test("uses the shared catalogue CTA and preserves generated-design details in a 
 test("includes each generated design pricing in order seed details", () => {
   const flow = runFlow();
   const expected = [
-    ["concept-floral-memory-frame.webp", "8,999", "6,749", 25],
-    ["concept-ocean-clock.webp", "3,999", "2,749", 31],
-    ["concept-tray-hamper.webp", "2,999", "2,199", 27],
-    ["concept-floral-coasters.webp", "2,199", "1,549", 30],
+    ["concept-floral-memory-frame.webp", "4,999", "3,999", 20],
+    ["concept-ocean-clock.webp", "2,999", "2,199", 27],
+    ["concept-tray-hamper.webp", "1,999", "1,499", 25],
+    ["concept-floral-coasters.webp", "1,299", "999", 23],
   ];
   expected.forEach(([asset, regular, festive, discount], index) => {
     flow.generatedCatalogueButtons[index].dispatch("click");
@@ -329,16 +329,16 @@ test("includes each generated design pricing in order seed details", () => {
 test("seeds every romantic concept with its disclosure, exact price, and blank dimensions", () => {
   const flow = runFlow();
   const expected = [
-    ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "899", "599", 33],
-    ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "1,199", "799", 33],
-    ["romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,499", "1,099", 27],
-    ["romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "999", "699", 30],
-    ["romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "699", "399", 43],
-    ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "1,299", "899", 31],
-    ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "899", "599", 33],
-    ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,999", "1,499", 25],
-    ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "1,299", "899", 31],
-    ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "3,499", "2,499", 29],
+    ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "599", "399", 33],
+    ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "999", "699", 30],
+    ["romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25],
+    ["romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "899", "599", 33],
+    ["romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30],
+    ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30],
+    ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33],
+    ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28],
+    ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "999", "699", 30],
+    ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20],
   ];
   expected.forEach(([asset, title, copy, regular, festive, discount], index) => {
     const button = flow.romanticConceptButtons[index];
