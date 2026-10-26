@@ -5,7 +5,21 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
+const page = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.";
+
+const CORPORATE_RESIN_GIFTS = [
+  ["corporate-logo-keychain-concept.webp", "Logo resin keychain", "Clear resin with a name/initial and subtle brand-colour accents.", "Price for one piece.", "299", "199", 33],
+  ["corporate-floral-bookmark-concept.webp", "Pressed-flower bookmark", "A slim resin bookmark for welcome kits or thoughtful team gifts.", "Price for one piece.", "249", "149", 40],
+  ["corporate-logo-paperweight-concept.webp", "Logo paperweight", "A polished desk keepsake with a logo or short message sealed inside.", "Price for one piece.", "499", "399", 20],
+  ["corporate-desk-nameplate-concept.webp", "Resin desk nameplate", "Personalised with a name, designation and brand colours.", "Price for one piece.", "999", "799", 20],
+  ["corporate-logo-coaster-set-concept.webp", "Branded coaster set", "Four coordinated coasters for desks, meeting rooms or client kits.", "Price for a set of four.", "999", "749", 25],
+  ["corporate-fridge-magnet-concept.webp", "Resin fridge magnet", "A compact branded keepsake for events and team celebrations.", "Price for one piece.", "249", "179", 28],
+  ["corporate-desk-logo-stand-concept.webp", "Mini resin desk stand", "A small decorative resin stand for desks, reception counters or car dashboards.", "Price for one piece.", "249", "179", 28],
+  ["corporate-recognition-award-concept.webp", "Recognition resin award", "A modern personalised memento for milestones and appreciation.", "Price for one piece.", "1,299", "899", 31],
+  ["corporate-desk-organizer-concept.webp", "Resin desk organiser", "A compact pen and visiting-card holder with custom colours.", "Price for one piece.", "899", "699", 22],
+  ["corporate-festive-hamper-concept.webp", "Corporate festive hamper", "A coordinated resin gift box for festive or thank-you occasions.", "Price for one gift set.", "1,999", "1,499", 25],
+];
 
 class Element {
   constructor(id, value = "") {
@@ -151,6 +165,24 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return romanticCard;
   });
+  const corporateCards = CORPORATE_RESIN_GIFTS.map(([asset, title, copy, unit, regular, offer, discount]) => {
+    const corporateCard = new Element("work-card");
+    corporateCard.caption = new Element("figcaption");
+    corporateCard.image = { getAttribute: () => `assets/${asset}` };
+    corporateCard.title = { textContent: title };
+    corporateCard.titleTag = "strong";
+    corporateCard.disclosure = { textContent: "Corporate gift concept" };
+    corporateCard.detailNodes = [
+      { textContent: copy },
+      { textContent: `Concept preview · made to order. ${unit}` },
+    ];
+    corporateCard.priceRows = [
+      ["Regular price", `₹${regular}`],
+      ["Offer price", `₹${offer}`],
+      ["Discount", `${discount}% off`],
+    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
+    return corporateCard;
+  });
   const posted = [];
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
@@ -167,7 +199,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     body,
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
-    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards] : []; },
+    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards, ...corporateCards] : []; },
     querySelector(selector) { return selector === '[data-order-prefill="customizer"]' ? customizer : null; },
     createElement(tag) {
       const element = new Element(tag);
@@ -186,8 +218,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const romanticExistingButtons = romanticExistingCards.map((existingCard) => existingCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const generatedCatalogueButtons = generatedCards.map((generatedCard) => generatedCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const romanticConceptButtons = romanticConceptCards.map((romanticCard) => romanticCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
+  const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, customizer, posted, windowObject };
+  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, customizer, posted, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -323,6 +356,27 @@ test("includes each generated design pricing in order seed details", () => {
     assert.ok(seed.designDetails.includes(`Discount: ${discount}% off`));
     assert.doesNotMatch(seed.designDetails, new RegExp(FINAL_QUOTE_NOTE));
     assert.doesNotMatch(seed.designDetails, /Average listed price/);
+  });
+});
+
+test("seeds every corporate catalogue card with identity, unit, concept, and pricing details", () => {
+  const section = page.match(/<section\b[^>]*id=["']corporate-resin-gifts["'][\s\S]*?<\/section>/);
+  assert.ok(section, "corporate catalogue section must exist before order extraction is tested");
+  assert.equal((section[0].match(/data-lightbox-trigger/g) || []).length, CORPORATE_RESIN_GIFTS.length);
+  const flow = runFlow();
+  CORPORATE_RESIN_GIFTS.forEach(([asset, title, copy, unit, regular, offer, discount], index) => {
+    const button = flow.corporateCatalogueButtons[index];
+    assert.equal(button.textContent, "Start an order");
+    button.dispatch("click");
+    const seed = submittedSeed(flow.posted);
+    assert.equal(seed.sourceId, `catalogue:${asset}`);
+    assert.equal(seed.productName, title);
+    assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
+    assert.match(seed.designDetails, new RegExp(unit.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
+    assert.match(seed.designDetails, /Concept preview · made to order/);
+    assert.match(seed.designDetails, new RegExp(`Regular price: ₹${regular}`));
+    assert.match(seed.designDetails, new RegExp(`Offer price: ₹${offer}`));
+    assert.match(seed.designDetails, new RegExp(`Discount: ${discount}% off`));
   });
 });
 

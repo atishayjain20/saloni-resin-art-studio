@@ -76,6 +76,19 @@ ROMANTIC_CONCEPTS = (
     ("romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20),
 )
 
+CORPORATE_RESIN_GIFTS = (
+    ("corporate-logo-keychain", "corporate-logo-keychain-concept.webp", "Logo resin keychain", "299", "199", 33, "Price for one piece.", "Clear resin with a name/initial and subtle brand-colour accents."),
+    ("corporate-floral-bookmark", "corporate-floral-bookmark-concept.webp", "Pressed-flower bookmark", "249", "149", 40, "Price for one piece.", "A slim resin bookmark for welcome kits or thoughtful team gifts."),
+    ("corporate-logo-paperweight", "corporate-logo-paperweight-concept.webp", "Logo paperweight", "499", "399", 20, "Price for one piece.", "A polished desk keepsake with a logo or short message sealed inside."),
+    ("corporate-desk-nameplate", "corporate-desk-nameplate-concept.webp", "Resin desk nameplate", "999", "799", 20, "Price for one piece.", "Personalised with a name, designation and brand colours."),
+    ("corporate-logo-coaster-set", "corporate-logo-coaster-set-concept.webp", "Branded coaster set", "999", "749", 25, "Price for a set of four.", "Four coordinated coasters for desks, meeting rooms or client kits."),
+    ("corporate-fridge-magnet", "corporate-fridge-magnet-concept.webp", "Resin fridge magnet", "249", "179", 28, "Price for one piece.", "A compact branded keepsake for events and team celebrations."),
+    ("corporate-desk-logo-stand", "corporate-desk-logo-stand-concept.webp", "Mini resin desk stand", "249", "179", 28, "Price for one piece.", "A small decorative resin stand for desks, reception counters or car dashboards."),
+    ("corporate-recognition-award", "corporate-recognition-award-concept.webp", "Recognition resin award", "1,299", "899", 31, "Price for one piece.", "A modern personalised memento for milestones and appreciation."),
+    ("corporate-desk-organizer", "corporate-desk-organizer-concept.webp", "Resin desk organiser", "899", "699", 22, "Price for one piece.", "A compact pen and visiting-card holder with custom colours."),
+    ("corporate-festive-hamper", "corporate-festive-hamper-concept.webp", "Corporate festive hamper", "1,999", "1,499", 25, "Price for one gift set.", "A coordinated resin gift box for festive or thank-you occasions."),
+)
+
 
 class StaticSiteContractTests(unittest.TestCase):
     @classmethod
@@ -255,6 +268,7 @@ class StaticSiteContractTests(unittest.TestCase):
             r'(?:<noscript><a[^>]*href="#festive-offers-fallback"[^>]*>Festive offers</a></noscript>\s*)?'
             r'<a href="#customizer">Design a frame</a>\s*'
             r'<a href="partners/">Join Partner Circle</a>\s*'
+            r'<a href="#corporate-resin-gifts">Corporate Resin Gifts</a>\s*'
             r'<a href="corporate-gifting/">Corporate gifting</a>',
         )
         self.assertIn('class="nav-cta" href="#romantic-keepsakes"', nav)
@@ -614,9 +628,9 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(f"<cite>{attribution}</cite>", section_html)
 
         self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#romantic-keepsakes["\']')
-        self.assertEqual(self.html.count('data-carousel='), 5)
-        self.assertEqual(self.html.count('data-lightbox-trigger'), 47)
-        self.assertEqual(self.html.count('class="product-pricing"'), 47)
+        self.assertEqual(self.html.count('data-carousel='), 6)
+        self.assertEqual(self.html.count('data-lightbox-trigger'), 57)
+        self.assertEqual(self.html.count('class="product-pricing"'), 57)
         self.assertEqual(self.html.count('data-testimonial-card'), 5)
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -733,6 +747,69 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(small_media)
         self.assertRegex(small_media.group(1), r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\(78vw, 78vw\)")
 
+    def test_corporate_resin_gifts_catalogue_contract(self):
+        romantic_start = self.html.index('<section class="romantic-keepsakes shell"')
+        romantic_end = self.html.index("</section>", romantic_start) + len("</section>")
+        corporate_match = re.search(r'<section\b[^>]*id=["\']corporate-resin-gifts["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(corporate_match)
+        corporate = corporate_match.group(0)
+        corporate_start = corporate_match.start()
+        studio_start = self.html.index('<section class="work-section studio-art-section shell"')
+        self.assertLess(romantic_end, corporate_start)
+        self.assertLess(corporate_start, studio_start)
+        self.assertNotRegex(self.html[romantic_end:corporate_start], r'<section\b')
+
+        self.assertIn('<a href="#corporate-resin-gifts">Corporate Resin Gifts</a>', self.html)
+        self.assertIn('<a href="corporate-gifting/">Corporate gifting</a>', self.html)
+        self.assertIn('data-carousel="corporate-resin-gifts"', corporate)
+        self.assertIn('aria-labelledby="corporate-resin-gifts-title"', corporate)
+        self.assertIn('<h2 id="corporate-resin-gifts-title">Corporate Resin Gifts</h2>', corporate)
+        self.assertIn('id="corporate-resin-gifts-track"', corporate)
+        self.assertIn('data-carousel-track', corporate)
+        self.assertIn('role="list"', corporate)
+        self.assertIn('tabindex="0"', corporate)
+        self.assertIn('aria-label="Corporate resin gifts"', corporate)
+        self.assertIn('aria-label="Previous corporate resin gifts"', corporate)
+        self.assertIn('aria-label="Next corporate resin gifts"', corporate)
+        self.assertNotIn(FINAL_QUOTE_NOTE, corporate)
+        self.assertIn("Concept previews are made to order. Saloni confirms feasibility, materials and final price before production.", corporate)
+
+        cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', corporate)
+        self.assertEqual(len(cards), len(CORPORATE_RESIN_GIFTS))
+        ids = [re.search(r'\bid=["\']([^"\']+)', card).group(1) for card in cards]
+        self.assertEqual(ids, [item[0] for item in CORPORATE_RESIN_GIFTS])
+        self.assertEqual(len(ids), len(set(ids)))
+        assets = re.findall(r'<img\b[^>]*src=["\'](assets/corporate-[^"\']+\.webp)["\']', corporate)
+        self.assertEqual(assets, [f"assets/{item[1]}" for item in CORPORATE_RESIN_GIFTS])
+        self.assertEqual(len(assets), len(set(assets)))
+
+        for card, (_, asset, title, regular, offer, discount, unit, description) in zip(cards, CORPORATE_RESIN_GIFTS):
+            with self.subTest(asset=asset):
+                self.assertIn(f">{title}</strong>", card)
+                self.assertIn(description, card)
+                self.assertIn(f"Concept preview · made to order. {unit}", card)
+                self.assertLessEqual(card[:card.index("<dl")].count("<p"), 2)
+                image = re.search(r'<img\b[^>]*>', card)
+                self.assertIsNotNone(image)
+                self.assertRegex(image.group(0), r'alt=["\'][^"\']*concept product preview[^"\']*["\']')
+                self.assertIn('loading="lazy"', image.group(0))
+                self.assertIn('decoding="async"', image.group(0))
+                trigger = re.search(r'<a\b[^>]*class=["\']lightbox-trigger["\'][^>]*data-lightbox-trigger[^>]*href=["\']assets/' + re.escape(asset) + r'["\'][\s\S]*?</a>', card)
+                self.assertIsNotNone(trigger)
+                self.assertRegex(trigger.group(0), r'aria-label=["\']Open larger view: [^"\']+["\']')
+                pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
+                self.assertIsNotNone(pricing)
+                pricing_html = pricing.group(0)
+                self.assertRegex(pricing_html, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
+                self.assertRegex(pricing_html, rf'<dt[^>]*>Offer price</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
+                self.assertRegex(pricing_html, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+
+        self.assertEqual(corporate.count("data-lightbox-trigger"), len(CORPORATE_RESIN_GIFTS))
+        self.assertEqual(corporate.count('class="product-pricing"'), len(CORPORATE_RESIN_GIFTS))
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertRegex(css, r"\.corporate-resin-gifts-section\s*\{[^}]*scroll-margin-top:\s*3rem")
+        self.assertRegex(css, r"@media \(max-width: 620px\) \{[\s\S]*?\.corporate-resin-gifts-section\s*\{[^}]*scroll-margin-top:\s*4rem")
+
     def test_public_metadata_uses_settled_custom_domain_url(self):
         public_url = "https://saloniresinart.com/"
         image_url = public_url + "assets/hero-floral-bouquet.jpg"
@@ -827,7 +904,7 @@ class StaticSiteContractTests(unittest.TestCase):
         owners = []
         for root in parser.roots:
             owners.extend(find_nodes(root, "data-carousel"))
-        self.assertEqual(len(owners), 5)
+        self.assertEqual(len(owners), 6)
         for owner in owners:
             with self.subTest(carousel=owner["attrs"].get("data-carousel")):
                 self.assertEqual(len(find_nodes(owner, "data-carousel-track")), 1)
@@ -1071,7 +1148,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
-        self.assertEqual(len(triggers), 47)
+        self.assertEqual(len(triggers), 57)
         for trigger in triggers:
             with self.subTest(trigger=trigger):
                 self.assertRegex(trigger, r'href=["\']assets/[^"\']+["\']')
@@ -1089,7 +1166,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(dialog_image)
         self.assertNotRegex(dialog_image.group(0), r'\bsrc=')
 
-        for section_id, cards, pricing_blocks in (("romantic-keepsakes", 14, 14), ("studio-art", 16, 16), ("hamper-rail", 3, 3), ("diwali", 14, 14)):
+        for section_id, cards, pricing_blocks in (("romantic-keepsakes", 14, 14), ("corporate-resin-gifts", 10, 10), ("studio-art", 16, 16), ("hamper-rail", 3, 3), ("diwali", 14, 14)):
             section = re.search(rf'<section\b[^>]*id=["\']{section_id}["\'][\s\S]*?</section>', self.html)
             self.assertIsNotNone(section)
             with self.subTest(section=section_id):
