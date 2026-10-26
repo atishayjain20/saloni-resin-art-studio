@@ -87,7 +87,7 @@ test("navigation has a collapsed, keyboard-operable icon toggle", () => {
   assert.doesNotMatch(toggleMarkup, /<span[^>]*>(?:Menu|Close)<\/span>/);
   assert.match(html, /href="styles\.css\?v=\d+"/);
   assert.match(html, /src="script\.js\?v=\d+"/);
-  assert.match(html, /<nav[^>]+id="primary-navigation"[^>]+aria-label="Primary navigation"/);  
+  assert.match(html, /<nav[^>]+id="primary-navigation"[^>]+aria-label="Primary navigation"/);
   const globalCss = css.split("@media (max-width: 620px)")[0];
   assert.match(css, /\.nav-toggle\s*\{[^}]*display:\s*grid[^}]*width:\s*42px[^}]*height:\s*42px/);
   assert.match(globalCss, /html:not\(\.js\) \.nav-toggle\s*\{[^}]*display:\s*none/);
