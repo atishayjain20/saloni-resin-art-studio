@@ -23,7 +23,11 @@ class Element {
   dispatch(type, event = {}) { const next = Object.assign({ target: this, preventDefault() {} }, event); (this.listeners[type] || []).forEach((listener) => listener(next)); }
   getAttribute(name) { return this.attributes[name] || ""; }
   setAttribute(name, value) { this.attributes[name] = String(value); }
-  querySelector(selector) { return selector === ".nav-toggle-label" ? this.label : null; }
+  querySelector(selector) {
+    if (selector === ".nav-toggle-closed") return this.closedIcon;
+    if (selector === ".nav-toggle-open") return this.openIcon;
+    return null;
+  }
   querySelectorAll(selector) { return selector === "a" ? this.links || [] : []; }
   focus() { this.focusCount += 1; this.ownerDocument.activeElement = this; }
 }
@@ -49,7 +53,9 @@ function runNavigation({ festive = false } = {}) {
   const toggle = new Element("nav-toggle", documentObject);
   toggle.setAttribute("type", "button");
   toggle.setAttribute("aria-expanded", "false");
-  toggle.label = { textContent: "Menu" };
+  toggle.setAttribute("aria-label", "Open navigation");
+  toggle.closedIcon = { hidden: false };
+  toggle.openIcon = { hidden: true };
   const nav = new Element("primary-navigation", documentObject);
   const links = [new Element("first-link", documentObject), new Element("second-link", documentObject)];
   nav.links = links;
@@ -73,23 +79,42 @@ function runNavigation({ festive = false } = {}) {
 }
 
 test("mobile navigation has a collapsed, keyboard-operable toggle", () => {
-  assert.match(html, /<button[^>]+id="nav-toggle"[^>]+type="button"[^>]+aria-expanded="false"[^>]+aria-controls="primary-navigation"/);
+  const toggleMarkup = html.match(/<button[^>]+id="nav-toggle"[\s\S]*?<\/button>/)[0];
+  assert.match(toggleMarkup, /type="button"[^>]+aria-expanded="false"[^>]+aria-controls="primary-navigation"[^>]+aria-label="Open navigation"/);
+  assert.match(toggleMarkup, /class="nav-toggle-closed"[^>]*aria-hidden="true">☰<\/span>/);
+  assert.match(toggleMarkup, /class="nav-toggle-open"[^>]*aria-hidden="true"[^>]*>×<\/span>/);
+  assert.doesNotMatch(toggleMarkup, /class="nav-toggle-label"/);
+  assert.doesNotMatch(toggleMarkup, /<span[^>]*>(?:Menu|Close)<\/span>/);
+  assert.match(html, /href="styles\.css\?v=\d+"/);
+  assert.match(html, /src="script\.js\?v=\d+"/);
   assert.match(html, /<nav[^>]+id="primary-navigation"[^>]+aria-label="Primary navigation"/);
+  assert.match(css, /\.nav-toggle\s*\{[^}]*display:\s*none[^}]*width:\s*42px[^}]*height:\s*42px/);
+  assert.match(css, /\.nav-toggle:hover, \.nav-toggle:focus-visible/);
   assert.match(css, /\.site-nav\s*\{[^}]*display:\s*flex/);
   assert.match(css, /@media\s*\(max-width:\s*620px\)[\s\S]*#primary-navigation\s*\{[^}]*display:\s*none/);
+  assert.match(css, /html:not\(\.js\) #primary-navigation\s*\{[^}]*display:\s*flex/);
   assert.doesNotMatch(css, /@media\s*\(max-width:\s*620px\)[\s\S]*\.site-nav\s*\{[^}]*display:\s*none/);
   assert.match(partnerHtml, /<nav class="site-nav" aria-label="Partner page navigation">/);
 
   const { documentObject, toggle, nav, links } = runNavigation();
   assert.equal(toggle.getAttribute("type"), "button");
   assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  assert.equal(toggle.getAttribute("aria-label"), "Open navigation");
+  assert.equal(toggle.closedIcon.hidden, false);
+  assert.equal(toggle.openIcon.hidden, true);
   assert.equal(nav.classList.contains("is-open"), false);
 
   toggle.dispatch("click");
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
+  assert.equal(toggle.getAttribute("aria-label"), "Close navigation");
+  assert.equal(toggle.closedIcon.hidden, true);
+  assert.equal(toggle.openIcon.hidden, false);
   assert.equal(nav.classList.contains("is-open"), true);
   links[0].dispatch("click");
   assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  assert.equal(toggle.getAttribute("aria-label"), "Open navigation");
+  assert.equal(toggle.closedIcon.hidden, false);
+  assert.equal(toggle.openIcon.hidden, true);
   assert.equal(nav.classList.contains("is-open"), false);
 
   toggle.dispatch("click");
