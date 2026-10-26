@@ -19,6 +19,29 @@ const CORPORATE_RESIN_GIFTS = [
   ["corporate-recognition-award-concept.webp", "Recognition resin award", "A modern personalised memento for milestones and appreciation.", "Price for one piece.", "1,299", "899", 31],
   ["corporate-desk-organizer-concept.webp", "Resin desk organiser", "A compact pen and visiting-card holder with custom colours.", "Price for one piece.", "899", "699", 22],
   ["corporate-festive-hamper-concept.webp", "Corporate festive hamper", "A coordinated resin gift box for festive or thank-you occasions.", "Price for one gift set.", "1,999", "1,499", 25],
+  ["corporate-business-card-holder-concept.webp", "Resin Business Card Holder", "A compact resin holder for a tidy stack of visiting cards.", "Price for one card holder; cards not included.", "599", "449", 25],
+  ["corporate-phone-rest-concept.webp", "Resin Phone Rest", "A steady resin rest for a phone on a desk or bedside table.", "Price for one phone rest; phone not included.", "699", "499", 29],
+  ["corporate-pen-cup-concept.webp", "Resin Pen Cup", "A polished pen cup with a clean, colourful resin finish.", "Price for one pen cup; stationery not included.", "899", "699", 22],
+  ["corporate-desk-trinket-tray-concept.webp", "Desk Trinket Tray", "A small catch-all tray for a desk, console, or bedside table.", "Price for one tray; contents not included.", "599", "449", 25],
+  ["corporate-lanyard-charm-concept.webp", "Personalised Lanyard Charm", "A personalised charm that clips onto a lanyard or bag.", "Price for one charm with clasp; lanyard not included.", "299", "199", 33],
+  ["corporate-mini-photo-stand-concept.webp", "Mini Photo Stand", "A compact photo stand for a desk memory or team note.", "Price for one base with metal clip; print not included.", "399", "299", 25],
+  ["corporate-bag-tag-concept.webp", "Personalised Bag Tag", "A personalised resin tag with a simple strap for a bag or case.", "Price for one tag with strap.", "399", "299", 25],
+  ["corporate-desk-clock-concept.webp", "Mini Resin Desk Clock", "A small resin clock to add a considered accent to a work desk.", "Price for one clock with stand; battery not included.", "1,299", "999", 23],
+  ["corporate-bookmark-keychain-duo-concept.webp", "Welcome Keepsake Duo", "A bookmark and keychain duo for a useful welcome keepsake.", "Price for a two-piece set.", "599", "449", 25],
+  ["corporate-desk-essentials-set-concept.webp", "Desk Essentials Set", "A coordinated pen cup and trinket tray for a complete desk set.", "Price for one pen cup and one trinket tray.", "1,499", "1,199", 20],
+];
+
+const DIWALI_NEW_CONCEPTS = [
+  ["diwali-marigold-petal-holder-concept.webp", "Marigold Petal Holder", "A warm marigold-inspired cup for a soft festive glow.", "one LED tealight holder · LED not included", "349", "249", 29],
+  ["diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Holder", "An ivory mandala cup with a calm, hand-finished festive feel.", "one LED tealight holder · LED not included", "399", "299", 25],
+  ["diwali-ruby-leaf-dish-concept.webp", "Ruby Leaf Dish", "A ruby-red leaf dish for a small festive offering or accent.", "one decorative dish", "399", "299", 25],
+  ["diwali-saffron-tilak-duo-concept.webp", "Saffron Tilak Duo", "Two saffron-toned mini dishes for tilak and rice.", "two mini dishes", "449", "349", 22],
+  ["diwali-pearl-rangoli-accent-concept.webp", "Pearl Rangoli Accent", "A pearly rangoli-inspired accent for an entryway or prayer corner.", "one decorative accent", "499", "399", 20],
+  ["diwali-emerald-led-holder-pair-concept.webp", "Emerald Glow Pair", "A pair of emerald cups for a jewel-toned LED-lit arrangement.", "pair of LED tealight holders · LEDs not included", "549", "399", 27],
+  ["diwali-rose-petal-offering-plate-concept.webp", "Rose Petal Offering Plate", "A rosy ritual plate with a gentle petal-inspired edge.", "one decorative ritual plate", "499", "349", 30],
+  ["diwali-golden-toran-charms-concept.webp", "Golden Toran Charms", "Three golden hanging charms to style a festive doorway or wall.", "set of three hanging charms with cords", "599", "449", 25],
+  ["diwali-lotus-rangoli-duo-concept.webp", "Lotus Rangoli Duo", "Two lotus pieces for a small layered rangoli arrangement.", "set of two decorative lotus pieces", "499", "399", 20],
+  ["diwali-festive-keepsake-box-concept.webp", "Festive Keepsake Box", "A small lidded box for a keepsake, note, or festive token.", "one small lidded box · contents not included", "599", "449", 25],
 ];
 
 class Element {
@@ -183,6 +206,24 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return corporateCard;
   });
+  const diwaliCards = DIWALI_NEW_CONCEPTS.map(([asset, title, copy, unit, regular, festive, discount]) => {
+    const diwaliCard = new Element("work-card");
+    diwaliCard.caption = new Element("figcaption");
+    diwaliCard.image = { getAttribute: () => `assets/${asset}` };
+    diwaliCard.title = { textContent: title };
+    diwaliCard.titleTag = "strong";
+    diwaliCard.disclosure = { textContent: "Concept preview · made to order" };
+    diwaliCard.detailNodes = [
+      { textContent: copy },
+      { textContent: `Concept preview · made to order · ${unit}` },
+    ];
+    diwaliCard.priceRows = [
+      ["Regular price", `₹${regular}`],
+      ["Festive price", `₹${festive}`],
+      ["Discount", `${discount}% off`],
+    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
+    return diwaliCard;
+  });
   const posted = [];
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
@@ -199,7 +240,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     body,
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
-    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards, ...corporateCards] : []; },
+    querySelectorAll(selector) { return selector === "[data-carousel] .work-card, .romantic-keepsake-card" ? [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards, ...corporateCards, ...diwaliCards] : []; },
     querySelector(selector) { return selector === '[data-order-prefill="customizer"]' ? customizer : null; },
     createElement(tag) {
       const element = new Element(tag);
@@ -219,8 +260,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const generatedCatalogueButtons = generatedCards.map((generatedCard) => generatedCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const romanticConceptButtons = romanticConceptCards.map((romanticCard) => romanticCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
+  const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, customizer, posted, windowObject };
+  return { elements, card, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, posted, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -376,6 +418,27 @@ test("seeds every corporate catalogue card with identity, unit, concept, and pri
     assert.match(seed.designDetails, /Concept preview · made to order/);
     assert.match(seed.designDetails, new RegExp(`Regular price: ₹${regular}`));
     assert.match(seed.designDetails, new RegExp(`Offer price: ₹${offer}`));
+    assert.match(seed.designDetails, new RegExp(`Discount: ${discount}% off`));
+  });
+});
+
+test("seeds every new Diwali concept with identity, unit, concept, and pricing details", () => {
+  const section = page.match(/<section\b[^>]*id=["']diwali["'][\s\S]*?<\/section>/);
+  assert.ok(section, "Diwali catalogue section must exist before order extraction is tested");
+  assert.equal((section[0].match(/data-lightbox-trigger/g) || []).length, 24);
+  const flow = runFlow();
+  DIWALI_NEW_CONCEPTS.forEach(([asset, title, copy, unit, regular, festive, discount], index) => {
+    const button = flow.diwaliCatalogueButtons[index];
+    assert.equal(button.textContent, "Start an order");
+    button.dispatch("click");
+    const seed = submittedSeed(flow.posted);
+    assert.equal(seed.sourceId, `catalogue:${asset}`);
+    assert.equal(seed.productName, title);
+    assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
+    assert.match(seed.designDetails, new RegExp(unit.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
+    assert.match(seed.designDetails, /Concept preview · made to order/);
+    assert.match(seed.designDetails, new RegExp(`Regular price: ₹${regular}`));
+    assert.match(seed.designDetails, new RegExp(`Festive price: ₹${festive}`));
     assert.match(seed.designDetails, new RegExp(`Discount: ${discount}% off`));
   });
 });

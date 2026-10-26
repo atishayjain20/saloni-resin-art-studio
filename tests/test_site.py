@@ -76,6 +76,19 @@ ROMANTIC_CONCEPTS = (
     ("romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20),
 )
 
+DIWALI_NEW_CONCEPTS = (
+    ("diwali-marigold-petal-holder", "diwali-marigold-petal-holder-concept.webp", "Marigold Petal Holder", "349", "249", 29, "one LED tealight holder · LED not included", "A warm marigold-inspired cup for a soft festive glow."),
+    ("diwali-ivory-mandala-holder", "diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Holder", "399", "299", 25, "one LED tealight holder · LED not included", "An ivory mandala cup with a calm, hand-finished festive feel."),
+    ("diwali-ruby-leaf-dish", "diwali-ruby-leaf-dish-concept.webp", "Ruby Leaf Dish", "399", "299", 25, "one decorative dish", "A ruby-red leaf dish for a small festive offering or accent."),
+    ("diwali-saffron-tilak-duo", "diwali-saffron-tilak-duo-concept.webp", "Saffron Tilak Duo", "449", "349", 22, "two mini dishes", "Two saffron-toned mini dishes for tilak and rice."),
+    ("diwali-pearl-rangoli-accent", "diwali-pearl-rangoli-accent-concept.webp", "Pearl Rangoli Accent", "499", "399", 20, "one decorative accent", "A pearly rangoli-inspired accent for an entryway or prayer corner."),
+    ("diwali-emerald-led-holder-pair", "diwali-emerald-led-holder-pair-concept.webp", "Emerald Glow Pair", "549", "399", 27, "pair of LED tealight holders · LEDs not included", "A pair of emerald cups for a jewel-toned LED-lit arrangement."),
+    ("diwali-rose-petal-offering-plate", "diwali-rose-petal-offering-plate-concept.webp", "Rose Petal Offering Plate", "499", "349", 30, "one decorative ritual plate", "A rosy ritual plate with a gentle petal-inspired edge."),
+    ("diwali-golden-toran-charms", "diwali-golden-toran-charms-concept.webp", "Golden Toran Charms", "599", "449", 25, "set of three hanging charms with cords", "Three golden hanging charms to style a festive doorway or wall."),
+    ("diwali-lotus-rangoli-duo", "diwali-lotus-rangoli-duo-concept.webp", "Lotus Rangoli Duo", "499", "399", 20, "set of two decorative lotus pieces", "Two lotus pieces for a small layered rangoli arrangement."),
+    ("diwali-festive-keepsake-box", "diwali-festive-keepsake-box-concept.webp", "Festive Keepsake Box", "599", "449", 25, "one small lidded box · contents not included", "A small lidded box for a keepsake, note, or festive token."),
+)
+
 CORPORATE_RESIN_GIFTS = (
     ("corporate-logo-keychain", "corporate-logo-keychain-concept.webp", "Logo resin keychain", "299", "199", 33, "Price for one piece.", "Clear resin with a name/initial and subtle brand-colour accents."),
     ("corporate-floral-bookmark", "corporate-floral-bookmark-concept.webp", "Pressed-flower bookmark", "249", "149", 40, "Price for one piece.", "A slim resin bookmark for welcome kits or thoughtful team gifts."),
@@ -87,6 +100,16 @@ CORPORATE_RESIN_GIFTS = (
     ("corporate-recognition-award", "corporate-recognition-award-concept.webp", "Recognition resin award", "1,299", "899", 31, "Price for one piece.", "A modern personalised memento for milestones and appreciation."),
     ("corporate-desk-organizer", "corporate-desk-organizer-concept.webp", "Resin desk organiser", "899", "699", 22, "Price for one piece.", "A compact pen and visiting-card holder with custom colours."),
     ("corporate-festive-hamper", "corporate-festive-hamper-concept.webp", "Corporate festive hamper", "1,999", "1,499", 25, "Price for one gift set.", "A coordinated resin gift box for festive or thank-you occasions."),
+    ("corporate-business-card-holder", "corporate-business-card-holder-concept.webp", "Resin Business Card Holder", "599", "449", 25, "Price for one card holder; cards not included.", "A compact resin holder for a tidy stack of visiting cards."),
+    ("corporate-phone-rest", "corporate-phone-rest-concept.webp", "Resin Phone Rest", "699", "499", 29, "Price for one phone rest; phone not included.", "A steady resin rest for a phone on a desk or bedside table."),
+    ("corporate-pen-cup", "corporate-pen-cup-concept.webp", "Resin Pen Cup", "899", "699", 22, "Price for one pen cup; stationery not included.", "A polished pen cup with a clean, colourful resin finish."),
+    ("corporate-desk-trinket-tray", "corporate-desk-trinket-tray-concept.webp", "Desk Trinket Tray", "599", "449", 25, "Price for one tray; contents not included.", "A small catch-all tray for a desk, console, or bedside table."),
+    ("corporate-lanyard-charm", "corporate-lanyard-charm-concept.webp", "Personalised Lanyard Charm", "299", "199", 33, "Price for one charm with clasp; lanyard not included.", "A personalised charm that clips onto a lanyard or bag."),
+    ("corporate-mini-photo-stand", "corporate-mini-photo-stand-concept.webp", "Mini Photo Stand", "399", "299", 25, "Price for one base with metal clip; print not included.", "A compact photo stand for a desk memory or team note."),
+    ("corporate-bag-tag", "corporate-bag-tag-concept.webp", "Personalised Bag Tag", "399", "299", 25, "Price for one tag with strap.", "A personalised resin tag with a simple strap for a bag or case."),
+    ("corporate-desk-clock", "corporate-desk-clock-concept.webp", "Mini Resin Desk Clock", "1,299", "999", 23, "Price for one clock with stand; battery not included.", "A small resin clock to add a considered accent to a work desk."),
+    ("corporate-bookmark-keychain-duo", "corporate-bookmark-keychain-duo-concept.webp", "Welcome Keepsake Duo", "599", "449", 25, "Price for a two-piece set.", "A bookmark and keychain duo for a useful welcome keepsake."),
+    ("corporate-desk-essentials-set", "corporate-desk-essentials-set-concept.webp", "Desk Essentials Set", "1,499", "1,199", 20, "Price for one pen cup and one trinket tray.", "A coordinated pen cup and trinket tray for a complete desk set."),
 )
 
 
@@ -137,7 +160,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertLess(diwali_start, self.html.index('<section class="intro-band shell reveal"'))
         self.assertIn('<a href="#diwali">Diwali</a>', self.html)
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
-        self.assertIn("Fourteen festive designs for your home and your people. Diwali prices ₹249–₹449.", section_html)
+        self.assertIn("Twenty-four festive designs for your home and your people. Diwali prices ₹249–₹449.", section_html)
         self.assertRegex(section_html, r"Reference images are shown for inspiration")
         self.assertIn('data-carousel="diwali"', section_html)
         self.assertIn('id="diwali-track"', section_html)
@@ -147,10 +170,11 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-controls="diwali-track"', section_html)
         self.assertIn('aria-label="Previous Diwali designs"', section_html)
         self.assertIn('aria-label="Next Diwali designs"', section_html)
-        cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
-        self.assertEqual(len(cards), 14)
-        self.assertEqual(section_html.count('data-lightbox-trigger'), 14)
-        self.assertEqual(section_html.count('class="product-pricing"'), 14)
+        all_cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
+        self.assertEqual(len(all_cards), 24)
+        cards = all_cards[:14]
+        self.assertEqual(section_html.count('data-lightbox-trigger'), 24)
+        self.assertEqual(section_html.count('class="product-pricing"'), 24)
         card_ids = [re.search(r'id=["\']([^"\']+)["\']', card).group(1) for card in cards]
         self.assertEqual(
             card_ids[-5:],
@@ -239,6 +263,71 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('document.querySelectorAll("[data-carousel] .work-card, .romantic-keepsake-card")', script)
         self.assertIn('card.querySelectorAll("figcaption p")', script)
         self.assertIn('button.textContent = "Start an order"', script)
+
+    def test_diwali_expansion_appends_ten_new_concept_cards(self):
+        section = re.search(r'<section\b[^>]*id=["\']diwali["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        section_html = section.group(0)
+        self.assertIn("Twenty-four festive designs for your home and your people.", section_html)
+        self.assertIn("New concept prices are introductory estimates. Crossed-out regular prices are provisional catalogue estimates, not previous selling prices. Saloni confirms the final quote.", section_html)
+        cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
+        self.assertEqual(len(cards), 24)
+        new_ids = [item[0] for item in DIWALI_NEW_CONCEPTS]
+        self.assertEqual([re.search(r'\bid=["\']([^"\']+)', card).group(1) for card in cards[-10:]], new_ids)
+        self.assertEqual(section_html.count("data-lightbox-trigger"), 24)
+        self.assertEqual(section_html.count('class="product-pricing"'), 24)
+        for card, (_, asset, title, regular, festive, discount, unit, description) in zip(cards[-10:], DIWALI_NEW_CONCEPTS):
+            with self.subTest(asset=asset):
+                self.assertIn(f'assets/{asset}', card)
+                self.assertIn(f">{title}</strong>", card)
+                self.assertIn(description, card)
+                self.assertIn("Concept preview · made to order", card)
+                self.assertIn(unit, card)
+                image = re.search(r'<img\b[^>]*>', card)
+                self.assertIsNotNone(image)
+                self.assertRegex(image.group(0), r'alt=["\']Original concept preview: [^"\']+["\']')
+                self.assertIn('loading="lazy"', image.group(0))
+                self.assertIn('decoding="async"', image.group(0))
+                self.assertIn('width="1024"', image.group(0))
+                self.assertIn('height="1024"', image.group(0))
+                self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
+                pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
+                self.assertIsNotNone(pricing)
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+
+    def test_corporate_expansion_appends_ten_new_concept_cards(self):
+        section = re.search(r'<section\b[^>]*id=["\']corporate-resin-gifts["\'][\s\S]*?</section>', self.html)
+        self.assertIsNotNone(section)
+        section_html = section.group(0)
+        self.assertIn("Twenty branded keepsakes", section_html)
+        self.assertIn("New concept prices are introductory estimates. Crossed-out regular prices are provisional catalogue estimates, not previous selling prices. Saloni confirms the final quote.", section_html)
+        cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
+        self.assertEqual(len(cards), 20)
+        new_ids = [item[0] for item in CORPORATE_RESIN_GIFTS[-10:]]
+        self.assertEqual([re.search(r'\bid=["\']([^"\']+)', card).group(1) for card in cards[-10:]], new_ids)
+        self.assertEqual(section_html.count("data-lightbox-trigger"), 20)
+        self.assertEqual(section_html.count('class="product-pricing"'), 20)
+        for card, (_, asset, title, regular, offer, discount, unit, description) in zip(cards[-10:], CORPORATE_RESIN_GIFTS[-10:]):
+            with self.subTest(asset=asset):
+                self.assertIn(f'assets/{asset}', card)
+                self.assertIn(f">{title}</strong>", card)
+                self.assertIn(description, card)
+                self.assertIn(f"Concept preview · made to order. {unit}", card)
+                image = re.search(r'<img\b[^>]*>', card)
+                self.assertIsNotNone(image)
+                self.assertRegex(image.group(0), r'alt=["\'][^"\']*Original concept preview[^"\']*["\']')
+                self.assertIn('loading="lazy"', image.group(0))
+                self.assertIn('decoding="async"', image.group(0))
+                self.assertIn('width="1024"', image.group(0))
+                self.assertIn('height="1024"', image.group(0))
+                self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
+                pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
+                self.assertIsNotNone(pricing)
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Offer price</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
 
     def test_diwali_anchor_offset_clears_sticky_header_at_responsive_breakpoints(self):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -629,8 +718,8 @@ class StaticSiteContractTests(unittest.TestCase):
 
         self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#romantic-keepsakes["\']')
         self.assertEqual(self.html.count('data-carousel='), 6)
-        self.assertEqual(self.html.count('data-lightbox-trigger'), 57)
-        self.assertEqual(self.html.count('class="product-pricing"'), 57)
+        self.assertEqual(self.html.count('data-lightbox-trigger'), 77)
+        self.assertEqual(self.html.count('class="product-pricing"'), 77)
         self.assertEqual(self.html.count('data-testimonial-card'), 5)
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -1148,7 +1237,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
-        self.assertEqual(len(triggers), 57)
+        self.assertEqual(len(triggers), 77)
         for trigger in triggers:
             with self.subTest(trigger=trigger):
                 self.assertRegex(trigger, r'href=["\']assets/[^"\']+["\']')
@@ -1166,7 +1255,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(dialog_image)
         self.assertNotRegex(dialog_image.group(0), r'\bsrc=')
 
-        for section_id, cards, pricing_blocks in (("romantic-keepsakes", 14, 14), ("corporate-resin-gifts", 10, 10), ("studio-art", 16, 16), ("hamper-rail", 3, 3), ("diwali", 14, 14)):
+        for section_id, cards, pricing_blocks in (("romantic-keepsakes", 14, 14), ("corporate-resin-gifts", 20, 20), ("studio-art", 16, 16), ("hamper-rail", 3, 3), ("diwali", 24, 24)):
             section = re.search(rf'<section\b[^>]*id=["\']{section_id}["\'][\s\S]*?</section>', self.html)
             self.assertIsNotNone(section)
             with self.subTest(section=section_id):
