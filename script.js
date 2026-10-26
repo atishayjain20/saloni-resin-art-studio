@@ -84,6 +84,22 @@
       });
     }
 
+    var navToggle = document.getElementById("nav-toggle");
+    var siteNav = document.getElementById("primary-navigation");
+    if (navToggle && siteNav) {
+      var festiveDialog = document.getElementById("festive-offers");
+      var navLabel = navToggle.querySelector(".nav-toggle-label");
+      function setNavOpen(open, restoreFocus) {
+        siteNav.classList.toggle("is-open", open);
+        navToggle.setAttribute("aria-expanded", String(open));
+        if (navLabel) navLabel.textContent = open ? "Close" : "Menu";
+        if (!open && restoreFocus) navToggle.focus({ preventScroll: true });
+      }
+      navToggle.addEventListener("click", function () { setNavOpen(navToggle.getAttribute("aria-expanded") !== "true"); });
+      siteNav.querySelectorAll("a").forEach(function (link) { link.addEventListener("click", function () { setNavOpen(false); }); });
+      document.addEventListener("keydown", function (event) { if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true" && (!festiveDialog || !festiveDialog.open)) setNavOpen(false, true); });
+    }
+
     document.querySelectorAll("[data-carousel]").forEach(function (carousel) {
       var track = carousel.querySelector("[data-carousel-track]");
       var previous = carousel.querySelector("[data-carousel-prev]");
