@@ -75,10 +75,10 @@ function runNavigation({ festive = false } = {}) {
   vm.createContext(context);
   vm.runInContext(script, context, { filename: "script.js" });
   documentObject.ready();
-  return { documentObject, toggle, nav, links, festiveDialog, festiveTrigger };
-}
+  return { documentObject, toggle, nav, links, festiveDialog, festiveTrigger };}
 
-test("mobile navigation has a collapsed, keyboard-operable toggle", () => {
+
+test("navigation has a collapsed, keyboard-operable icon toggle", () => {
   const toggleMarkup = html.match(/<button[^>]+id="nav-toggle"[\s\S]*?<\/button>/)[0];
   assert.match(toggleMarkup, /type="button"[^>]+aria-expanded="false"[^>]+aria-controls="primary-navigation"[^>]+aria-label="Open navigation"/);
   assert.match(toggleMarkup, /class="nav-toggle-closed"[^>]*aria-hidden="true">☰<\/span>/);
@@ -88,11 +88,16 @@ test("mobile navigation has a collapsed, keyboard-operable toggle", () => {
   assert.match(html, /href="styles\.css\?v=\d+"/);
   assert.match(html, /src="script\.js\?v=\d+"/);
   assert.match(html, /<nav[^>]+id="primary-navigation"[^>]+aria-label="Primary navigation"/);
-  assert.match(css, /\.nav-toggle\s*\{[^}]*display:\s*none[^}]*width:\s*42px[^}]*height:\s*42px/);
+  const globalCss = css.split("@media (max-width: 620px)")[0];
+  assert.match(css, /\.nav-toggle\s*\{[^}]*display:\s*grid[^}]*width:\s*42px[^}]*height:\s*42px/);
+  assert.match(globalCss, /html:not\(\.js\) \.nav-toggle\s*\{[^}]*display:\s*none/);
+  assert.match(globalCss, /html\.js #primary-navigation\s*\{[^}]*display:\s*none/);
+  assert.match(globalCss, /html\.js #primary-navigation\.is-open\s*\{[^}]*display:\s*flex/);
   assert.match(css, /\.nav-toggle:hover, \.nav-toggle:focus-visible/);
   assert.match(css, /\.site-nav\s*\{[^}]*display:\s*flex/);
   assert.match(css, /@media\s*\(max-width:\s*620px\)[\s\S]*#primary-navigation\s*\{[^}]*display:\s*none/);
   assert.match(css, /html:not\(\.js\) #primary-navigation\s*\{[^}]*display:\s*flex/);
+  assert.match(css, /@media\s*\(min-width:\s*621px\)[\s\S]*#primary-navigation\.is-open[\s\S]*width:\s*min\(100%,\s*38rem\)/);
   assert.doesNotMatch(css, /@media\s*\(max-width:\s*620px\)[\s\S]*\.site-nav\s*\{[^}]*display:\s*none/);
   assert.match(partnerHtml, /<nav class="site-nav" aria-label="Partner page navigation">/);
 
