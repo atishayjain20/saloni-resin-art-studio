@@ -32,13 +32,7 @@ class Element {
   focus() { this.focusCount += 1; this.ownerDocument.activeElement = this; }
 }
 
-class Dialog extends Element {
-  constructor(id, ownerDocument) { super(id, ownerDocument); this.open = false; }
-  showModal() { this.open = true; }
-  close() { this.open = false; this.dispatch("close"); }
-}
-
-function runNavigation({ festive = false } = {}) {
+function runNavigation() {
   const documentObject = {
     readyState: "loading",
     activeElement: null,
@@ -46,7 +40,7 @@ function runNavigation({ festive = false } = {}) {
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; else (this.listeners[type] ||= []).push(listener); },
     listeners: {},
     dispatch(type, event) { (this.listeners[type] || []).forEach((listener) => listener(event)); },
-    querySelector(selector) { return selector === '[aria-controls="festive-offers"]' ? festiveTrigger : null; },
+    querySelector() { return null; },
     querySelectorAll() { return []; },
     getElementById(id) { return this.elements.get(id) || null; },
   };
@@ -59,9 +53,7 @@ function runNavigation({ festive = false } = {}) {
   const nav = new Element("primary-navigation", documentObject);
   const links = [new Element("first-link", documentObject), new Element("second-link", documentObject)];
   nav.links = links;
-  const festiveDialog = festive ? new Dialog("festive-offers", documentObject) : null;
-  const festiveTrigger = festive ? new Element("festive-trigger", documentObject) : null;
-  documentObject.elements = new Map([[toggle.id, toggle], [nav.id, nav], ...(festiveDialog ? [[festiveDialog.id, festiveDialog]] : [])]);
+  documentObject.elements = new Map([[toggle.id, toggle], [nav.id, nav]]);
   documentObject.activeElement = toggle;
   const windowObject = {
     location: { href: "https://saloniresinart.com/" },
@@ -69,13 +61,13 @@ function runNavigation({ festive = false } = {}) {
     addEventListener() {},
     setTimeout() { return 1; },
     clearTimeout() {},
-    localStorage: festive ? { getItem() { return "1"; } } : undefined,
+    localStorage: undefined,
   };
   const context = { console, document: documentObject, window: windowObject, IntersectionObserver: undefined, Date, Math, URL, URLSearchParams };
   vm.createContext(context);
   vm.runInContext(script, context, { filename: "script.js" });
   documentObject.ready();
-  return { documentObject, toggle, nav, links, festiveDialog, festiveTrigger };}
+  return { documentObject, toggle, nav, links };}
 
 
 test("navigation has a collapsed, keyboard-operable icon toggle", () => {
@@ -127,19 +119,4 @@ test("navigation has a collapsed, keyboard-operable icon toggle", () => {
   assert.equal(toggle.getAttribute("aria-expanded"), "false");
   assert.equal(toggle.focusCount, 1);
   assert.equal(documentObject.activeElement, toggle);
-});
-
-test("festive dialog owns Escape while it is open", () => {
-  const { documentObject, toggle, nav, festiveDialog, festiveTrigger } = runNavigation({ festive: true });
-  toggle.dispatch("click");
-  festiveTrigger.dispatch("click");
-  assert.equal(festiveDialog.open, true);
-
-  documentObject.dispatch("keydown", { key: "Escape" });
-  assert.equal(festiveDialog.open, true);
-  assert.equal(nav.classList.contains("is-open"), true);
-  assert.equal(toggle.focusCount, 0);
-
-  festiveDialog.close();
-  assert.equal(festiveTrigger.focusCount, 1);
 });

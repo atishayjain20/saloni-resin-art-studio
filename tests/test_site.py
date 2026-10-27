@@ -122,7 +122,7 @@ class StaticSiteContractTests(unittest.TestCase):
     def test_page_has_required_sections_and_accessibility_hooks(self):
         required_ids = [
             "main-content", "hero", "diwali", "offerings", "studio-art", "hamper-rail",
-            "festive-offers", "testimonials", "order", "footer",
+            "testimonials", "order", "footer",
         ]
         for section_id in required_ids:
             with self.subTest(section_id=section_id):
@@ -156,12 +156,12 @@ class StaticSiteContractTests(unittest.TestCase):
         hero_end = self.html.index('</section>', hero_start) + len('</section>')
         diwali_start = self.html.index(section_html)
         self.assertLess(hero_end, diwali_start)
-        self.assertNotRegex(self.html[hero_end:diwali_start], r'<section\b')
+        self.assertNotIn('id="offerings"', self.html[hero_end:diwali_start])
         self.assertLess(diwali_start, self.html.index('<section class="intro-band shell reveal"'))
         self.assertIn('<a href="#diwali">Diwali</a>', self.html)
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
-        self.assertIn("Twenty-four festive designs for your home and your people. Diwali prices ₹249–₹449.", section_html)
-        self.assertRegex(section_html, r"Reference images are shown for inspiration")
+        self.assertIn("Diwali prices ₹249–₹1,799", section_html)
+        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
         self.assertIn('data-carousel="diwali"', section_html)
         self.assertIn('id="diwali-track"', section_html)
         self.assertIn('data-carousel-track', section_html)
@@ -198,10 +198,10 @@ class StaticSiteContractTests(unittest.TestCase):
             "diwali-pastel-lotus-tealight.jpeg": "Reference design · price per holder.",
             "diwali-ocean-bloom-pooja-platter.jpg": "Reference design · price per platter.",
             "diwali-golden-ganesha-pooja-plate.jpg": "Reference design · price per plate.",
-            "diwali-om-mini-tilak-plate.webp": "Concept preview · made to order · price per plate",
-            "diwali-lotus-diya-pair.webp": "Concept preview · made to order · price for the pair",
-            "diwali-peacock-mini-pooja-thali.webp": "Concept preview · made to order · price per thali",
-            "diwali-floral-swastik-tealight-set.webp": "Concept preview · made to order · price for the three-piece set",
+            "diwali-om-mini-tilak-plate.webp": "price per plate",
+            "diwali-lotus-diya-pair.webp": "price for the pair",
+            "diwali-peacock-mini-pooja-thali.webp": "price per thali",
+            "diwali-floral-swastik-tealight-set.webp": "price for the three-piece set",
         }
         price_matrix = {
             "Jewel Glow Tealight": ("349", "249", "29"),
@@ -242,23 +242,19 @@ class StaticSiteContractTests(unittest.TestCase):
                     "diwali-floral-swastik-tealight-set.webp",
                 }:
                     self.assertRegex(image, r'\balt=["\']Original concept preview: [^"\']+["\']')
-                    self.assertIn("Concept preview · made to order", card)
+                    self.assertNotIn("Concept preview · made to order", card)
         for title, (regular, festive, discount) in price_matrix.items():
             with self.subTest(title=title):
                 card = next((card for card in cards if f">{title}</strong>" in card), None)
                 self.assertIsNotNone(card)
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card).group(0)
-                self.assertRegex(pricing, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{regular}</s></dd>')
-                self.assertRegex(pricing, rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{festive}</dd>')
-                self.assertRegex(pricing, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
-                self.assertEqual(pricing.count("<dt"), 3)
+                self.assertRegex(pricing, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{festive}</dd>')
+                self.assertEqual(pricing.count("<dt"), 1)
         happy_diwali_card = re.search(r'<article\b[^>]*id=["\']diwali-happy-glow["\'][\s\S]*?</article>', section_html)
         self.assertIsNotNone(happy_diwali_card)
         happy_diwali_pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', happy_diwali_card.group(0)).group(0)
-        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹349–₹549</s></dd>')
-        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹250–₹400</dd>')
-        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>Discount</dt>\s*<dd[^>]*>27–28% off</dd>')
-        self.assertEqual(happy_diwali_pricing.count("<dt"), 3)
+        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹250–₹400</dd>')
+        self.assertEqual(happy_diwali_pricing.count("<dt"), 1)
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".diwali-section", css)
         self.assertRegex(css, r":is\(\.work-card, \.romantic-keepsake-card, \.collection-card\) img\s*\{[^}]*aspect-ratio:\s*1\s*/\s*1[^}]*object-fit:\s*cover")
@@ -268,14 +264,14 @@ class StaticSiteContractTests(unittest.TestCase):
         script = (ROOT / "script.js").read_text(encoding="utf-8")
         self.assertIn('document.querySelectorAll("[data-carousel] .work-card, .romantic-keepsake-card")', script)
         self.assertIn('card.querySelectorAll("figcaption p")', script)
-        self.assertIn('button.textContent = "Start an order"', script)
+        self.assertIn('button.textContent = "Request this item"', script)
 
     def test_diwali_expansion_appends_ten_new_concept_cards(self):
         section = re.search(r'<section\b[^>]*id=["\']diwali["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
         self.assertIn("Twenty-four festive designs for your home and your people.", section_html)
-        self.assertIn("New concept prices are introductory estimates. Crossed-out regular prices are provisional catalogue estimates, not previous selling prices. Saloni confirms the final quote.", section_html)
+        self.assertNotIn("Crossed-out regular prices", section_html)
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 24)
         new_ids = [item[0] for item in DIWALI_NEW_CONCEPTS]
@@ -287,7 +283,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(f'assets/{asset}', card)
                 self.assertIn(f">{title}</strong>", card)
                 self.assertIn(description, card)
-                self.assertIn("Concept preview · made to order", card)
+                self.assertNotIn("Concept preview · made to order", card)
                 self.assertIn(unit, card)
                 image = re.search(r'<img\b[^>]*>', card)
                 self.assertIsNotNone(image)
@@ -299,16 +295,14 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
-                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
-                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
-                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
 
     def test_corporate_expansion_appends_ten_new_concept_cards(self):
         section = re.search(r'<section\b[^>]*id=["\']corporate-resin-gifts["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
         self.assertIn("Twenty branded keepsakes", section_html)
-        self.assertIn("New concept prices are introductory estimates. Crossed-out regular prices are provisional catalogue estimates, not previous selling prices. Saloni confirms the final quote.", section_html)
+        self.assertNotIn("Crossed-out regular prices", section_html)
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 20)
         new_ids = [item[0] for item in CORPORATE_RESIN_GIFTS[-10:]]
@@ -320,7 +314,8 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(f'assets/{asset}', card)
                 self.assertIn(f">{title}</strong>", card)
                 self.assertIn(description, card)
-                self.assertIn(f"Concept preview · made to order. {unit}", card)
+                self.assertNotIn("Concept preview · made to order", card)
+                self.assertIn(unit, card)
                 image = re.search(r'<img\b[^>]*>', card)
                 self.assertIsNotNone(image)
                 self.assertRegex(image.group(0), r'alt=["\'][^"\']*Original concept preview[^"\']*["\']')
@@ -331,9 +326,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
-                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
-                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Offer price</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
-                self.assertRegex(pricing.group(0), rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
 
     def test_diwali_anchor_offset_clears_sticky_header_at_responsive_breakpoints(self):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -359,17 +352,15 @@ class StaticSiteContractTests(unittest.TestCase):
             r'<a href="#diwali">Diwali</a>\s*'
             r'<a href="#romantic-keepsakes">Resin art</a>\s*'
             r'<a href="#hamper-rail">Hampers</a>\s*'
-            r'<button[^>]*type="button"[^>]*aria-haspopup="dialog"[^>]*aria-controls="festive-offers"[^>]*>Festive offers</button>\s*'
-            r'(?:<noscript><a[^>]*href="#festive-offers-fallback"[^>]*>Festive offers</a></noscript>\s*)?'
+            r'<a href="#diwali">Festive offers</a>\s*'
             r'<a href="#customizer">Design a frame</a>\s*'
             r'<a href="partners/">Join Partner Circle</a>\s*'
             r'<a href="#corporate-resin-gifts">Corporate Resin Gifts</a>\s*'
             r'<a href="corporate-gifting/">Corporate gifting</a>',
         )
-        self.assertIn('class="nav-cta" href="#romantic-keepsakes"', nav)
+        self.assertIn('class="nav-cta" href="#order" data-order-prefill="general"', nav)
         self.assertNotIn('href="#process"', nav)
         self.assertNotIn(">The process<", nav)
-        self.assertNotIn('class="nav-cta" href="#order"', nav)
         footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', self.html)
         self.assertIsNotNone(footer)
         self.assertIn('<a href="#romantic-keepsakes">Resin art</a>', footer.group(0))
@@ -700,10 +691,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
-                self.assertEqual(pricing_html.count("<dt"), 3)
+                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
         script = (ROOT / "script.js").read_text(encoding="utf-8")
         self.assertIn(".romantic-keepsake-card", script)
         self.assertIn('data-order-prefill", "catalogue"', script)
@@ -744,7 +732,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(quote, section_html)
                 self.assertIn(f"<cite>{attribution}</cite>", section_html)
 
-        self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#romantic-keepsakes["\']')
+        self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#catalogue-filters["\']')
         self.assertEqual(self.html.count('data-carousel='), 6)
         self.assertEqual(self.html.count('data-lightbox-trigger'), 77)
         self.assertEqual(self.html.count('class="product-pricing"'), 77)
@@ -782,9 +770,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-label="Previous romantic keepsakes"', section_html)
         self.assertIn('aria-label="Next romantic keepsakes"', section_html)
         self.assertIn("14 keepsakes and concept previews — swipe or use the arrows to explore.", section_html)
-        self.assertIn("Concept previews are illustrative.", section_html)
-        for phrase in ("feasibility", "materials", "final design", "quote", "delivery"):
-            self.assertIn(phrase, section_html)
+        self.assertNotIn("Concept previews are illustrative.", section_html)
+        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*romantic-keepsake-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 14)
@@ -815,21 +802,19 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIsNotNone(card)
                 self.assertIn(f">{title}</h3>", card)
                 self.assertIn(copy, card)
-                self.assertIn("Concept preview · made to order", card)
+                self.assertNotIn("Concept preview · made to order", card)
                 self.assertIn("Original concept preview:", card)
                 self.assertNotIn(FINAL_QUOTE_NOTE, card)
                 self.assertNotIn("Market reference", card)
                 self.assertNotIn("Average listed price", card)
-                self.assertIn("Regular price", card)
-                self.assertIn("Festive price", card)
-                self.assertIn("Discount", card)
+                self.assertNotIn("Regular price", card)
+                self.assertNotIn("Festive price", card)
+                self.assertNotIn("Discount", card)
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)
-                self.assertEqual(pricing_html.count("<dt"), 3)
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+                self.assertEqual(pricing_html.count("<dt"), 1)
+                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
                 image = re.search(r'<img\b[^>]*>', card)
                 self.assertIsNotNone(image)
                 image_tag = image.group(0)
@@ -844,7 +829,8 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertEqual(trigger.group(1), f"assets/{asset}")
 
         for asset, _, _, _, _, _ in ROMANTIC_CONCEPTS:
-            self.assertEqual(self.html.count(f'src="assets/{asset}"'), 1)
+            expected_count = 2 if asset in {"romantic-heart-trinket-tray.webp", "romantic-initial-desk-stand.webp"} else 1
+            self.assertEqual(self.html.count(f'src="assets/{asset}"'), expected_count)
         for studio_concept in (
             "concept-floral-memory-frame.webp",
             "concept-ocean-clock.webp",
@@ -902,7 +888,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-label="Previous corporate resin gifts"', corporate)
         self.assertIn('aria-label="Next corporate resin gifts"', corporate)
         self.assertNotIn(FINAL_QUOTE_NOTE, corporate)
-        self.assertIn("Concept previews are made to order. Saloni confirms feasibility, materials and final price before production.", corporate)
+        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', corporate)
         self.assertEqual(len(cards), len(CORPORATE_RESIN_GIFTS))
@@ -917,7 +903,8 @@ class StaticSiteContractTests(unittest.TestCase):
             with self.subTest(asset=asset):
                 self.assertIn(f">{title}</strong>", card)
                 self.assertIn(description, card)
-                self.assertIn(f"Concept preview · made to order. {unit}", card)
+                self.assertNotIn("Concept preview · made to order", card)
+                self.assertIn(unit, card)
                 self.assertLessEqual(card[:card.index("<dl")].count("<p"), 2)
                 image = re.search(r'<img\b[^>]*>', card)
                 self.assertIsNotNone(image)
@@ -930,9 +917,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Offer price</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
 
         self.assertEqual(corporate.count("data-lightbox-trigger"), len(CORPORATE_RESIN_GIFTS))
         self.assertEqual(corporate.count('class="product-pricing"'), len(CORPORATE_RESIN_GIFTS))
@@ -942,7 +927,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_public_metadata_uses_settled_custom_domain_url(self):
         public_url = "https://saloniresinart.com/"
-        image_url = public_url + "assets/hero-floral-bouquet.jpg"
+        image_url = public_url + "assets/resin-clock.jpg"
         self.assertIn(f'<link rel="canonical" href="{public_url}">', self.html)
         self.assertIn(f'<meta property="og:url" content="{public_url}">', self.html)
         self.assertIn(f'<meta property="og:image" content="{image_url}">', self.html)
@@ -1161,36 +1146,20 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertNotRegex(card_text, re.compile(r'\bsample\b', re.I))
         self.assertNotRegex(self.html, re.compile(r'"@type"\s*:\s*"(?:Review|AggregateRating)"', re.I))
 
-    def test_festive_offers_area_has_diwali_navratri_and_contact_paths(self):
-        match = re.search(r'<dialog\b[^>]*id=["\']festive-offers["\'][\s\S]*?</dialog>', self.html)
-        self.assertIsNotNone(match)
-        dialog = match.group(0)
-        self.assertIn("Diwali", dialog)
-        self.assertIn("Navratri", dialog)
-        self.assertRegex(dialog, r"special discounts")
-        self.assertRegex(dialog, r"Contact Saloni for offer details")
-        self.assertIn('href="tel:8209238541"', dialog)
-        self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', dialog)
-        self.assertIn('aria-labelledby="festive-offers-title"', dialog)
-        self.assertIn('<form method="dialog"', dialog)
-        self.assertRegex(self.html, r'<button\b[^>]*type="button"[^>]*aria-haspopup="dialog"[^>]*aria-controls="festive-offers"')
+    def test_festive_offers_area_stays_inline_without_unsupported_claims(self):
+        self.assertIn('<a href="#diwali">Festive offers</a>', self.html)
+        self.assertIn('<p class="festive-banner shell" id="festive-offers">', self.html)
+        self.assertIn('id="festive-offers"', self.html)
+        self.assertIn('id="festive-offers-fallback"', self.html)
+        self.assertNotRegex(self.html, r'<dialog\b[^>]*festive-offers')
+        self.assertNotIn("special discounts", self.html)
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertNotIn(".offers-section", css)
-        self.assertIn(".festive-noscript .button-dark", css)
-        self.assertIn(".festive-noscript .button-line", css)
-        self.assertRegex(css, r'dialog\.festive-dialog:not\(\[open\]\)\s*\{[^}]*display:\s*none')
-        self.assertRegex(css, r'\.festive-dialog-panel\s*\{[^}]*overflow:\s*auto')
-        self.assertRegex(css, r'\.festive-dialog-close\s*\{[^}]*width:\s*44px[^}]*height:\s*44px')
-        self.assertRegex(css, r'html:not\(\.js\) \.site-nav \.nav-link-button\s*\{[^}]*display:\s*none')
-        self.assertRegex(css, r'@media \(max-width: 620px\) \{[\s\S]*dialog\.festive-dialog\s*\{[^}]*max-width:\s*calc\(100vw - 1rem\)')
-        self.assertIn('href="#festive-offers-fallback"', self.html)
-        self.assertIn('class="nav-link-fallback"', self.html)
-        self.assertIn('id="festive-offers-fallback"', self.html)
-        self.assertIn('href="tel:8209238541"', self.html[self.html.index('id="festive-offers-fallback"'):])
-        self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', self.html[self.html.index('id="festive-offers-fallback"'):])
+        self.assertNotIn("festive-dialog", css)
+        self.assertNotIn("festive-noscript", css)
         script = (ROOT / "script.js").read_text(encoding="utf-8")
-        self.assertNotIn("autoAttempted", script)
-        self.assertIn("if (!seen)", script)
+        self.assertNotIn("initFestiveOffers", script)
+        self.assertNotIn('aria-controls="festive-offers"', script)
 
     def test_studio_catalogue_prices_are_exact_and_scoped(self):
         studio_match = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
@@ -1238,23 +1207,12 @@ class StaticSiteContractTests(unittest.TestCase):
                     pricing_blocks = re.findall(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                     self.assertEqual(len(pricing_blocks), 1)
                     pricing = pricing_blocks[0]
-                    self.assertRegex(pricing, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
-                    self.assertRegex(pricing, rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
-                    self.assertRegex(pricing, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
-                    self.assertEqual(pricing.count("<dt"), 3)
-                    regular_value = int(regular.replace(",", ""))
-                    festive_value = int(festive.replace(",", ""))
-                    self.assertGreater(regular_value, festive_value)
-                    self.assertEqual(round((regular_value - festive_value) / regular_value * 100), discount)
+                    self.assertRegex(pricing, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
 
         assert_matrix(studio, studio_matrix, expected_cards=16, expected_pricing_blocks=16)
         assert_matrix(hamper, hamper_matrix)
 
         self.assertEqual(studio.count('class="product-pricing"') + hamper.count('class="product-pricing"'), 19)
-        dialog_match = re.search(r'<dialog\b[^>]*id=["\']festive-offers["\'][\s\S]*?</dialog>', self.html)
-        self.assertIsNotNone(dialog_match)
-        self.assertNotIn("product-pricing", dialog_match.group(0))
-        self.assertNotRegex(dialog_match.group(0), r'<dl\b')
         self.assertNotIn("schema.org/Offer", self.html)
 
     def test_final_quote_note_lives_once_before_the_order_form(self):
@@ -1320,16 +1278,14 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(f">{title}</strong>", card)
                 self.assertIn('class="work-card', card)
                 self.assertNotIn('data-concept', card)
-                self.assertIn("Concept preview · made to order", card)
+                self.assertNotIn("Concept preview · made to order", card)
                 self.assertNotIn("Market reference", card)
                 self.assertNotIn(FINAL_QUOTE_NOTE, card)
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)
-                self.assertEqual(pricing_html.count("<dt"), 3)
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹{re.escape(regular)}</s></dd>')
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
-                self.assertRegex(pricing_html, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
+                self.assertEqual(pricing_html.count("<dt"), 1)
+                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
                 image = re.search(r'<img\b[^>]*>', card)
                 self.assertIsNotNone(image)
                 image_tag = image.group(0)
@@ -1377,7 +1333,7 @@ class StaticSiteContractTests(unittest.TestCase):
         for control_id in ("frame-type", "border-style", "frame-preset", "filling-colour", "brush-colour", "border-colour", "personal-text", "reference-image", "image-size", "crop-zoom", "crop-x", "crop-y", "position-left", "position-centre", "position-right", "paint-toggle"):
             with self.subTest(label_for=control_id):
                 self.assertRegex(section, rf'<label\b[^>]*for=["\']{control_id}["\']')
-        self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Frame shape and finish')
+        self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Frame shape and size')
         self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Colour story')
         self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Personal details')
         self.assertRegex(section, r'<fieldset\b[^>]*>\s*<legend[^>]*>Finishing touches')
