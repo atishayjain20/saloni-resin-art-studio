@@ -13,13 +13,13 @@
   <meta property="og:site_name" content="Saloni Resin Art Studio">
   <link rel="canonical" href="https://saloniresinart.com/">
   <meta property="og:url" content="https://saloniresinart.com/">
-  <meta property="og:image" content="https://saloniresinart.com/assets/hero-floral-bouquet.jpg">
-  <meta property="og:image:alt" content="Colourful floral bouquet from Saloni Resin Art Studio">
+  <meta property="og:image" content="https://saloniresinart.com/assets/resin-clock.jpg">
+  <meta property="og:image:alt" content="Round blue, white, and gold resin clock with gold numerals">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Custom Resin Art &amp; Gifts | Saloni Resin Art Studio">
   <meta name="twitter:description" content="Explore custom resin frames, personalized gifts and customized hampers from Saloni Resin Art Studio. Share your colours, theme and occasion with Saloni.">
-  <meta name="twitter:image" content="https://saloniresinart.com/assets/hero-floral-bouquet.jpg">
-  <meta name="twitter:image:alt" content="Colourful floral bouquet from Saloni Resin Art Studio">
+  <meta name="twitter:image" content="https://saloniresinart.com/assets/resin-clock.jpg">
+  <meta name="twitter:image:alt" content="Round blue, white, and gold resin clock with gold numerals">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <script type="application/ld+json">
     {
@@ -61,13 +61,12 @@
         <a href="#diwali">Diwali</a>
         <a href="#romantic-keepsakes">Resin art</a>
         <a href="#hamper-rail">Hampers</a>
-        <button class="nav-link-button" type="button" aria-haspopup="dialog" aria-controls="festive-offers">Festive offers</button>
-        <noscript><a class="nav-link-fallback" href="#festive-offers-fallback">Festive offers</a></noscript>
+        <a href="#diwali">Festive offers</a>
         <a href="#customizer">Design a frame</a>
         <a href="partners/">Join Partner Circle</a>
         <a href="#corporate-resin-gifts">Corporate Resin Gifts</a>
         <a href="corporate-gifting/">Corporate gifting</a>
-        <a class="nav-cta" href="#romantic-keepsakes">Order a keepsake <span aria-hidden="true">↗</span></a>
+        <a class="nav-cta" href="#order" data-order-prefill="general">Request a custom gift <span aria-hidden="true">↗</span></a>
       </nav>
     </div>
   </header>
@@ -78,32 +77,75 @@
         <h1 id="hero-title">Made for the moment they’ll <em>remember.</em></h1>
         <p class="hero-intro">Thoughtful custom resin frames, resin art, personalized gifts, and customized hampers from Ajmer, Rajasthan, for the people and milestones that deserve something more personal.</p>
         <div class="hero-actions">
-          <a class="button button-dark" href="#romantic-keepsakes">See the collection <span aria-hidden="true">↘</span></a>
-          <a class="button button-line" href="#order">Start an order <span aria-hidden="true">↗</span></a>
+          <a class="button button-dark" href="#catalogue-filters" data-browse-all>Browse gifts <span aria-hidden="true">↘</span></a>
+          <a class="button button-line" href="#order" data-order-prefill="general">Request a custom gift <span aria-hidden="true">↗</span></a>
         </div>
         <a class="instagram-mark" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Follow the studio <strong>@saloniresin_art_studio</strong></a>
       </div>
-      <div class="hero-collage reveal reveal-delay" aria-label="A floral arrangement and resin keepsakes">
+      <div class="hero-collage reveal reveal-delay" aria-label="Finished resin artwork from the studio">
         <figure class="hero-image hero-image-main">
-          <img src="assets/hero-floral-bouquet.jpg" alt="Bright bouquet of purple, pink, yellow, and white flowers arranged by the studio" width="1350" height="1800" fetchpriority="high">
-          <figcaption>Colour, gathered with feeling.</figcaption>
+          <img src="assets/romantic-heart-trinket-tray.webp" alt="Coquette heart trinket tray in soft resin" width="1024" height="1024" fetchpriority="high">
+          <figcaption><strong>Tiny tray, big feelings</strong><span>A soft place for rings, earbuds, and the little things you share.</span></figcaption>
         </figure>
         <figure class="hero-image hero-image-clock">
-          <img src="assets/resin-clock.jpg" alt="Round blue, white, and gold resin clock with gold numerals" width="540" height="960" loading="lazy">
-          <figcaption>Resin, made personal.</figcaption>
+          <img src="assets/romantic-initial-desk-stand.webp" alt="Couple initial resin desk stand" width="1024" height="1024" loading="lazy" decoding="async">
+          <figcaption><strong>Your initial. Mine. Ours.</strong><span>Two letters, one small corner that belongs to both of you.</span></figcaption>
         </figure>
         <span class="hero-note" aria-hidden="true">made with care<br>for your people</span>
       </div>
     </section>
+
+    <nav class="category-shortcuts shell" aria-label="Browse gift categories">
+      <a href="#romantic-keepsakes" data-category-shortcut="couple">Couple gifts <span aria-hidden="true">↘</span></a>
+      <a href="#diwali" data-category-shortcut="diwali">Diwali <span aria-hidden="true">↘</span></a>
+      <a href="#studio-art" data-category-shortcut="frames">Frames <span aria-hidden="true">↘</span></a>
+      <a href="#hamper-rail" data-category-shortcut="hampers">Hampers <span aria-hidden="true">↘</span></a>
+    </nav>
+
+    <section class="catalogue-tools shell" id="catalogue-filters" aria-labelledby="catalogue-filters-title">
+      <div>
+        <p class="eyebrow">The collection</p>
+        <h2 id="catalogue-filters-title">Find a gift that fits the moment.</h2>
+        <p class="catalogue-note" id="catalogue-disclosure">Some catalogue images are illustrative or reference ideas. Saloni confirms availability, materials, final design, quote, and delivery.</p>
+      </div>
+      <div class="catalogue-enhancement" data-catalogue-enhancement>
+        <div class="catalogue-filter-fields">
+          <label for="catalogue-type-filter">Gift type
+            <select id="catalogue-type-filter" name="catalogue-type-filter">
+              <option value="all">All gift types</option>
+              <option value="couple">Couple gifts</option>
+              <option value="diwali">Diwali</option>
+              <option value="frames">Frames and resin art</option>
+              <option value="hampers">Hampers</option>
+              <option value="corporate">Corporate gifts</option>
+            </select>
+          </label>
+          <label for="catalogue-price-filter">Budget (full price range)
+            <select id="catalogue-price-filter" name="catalogue-price-filter">
+              <option value="all">Any price</option>
+              <option value="499">Up to ₹499</option>
+              <option value="999">Up to ₹999</option>
+              <option value="1999">Up to ₹1,999</option>
+              <option value="2000">₹2,000 and above</option>
+            </select>
+          </label>
+          <button class="button button-line" id="catalogue-filter-reset" type="button">Reset filters</button>
+        </div>
+        <p class="catalogue-filter-status" id="catalogue-filter-status" role="status" aria-live="polite"></p>
+        <p class="catalogue-filter-empty" id="catalogue-filter-empty" role="status" hidden>No gifts match those choices. <button class="text-button" id="catalogue-empty-reset" type="button">Show all gifts</button></p>
+      </div>
+      <a class="button button-dark catalogue-browse-all" href="#diwali" id="browse-all-gifts" data-browse-all>Browse all gifts <span aria-hidden="true">↘</span></a>
+    </section>
+
+    <p class="festive-banner shell" id="festive-offers"><span id="festive-offers-fallback" aria-hidden="true"></span><strong>Festive gifting, without the rush.</strong> <a href="#diwali">Browse Diwali designs <span aria-hidden="true">↘</span></a></p>
 
     <section class="work-section diwali-section shell" id="diwali" data-carousel="diwali" aria-labelledby="diwali-title">
       <div class="rail-heading reveal">
         <div>
           <p class="eyebrow">Diwali collection</p>
           <h2 id="diwali-title">Little lights. Lovely beginnings.</h2>
-          <p>Twenty-four festive designs for your home and your people. Diwali prices ₹249–₹449.</p>
-          <p class="catalogue-note diwali-reference-note">Reference images are shown for inspiration. Saloni confirms availability, materials, final design, quote, and delivery.</p>
-          <p class="catalogue-note diwali-concept-note">New concept prices are introductory estimates. Crossed-out regular prices are provisional catalogue estimates, not previous selling prices. Saloni confirms the final quote.</p>
+          <p>Twenty-four festive designs for your home and your people. Diwali prices ₹249–₹1,799.</p>
+
         </div>
         <div class="rail-controls" aria-label="Diwali carousel controls">
           <button class="carousel-button" type="button" data-carousel-prev aria-controls="diwali-track" aria-label="Previous Diwali designs"><span class="arrow arrow-left" aria-hidden="true"></span></button>
@@ -112,148 +154,148 @@
       </div>
       <div class="carousel">
         <div class="carousel-track" id="diwali-track" data-carousel-track role="list" tabindex="0" aria-label="Diwali designs">
-          <article class="work-card reveal" id="diwali-jewel-glow" role="listitem">
+          <article class="work-card reveal" id="diwali-jewel-glow" data-featured="true" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-jewel-glow-tealight.jpg" aria-label="Open larger view: Jewel-toned resin tealight holder with golden flecks"><img src="assets/diwali-jewel-glow-tealight.jpg" alt="Jewel-toned resin tealight holder with golden flecks" width="236" height="419" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Jewel Glow Tealight</strong><p>Rich colour and golden flecks for a festive corner</p><p class="diwali-card-note">Reference design · price per holder.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹349</s></dd></div><div><dt>Festive price</dt><dd>₹249</dd></div><div><dt>Discount</dt><dd>29% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Jewel Glow Tealight</strong><p>Rich colour and golden flecks for a festive corner</p><p class="diwali-card-note">Reference design · price per holder.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹249</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-happy-glow" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-happy-diwali-glow.webp" aria-label="Open larger view: Happy Diwali printed resin tealight holder in warm amber tones"><img src="assets/diwali-happy-diwali-glow.webp" alt="Happy Diwali printed resin tealight holder in warm amber tones" width="600" height="600" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Happy Diwali Glow</strong><p>A warm amber accent with a festive greeting</p><p class="diwali-card-note">Reference design · Price depends on size.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹349–₹549</s></dd></div><div><dt>Festive price</dt><dd>₹250–₹400</dd></div><div><dt>Discount</dt><dd>27–28% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Happy Diwali Glow</strong><p>A warm amber accent with a festive greeting</p><p class="diwali-card-note">Reference design · Price depends on size.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>From</dt><dd>₹250–₹400</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="diwali-shubh-labh" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-shubh-labh-welcome-pair.jpg" aria-label="Open larger view: Shubh Labh resin welcome pair with green and floral details"><img src="assets/diwali-shubh-labh-welcome-pair.jpg" alt="Shubh Labh resin welcome pair with green and floral details" width="1200" height="1200" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Shubh Labh Welcome Pair</strong><p>Bright green, floral details and a joyful welcome</p><p class="diwali-card-note">Reference design · price for the pair.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹499</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Shubh Labh Welcome Pair</strong><p>Bright green, floral details and a joyful welcome</p><p class="diwali-card-note">Reference design · price for the pair.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="diwali-festive-hamper" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-festive-welcome-hamper.jpeg" aria-label="Open larger view: Colourful festive welcome hamper with traditional festive touches"><img src="assets/diwali-festive-welcome-hamper.jpeg" alt="Colourful festive welcome hamper with traditional festive touches" width="335" height="597" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Festive Welcome Hamper</strong><p>A colourful gifting idea with traditional festive touches</p><p class="diwali-card-note">Reference design · contents are confirmed before ordering.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹549</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>27% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Festive Welcome Hamper</strong><p>A colourful gifting idea with traditional festive touches</p><p class="diwali-card-note">Reference design · contents are confirmed before ordering.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-rose-gold" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-rose-gold-festive-set.jpeg" aria-label="Open larger view: Pink and gold festive resin set with floral details"><img src="assets/diwali-rose-gold-festive-set.jpeg" alt="Pink and gold festive resin set with floral details" width="335" height="597" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Rose &amp; Gold Festive Set</strong><p>Pink tones, floral details and golden accents</p><p class="diwali-card-note">Reference design · contents are confirmed before ordering.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,099</s></dd></div><div><dt>Festive price</dt><dd>₹849</dd></div><div><dt>Discount</dt><dd>23% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Rose &amp; Gold Festive Set</strong><p>Pink tones, floral details and golden accents</p><p class="diwali-card-note">Reference design · contents are confirmed before ordering.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹849</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-lotus-blue" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-lotus-blue-festive-set.jpeg" aria-label="Open larger view: Soft blue and pink lotus festive resin set"><img src="assets/diwali-lotus-blue-festive-set.jpeg" alt="Soft blue and pink lotus festive resin set" width="335" height="597" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Lotus Blue Festive Set</strong><p>Soft blue and pink for a fresh festive setting</p><p class="diwali-card-note">Reference design · contents are confirmed before ordering.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,199</s></dd></div><div><dt>Festive price</dt><dd>₹899</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Lotus Blue Festive Set</strong><p>Soft blue and pink for a fresh festive setting</p><p class="diwali-card-note">Reference design · contents are confirmed before ordering.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹899</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="diwali-gold-lotus" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-gold-fleck-lotus-light.jpeg" aria-label="Open larger view: Jewel-toned layered lotus tealight with gold flecks"><img src="assets/diwali-gold-fleck-lotus-light.jpeg" alt="Jewel-toned layered lotus tealight with gold flecks" width="335" height="597" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Gold-Fleck Lotus Light</strong><p>A layered lotus shape with a jewel-toned finish</p><p class="diwali-card-note">Reference design · price per holder.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹399</s></dd></div><div><dt>Festive price</dt><dd>₹299</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Gold-Fleck Lotus Light</strong><p>A layered lotus shape with a jewel-toned finish</p><p class="diwali-card-note">Reference design · price per holder.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="diwali-pastel-lotus" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-pastel-lotus-tealight.jpeg" aria-label="Open larger view: Pastel lotus resin tealight holder"><img src="assets/diwali-pastel-lotus-tealight.jpeg" alt="Pastel lotus resin tealight holder" width="335" height="597" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Pastel Lotus Tealight</strong><p>A little bloom of colour for your Diwali décor</p><p class="diwali-card-note">Reference design · price per holder.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹349</s></dd></div><div><dt>Festive price</dt><dd>₹249</dd></div><div><dt>Discount</dt><dd>29% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Pastel Lotus Tealight</strong><p>A little bloom of colour for your Diwali décor</p><p class="diwali-card-note">Reference design · price per holder.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹249</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-ocean-bloom" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-ocean-bloom-pooja-platter.jpg" aria-label="Open larger view: Ocean blue pooja platter with floral and pearl-like details"><img src="assets/diwali-ocean-bloom-pooja-platter.jpg" alt="Ocean blue pooja platter with floral and pearl-like details" width="360" height="640" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Ocean Bloom Pooja Platter</strong><p>Floral detailing and pearl-like accents in ocean blue</p><p class="diwali-card-note">Reference design · price per platter.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,399</s></dd></div><div><dt>Festive price</dt><dd>₹1,799</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Ocean Bloom Pooja Platter</strong><p>Floral detailing and pearl-like accents in ocean blue</p><p class="diwali-card-note">Reference design · price per platter.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,799</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-ganesha-plate" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-golden-ganesha-pooja-plate.jpg" aria-label="Open larger view: Ivory and gold Ganesha pooja plate"><img src="assets/diwali-golden-ganesha-pooja-plate.jpg" alt="Ivory and gold Ganesha pooja plate" width="736" height="981" loading="lazy" decoding="async"></a>
-              <figcaption><span>Reference design</span><strong>Golden Ganesha Pooja Plate</strong><p>Ivory and gold with a cheerful Ganesha motif</p><p class="diwali-card-note">Reference design · price per plate.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹499</s></dd></div><div><dt>Festive price</dt><dd>₹349</dd></div><div><dt>Discount</dt><dd>30% off</dd></div></dl></figcaption>
+              <figcaption><span>Reference design</span><strong>Golden Ganesha Pooja Plate</strong><p>Ivory and gold with a cheerful Ganesha motif</p><p class="diwali-card-note">Reference design · price per plate.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹349</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-om-mini-tilak-plate" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-om-mini-tilak-plate.webp" aria-label="Open larger view: Om mini tilak plate with floral resin details"><img src="assets/diwali-om-mini-tilak-plate.webp" alt="Original concept preview: Om mini tilak plate with floral resin details" width="1122" height="1402" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview</span><strong>Om Mini Tilak Plate</strong><p>A rosy Om plate for tilak, rice and a small festive welcome</p><p class="diwali-card-note">Concept preview · made to order · price per plate</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹349</s></dd></div><div><dt>Festive price</dt><dd>₹249</dd></div><div><dt>Discount</dt><dd>29% off</dd></div></dl></figcaption>
+              <figcaption><strong>Om Mini Tilak Plate</strong><p>A rosy Om plate for tilak, rice and a small festive welcome</p><p class="diwali-card-note">price per plate</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹249</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-lotus-diya-pair" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-lotus-diya-pair.webp" aria-label="Open larger view: Jewel-toned lotus diya pair with gold accents"><img src="assets/diwali-lotus-diya-pair.webp" alt="Original concept preview: Jewel-toned lotus diya pair with gold accents" width="1122" height="1402" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview</span><strong>Lotus Diya Pair</strong><p>A pair of jewel-toned lotus diyas for a glowing festive corner</p><p class="diwali-card-note">Concept preview · made to order · price for the pair</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹449</s></dd></div><div><dt>Festive price</dt><dd>₹349</dd></div><div><dt>Discount</dt><dd>22% off</dd></div></dl></figcaption>
+              <figcaption><strong>Lotus Diya Pair</strong><p>A pair of jewel-toned lotus diyas for a glowing festive corner</p><p class="diwali-card-note">price for the pair</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹349</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="diwali-peacock-mini-pooja-thali" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-peacock-mini-pooja-thali.webp" aria-label="Open larger view: Peacock mini pooja thali with teal, lavender and gold details"><img src="assets/diwali-peacock-mini-pooja-thali.webp" alt="Original concept preview: Peacock mini pooja thali with teal, lavender and gold details" width="1122" height="1402" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview</span><strong>Peacock Mini Pooja Thali</strong><p>A peacock-feather pooja thali with space for tilak and rice</p><p class="diwali-card-note">Concept preview · made to order · price per thali</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Festive price</dt><dd>₹449</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Peacock Mini Pooja Thali</strong><p>A peacock-feather pooja thali with space for tilak and rice</p><p class="diwali-card-note">price per thali</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="diwali-floral-swastik-tealight-set" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-floral-swastik-tealight-set.webp" aria-label="Open larger view: Floral Swastik tealight set with two holders and a matching flower accent"><img src="assets/diwali-floral-swastik-tealight-set.webp" alt="Original concept preview: Floral Swastik tealight set with two holders and a matching flower accent" width="1122" height="1402" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview</span><strong>Floral Swastik Tealight Set</strong><p>Two holders and a small matching flower accent for a bright festive corner</p><p class="diwali-card-note">Concept preview · made to order · price for the three-piece set</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹499</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><strong>Floral Swastik Tealight Set</strong><p>Two holders and a small matching flower accent for a bright festive corner</p><p class="diwali-card-note">price for the three-piece set</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-marigold-petal-holder" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-marigold-petal-holder-concept.webp" aria-label="Open larger view: Original concept preview: A warm marigold-inspired cup for a soft festive glow"><img src="assets/diwali-marigold-petal-holder-concept.webp" alt="Original concept preview: A warm marigold-inspired cup for a soft festive glow" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Marigold Petal Holder</strong><p>A warm marigold-inspired cup for a soft festive glow.</p><p class="diwali-card-note">Concept preview · made to order · one LED tealight holder · LED not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹349</s></dd></div><div><dt>Festive price</dt><dd>₹249</dd></div><div><dt>Discount</dt><dd>29% off</dd></div></dl></figcaption>
+              <figcaption><strong>Marigold Petal Holder</strong><p>A warm marigold-inspired cup for a soft festive glow.</p><p class="diwali-card-note">one LED tealight holder · LED not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹249</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-ivory-mandala-holder" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-ivory-mandala-holder-concept.webp" aria-label="Open larger view: Original concept preview: An ivory mandala cup with a calm, hand-finished festive feel"><img src="assets/diwali-ivory-mandala-holder-concept.webp" alt="Original concept preview: An ivory mandala cup with a calm, hand-finished festive feel" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Ivory Mandala Holder</strong><p>An ivory mandala cup with a calm, hand-finished festive feel.</p><p class="diwali-card-note">Concept preview · made to order · one LED tealight holder · LED not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹399</s></dd></div><div><dt>Festive price</dt><dd>₹299</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Ivory Mandala Holder</strong><p>An ivory mandala cup with a calm, hand-finished festive feel.</p><p class="diwali-card-note">one LED tealight holder · LED not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="diwali-ruby-leaf-dish" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-ruby-leaf-dish-concept.webp" aria-label="Open larger view: Original concept preview: A ruby-red leaf dish for a small festive offering or accent"><img src="assets/diwali-ruby-leaf-dish-concept.webp" alt="Original concept preview: A ruby-red leaf dish for a small festive offering or accent" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Ruby Leaf Dish</strong><p>A ruby-red leaf dish for a small festive offering or accent.</p><p class="diwali-card-note">Concept preview · made to order · one decorative dish</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹999</s></dd></div><div><dt>Festive price</dt><dd>₹799</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><strong>Ruby Leaf Dish</strong><p>A ruby-red leaf dish for a small festive offering or accent.</p><p class="diwali-card-note">one decorative dish</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹799</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="diwali-saffron-tilak-duo" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-saffron-tilak-duo-concept.webp" aria-label="Open larger view: Original concept preview: Two saffron-toned mini dishes for tilak and rice"><img src="assets/diwali-saffron-tilak-duo-concept.webp" alt="Original concept preview: Two saffron-toned mini dishes for tilak and rice" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Saffron Tilak Duo</strong><p>Two saffron-toned mini dishes for tilak and rice.</p><p class="diwali-card-note">Concept preview · made to order · two mini dishes</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹449</s></dd></div><div><dt>Festive price</dt><dd>₹349</dd></div><div><dt>Discount</dt><dd>22% off</dd></div></dl></figcaption>
+              <figcaption><strong>Saffron Tilak Duo</strong><p>Two saffron-toned mini dishes for tilak and rice.</p><p class="diwali-card-note">two mini dishes</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹349</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-pearl-rangoli-accent" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-pearl-rangoli-accent-concept.webp" aria-label="Open larger view: Original concept preview: A pearly rangoli-inspired accent for an entryway or prayer corner"><img src="assets/diwali-pearl-rangoli-accent-concept.webp" alt="Original concept preview: A pearly rangoli-inspired accent for an entryway or prayer corner" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Pearl Rangoli Accent</strong><p>A pearly rangoli-inspired accent for an entryway or prayer corner.</p><p class="diwali-card-note">Concept preview · made to order · one decorative accent</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹499</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><strong>Pearl Rangoli Accent</strong><p>A pearly rangoli-inspired accent for an entryway or prayer corner.</p><p class="diwali-card-note">one decorative accent</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-emerald-led-holder-pair" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-emerald-led-holder-pair-concept.webp" aria-label="Open larger view: Original concept preview: A pair of emerald cups for a jewel-toned LED-lit arrangement"><img src="assets/diwali-emerald-led-holder-pair-concept.webp" alt="Original concept preview: A pair of emerald cups for a jewel-toned LED-lit arrangement" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Emerald Glow Pair</strong><p>A pair of emerald cups for a jewel-toned LED-lit arrangement.</p><p class="diwali-card-note">Concept preview · made to order · pair of LED tealight holders · LEDs not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹999</s></dd></div><div><dt>Festive price</dt><dd>₹799</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><strong>Emerald Glow Pair</strong><p>A pair of emerald cups for a jewel-toned LED-lit arrangement.</p><p class="diwali-card-note">pair of LED tealight holders · LEDs not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹799</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="diwali-rose-petal-offering-plate" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-rose-petal-offering-plate-concept.webp" aria-label="Open larger view: Original concept preview: A rosy ritual plate with a gentle petal-inspired edge"><img src="assets/diwali-rose-petal-offering-plate-concept.webp" alt="Original concept preview: A rosy ritual plate with a gentle petal-inspired edge" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Rose Petal Offering Plate</strong><p>A rosy ritual plate with a gentle petal-inspired edge.</p><p class="diwali-card-note">Concept preview · made to order · one decorative ritual plate</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Festive price</dt><dd>₹449</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Rose Petal Offering Plate</strong><p>A rosy ritual plate with a gentle petal-inspired edge.</p><p class="diwali-card-note">one decorative ritual plate</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="diwali-golden-toran-charms" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-golden-toran-charms-concept.webp" aria-label="Open larger view: Original concept preview: Three golden hanging charms to style a festive doorway or wall"><img src="assets/diwali-golden-toran-charms-concept.webp" alt="Original concept preview: Three golden hanging charms to style a festive doorway or wall" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Golden Toran Charms</strong><p>Three golden hanging charms to style a festive doorway or wall.</p><p class="diwali-card-note">Concept preview · made to order · set of three hanging charms with cords</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Festive price</dt><dd>₹449</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Golden Toran Charms</strong><p>Three golden hanging charms to style a festive doorway or wall.</p><p class="diwali-card-note">set of three hanging charms with cords</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-lotus-rangoli-duo" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-lotus-rangoli-duo-concept.webp" aria-label="Open larger view: Original concept preview: Two lotus pieces for a small layered rangoli arrangement"><img src="assets/diwali-lotus-rangoli-duo-concept.webp" alt="Original concept preview: Two lotus pieces for a small layered rangoli arrangement" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Lotus Rangoli Duo</strong><p>Two lotus pieces for a small layered rangoli arrangement.</p><p class="diwali-card-note">Concept preview · made to order · set of two decorative lotus pieces</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹499</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><strong>Lotus Rangoli Duo</strong><p>Two lotus pieces for a small layered rangoli arrangement.</p><p class="diwali-card-note">set of two decorative lotus pieces</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-festive-keepsake-box" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-festive-keepsake-box-concept.webp" aria-label="Open larger view: Original concept preview: A small lidded box for a keepsake, note, or festive token"><img src="assets/diwali-festive-keepsake-box-concept.webp" alt="Original concept preview: A small lidded box for a keepsake, note, or festive token" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Festive Keepsake Box</strong><p>A small lidded box for a keepsake, note, or festive token.</p><p class="diwali-card-note">Concept preview · made to order · one small lidded box · contents not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹849</s></dd></div><div><dt>Festive price</dt><dd>₹649</dd></div><div><dt>Discount</dt><dd>24% off</dd></div></dl></figcaption>
+              <figcaption><strong>Festive Keepsake Box</strong><p>A small lidded box for a keepsake, note, or festive token.</p><p class="diwali-card-note">one small lidded box · contents not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹649</dd></div></dl></figcaption>
             </figure>
           </article>
         </div>
@@ -291,7 +333,6 @@
         </div>
         <div class="romantic-keepsakes-intro">
           <p>14 keepsakes and concept previews — swipe or use the arrows to explore.</p>
-          <p class="romantic-keepsakes-catalogue-note">Concept previews are illustrative. Saloni confirms feasibility, materials, final design, quote, and delivery.</p>
           <a class="text-link" href="#studio-art">Explore the keepsakes <span aria-hidden="true">→</span></a>
           <div class="rail-controls" aria-label="Romantic keepsakes carousel controls">
             <button class="carousel-button" type="button" data-carousel-prev aria-controls="romantic-keepsakes-track" aria-label="Previous romantic keepsakes"><span class="arrow arrow-left" aria-hidden="true"></span></button>
@@ -304,85 +345,85 @@
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-keychain-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-us-keychain-pair.webp" aria-label="Open larger view: Original concept preview of matching resin keychains with a shared heart detail"><img src="assets/romantic-us-keychain-pair.webp" alt="Original concept preview: Matching resin keychains with a shared heart detail" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-keychain-title">Two keys, one little us</h3><p>Made to travel together, even when you cannot.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>33% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-keychain-title">Two keys, one little us</h3><p>Made to travel together, even when you cannot.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-bookmark-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-floral-bookmark-set.webp" aria-label="Open larger view: Original concept preview of a dried-flower resin bookmark set"><img src="assets/romantic-floral-bookmark-set.webp" alt="Original concept preview: Dried-flower resin bookmark set in soft romantic colours" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-bookmark-title">Save our page</h3><p>Three little places to keep the chapters that feel like yours.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹999</s></dd></div><div><dt>Festive price</dt><dd>₹699</dd></div><div><dt>Discount</dt><dd>30% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-bookmark-title">Save our page</h3><p>Three little places to keep the chapters that feel like yours.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹699</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-calendar-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-calendar-coaster.webp" aria-label="Open larger view: Original concept preview of an anniversary calendar coaster with a circled date"><img src="assets/romantic-calendar-coaster.webp" alt="Original concept preview: Anniversary calendar coaster with a circled date" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-calendar-title">Our date, every day</h3><p>The day everything changed, circled for every ordinary morning after.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,199</s></dd></div><div><dt>Festive price</dt><dd>₹899</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-calendar-title">Our date, every day</h3><p>The day everything changed, circled for every ordinary morning after.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹899</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-bracelet-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-first-rose-bracelet.webp" aria-label="Open larger view: Original concept preview of a preserved-petal resin bracelet"><img src="assets/romantic-first-rose-bracelet.webp" alt="Original concept preview: Preserved-petal resin bracelet for a first rose" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-bracelet-title">The first rose, still with me</h3><p>One petal from the beginning, made wearable.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹899</s></dd></div><div><dt>Festive price</dt><dd>₹599</dd></div><div><dt>Discount</dt><dd>33% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-bracelet-title">The first rose, still with me</h3><p>One petal from the beginning, made wearable.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹599</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-trinket-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-heart-trinket-tray.webp" aria-label="Open larger view: Original concept preview of a coquette heart trinket tray"><img src="assets/romantic-heart-trinket-tray.webp" alt="Original concept preview: Coquette heart trinket tray in soft resin" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-trinket-title">Tiny tray, big feelings</h3><p>A soft place for rings, earbuds, and the little things you share.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹499</s></dd></div><div><dt>Festive price</dt><dd>₹349</dd></div><div><dt>Discount</dt><dd>30% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-trinket-title">Tiny tray, big feelings</h3><p>A soft place for rings, earbuds, and the little things you share.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹349</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-initial-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-initial-desk-stand.webp" aria-label="Open larger view: Original concept preview of a couple initial resin desk stand"><img src="assets/romantic-initial-desk-stand.webp" alt="Original concept preview: Couple initial resin desk stand" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-initial-title">Your initial. Mine. Ours.</h3><p>Two letters, one small corner that belongs to both of you.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹999</s></dd></div><div><dt>Festive price</dt><dd>₹699</dd></div><div><dt>Discount</dt><dd>30% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-initial-title">Your initial. Mine. Ours.</h3><p>Two letters, one small corner that belongs to both of you.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹699</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-pendant-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-botanical-pendant.webp" aria-label="Open larger view: Original concept preview of a botanical resin pendant with a name"><img src="assets/romantic-botanical-pendant.webp" alt="Original concept preview: Botanical resin pendant with a name" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-pendant-title">A little piece of our season</h3><p>Pressed flowers and a name, kept close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>33% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-pendant-title">A little piece of our season</h3><p>Pressed flowers and a name, kept close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-ocean-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-ocean-memory-tray.webp" aria-label="Open larger view: Original concept preview of an ocean memory resin tray"><img src="assets/romantic-ocean-memory-tray.webp" alt="Original concept preview: Ocean memory resin tray inspired by a special place" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-ocean-title">Our place, held in waves</h3><p>For the beach, trip, or city that became part of your story.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,799</s></dd></div><div><dt>Festive price</dt><dd>₹1,299</dd></div><div><dt>Discount</dt><dd>28% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-ocean-title">Our place, held in waves</h3><p>For the beach, trip, or city that became part of your story.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-scene-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-couple-scene.webp" aria-label="Open larger view: Original concept preview of a playful couple scene resin showpiece"><img src="assets/romantic-couple-scene.webp" alt="Original concept preview: Playful couple scene resin showpiece" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-scene-title">Our favourite little scene</h3><p>A tiny version of the everyday moment you would replay.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹999</s></dd></div><div><dt>Festive price</dt><dd>₹699</dd></div><div><dt>Discount</dt><dd>30% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-scene-title">Our favourite little scene</h3><p>A tiny version of the everyday moment you would replay.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹699</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-miniature-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-couple-miniature.webp" aria-label="Open larger view: Original concept preview of a custom couple miniature resin keepsake"><img src="assets/romantic-couple-miniature.webp" alt="Original concept preview: Custom couple miniature resin keepsake" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><h3 id="romantic-miniature-title">Your story, in 3D</h3><p>Two people, one meaningful detail, made into a shelf-sized memory.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,499</s></dd></div><div><dt>Festive price</dt><dd>₹1,999</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><h3 id="romantic-miniature-title">Your story, in 3D</h3><p>Two people, one meaningful detail, made into a shelf-sized memory.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,999</dd></div></dl></figcaption>
             </figure>
           </article>
-          <article class="romantic-keepsake-card" id="rose-hexagon" role="listitem" aria-labelledby="romantic-rose-title">
+          <article class="romantic-keepsake-card" id="rose-hexagon" data-featured="true" role="listitem" aria-labelledby="romantic-rose-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-rose-hexagon-keepsake.jpeg" aria-label="Open larger view: Clear hexagonal resin keepsake with preserved roses and a camera icon"><img src="assets/studio-rose-hexagon-keepsake.jpeg" alt="Clear hexagonal resin keepsake with preserved roses and a camera icon" width="1080" height="1012" loading="lazy" decoding="async"></a>
-              <figcaption><span>Floral keepsake</span><h3 id="romantic-rose-title">Rose hexagon</h3><p>First rose from a boyfriend, held in love.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,999</s></dd></div><div><dt>Festive price</dt><dd>₹2,499</dd></div><div><dt>Discount</dt><dd>17% off</dd></div></dl></figcaption>
+              <figcaption><span>Floral keepsake</span><h3 id="romantic-rose-title">Rose hexagon</h3><p>First rose from a boyfriend, held in love.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹2,499</dd></div></dl></figcaption>
             </figure>
           </article>
-          <article class="romantic-keepsake-card" id="personalized-photo-clock" role="listitem" aria-labelledby="romantic-clock-title">
+          <article class="romantic-keepsake-card" id="personalized-photo-clock" data-featured="true" role="listitem" aria-labelledby="romantic-clock-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-personalized-photo-clock.jpeg" aria-label="Open larger view: Round white and gold resin photo clock with a couple&#x27;s picture and gold numerals"><img src="assets/studio-personalized-photo-clock.jpeg" alt="Round white and gold resin photo clock with a couple's picture and gold numerals" width="960" height="1280" loading="lazy" decoding="async"></a>
-              <figcaption><span>Personalized keepsake</span><h3 id="romantic-clock-title">Personalized photo clock</h3><p>A favourite couple photo, held in a clock.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹3,999</s></dd></div><div><dt>Festive price</dt><dd>₹3,000</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><span>Personalized keepsake</span><h3 id="romantic-clock-title">Personalized photo clock</h3><p>A favourite couple photo, held in a clock.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹3,000</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-hamper-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-hamper.jpg" aria-label="Open larger view: Romantic hamper with pink roses, heart balloons, photographs, and handwritten cards"><img src="assets/romantic-hamper.jpg" alt="Romantic hamper with pink roses, heart balloons, photographs, and handwritten cards" width="540" height="960" loading="lazy" decoding="async"></a>
-              <figcaption><span>Anniversary &amp; love</span><h3 id="romantic-hamper-title">Say it without a speech</h3><p>Photos, flowers, and the little words that are better kept close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,499</s></dd></div><div><dt>Festive price</dt><dd>₹1,999</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><span>Anniversary &amp; love</span><h3 id="romantic-hamper-title">Say it without a speech</h3><p>Photos, flowers, and the little words that are better kept close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,999</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-rose-display-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-red-rose-resin-display.jpeg" aria-label="Open larger view: Round clear resin display with preserved red roses on a small stand"><img src="assets/studio-red-rose-resin-display.jpeg" alt="Round clear resin display with preserved red roses on a small stand" width="480" height="638" loading="lazy" decoding="async"></a>
-              <figcaption><span>Preserved flowers</span><h3 id="romantic-rose-display-title">Preserved rose display</h3><p>Preserved red roses, held close for a lasting moment.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹899</s></dd></div><div><dt>Festive price</dt><dd>₹599</dd></div><div><dt>Discount</dt><dd>33% off</dd></div></dl></figcaption>
+              <figcaption><span>Preserved flowers</span><h3 id="romantic-rose-display-title">Preserved rose display</h3><p>Preserved red roses, held close for a lasting moment.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹599</dd></div></dl></figcaption>
             </figure>
           </article>
         </div>
@@ -400,8 +441,6 @@
           <p class="eyebrow">For teams &amp; celebrations</p>
           <h2 id="corporate-resin-gifts-title">Corporate Resin Gifts</h2>
           <p>Twenty branded keepsakes and gift sets for welcome kits, desks, milestones and festive thank-yous.</p>
-          <p class="catalogue-note">Concept previews are made to order. Saloni confirms feasibility, materials and final price before production.</p>
-          <p class="catalogue-note corporate-concept-note">New concept prices are introductory estimates. Crossed-out regular prices are provisional catalogue estimates, not previous selling prices. Saloni confirms the final quote.</p>
         </div>
         <div class="rail-controls" aria-label="Corporate resin gifts carousel controls">
           <button class="carousel-button" type="button" data-carousel-prev aria-controls="corporate-resin-gifts-track" aria-label="Previous corporate resin gifts"><span class="arrow arrow-left" aria-hidden="true"></span></button>
@@ -411,93 +450,93 @@
       <div class="carousel">
         <div class="carousel-track" id="corporate-resin-gifts-track" data-carousel-track role="list" tabindex="0" aria-label="Corporate resin gifts">
           <article class="work-card reveal" id="corporate-logo-keychain" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-keychain-concept.webp" aria-label="Open larger view: Logo resin keychain concept product preview"><img src="assets/corporate-logo-keychain-concept.webp" alt="Logo resin keychain concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Logo resin keychain</strong><p>Clear resin with a name/initial and subtle brand-colour accents.</p><p class="corporate-card-note">Concept preview · made to order. Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹299</s></dd></div><div><dt>Offer price</dt><dd>₹199</dd></div><div><dt>Discount</dt><dd>33% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-keychain-concept.webp" aria-label="Open larger view: Logo resin keychain concept product preview"><img src="assets/corporate-logo-keychain-concept.webp" alt="Logo resin keychain concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Logo resin keychain</strong><p>Clear resin with a name/initial and subtle brand-colour accents.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹199</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-floral-bookmark" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-floral-bookmark-concept.webp" aria-label="Open larger view: Pressed-flower bookmark concept product preview"><img src="assets/corporate-floral-bookmark-concept.webp" alt="Pressed-flower bookmark concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Pressed-flower bookmark</strong><p>A slim resin bookmark for welcome kits or thoughtful team gifts.</p><p class="corporate-card-note">Concept preview · made to order. Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹249</s></dd></div><div><dt>Offer price</dt><dd>₹149</dd></div><div><dt>Discount</dt><dd>40% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-floral-bookmark-concept.webp" aria-label="Open larger view: Pressed-flower bookmark concept product preview"><img src="assets/corporate-floral-bookmark-concept.webp" alt="Pressed-flower bookmark concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Pressed-flower bookmark</strong><p>A slim resin bookmark for welcome kits or thoughtful team gifts.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹149</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="corporate-logo-paperweight" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-paperweight-concept.webp" aria-label="Open larger view: Logo paperweight concept product preview"><img src="assets/corporate-logo-paperweight-concept.webp" alt="Logo paperweight concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Logo paperweight</strong><p>A polished desk keepsake with a logo or short message sealed inside.</p><p class="corporate-card-note">Concept preview · made to order. Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹499</s></dd></div><div><dt>Offer price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-paperweight-concept.webp" aria-label="Open larger view: Logo paperweight concept product preview"><img src="assets/corporate-logo-paperweight-concept.webp" alt="Logo paperweight concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Logo paperweight</strong><p>A polished desk keepsake with a logo or short message sealed inside.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="corporate-desk-nameplate" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-nameplate-concept.webp" aria-label="Open larger view: Resin desk nameplate concept product preview"><img src="assets/corporate-desk-nameplate-concept.webp" alt="Resin desk nameplate concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin desk nameplate</strong><p>Personalised with a name, designation and brand colours.</p><p class="corporate-card-note">Concept preview · made to order. Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹999</s></dd></div><div><dt>Offer price</dt><dd>₹799</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-nameplate-concept.webp" aria-label="Open larger view: Resin desk nameplate concept product preview"><img src="assets/corporate-desk-nameplate-concept.webp" alt="Resin desk nameplate concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin desk nameplate</strong><p>Personalised with a name, designation and brand colours.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹799</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal" id="corporate-logo-coaster-set" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-coaster-set-concept.webp" aria-label="Open larger view: Branded coaster set concept product preview"><img src="assets/corporate-logo-coaster-set-concept.webp" alt="Branded coaster set concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Branded coaster set</strong><p>Four coordinated coasters for desks, meeting rooms or client kits.</p><p class="corporate-card-note">Concept preview · made to order. Price for a set of four.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹999</s></dd></div><div><dt>Offer price</dt><dd>₹749</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-coaster-set-concept.webp" aria-label="Open larger view: Branded coaster set concept product preview"><img src="assets/corporate-logo-coaster-set-concept.webp" alt="Branded coaster set concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Branded coaster set</strong><p>Four coordinated coasters for desks, meeting rooms or client kits.</p><p class="corporate-card-note">Price for a set of four.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹749</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-fridge-magnet" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-fridge-magnet-concept.webp" aria-label="Open larger view: Resin fridge magnet concept product preview"><img src="assets/corporate-fridge-magnet-concept.webp" alt="Resin fridge magnet concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin fridge magnet</strong><p>A compact branded keepsake for events and team celebrations.</p><p class="corporate-card-note">Concept preview · made to order. Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹249</s></dd></div><div><dt>Offer price</dt><dd>₹179</dd></div><div><dt>Discount</dt><dd>28% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-fridge-magnet-concept.webp" aria-label="Open larger view: Resin fridge magnet concept product preview"><img src="assets/corporate-fridge-magnet-concept.webp" alt="Resin fridge magnet concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin fridge magnet</strong><p>A compact branded keepsake for events and team celebrations.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹179</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="corporate-desk-logo-stand" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-logo-stand-concept.webp" aria-label="Open larger view: Mini resin desk stand concept product preview"><img src="assets/corporate-desk-logo-stand-concept.webp" alt="Mini resin desk stand concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Mini resin desk stand</strong><p>A small decorative resin stand for desks, reception counters or car dashboards.</p><p class="corporate-card-note">Concept preview · made to order. Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹249</s></dd></div><div><dt>Offer price</dt><dd>₹179</dd></div><div><dt>Discount</dt><dd>28% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-logo-stand-concept.webp" aria-label="Open larger view: Mini resin desk stand concept product preview"><img src="assets/corporate-desk-logo-stand-concept.webp" alt="Mini resin desk stand concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Mini resin desk stand</strong><p>A small decorative resin stand for desks, reception counters or car dashboards.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹179</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="corporate-recognition-award" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-recognition-award-concept.webp" aria-label="Open larger view: Recognition resin award concept product preview"><img src="assets/corporate-recognition-award-concept.webp" alt="Recognition resin award concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Recognition resin award</strong><p>A modern personalised memento for milestones and appreciation.</p><p class="corporate-card-note">Concept preview · made to order. Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,299</s></dd></div><div><dt>Offer price</dt><dd>₹899</dd></div><div><dt>Discount</dt><dd>31% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-recognition-award-concept.webp" aria-label="Open larger view: Recognition resin award concept product preview"><img src="assets/corporate-recognition-award-concept.webp" alt="Recognition resin award concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Recognition resin award</strong><p>A modern personalised memento for milestones and appreciation.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹899</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal" id="corporate-desk-organizer" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-organizer-concept.webp" aria-label="Open larger view: Resin desk organiser concept product preview"><img src="assets/corporate-desk-organizer-concept.webp" alt="Resin desk organiser concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin desk organiser</strong><p>A compact pen and visiting-card holder with custom colours.</p><p class="corporate-card-note">Concept preview · made to order. Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,299</s></dd></div><div><dt>Offer price</dt><dd>₹999</dd></div><div><dt>Discount</dt><dd>23% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-organizer-concept.webp" aria-label="Open larger view: Resin desk organiser concept product preview"><img src="assets/corporate-desk-organizer-concept.webp" alt="Resin desk organiser concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin desk organiser</strong><p>A compact pen and visiting-card holder with custom colours.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹999</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-festive-hamper" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-festive-hamper-concept.webp" aria-label="Open larger view: Corporate festive hamper concept product preview"><img src="assets/corporate-festive-hamper-concept.webp" alt="Corporate festive hamper concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Corporate festive hamper</strong><p>A coordinated resin gift box for festive or thank-you occasions.</p><p class="corporate-card-note">Concept preview · made to order. Price for one gift set.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,999</s></dd></div><div><dt>Offer price</dt><dd>₹1,499</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-festive-hamper-concept.webp" aria-label="Open larger view: Corporate festive hamper concept product preview"><img src="assets/corporate-festive-hamper-concept.webp" alt="Corporate festive hamper concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Corporate festive hamper</strong><p>A coordinated resin gift box for festive or thank-you occasions.</p><p class="corporate-card-note">Price for one gift set.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,499</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal" id="corporate-business-card-holder" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-business-card-holder-concept.webp" aria-label="Open larger view: Original concept preview: A compact resin holder for a tidy stack of visiting cards"><img src="assets/corporate-business-card-holder-concept.webp" alt="Original concept preview: A compact resin holder for a tidy stack of visiting cards concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Resin Business Card Holder</strong><p>A compact resin holder for a tidy stack of visiting cards.</p><p class="corporate-card-note">Concept preview · made to order. Price for one card holder; cards not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Offer price</dt><dd>₹449</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Resin Business Card Holder</strong><p>A compact resin holder for a tidy stack of visiting cards.</p><p class="corporate-card-note">Price for one card holder; cards not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-phone-rest" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-phone-rest-concept.webp" aria-label="Open larger view: Original concept preview: A steady resin rest for a phone on a desk or bedside table"><img src="assets/corporate-phone-rest-concept.webp" alt="Original concept preview: A steady resin rest for a phone on a desk or bedside table concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Resin Phone Rest</strong><p>A steady resin rest for a phone on a desk or bedside table.</p><p class="corporate-card-note">Concept preview · made to order. Price for one phone rest; phone not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹699</s></dd></div><div><dt>Offer price</dt><dd>₹499</dd></div><div><dt>Discount</dt><dd>29% off</dd></div></dl></figcaption>
+              <figcaption><strong>Resin Phone Rest</strong><p>A steady resin rest for a phone on a desk or bedside table.</p><p class="corporate-card-note">Price for one phone rest; phone not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹499</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="corporate-pen-cup" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-pen-cup-concept.webp" aria-label="Open larger view: Original concept preview: A polished pen cup with a clean, colourful resin finish"><img src="assets/corporate-pen-cup-concept.webp" alt="Original concept preview: A polished pen cup with a clean, colourful resin finish concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Resin Pen Cup</strong><p>A polished pen cup with a clean, colourful resin finish.</p><p class="corporate-card-note">Concept preview · made to order. Price for one pen cup; stationery not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹899</s></dd></div><div><dt>Offer price</dt><dd>₹699</dd></div><div><dt>Discount</dt><dd>22% off</dd></div></dl></figcaption>
+              <figcaption><strong>Resin Pen Cup</strong><p>A polished pen cup with a clean, colourful resin finish.</p><p class="corporate-card-note">Price for one pen cup; stationery not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹699</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="corporate-desk-trinket-tray" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-trinket-tray-concept.webp" aria-label="Open larger view: Original concept preview: A small catch-all tray for a desk, console, or bedside table"><img src="assets/corporate-desk-trinket-tray-concept.webp" alt="Original concept preview: A small catch-all tray for a desk, console, or bedside table concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Desk Trinket Tray</strong><p>A small catch-all tray for a desk, console, or bedside table.</p><p class="corporate-card-note">Concept preview · made to order. Price for one tray; contents not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Offer price</dt><dd>₹449</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Desk Trinket Tray</strong><p>A small catch-all tray for a desk, console, or bedside table.</p><p class="corporate-card-note">Price for one tray; contents not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="corporate-lanyard-charm" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-lanyard-charm-concept.webp" aria-label="Open larger view: Original concept preview: A personalised charm that clips onto a lanyard or bag"><img src="assets/corporate-lanyard-charm-concept.webp" alt="Original concept preview: A personalised charm that clips onto a lanyard or bag concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Personalised Lanyard Charm</strong><p>A personalised charm that clips onto a lanyard or bag.</p><p class="corporate-card-note">Concept preview · made to order. Price for one charm with clasp; lanyard not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹299</s></dd></div><div><dt>Offer price</dt><dd>₹199</dd></div><div><dt>Discount</dt><dd>33% off</dd></div></dl></figcaption>
+              <figcaption><strong>Personalised Lanyard Charm</strong><p>A personalised charm that clips onto a lanyard or bag.</p><p class="corporate-card-note">Price for one charm with clasp; lanyard not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹199</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-mini-photo-stand" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-mini-photo-stand-concept.webp" aria-label="Open larger view: Original concept preview: A compact photo stand for a desk memory or team note"><img src="assets/corporate-mini-photo-stand-concept.webp" alt="Original concept preview: A compact photo stand for a desk memory or team note concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Mini Photo Stand</strong><p>A compact photo stand for a desk memory or team note.</p><p class="corporate-card-note">Concept preview · made to order. Price for one base with metal clip; print not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹399</s></dd></div><div><dt>Offer price</dt><dd>₹299</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Mini Photo Stand</strong><p>A compact photo stand for a desk memory or team note.</p><p class="corporate-card-note">Price for one base with metal clip; print not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="corporate-bag-tag" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-bag-tag-concept.webp" aria-label="Open larger view: Original concept preview: A personalised resin tag with a simple strap for a bag or case"><img src="assets/corporate-bag-tag-concept.webp" alt="Original concept preview: A personalised resin tag with a simple strap for a bag or case concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Personalised Bag Tag</strong><p>A personalised resin tag with a simple strap for a bag or case.</p><p class="corporate-card-note">Concept preview · made to order. Price for one tag with strap.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹399</s></dd></div><div><dt>Offer price</dt><dd>₹299</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Personalised Bag Tag</strong><p>A personalised resin tag with a simple strap for a bag or case.</p><p class="corporate-card-note">Price for one tag with strap.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="corporate-desk-clock" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-clock-concept.webp" aria-label="Open larger view: Original concept preview: A small resin clock to add a considered accent to a work desk"><img src="assets/corporate-desk-clock-concept.webp" alt="Original concept preview: A small resin clock to add a considered accent to a work desk concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Mini Resin Desk Clock</strong><p>A small resin clock to add a considered accent to a work desk.</p><p class="corporate-card-note">Concept preview · made to order. Price for one clock with stand; battery not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,299</s></dd></div><div><dt>Offer price</dt><dd>₹999</dd></div><div><dt>Discount</dt><dd>23% off</dd></div></dl></figcaption>
+              <figcaption><strong>Mini Resin Desk Clock</strong><p>A small resin clock to add a considered accent to a work desk.</p><p class="corporate-card-note">Price for one clock with stand; battery not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹999</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="corporate-bookmark-keychain-duo" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-bookmark-keychain-duo-concept.webp" aria-label="Open larger view: Original concept preview: A bookmark and keychain duo for a useful welcome keepsake"><img src="assets/corporate-bookmark-keychain-duo-concept.webp" alt="Original concept preview: A bookmark and keychain duo for a useful welcome keepsake concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Welcome Keepsake Duo</strong><p>A bookmark and keychain duo for a useful welcome keepsake.</p><p class="corporate-card-note">Concept preview · made to order. Price for a two-piece set.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Offer price</dt><dd>₹449</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption>
+              <figcaption><strong>Welcome Keepsake Duo</strong><p>A bookmark and keychain duo for a useful welcome keepsake.</p><p class="corporate-card-note">Price for a two-piece set.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-desk-essentials-set" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-essentials-set-concept.webp" aria-label="Open larger view: Original concept preview: A coordinated pen cup and trinket tray for a complete desk set"><img src="assets/corporate-desk-essentials-set-concept.webp" alt="Original concept preview: A coordinated pen cup and trinket tray for a complete desk set concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
-              <figcaption><span>Concept preview · made to order</span><strong>Desk Essentials Set</strong><p>A coordinated pen cup and trinket tray for a complete desk set.</p><p class="corporate-card-note">Concept preview · made to order. Price for one pen cup and one trinket tray.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,499</s></dd></div><div><dt>Offer price</dt><dd>₹1,199</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption>
+              <figcaption><strong>Desk Essentials Set</strong><p>A coordinated pen cup and trinket tray for a complete desk set.</p><p class="corporate-card-note">Price for one pen cup and one trinket tray.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,199</dd></div></dl></figcaption>
             </figure>
           </article>
         </div>
@@ -514,29 +553,29 @@
       </div>
       <div class="carousel">
         <div class="carousel-track" id="studio-art-track" data-carousel-track tabindex="0" aria-label="Art from the studio">
-          <article class="work-card reveal" id="blue-mantra-frame"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-blue-mantra-frame.jpeg" aria-label="Open larger view: Blue and white resin frame with a gold Namokar mantra design and textured stone border"><img src="assets/studio-blue-mantra-frame.jpeg" alt="Blue and white resin frame with a gold Namokar mantra design and textured stone border" width="960" height="1280" loading="lazy" decoding="async"></a><figcaption><span>Studio piece</span><strong>Namokar mantra frame</strong><p>Cool blue resin and a softly textured border.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹5,499</s></dd></div><div><dt>Festive price</dt><dd>₹4,099</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-1"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-lilac-symbol-rakhi.jpeg" aria-label="Open larger view: Lilac resin rakhi medallion with a traditional swastika motif, pearls, and floral styling"><img src="assets/studio-lilac-symbol-rakhi.jpeg" alt="Lilac resin rakhi medallion with a traditional swastika motif, pearls, and floral styling" width="1254" height="1254" loading="lazy" decoding="async"></a><figcaption><span>Rakhi detail</span><strong>Lilac symbol medallion</strong><p>A pearled rakhi with a traditional motif at its centre.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹499</s></dd></div><div><dt>Festive price</dt><dd>₹349</dd></div><div><dt>Discount</dt><dd>30% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-little-brother-rakhi.jpeg" aria-label="Open larger view: Lilac resin rakhi medallion reading LITTLE BROTHER, styled with pearls and flowers"><img src="assets/studio-little-brother-rakhi.jpeg" alt="Lilac resin rakhi medallion reading LITTLE BROTHER, styled with pearls and flowers" width="1254" height="1254" loading="lazy" decoding="async"></a><figcaption><span>Rakhi detail</span><strong>Little brother keepsake</strong><p>Gold lettering set into a floral, pearl-finished rakhi.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>33% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-3" id="white-mantra-frame"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-white-mantra-frame.jpeg" aria-label="Open larger view: White and gold resin frame with a Jain mantra design, figures, and textured border"><img src="assets/studio-white-mantra-frame.jpeg" alt="White and gold resin frame with a Jain mantra design, figures, and textured border" width="899" height="1599" loading="lazy" decoding="async"></a><figcaption><span>Studio piece</span><strong>Namokar mantra frame</strong><p>White texture, gold edging, and a detailed centre.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹5,999</s></dd></div><div><dt>Festive price</dt><dd>₹4,599</dd></div><div><dt>Discount</dt><dd>23% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-lilac-scalloped-tray.jpeg" aria-label="Open larger view: Lilac scalloped resin tray with two round red and cream accents"><img src="assets/studio-lilac-scalloped-tray.jpeg" alt="Lilac scalloped resin tray with two round red and cream accents" width="1152" height="648" loading="lazy" decoding="async"></a><figcaption><span>Resin decor</span><strong>Lilac scalloped tray</strong><p>A soft lilac tray with a playful pair of round details.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹599</s></dd></div><div><dt>Festive price</dt><dd>₹399</dd></div><div><dt>Discount</dt><dd>33% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-square-keepsake.jpeg" aria-label="Open larger view: Square resin keepsake filled with cream, peach, and green dried flowers"><img src="assets/studio-floral-square-keepsake.jpeg" alt="Square resin keepsake filled with cream, peach, and green dried flowers" width="1080" height="1188" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Pressed flower square</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> First bouquet, forever close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,499</s></dd></div><div><dt>Festive price</dt><dd>₹1,999</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-3"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-hexagon-keepsake.jpeg" aria-label="Open larger view: Hexagonal resin keepsake with pressed flowers in pink, peach, and lilac tones"><img src="assets/studio-floral-hexagon-keepsake.jpeg" alt="Hexagonal resin keepsake with pressed flowers in pink, peach, and lilac tones" width="959" height="1073" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Lilac flower hexagon</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> Handwritten note, kept close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,499</s></dd></div><div><dt>Festive price</dt><dd>₹1,999</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-handled-tray.jpeg" aria-label="Open larger view: Clear handled resin tray with a colourful pressed-flower arrangement"><img src="assets/studio-floral-handled-tray.jpeg" alt="Clear handled resin tray with a colourful pressed-flower arrangement" width="851" height="1207" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Handled flower tray</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> Special-day flower, remembered.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,999</s></dd></div><div><dt>Festive price</dt><dd>₹2,299</dd></div><div><dt>Discount</dt><dd>23% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal" id="floral-memory-frame"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-floral-memory-frame.webp" aria-label="Open larger view: Original concept preview of a soft-arch floral memory frame"><img src="assets/concept-floral-memory-frame.webp" alt="Original concept preview: Soft-arch clear resin memory frame with dried blush roses and restrained gold flecks" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Concept preview · made to order</span><strong>Your flowers, held close</strong><p>A soft arch for the flowers and small date that belong to one favourite day.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹4,999</s></dd></div><div><dt>Festive price</dt><dd>₹3,999</dd></div><div><dt>Discount</dt><dd>20% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-1"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-ocean-clock.webp" aria-label="Open larger view: Original concept preview of a blue and ivory shoreline resin clock"><img src="assets/concept-ocean-clock.webp" alt="Original concept preview: Round blue and ivory shoreline-inspired resin clock with restrained gold leaf" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Concept preview · made to order</span><strong>A little blue hour</strong><p>A shoreline-inspired clock for the room that could use a little more calm.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,999</s></dd></div><div><dt>Festive price</dt><dd>₹2,199</dd></div><div><dt>Discount</dt><dd>27% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-tray-hamper.webp" aria-label="Open larger view: Original concept preview of a lilac handled celebration tray"><img src="assets/concept-tray-hamper.webp" alt="Original concept preview: Lilac handled resin tray with small wrapped gifts, a blank note card, and dried floral styling" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Concept preview · made to order</span><strong>A tray full of celebration</strong><p>A lilac tray to gather a few thoughtful surprises around one occasion.</p><p>Contents chosen separately; pictured styling is not included by default.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,999</s></dd></div><div><dt>Festive price</dt><dd>₹1,499</dd></div><div><dt>Discount</dt><dd>25% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-3"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-floral-coasters.webp" aria-label="Open larger view: Original concept preview of four pressed-flower resin coasters"><img src="assets/concept-floral-coasters.webp" alt="Original concept preview: Four clear and lilac pressed-flower resin coasters with restrained gold detail" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Concept preview · made to order</span><strong>Little messages, shared</strong><p>Four small places for personal lettering, pressed flowers, and everyday rituals.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,299</s></dd></div><div><dt>Festive price</dt><dd>₹999</dd></div><div><dt>Discount</dt><dd>23% off</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal" id="blue-mantra-frame" data-featured="true"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-blue-mantra-frame.jpeg" aria-label="Open larger view: Blue and white resin frame with a gold Namokar mantra design and textured stone border"><img src="assets/studio-blue-mantra-frame.jpeg" alt="Blue and white resin frame with a gold Namokar mantra design and textured stone border" width="960" height="1280" loading="lazy" decoding="async"></a><figcaption><span>Studio piece</span><strong>Namokar mantra frame</strong><p>Cool blue resin and a softly textured border.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹4,099</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-1"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-lilac-symbol-rakhi.jpeg" aria-label="Open larger view: Lilac resin rakhi medallion with a traditional swastika motif, pearls, and floral styling"><img src="assets/studio-lilac-symbol-rakhi.jpeg" alt="Lilac resin rakhi medallion with a traditional swastika motif, pearls, and floral styling" width="1254" height="1254" loading="lazy" decoding="async"></a><figcaption><span>Rakhi detail</span><strong>Lilac symbol medallion</strong><p>A pearled rakhi with a traditional motif at its centre.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹349</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-little-brother-rakhi.jpeg" aria-label="Open larger view: Lilac resin rakhi medallion reading LITTLE BROTHER, styled with pearls and flowers"><img src="assets/studio-little-brother-rakhi.jpeg" alt="Lilac resin rakhi medallion reading LITTLE BROTHER, styled with pearls and flowers" width="1254" height="1254" loading="lazy" decoding="async"></a><figcaption><span>Rakhi detail</span><strong>Little brother keepsake</strong><p>Gold lettering set into a floral, pearl-finished rakhi.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹399</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-3" id="white-mantra-frame" data-featured="true"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-white-mantra-frame.jpeg" aria-label="Open larger view: White and gold resin frame with a Jain mantra design, figures, and textured border"><img src="assets/studio-white-mantra-frame.jpeg" alt="White and gold resin frame with a Jain mantra design, figures, and textured border" width="899" height="1599" loading="lazy" decoding="async"></a><figcaption><span>Studio piece</span><strong>Namokar mantra frame</strong><p>White texture, gold edging, and a detailed centre.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹4,599</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-lilac-scalloped-tray.jpeg" aria-label="Open larger view: Lilac scalloped resin tray with two round red and cream accents"><img src="assets/studio-lilac-scalloped-tray.jpeg" alt="Lilac scalloped resin tray with two round red and cream accents" width="1152" height="648" loading="lazy" decoding="async"></a><figcaption><span>Resin decor</span><strong>Lilac scalloped tray</strong><p>A soft lilac tray with a playful pair of round details.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹399</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-square-keepsake.jpeg" aria-label="Open larger view: Square resin keepsake filled with cream, peach, and green dried flowers"><img src="assets/studio-floral-square-keepsake.jpeg" alt="Square resin keepsake filled with cream, peach, and green dried flowers" width="1080" height="1188" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Pressed flower square</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> First bouquet, forever close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,999</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-3"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-hexagon-keepsake.jpeg" aria-label="Open larger view: Hexagonal resin keepsake with pressed flowers in pink, peach, and lilac tones"><img src="assets/studio-floral-hexagon-keepsake.jpeg" alt="Hexagonal resin keepsake with pressed flowers in pink, peach, and lilac tones" width="959" height="1073" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Lilac flower hexagon</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> Handwritten note, kept close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,999</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-handled-tray.jpeg" aria-label="Open larger view: Clear handled resin tray with a colourful pressed-flower arrangement"><img src="assets/studio-floral-handled-tray.jpeg" alt="Clear handled resin tray with a colourful pressed-flower arrangement" width="851" height="1207" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Handled flower tray</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> Special-day flower, remembered.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹2,299</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal" id="floral-memory-frame" data-featured="true"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-floral-memory-frame.webp" aria-label="Open larger view: Original concept preview of a soft-arch floral memory frame"><img src="assets/concept-floral-memory-frame.webp" alt="Original concept preview: Soft-arch clear resin memory frame with dried blush roses and restrained gold flecks" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>Your flowers, held close</strong><p>A soft arch for the flowers and small date that belong to one favourite day.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹3,999</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-1"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-ocean-clock.webp" aria-label="Open larger view: Original concept preview of a blue and ivory shoreline resin clock"><img src="assets/concept-ocean-clock.webp" alt="Original concept preview: Round blue and ivory shoreline-inspired resin clock with restrained gold leaf" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>A little blue hour</strong><p>A shoreline-inspired clock for the room that could use a little more calm.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹2,199</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-tray-hamper.webp" aria-label="Open larger view: Original concept preview of a lilac handled celebration tray"><img src="assets/concept-tray-hamper.webp" alt="Original concept preview: Lilac handled resin tray with small wrapped gifts, a blank note card, and dried floral styling" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>A tray full of celebration</strong><p>A lilac tray to gather a few thoughtful surprises around one occasion.</p><p>Contents chosen separately; pictured styling is not included by default.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,499</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-3"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-floral-coasters.webp" aria-label="Open larger view: Original concept preview of four pressed-flower resin coasters"><img src="assets/concept-floral-coasters.webp" alt="Original concept preview: Four clear and lilac pressed-flower resin coasters with restrained gold detail" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>Little messages, shared</strong><p>Four small places for personal lettering, pressed flowers, and everyday rituals.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹999</dd></div></dl></figcaption></figure></article>
           <article class="work-card work-card-tall reveal">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/resin-clock.jpg" aria-label="Open larger view: Blue and gold resin clock with a cloud-like white centre"><img src="assets/resin-clock.jpg" alt="Blue and gold resin clock with a cloud-like white centre" width="540" height="960" loading="lazy"></a><figcaption><span>Resin art</span><strong>Blue hour resin clock</strong><p>A little sky, a little shoreline, and a moment that keeps time.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,999</s></dd></div><div><dt>Festive price</dt><dd>₹2,199</dd></div><div><dt>Discount</dt><dd>27% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/resin-clock.jpg" aria-label="Open larger view: Blue and gold resin clock with a cloud-like white centre"><img src="assets/resin-clock.jpg" alt="Blue and gold resin clock with a cloud-like white centre" width="540" height="960" loading="lazy"></a><figcaption><span>Resin art</span><strong>Blue hour resin clock</strong><p>A little sky, a little shoreline, and a moment that keeps time.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹2,199</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card work-card-tall reveal reveal-delay-1">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/resin-message-coasters.jpg" aria-label="Open larger view: Six black message coasters with colourful hand-drawn food and love motifs"><img src="assets/resin-message-coasters.jpg" alt="Six black message coasters with colourful hand-drawn food and love motifs" width="640" height="1136" loading="lazy"></a><figcaption><span>Personalized set</span><strong>Personalized message coasters</strong><p>Playful coasters for the person who makes ordinary days better.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹1,799</s></dd></div><div><dt>Festive price</dt><dd>₹1,299</dd></div><div><dt>Discount</dt><dd>28% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/resin-message-coasters.jpg" aria-label="Open larger view: Six black message coasters with colourful hand-drawn food and love motifs"><img src="assets/resin-message-coasters.jpg" alt="Six black message coasters with colourful hand-drawn food and love motifs" width="640" height="1136" loading="lazy"></a><figcaption><span>Personalized set</span><strong>Personalized message coasters</strong><p>Playful coasters for the person who makes ordinary days better.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,299</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card work-card-tall reveal reveal-delay-2" id="navkar-resin-frame">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/navkar-resin-frame.jpg" aria-label="Open larger view: White and gold resin wall frame displaying a Navkar mantra"><img src="assets/navkar-resin-frame.jpg" alt="White and gold resin wall frame displaying a Navkar mantra" width="540" height="960" loading="lazy"></a><figcaption><span>Wall decor</span><strong>Namokar mantra resin frame</strong><p>Soft white texture, gold detail, and words that belong at home.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹4,499</s></dd></div><div><dt>Festive price</dt><dd>₹3,499</dd></div><div><dt>Discount</dt><dd>22% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/navkar-resin-frame.jpg" aria-label="Open larger view: White and gold resin wall frame displaying a Navkar mantra"><img src="assets/navkar-resin-frame.jpg" alt="White and gold resin wall frame displaying a Navkar mantra" width="540" height="960" loading="lazy"></a><figcaption><span>Wall decor</span><strong>Namokar mantra resin frame</strong><p>Soft white texture, gold detail, and words that belong at home.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹3,499</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card work-card-tall reveal reveal-delay-3">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/personalized-floral-hoop.jpg" aria-label="Open larger view: Floral embroidered hoop with a small pair of golden footprints in the centre"><img src="assets/personalized-floral-hoop.jpg" alt="Floral embroidered hoop with a small pair of golden footprints in the centre" width="540" height="960" loading="lazy"></a><figcaption><span>Personalized keepsake</span><strong>A tiny beginning</strong><p>Floral detail arranged around a memory worth marking.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹999</s></dd></div><div><dt>Festive price</dt><dd>₹599</dd></div><div><dt>Discount</dt><dd>40% off</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/personalized-floral-hoop.jpg" aria-label="Open larger view: Floral embroidered hoop with a small pair of golden footprints in the centre"><img src="assets/personalized-floral-hoop.jpg" alt="Floral embroidered hoop with a small pair of golden footprints in the centre" width="540" height="960" loading="lazy"></a><figcaption><span>Personalized keepsake</span><strong>A tiny beginning</strong><p>Floral detail arranged around a memory worth marking.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹599</dd></div></dl></figcaption></figure>
           </article>
         </div>
       </div>
@@ -552,9 +591,9 @@
       </div>
       <div class="carousel">
         <div class="carousel-track" id="hamper-track" data-carousel-track tabindex="0" aria-label="Occasion hampers">
-          <article class="work-card work-card-hamper reveal" id="birthday-hamper"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/birthday-hamper.jpg" aria-label="Open larger view: Blue and white birthday hamper filled with chocolate, flowers, and photo details"><img src="assets/birthday-hamper.jpg" alt="Blue and white birthday hamper filled with chocolate, flowers, and photo details" width="540" height="960" loading="lazy"></a><figcaption><span>Birthday</span><strong>A whole birthday mood</strong><p>Bright flowers, favourite treats, and details that say this was made for them.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,499</s></dd></div><div><dt>Festive price</dt><dd>₹1,799</dd></div><div><dt>Discount</dt><dd>28% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card work-card-hamper reveal reveal-delay-1" id="car-theme-hamper"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/car-theme-hamper.jpg" aria-label="Open larger view: Car-themed hamper arranged with toy cars, checkered flags, snacks, and a race-day backdrop"><img src="assets/car-theme-hamper.jpg" alt="Car-themed hamper arranged with toy cars, checkered flags, snacks, and a race-day backdrop" width="540" height="960" loading="lazy"></a><figcaption><span>Theme hamper</span><strong>Built around the obsession</strong><p>When their favourite thing is the starting point, the whole gift can follow.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,499</s></dd></div><div><dt>Festive price</dt><dd>₹1,799</dd></div><div><dt>Discount</dt><dd>28% off</dd></div></dl></figcaption></figure></article>
-          <article class="work-card work-card-hamper reveal reveal-delay-2" id="holi-hamper"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/holi-hamper.webp" aria-label="Open larger view: Colourful Holi hamper with paper fan, bright treats, and playful festive decorations"><img src="assets/holi-hamper.webp" alt="Colourful Holi hamper with paper fan, bright treats, and playful festive decorations" width="1080" height="1080" loading="lazy"></a><figcaption><span>Festival</span><strong>Colour for Holi</strong><p>A festive arrangement full of colour, treats, and a reason to gather.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Regular price</dt><dd><s>₹2,199</s></dd></div><div><dt>Festive price</dt><dd>₹1,499</dd></div><div><dt>Discount</dt><dd>32% off</dd></div></dl></figcaption></figure></article>
+          <article class="work-card work-card-hamper reveal" id="birthday-hamper" data-featured="true"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/birthday-hamper.jpg" aria-label="Open larger view: Blue and white birthday hamper filled with chocolate, flowers, and photo details"><img src="assets/birthday-hamper.jpg" alt="Blue and white birthday hamper filled with chocolate, flowers, and photo details" width="540" height="960" loading="lazy"></a><figcaption><span>Birthday</span><strong>A whole birthday mood</strong><p>Bright flowers, favourite treats, and details that say this was made for them.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,799</dd></div></dl></figcaption></figure></article>
+          <article class="work-card work-card-hamper reveal reveal-delay-1" id="car-theme-hamper" data-featured="true"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/car-theme-hamper.jpg" aria-label="Open larger view: Car-themed hamper arranged with toy cars, checkered flags, snacks, and a race-day backdrop"><img src="assets/car-theme-hamper.jpg" alt="Car-themed hamper arranged with toy cars, checkered flags, snacks, and a race-day backdrop" width="540" height="960" loading="lazy"></a><figcaption><span>Theme hamper</span><strong>Built around the obsession</strong><p>When their favourite thing is the starting point, the whole gift can follow.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,799</dd></div></dl></figcaption></figure></article>
+          <article class="work-card work-card-hamper reveal reveal-delay-2" id="holi-hamper"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/holi-hamper.webp" aria-label="Open larger view: Colourful Holi hamper with paper fan, bright treats, and playful festive decorations"><img src="assets/holi-hamper.webp" alt="Colourful Holi hamper with paper fan, bright treats, and playful festive decorations" width="1080" height="1080" loading="lazy"></a><figcaption><span>Festival</span><strong>Colour for Holi</strong><p>A festive arrangement full of colour, treats, and a reason to gather.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,499</dd></div></dl></figcaption></figure></article>
 
         </div>
       </div>
@@ -570,8 +609,45 @@
 
       <div class="customizer-layout">
         <form class="customizer-form" id="customizer-form" novalidate>
-          <fieldset class="customizer-fieldset">
-            <legend>Frame shape and finish</legend>
+          <fieldset class="customizer-fieldset customizer-basics">
+            <legend>Start with the basics</legend>
+            <label for="frame-template">Template
+              <select id="frame-template" name="frame-template">
+                <option value="soft-bloom">Soft bloom</option>
+                <option value="golden-memory">Golden memory</option>
+                <option value="minimal-keepsake">Minimal keepsake</option>
+              </select>
+            </label>
+            <label for="colour-theme">Colour theme
+              <select id="colour-theme" name="colour-theme">
+                <option value="warm-rose">Warm rose</option>
+                <option value="ocean-blue">Ocean blue</option>
+                <option value="ivory-gold">Ivory and gold</option>
+              </select>
+            </label>
+            <p class="field-hint">Add a photo or message below, then adjust only the details you want.</p>
+          </fieldset>
+
+          <fieldset class="customizer-fieldset customizer-personal">
+            <legend>Personal details</legend>
+            <label for="personal-text">Text
+              <textarea id="personal-text" name="personal-text" rows="5" placeholder="One line per row" aria-describedby="personal-text-hint"></textarea>
+            </label>
+            <p class="field-hint" id="personal-text-hint">One line per row. Line breaks stay in the preview.</p>
+            <p class="customizer-status" id="text-status" role="status" aria-live="polite"></p>
+            <label for="reference-image">One local reference image
+              <input id="reference-image" name="reference-image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+            </label>
+            <p class="field-hint">JPG, PNG, or WebP · up to 10MB. The image stays on this device.</p>
+            <p class="customizer-status" id="image-status" role="status" aria-live="polite"></p>
+            <div class="image-actions" id="image-actions" hidden>
+              <button class="mini-button" id="replace-image" type="button">Replace image</button>
+              <button class="mini-button" id="remove-image" type="button">Remove image</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="customizer-fieldset customizer-frame-size">
+            <legend>Frame shape and size</legend>
             <label for="frame-type">Frame type
               <select id="frame-type" name="frame-type">
                 <option value="square">Square keepsake</option>
@@ -603,6 +679,8 @@
             <p class="dimension-note" id="frame-dimension-label" role="status" aria-live="polite">Square · 8 × 8 in</p>
           </fieldset>
 
+          <details class="customizer-advanced" id="customizer-advanced">
+            <summary>Advanced options</summary>
           <fieldset class="customizer-fieldset">
             <legend>Colour story</legend>
             <div class="colour-control">
@@ -643,18 +721,6 @@
               <p class="colour-error" id="text-colour-error" role="alert" aria-live="polite" hidden>Use 6 hex digits, for example #2C2523.</p>
             </div>
           </fieldset>
-
-          <fieldset class="customizer-fieldset">
-            <legend>Personal details</legend>
-            <label for="personal-text">Text
-              <textarea id="personal-text" name="personal-text" rows="5" placeholder="One line per row" aria-describedby="personal-text-hint"></textarea>
-            </label>
-            <p class="field-hint" id="personal-text-hint">One line per row. Line breaks stay in the preview.</p>
-            <p class="customizer-status" id="text-status" role="status" aria-live="polite"></p>
-            <label for="reference-image">One local reference image
-              <input id="reference-image" name="reference-image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
-            </label>
-            <p class="field-hint">JPG, PNG, or WebP · up to 10MB. The image stays on this device.</p>
             <div class="image-layout-controls" id="image-layout-controls" aria-describedby="image-placement-hint">
               <div class="range-control">
                 <label for="image-size">Image size <output id="image-size-value" for="image-size">Default</output></label>
@@ -687,14 +753,7 @@
               </details>
             </div>
             <p class="field-hint" id="image-placement-hint">Drag the image to place it. Arrow keys move it when the preview is focused. Size and crop zoom are independent.</p>
-            <p class="customizer-status" id="image-status" role="status" aria-live="polite"></p>
-            <div class="image-actions" id="image-actions" hidden>
-              <button class="mini-button" id="replace-image" type="button">Replace image</button>
-              <button class="mini-button" id="remove-image" type="button">Remove image</button>
-            </div>
-          </fieldset>
-
-          <fieldset class="customizer-fieldset">
+            <fieldset class="customizer-fieldset">
             <legend>Finishing touches</legend>
             <div class="choice-grid" aria-label="Optional frame details">
               <label class="choice-chip" for="detail-stones"><input id="detail-stones" type="checkbox" name="details" value="Stones"> Faceted stones</label>
@@ -715,7 +774,8 @@
               <button class="mini-button" id="paint-clear" type="button">Clear paint</button>
             </div>
             <p class="field-hint">The brush cursor is a local guide and is not included in the PNG.</p>
-          </fieldset>
+            </fieldset>
+          </details>
 
           <div class="customizer-actions">
             <button class="button button-line" id="customizer-reset" type="button">Reset choices</button>
@@ -744,8 +804,9 @@
             <button class="button button-line download-button" id="share-design" type="button" aria-describedby="share-guidance">Share design</button>
             <p class="share-guidance" id="share-guidance">Optional native Share can pass the PNG and summary to the destination you choose. Some apps may omit the text or PNG; for Instagram, use the manual steps above.</p>
             <p class="customizer-status" id="share-status" role="status" aria-live="polite"></p>
-            <button class="button button-dark download-button" id="order-from-customizer" type="button" data-order-prefill="customizer">Start an order from this design</button>
-            <p class="share-guidance">The order form can receive the design summary. If you want to include the customizer PNG, download it and attach it in the form.</p>
+            <button class="button button-dark download-button" id="order-from-customizer" type="button" data-order-prefill="customizer">Request this design</button>
+            <button class="button button-line download-button" id="customizer-design-help" type="button" data-order-prefill="general">Let Saloni design it for me</button>
+            <p class="share-guidance">This request carries the current design summary and size. Automatic PNG handoff stays deferred until the request form can validate it safely; attach a downloaded PNG separately if needed.</p>
           </div>
         </div>
       </div>
@@ -805,8 +866,8 @@
       <div class="order-copy reveal"><p class="eyebrow">Start a conversation</p><h2 id="order-title">Tell us the moment. We’ll talk through the piece.</h2><p>Every order starts with a few details. Choose a catalogue piece or start with your customizer design, then edit the visible request fields before sending.</p><p>Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM. Shipping across India.</p><p class="order-privacy-note">Order details and an optional image are stored in the studio’s private Google Sheet and restricted Drive folder for handling. Customer requests and uploaded images are scheduled for deletion after 90 days; partner attribution and private commission records are retained for payout records. Request correction or deletion through <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p><div class="ordering-questions" aria-label="Ordering questions"><details><summary>What can I personalize?</summary><p>Choose colours, words, and a theme; discuss the details with Saloni.</p></details><details><summary>Is the preview final?</summary><p>The customizer preview is illustrative. Saloni confirms the final size, materials, and quote.</p></details><details><summary>How do I order?</summary><p>Send a request here. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed by this form.</p></details></div></div>
       <div class="order-panel order-form-panel reveal reveal-delay" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"><p class="order-final-quote-note">Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.</p>
         <p class="panel-label">Order request</p>
-        <p class="panel-note">Select “Start an order” on a catalogue card or the customizer. The request form stays here while you browse.</p>
-        <div class="order-form-status" id="order-form-status" role="status" aria-live="polite">Select “Start an order” on a catalogue card or the customizer to begin. You can still call Saloni at <a href="tel:8209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.</div>
+            <p class="panel-note">Select “Request this item” on a catalogue card, “Request this design” in the customizer, or request a custom gift. The form stays here while you browse.</p>
+            <div class="order-form-status" id="order-form-status" role="status" aria-live="polite">Choose a product, a customizer design, or a general custom gift request to begin. You can still call Saloni at <a href="tel:8209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.</div>
         <iframe id="order-form-frame" name="saloni-order-form-frame" title="Saloni Resin Art Studio order request form" loading="lazy" hidden></iframe>
       </div>
     </section>
@@ -819,23 +880,6 @@
       <p class="footer-credit">© Saloni Resin Art Studio</p>
     </div>
   </footer>
-
-  <dialog class="festive-dialog" id="festive-offers" aria-labelledby="festive-offers-title">
-    <div class="festive-dialog-panel">
-      <form method="dialog" class="festive-dialog-close-form">
-        <button class="festive-dialog-close" type="submit" aria-label="Close festive offers"><span aria-hidden="true">×</span></button>
-      </form>
-      <div class="festive-dialog-copy">
-        <p class="eyebrow">A seasonal note</p>
-        <h2 id="festive-offers-title">Festive offers for Diwali &amp; Navratri.</h2>
-        <p>Celebrate with special discounts. Contact Saloni for offer details.</p>
-      </div>
-      <div class="festive-dialog-actions">
-        <a class="button button-dark" href="tel:8209238541">Call Saloni <span aria-hidden="true">↗</span></a>
-        <a class="button button-line" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Instagram <span aria-hidden="true">↗</span></a>
-      </div>
-    </div>
-  </dialog>
 
   <dialog class="lightbox-dialog" id="art-lightbox" aria-labelledby="lightbox-title">
     <div class="lightbox-panel">
@@ -850,16 +894,5 @@
     </div>
   </dialog>
 
-  <noscript>
-    <section class="festive-dialog-panel festive-noscript shell" id="festive-offers-fallback" aria-labelledby="festive-offers-fallback-title">
-      <p class="eyebrow">A seasonal note</p>
-      <h2 id="festive-offers-fallback-title">Festive offers for Diwali &amp; Navratri.</h2>
-      <p>Celebrate with special discounts. Contact Saloni for offer details.</p>
-      <div class="festive-noscript-actions">
-        <a class="button button-dark" href="tel:8209238541">Call Saloni <span aria-hidden="true">↗</span></a>
-        <a class="button button-line" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Instagram <span aria-hidden="true">↗</span></a>
-      </div>
-    </section>
-  </noscript>
 </body>
 </html>

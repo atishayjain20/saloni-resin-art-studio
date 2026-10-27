@@ -391,6 +391,8 @@
     var borderStyle = document.getElementById("border-style");
     var framePreset = document.getElementById("frame-preset");
     var frameUnit = document.getElementById("frame-unit");
+    var frameTemplate = document.getElementById("frame-template");
+    var colourTheme = document.getElementById("colour-theme");
     var frameDimensionLabel = document.getElementById("frame-dimension-label");
     var previewDimensionLabel = document.getElementById("preview-dimension-label");
     var referenceImage = document.getElementById("reference-image");
@@ -563,6 +565,35 @@
       return Array.prototype.slice.call(form.querySelectorAll('input[name="details"]:checked')).map(function (input) {
         return input.value;
       });
+    }
+
+    function applyPalette(palette) {
+      Object.keys(palette).forEach(function (name) { setColour(name, palette[name]); });
+    }
+
+    function applyTemplate(template) {
+      var presets = {
+        "soft-bloom": { type: "square", border: "scalloped", size: "8", theme: "warm-rose" },
+        "golden-memory": { type: "arch", border: "gold", size: "10", theme: "ivory-gold" },
+        "minimal-keepsake": { type: "round", border: "stones", size: "6", theme: "ocean-blue" }
+      };
+      var preset = presets[template] || presets["soft-bloom"];
+      frameType.value = preset.type;
+      borderStyle.value = preset.border;
+      framePreset.value = preset.size;
+      if (colourTheme) colourTheme.value = preset.theme;
+      applyColourTheme(preset.theme);
+      endPhotoDrag();
+      renderPreview();
+    }
+
+    function applyColourTheme(theme) {
+      var palettes = {
+        "warm-rose": { filling: "#C7A5CC", brush: "#D1A24B", paint: "#C96572", border: "#D8C9B9", text: "#2C2523" },
+        "ocean-blue": { filling: "#B7D4E5", brush: "#4C80A8", paint: "#C96572", border: "#D2D8DD", text: "#203039" },
+        "ivory-gold": { filling: "#F1E3C5", brush: "#D1A24B", paint: "#B66A5D", border: "#C7B58D", text: "#2C2523" }
+      };
+      applyPalette(palettes[theme] || palettes["warm-rose"]);
     }
 
     function hexToRgb(hex) {
@@ -1627,6 +1658,8 @@
     downloadPreview.addEventListener("click", downloadPng);
     shareDesign.addEventListener("click", shareDesignNow);
     reset.addEventListener("click", resetCustomiser);
+    frameTemplate.addEventListener("change", function () { applyTemplate(frameTemplate.value); });
+    colourTheme.addEventListener("change", function () { applyColourTheme(colourTheme.value); renderPreview(); });
     frameType.addEventListener("change", endPhotoDrag);
     borderStyle.addEventListener("change", endPhotoDrag);
     framePreset.addEventListener("change", endPhotoDrag);
