@@ -87,7 +87,6 @@
     var navToggle = document.getElementById("nav-toggle");
     var siteNav = document.getElementById("primary-navigation");
     if (navToggle && siteNav) {
-      var festiveDialog = document.getElementById("festive-offers");
       var navClosedIcon = navToggle.querySelector(".nav-toggle-closed");
       var navOpenIcon = navToggle.querySelector(".nav-toggle-open");
       function setNavOpen(open, restoreFocus) {
@@ -100,7 +99,7 @@
       }
       navToggle.addEventListener("click", function () { setNavOpen(navToggle.getAttribute("aria-expanded") !== "true"); });
       siteNav.querySelectorAll("a").forEach(function (link) { link.addEventListener("click", function () { setNavOpen(false); }); });
-      document.addEventListener("keydown", function (event) { if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true" && (!festiveDialog || !festiveDialog.open)) setNavOpen(false, true); });
+      document.addEventListener("keydown", function (event) { if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true") setNavOpen(false, true); });
     }
 
     document.querySelectorAll("[data-carousel]").forEach(function (carousel) {
@@ -110,7 +109,9 @@
       if (!track || !previous || !next) return;
 
       function stepSize() {
-        var firstCard = track.firstElementChild;
+        var firstCard = Array.prototype.find.call(track.children || [], function (card) {
+          return !card.hidden && (!card.getAttribute || card.getAttribute("aria-hidden") !== "true");
+        });
         if (!firstCard) return track.clientWidth * 0.85;
         var styles = window.getComputedStyle(track);
         var gap = parseFloat(styles.columnGap || styles.gap || "0");
@@ -118,9 +119,16 @@
       }
 
       function updateControls() {
-        var maxScroll = track.scrollWidth - track.clientWidth - 2;
+        var maxScroll = Math.max(0, track.scrollWidth - track.clientWidth - 2);
         previous.disabled = track.scrollLeft <= 2;
         next.disabled = track.scrollLeft >= maxScroll;
+      }
+
+      function refreshControls(resetScroll) {
+        if (resetScroll) track.scrollLeft = 0;
+        var maxScroll = Math.max(0, track.scrollWidth - track.clientWidth - 2);
+        if (track.scrollLeft > maxScroll) track.scrollLeft = maxScroll;
+        updateControls();
       }
 
       function move(direction) {
@@ -138,7 +146,8 @@
       });
       track.addEventListener("scroll", updateControls, { passive: true });
       window.addEventListener("resize", updateControls, { passive: true });
-      updateControls();
+      carousel.refreshControls = refreshControls;
+      refreshControls(false);
       carousel.classList.add("is-ready");
     });
 
@@ -173,64 +182,7 @@
       });
     }
 
-    function initFestiveOffers() {
-      var dialog = document.getElementById("festive-offers");
-      var trigger = document.querySelector('[aria-controls="festive-offers"]');
-      if (!dialog || !trigger) return;
-
-      var storageKey = "saloniFestiveOfferSeen";
-      var restoreTarget = null;
-
-      function meaningfulFocusTarget(target) {
-        if (!target || target === document.body || target === document.documentElement || typeof target.focus !== "function") return null;
-        return target;
-      }
-
-      function contactFallback() {
-        try {
-          if (window.location) window.location.href = "tel:8209238541";
-        } catch (error) {}
-      }
-
-      function openDialog(manual) {
-        if (typeof dialog.showModal !== "function") {
-          if (manual) contactFallback();
-          return false;
-        }
-        restoreTarget = manual ? trigger : meaningfulFocusTarget(document.activeElement);
-        try {
-          dialog.showModal();
-        } catch (error) {
-          restoreTarget = null;
-          if (manual) contactFallback();
-          return false;
-        }
-        if (!manual) {
-          try {
-            if (window.localStorage) window.localStorage.setItem(storageKey, "1");
-          } catch (error) {}
-        }
-        return true;
-      }
-
-      dialog.addEventListener("close", function () {
-        var target = restoreTarget;
-        restoreTarget = null;
-        if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
-      });
-      trigger.addEventListener("click", function (event) {
-        event.preventDefault();
-        openDialog(true);
-      });
-
-      var seen = false;
-      try {
-        seen = !!window.localStorage && window.localStorage.getItem(storageKey) === "1";
-      } catch (error) {}
-      if (!seen) openDialog(false);
-    }
-
-    initFestiveOffers();
+    initCatalogueExperience();
 
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll("[data-carousel-track] > :nth-child(-n+2)").forEach(function (element) {
@@ -254,6 +206,158 @@
 
     initReferralAttribution();
     initOrderRequestFlow();
+  }
+
+  function refreshCatalogueCarousels(resetScroll) {
+    document.querySelectorAll("[data-carousel]").forEach(function (carousel) {
+      if (typeof carousel.refreshControls === "function") carousel.refreshControls(resetScroll === true);
+    });
+  }
+
+  function initCatalogueExperience() {
+    var tools = document.getElementById("catalogue-filters");
+    var typeFilter = document.getElementById("catalogue-type-filter");
+    var priceFilter = document.getElementById("catalogue-price-filter");
+    var resetButton = document.getElementById("catalogue-filter-reset");
+    var emptyReset = document.getElementById("catalogue-empty-reset");
+    var status = document.getElementById("catalogue-filter-status");
+    var empty = document.getElementById("catalogue-filter-empty");
+    if (!tools || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty) return;
+
+    var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
+      return !card.closest || !card.closest("#testimonials");
+    });
+    var sections = [];
+    var allVisible = false;
+
+    function sectionFor(card) {
+      var section = card.closest ? card.closest("section") : null;
+      if (section && sections.indexOf(section) === -1) sections.push(section);
+      return section;
+    }
+
+    function typeFor(card) {
+      var section = sectionFor(card);
+      var id = section ? section.id : "";
+      if (id === "romantic-keepsakes") return "couple";
+      if (id === "diwali") return "diwali";
+      if (id === "corporate-resin-gifts") return "corporate";
+      if (id === "hamper-rail") return "hampers";
+      return "frames";
+    }
+
+    function priceFor(card) {
+      var value = card.querySelector(".product-pricing dd");
+      var numbers = value ? value.textContent.match(/[0-9][0-9,]*/g) : null;
+      if (!numbers || !numbers.length) return null;
+      numbers = numbers.map(function (number) { return Number(number.replace(/,/g, "")); }).filter(function (number) { return Number.isFinite(number); });
+      if (!numbers.length) return null;
+      return { min: Math.min.apply(Math, numbers), max: Math.max.apply(Math, numbers) };
+    }
+
+    function matchesPrice(card, selected) {
+      if (selected === "all") return true;
+      var price = priceFor(card);
+      if (!price) return false;
+      var limit = Number(selected);
+      if (!Number.isFinite(limit)) return true;
+      if (limit === 2000) return price.min >= 2000;
+      return price.max <= limit;
+    }
+
+    function setVisibility(card, visible) {
+      card.hidden = !visible;
+      if (visible) card.removeAttribute("aria-hidden");
+      else card.setAttribute("aria-hidden", "true");
+    }
+
+    function applyFilters() {
+      var selectedType = typeFilter.value || "all";
+      var selectedPrice = priceFilter.value || "all";
+      var count = 0;
+      cards.forEach(function (card) {
+        var type = typeFor(card);
+        var price = priceFor(card);
+        card.setAttribute("data-product-type", type);
+        if (price) {
+          card.setAttribute("data-price-min", String(price.min));
+          card.setAttribute("data-price-max", String(price.max));
+        } else {
+          card.removeAttribute("data-price-min");
+          card.removeAttribute("data-price-max");
+        }
+        var visible = (allVisible || card.getAttribute("data-featured") === "true") && (selectedType === "all" || selectedType === type) && matchesPrice(card, selectedPrice);
+        setVisibility(card, visible);
+        if (visible) count += 1;
+      });
+      sections.forEach(function (section) {
+        var hasVisibleCard = cards.some(function (card) { return card.closest && card.closest("section") === section && !card.hidden; });
+        section.hidden = !hasVisibleCard;
+      });
+      empty.hidden = count !== 0;
+      var hasFilters = selectedType !== "all" || selectedPrice !== "all";
+      status.textContent = count + (count === 1 ? " gift" : " gifts") + " shown." + (hasFilters ? " Filters are applied." : allVisible ? " Browse the full collection." : " Featured picks are shown first.");
+      refreshCatalogueCarousels(true);
+      document.documentElement.classList.add("catalogue-ready");
+    }
+
+    function showAll() {
+      allVisible = true;
+      typeFilter.value = "all";
+      priceFilter.value = "all";
+      applyFilters();
+    }
+
+    function scrollToHash(href) {
+      var id = String(href || "").replace(/^#/, "");
+      var target = id ? document.getElementById(id) : null;
+      if (target && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
+    }
+
+    document.querySelectorAll("[data-browse-all]").forEach(function (link) {
+      link.addEventListener("click", function (event) {
+        event.preventDefault();
+        showAll();
+        scrollToHash(link.getAttribute("href") || "#catalogue-filters");
+      });
+    });
+    document.querySelectorAll("[data-category-shortcut]").forEach(function (link) {
+      link.addEventListener("click", function (event) {
+        var category = link.getAttribute("data-category-shortcut");
+        if (!category) return;
+        event.preventDefault();
+        allVisible = true;
+        typeFilter.value = category;
+        priceFilter.value = "all";
+        applyFilters();
+        scrollToHash(link.getAttribute("href"));
+      });
+    });
+    typeFilter.addEventListener("change", function () { allVisible = true; applyFilters(); });
+    priceFilter.addEventListener("change", function () { allVisible = true; applyFilters(); });
+    resetButton.addEventListener("click", function () {
+      allVisible = false;
+      typeFilter.value = "all";
+      priceFilter.value = "all";
+      applyFilters();
+    });
+    emptyReset.addEventListener("click", showAll);
+    window.addEventListener("hashchange", function () {
+      var target = document.getElementById(String(window.location.hash || "").replace(/^#/, ""));
+      if (!target || (!target.matches || (!target.matches("article") && !target.matches("section")))) return;
+      if (target.matches("article") || target.querySelector(".work-card, .romantic-keepsake-card")) {
+        showAll();
+        scrollToHash(target.id);
+      }
+    });
+
+    if (window.location && window.location.hash) {
+      var initialTarget = document.getElementById(String(window.location.hash).replace(/^#/, ""));
+      if (initialTarget && (initialTarget.matches("article") || (initialTarget.matches("section") && initialTarget.querySelector(".work-card, .romantic-keepsake-card")))) showAll();
+      else applyFilters();
+    } else {
+      applyFilters();
+    }
   }
 
   function initOrderRequestFlow() {
@@ -466,10 +570,8 @@
       if (!image || !title) return null;
       var sourceId = "catalogue:" + image.getAttribute("src").replace(/^assets\//, "");
       var details = Array.prototype.map.call(card.querySelectorAll("figcaption p"), function (node) { return node.textContent.trim(); }).join(" ");
-      var disclosure = card.querySelector("figcaption span");
-      if (disclosure && disclosure.textContent.trim() === "Concept preview · made to order") {
-        details += (details ? " " : "") + disclosure.textContent.trim();
-      }
+      var cardCopy = (card.textContent || "") + " " + (image.alt || "");
+      if (/concept preview|reference design|gifting concept/i.test(cardCopy)) details += (details ? " " : "") + "Illustrative/reference image; final design to confirm with Saloni.";
       var pricingDetails = Array.prototype.map.call(card.querySelectorAll(".product-pricing > div"), function (row) {
         var priceLabel = row.querySelector("dt");
         var priceValue = row.querySelector("dd");
@@ -485,7 +587,7 @@
       if (!seed || !caption || caption.querySelector("[data-order-prefill]")) return;
       var button = document.createElement("button");
       button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "catalogue");
-      button.textContent = "Start an order";
+      button.textContent = "Request this item";
       button.addEventListener("click", function () { chooseSource(seed); });
       caption.appendChild(button);
     });
@@ -511,6 +613,16 @@
         });
       });
     }
+
+    document.querySelectorAll('[data-order-prefill="general"]').forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        if (event && event.preventDefault) event.preventDefault();
+        chooseSource({
+          sourceKind: "catalogue", sourceId: "catalogue:general-custom-gift", productName: "Custom gift enquiry",
+          designDetails: "General custom gift enquiry. Saloni will confirm the occasion, size, materials, quote, and delivery."
+        });
+      });
+    });
   }
   if (document.readyState === "loading" || document.readyState === undefined) document.addEventListener("DOMContentLoaded", initializePage);
   else initializePage();
