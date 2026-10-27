@@ -261,7 +261,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(happy_diwali_pricing.count("<dt"), 3)
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".diwali-section", css)
-        self.assertRegex(css, r"\.diwali-section \.work-card img\s*\{[^}]*aspect-ratio:\s*1\s*[/]?\s*1[^}]*object-fit:\s*contain")
+        self.assertRegex(css, r":is\(\.work-card, \.romantic-keepsake-card, \.collection-card\) img\s*\{[^}]*aspect-ratio:\s*1\s*/\s*1[^}]*object-fit:\s*cover")
         self.assertRegex(css, r"\.diwali-section \.eyebrow, \.diwali-section \.work-card figcaption span\s*\{[^}]*color:\s*var\(--cocoa\)")
         self.assertNotRegex(css, r"\.diwali-section \.eyebrow, \.diwali-section \.work-card figcaption span\s*\{[^}]*var\(--marigold\)")
         self.assertRegex(css, r"\.diwali-section \.diwali-card-note\s*\{[^}]*color:\s*var\(--cocoa\)")
@@ -480,6 +480,28 @@ class StaticSiteContractTests(unittest.TestCase):
 
         self.assertIn("height: auto", figure_rule)
         self.assertIn("height: auto", caption_rule)
+
+    def test_product_card_images_share_square_cover_inset_geometry(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        shared = re.search(r":is\(\.work-card, \.romantic-keepsake-card, \.collection-card\) img\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(shared)
+        shared_rule = shared.group(1)
+        self.assertRegex(shared_rule, r"aspect-ratio:\s*1\s*/\s*1")
+        self.assertRegex(shared_rule, r"object-fit:\s*cover")
+        self.assertRegex(shared_rule, r"object-position:\s*center")
+        self.assertRegex(shared_rule, r"padding:\s*0\.5rem")
+        self.assertRegex(shared_rule, r"background:\s*var\(--paper\)")
+
+        for selector in (
+            r"\.romantic-keepsake-card img",
+            r"\.diwali-section \.work-card img",
+            r"\.work-card img",
+            r"\.work-card-hamper img",
+            r"\.studio-art-section \.work-card img",
+            r"\.collection-card img",
+        ):
+            with self.subTest(selector=selector):
+                self.assertNotRegex(css, rf"{selector}\s*\{{[^}}]*(?:aspect-ratio|object-fit|object-position|padding|height):")
 
     def test_collection_pages_have_distinct_buying_guidance(self):
         guidance = {
@@ -732,7 +754,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn(".romantic-keepsakes", css)
         self.assertIn(".carousel-track", css)
         self.assertRegex(css, r"\.romantic-keepsake-notes-label\s*\{[^}]*grid-column:\s*1 / -1")
-        self.assertRegex(css, r"\.romantic-keepsake-card img\s*\{[^}]*object-fit:\s*contain")
+        self.assertRegex(css, r":is\(\.work-card, \.romantic-keepsake-card, \.collection-card\) img\s*\{[^}]*object-fit:\s*cover")
         self.assertRegex(css, r"\.romantic-keepsake-card figcaption > p:first-of-type, \.studio-art-section \.work-card figcaption > p:first-of-type\s*\{[^}]*font-size:\s*0\.75rem")
         self.assertRegex(css, r"\.carousel-track\s*\{[^}]*grid-auto-flow:\s*column[^}]*overflow-x:\s*auto")
         medium_media = re.search(r"@media \(max-width: 840px\) \{([\s\S]*?)\n\}\n\n@media \(max-width: 620px\)", css)
@@ -741,7 +763,7 @@ class StaticSiteContractTests(unittest.TestCase):
         small_media = re.search(r"@media \(max-width: 620px\) \{([\s\S]*?)\n\}\n\n@media \(prefers-reduced-motion: reduce\)", css)
         self.assertIsNotNone(small_media)
         self.assertRegex(small_media.group(1), r"\.romantic-keepsake-card\s*\{[^}]*padding:\s*0\.7rem")
-        self.assertRegex(small_media.group(1), r"\.romantic-keepsake-card img\s*\{[^}]*height:\s*11rem")
+        self.assertNotRegex(small_media.group(1), r"\.romantic-keepsake-card img\s*\{[^}]*height:")
         self.assertRegex(small_media.group(1), r"\.romantic-keepsake-notes\s*\{[^}]*grid-template-columns:\s*1fr")
         self.assertRegex(small_media.group(1), r"\.romantic-keepsake-card figcaption \.product-pricing > div\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto")
         self.assertRegex(small_media.group(1), r"\.romantic-keepsake-card figcaption \.product-pricing dd\s*\{[^}]*white-space:\s*nowrap[^}]*overflow-wrap:\s*normal")
@@ -1101,12 +1123,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertNotIn("<button", card)
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
-        studio_rule = re.search(r"\.studio-art-section \.work-card img\s*\{([^}]*)\}", css)
-        self.assertIsNotNone(studio_rule)
-        self.assertIn("aspect-ratio: 4 / 5", studio_rule.group(1))
-        self.assertIn("object-fit: contain", studio_rule.group(1))
-        self.assertIn("object-position: center", studio_rule.group(1))
-        self.assertIn("background: transparent", studio_rule.group(1))
+        self.assertNotRegex(css, r"\.studio-art-section \.work-card img\s*\{")
 
     def test_testimonial_carousel_contract(self):
         parser = MarkupTreeParser()
