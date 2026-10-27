@@ -79,14 +79,14 @@ ROMANTIC_CONCEPTS = (
 DIWALI_NEW_CONCEPTS = (
     ("diwali-marigold-petal-holder", "diwali-marigold-petal-holder-concept.webp", "Marigold Petal Holder", "349", "249", 29, "one LED tealight holder · LED not included", "A warm marigold-inspired cup for a soft festive glow."),
     ("diwali-ivory-mandala-holder", "diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Holder", "399", "299", 25, "one LED tealight holder · LED not included", "An ivory mandala cup with a calm, hand-finished festive feel."),
-    ("diwali-ruby-leaf-dish", "diwali-ruby-leaf-dish-concept.webp", "Ruby Leaf Dish", "399", "299", 25, "one decorative dish", "A ruby-red leaf dish for a small festive offering or accent."),
+    ("diwali-ruby-leaf-dish", "diwali-ruby-leaf-dish-concept.webp", "Ruby Leaf Dish", "999", "799", 20, "one decorative dish", "A ruby-red leaf dish for a small festive offering or accent."),
     ("diwali-saffron-tilak-duo", "diwali-saffron-tilak-duo-concept.webp", "Saffron Tilak Duo", "449", "349", 22, "two mini dishes", "Two saffron-toned mini dishes for tilak and rice."),
     ("diwali-pearl-rangoli-accent", "diwali-pearl-rangoli-accent-concept.webp", "Pearl Rangoli Accent", "499", "399", 20, "one decorative accent", "A pearly rangoli-inspired accent for an entryway or prayer corner."),
-    ("diwali-emerald-led-holder-pair", "diwali-emerald-led-holder-pair-concept.webp", "Emerald Glow Pair", "549", "399", 27, "pair of LED tealight holders · LEDs not included", "A pair of emerald cups for a jewel-toned LED-lit arrangement."),
-    ("diwali-rose-petal-offering-plate", "diwali-rose-petal-offering-plate-concept.webp", "Rose Petal Offering Plate", "499", "349", 30, "one decorative ritual plate", "A rosy ritual plate with a gentle petal-inspired edge."),
+    ("diwali-emerald-led-holder-pair", "diwali-emerald-led-holder-pair-concept.webp", "Emerald Glow Pair", "999", "799", 20, "pair of LED tealight holders · LEDs not included", "A pair of emerald cups for a jewel-toned LED-lit arrangement."),
+    ("diwali-rose-petal-offering-plate", "diwali-rose-petal-offering-plate-concept.webp", "Rose Petal Offering Plate", "599", "449", 25, "one decorative ritual plate", "A rosy ritual plate with a gentle petal-inspired edge."),
     ("diwali-golden-toran-charms", "diwali-golden-toran-charms-concept.webp", "Golden Toran Charms", "599", "449", 25, "set of three hanging charms with cords", "Three golden hanging charms to style a festive doorway or wall."),
     ("diwali-lotus-rangoli-duo", "diwali-lotus-rangoli-duo-concept.webp", "Lotus Rangoli Duo", "499", "399", 20, "set of two decorative lotus pieces", "Two lotus pieces for a small layered rangoli arrangement."),
-    ("diwali-festive-keepsake-box", "diwali-festive-keepsake-box-concept.webp", "Festive Keepsake Box", "599", "449", 25, "one small lidded box · contents not included", "A small lidded box for a keepsake, note, or festive token."),
+    ("diwali-festive-keepsake-box", "diwali-festive-keepsake-box-concept.webp", "Festive Keepsake Box", "849", "649", 24, "one small lidded box · contents not included", "A small lidded box for a keepsake, note, or festive token."),
 )
 
 CORPORATE_RESIN_GIFTS = (
@@ -98,7 +98,7 @@ CORPORATE_RESIN_GIFTS = (
     ("corporate-fridge-magnet", "corporate-fridge-magnet-concept.webp", "Resin fridge magnet", "249", "179", 28, "Price for one piece.", "A compact branded keepsake for events and team celebrations."),
     ("corporate-desk-logo-stand", "corporate-desk-logo-stand-concept.webp", "Mini resin desk stand", "249", "179", 28, "Price for one piece.", "A small decorative resin stand for desks, reception counters or car dashboards."),
     ("corporate-recognition-award", "corporate-recognition-award-concept.webp", "Recognition resin award", "1,299", "899", 31, "Price for one piece.", "A modern personalised memento for milestones and appreciation."),
-    ("corporate-desk-organizer", "corporate-desk-organizer-concept.webp", "Resin desk organiser", "899", "699", 22, "Price for one piece.", "A compact pen and visiting-card holder with custom colours."),
+    ("corporate-desk-organizer", "corporate-desk-organizer-concept.webp", "Resin desk organiser", "1,299", "999", 23, "Price for one piece.", "A compact pen and visiting-card holder with custom colours."),
     ("corporate-festive-hamper", "corporate-festive-hamper-concept.webp", "Corporate festive hamper", "1,999", "1,499", 25, "Price for one gift set.", "A coordinated resin gift box for festive or thank-you occasions."),
     ("corporate-business-card-holder", "corporate-business-card-holder-concept.webp", "Resin Business Card Holder", "599", "449", 25, "Price for one card holder; cards not included.", "A compact resin holder for a tidy stack of visiting cards."),
     ("corporate-phone-rest", "corporate-phone-rest-concept.webp", "Resin Phone Rest", "699", "499", 29, "Price for one phone rest; phone not included.", "A steady resin rest for a phone on a desk or bedside table."),
@@ -189,7 +189,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn('data-order-prefill="catalogue"', section_html)
         reference_notes = {
             "diwali-jewel-glow-tealight.jpg": "Reference design · price per holder.",
-            "diwali-happy-diwali-glow.webp": "Reference design · price per holder.",
+            "diwali-happy-diwali-glow.webp": "Price depends on size.",
             "diwali-shubh-labh-welcome-pair.jpg": "Reference design · price for the pair.",
             "diwali-festive-welcome-hamper.jpeg": "Reference design · contents are confirmed before ordering.",
             "diwali-rose-gold-festive-set.jpeg": "Reference design · contents are confirmed before ordering.",
@@ -205,14 +205,13 @@ class StaticSiteContractTests(unittest.TestCase):
         }
         price_matrix = {
             "Jewel Glow Tealight": ("349", "249", "29"),
-            "Happy Diwali Glow": ("399", "299", "25"),
             "Shubh Labh Welcome Pair": ("499", "399", "20"),
             "Festive Welcome Hamper": ("549", "399", "27"),
-            "Rose &amp; Gold Festive Set": ("549", "399", "27"),
-            "Lotus Blue Festive Set": ("549", "399", "27"),
+            "Rose &amp; Gold Festive Set": ("1,099", "849", "23"),
+            "Lotus Blue Festive Set": ("1,199", "899", "25"),
             "Gold-Fleck Lotus Light": ("399", "299", "25"),
             "Pastel Lotus Tealight": ("349", "249", "29"),
-            "Ocean Bloom Pooja Platter": ("499", "399", "20"),
+            "Ocean Bloom Pooja Platter": ("2,399", "1,799", "25"),
             "Golden Ganesha Pooja Plate": ("499", "349", "30"),
             "Om Mini Tilak Plate": ("349", "249", "29"),
             "Lotus Diya Pair": ("449", "349", "22"),
@@ -253,6 +252,13 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertRegex(pricing, rf'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹{festive}</dd>')
                 self.assertRegex(pricing, rf'<dt[^>]*>Discount</dt>\s*<dd[^>]*>{discount}% off</dd>')
                 self.assertEqual(pricing.count("<dt"), 3)
+        happy_diwali_card = re.search(r'<article\b[^>]*id=["\']diwali-happy-glow["\'][\s\S]*?</article>', section_html)
+        self.assertIsNotNone(happy_diwali_card)
+        happy_diwali_pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', happy_diwali_card.group(0)).group(0)
+        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>Regular price</dt>\s*<dd[^>]*><s>₹349–₹549</s></dd>')
+        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>Festive price</dt>\s*<dd[^>]*>₹250–₹400</dd>')
+        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>Discount</dt>\s*<dd[^>]*>27–28% off</dd>')
+        self.assertEqual(happy_diwali_pricing.count("<dt"), 3)
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".diwali-section", css)
         self.assertRegex(css, r"\.diwali-section \.work-card img\s*\{[^}]*aspect-ratio:\s*1\s*[/]?\s*1[^}]*object-fit:\s*contain")
@@ -661,7 +667,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(len(cards), 14)
         highlight_matrix = {
             "studio-rose-hexagon-keepsake.jpeg": ("2,999", "2,499", 17),
-            "studio-personalized-photo-clock.jpeg": ("2,999", "2,499", 17),
+            "studio-personalized-photo-clock.jpeg": ("3,999", "3,000", 25),
             "romantic-hamper.jpg": ("2,499", "1,999", 20),
             "studio-red-rose-resin-display.jpeg": ("899", "599", 33),
         }
@@ -1164,10 +1170,10 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(studio, r'Size, materials, and personalisation can change the final quote; Saloni confirms the final quote')
 
         studio_matrix = {
-            "studio-blue-mantra-frame.jpeg": ("3,999", "2,999", 25),
+            "studio-blue-mantra-frame.jpeg": ("5,499", "4,099", 25),
             "studio-lilac-symbol-rakhi.jpeg": ("499", "349", 30),
             "studio-little-brother-rakhi.jpeg": ("599", "399", 33),
-            "studio-white-mantra-frame.jpeg": ("4,499", "3,499", 22),
+            "studio-white-mantra-frame.jpeg": ("5,999", "4,599", 23),
             "studio-lilac-scalloped-tray.jpeg": ("599", "399", 33),
             "studio-floral-square-keepsake.jpeg": ("2,499", "1,999", 20),
             "studio-floral-hexagon-keepsake.jpeg": ("2,499", "1,999", 20),
