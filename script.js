@@ -233,6 +233,9 @@
     initFestiveOffers();
 
     var reveals = document.querySelectorAll(".reveal");
+    document.querySelectorAll("[data-carousel-track] > :nth-child(-n+2)").forEach(function (element) {
+      element.classList.add("is-visible");
+    });
     if ("IntersectionObserver" in window) {
       root.classList.add("reveal-ready");
       var observer = new IntersectionObserver(function (entries, currentObserver) {
@@ -242,7 +245,9 @@
           currentObserver.unobserve(entry.target);
         });
       }, { threshold: 0.12, rootMargin: "0px 0px -5%" });
-      reveals.forEach(function (element) { observer.observe(element); });
+      reveals.forEach(function (element) {
+        if (!element.classList.contains("is-visible")) observer.observe(element);
+      });
     } else {
       reveals.forEach(function (element) { element.classList.add("is-visible"); });
     }

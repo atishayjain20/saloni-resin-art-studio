@@ -840,7 +840,20 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(medium_media.group(1), r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\(245px, 38vw\)")
         small_media = re.search(r"@media \(max-width: 620px\) \{([\s\S]*?)\n\}\n\n@media \(prefers-reduced-motion: reduce\)", css)
         self.assertIsNotNone(small_media)
-        self.assertRegex(small_media.group(1), r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\(78vw, 78vw\)")
+        self.assertRegex(small_media.group(1), r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\(64vw, 64vw\)")
+
+    def test_mobile_carousel_peek_is_visible_before_swipe(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        small_media = re.search(r"@media \(max-width: 620px\) \{([\s\S]*?)\n\}\n\n@media \(prefers-reduced-motion: reduce\)", css)
+        self.assertIsNotNone(small_media)
+        width_match = re.search(r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\((\d+)vw, \1vw\)[^}]*gap:\s*1rem", small_media.group(1))
+        self.assertIsNotNone(width_match)
+        card_width_vw = int(width_match.group(1))
+        for viewport in (390, 375):
+            with self.subTest(viewport=viewport):
+                romantic_clip_width = viewport - 72
+                next_card_peek = romantic_clip_width - (viewport * card_width_vw / 100) - 16
+                self.assertGreaterEqual(next_card_peek, viewport * 0.12)
 
     def test_corporate_resin_gifts_catalogue_contract(self):
         romantic_start = self.html.index('<section class="romantic-keepsakes shell"')
