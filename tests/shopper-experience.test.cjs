@@ -497,3 +497,13 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
   assert.deepEqual(rowsFor("Pearl Rangoli Accent").slice(1), [["Size", "3–4 in"]]);
   assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "4–5 in"]]);
 });
+
+test("studio edit leads directly into the order conversation", () => {
+  const studioStart = html.indexOf('<section class="intro-band shell reveal" id="offerings"');
+  const orderStart = html.indexOf('<section class="order-section shell" id="order"');
+  assert.ok(studioStart >= 0, "expected #offerings section");
+  assert.ok(orderStart >= 0, "expected #order section");
+  const studioEnd = html.indexOf("</section>", studioStart) + "</section>".length;
+  assert.ok(studioEnd < orderStart, "#offerings must come before #order");
+  assert.equal(html.slice(studioEnd, orderStart).trim(), "", "#offerings must be immediately before #order");
+});
