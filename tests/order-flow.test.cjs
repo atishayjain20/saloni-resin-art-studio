@@ -110,6 +110,10 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   card.title = { textContent: "Test frame" };
   card.titleTag = "strong";
   card.detailNodes = [{ textContent: "Blue and gold" }];
+  card.priceRows = [
+    ["Price", "₹249"],
+    ["Size", "4 in"],
+  ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
   const romanticExistingCatalogue = [
     ["studio-rose-hexagon-keepsake.jpeg", "Rose hexagon", "First rose from a boyfriend, held in love."],
     ["studio-personalized-photo-clock.jpeg", "Personalized photo clock", "A favourite couple photo, held in a clock."],
@@ -123,6 +127,11 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     existingCard.title = { textContent: title };
     existingCard.titleTag = "h3";
     existingCard.detailNodes = [{ textContent: copy }];
+    const size = title === "Rose hexagon" ? ["Size", "8–10 in"] : title === "Personalized photo clock" ? ["Size", "16–18 in"] : ["Size", "Custom size in inches — confirm with Saloni"];
+    existingCard.priceRows = [
+      ["Price", "₹599"],
+      size,
+    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return existingCard;
   });
   const highlightCard = romanticExistingCards[3];
@@ -147,7 +156,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ["concept-tray-hamper.webp", "A tray full of celebration", "1,999", "1,499", 25],
     ["concept-floral-coasters.webp", "Little messages, shared", "1,299", "999", 23],
   ];
-  const generatedCards = generatedCatalogue.map(([asset, title, regular, festive, discount]) => {
+  const generatedCards = generatedCatalogue.map(([asset, title, regular, festive, discount], index) => {
     const generatedCard = new Element("generated-catalogue-card");
     generatedCard.caption = new Element("figcaption");
     generatedCard.image = { getAttribute: () => `assets/${asset}` };
@@ -158,6 +167,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ];
     generatedCard.priceRows = [
       ["Estimated from", `₹${festive}`],
+      index === 0 ? ["Suggested size", "20×22 in — confirm with Saloni"] : index === 1 || index === 2 ? ["Size", "Custom size in inches — confirm with Saloni"] : ["Suggested size", "3 in each — confirm with Saloni"],
     ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return generatedCard;
   });
@@ -173,7 +183,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "999", "699", 30],
     ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20],
   ];
-  const romanticConceptCards = romanticCatalogue.map(([asset, title, copy, regular, festive, discount]) => {
+  const romanticConceptCards = romanticCatalogue.map(([asset, title, copy, regular, festive, discount], index) => {
     const romanticCard = new Element("romantic-keepsake-card");
     romanticCard.caption = new Element("figcaption");
     romanticCard.image = { getAttribute: () => `assets/${asset}` };
@@ -185,10 +195,23 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ];
     romanticCard.priceRows = [
       ["Estimated from", `₹${festive}`],
+      index === 0 ? ["Suggested size", "1.5–2 in each — confirm with Saloni"] : index === 1 ? ["Suggested size", "5–6 in each — confirm with Saloni"] : index === 2 ? ["Suggested size", "3 in — confirm with Saloni"] : index === 4 ? ["Size", "4 in"] : ["Size", "Custom size in inches — confirm with Saloni"],
     ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return romanticCard;
   });
-  const corporateCards = CORPORATE_RESIN_GIFTS.map(([asset, title, copy, unit, regular, offer, discount]) => {
+  const corporateSizes = [
+    ["Suggested size", "1.5–2 in — confirm with Saloni"], ["Suggested size", "5–6 in — confirm with Saloni"],
+    ["Suggested size", "4 in — confirm with Saloni"], ["Suggested size", "6 in — confirm with Saloni"],
+    ["Suggested size", "3 in each — confirm with Saloni"], ["Suggested size", "2 in — confirm with Saloni"],
+    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
+    ["Size", "6–8 in"], ["Size", "Custom size in inches — confirm with Saloni"],
+    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
+    ["Size", "Custom size in inches — confirm with Saloni"], ["Suggested size", "4 in — confirm with Saloni"],
+    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
+    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
+    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
+  ];
+  const corporateCards = CORPORATE_RESIN_GIFTS.map(([asset, title, copy, unit, regular, offer, discount], index) => {
     const corporateCard = new Element("work-card");
     corporateCard.caption = new Element("figcaption");
     corporateCard.image = { getAttribute: () => `assets/${asset}`, alt: `Illustrative preview: ${title}` };
@@ -201,10 +224,16 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ];
     corporateCard.priceRows = [
       ["Estimated from", `₹${offer}`],
+      corporateSizes[index],
     ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return corporateCard;
   });
-  const diwaliCards = DIWALI_NEW_CONCEPTS.map(([asset, title, copy, unit, regular, festive, discount]) => {
+  const diwaliSizes = [
+    ["Size", "3 in"], ["Suggested size", "3 in — confirm with Saloni"], ["Size", "6 in"], ["Size", "2–3 in each"],
+    ["Suggested size", "3–4 in — confirm with Saloni"], ["Size", "3–4 in each"], ["Suggested size", "4–5 in — confirm with Saloni"], ["Size", "2 in each"],
+    ["Size", "3–4 in each"], ["Size", "3–4 in"],
+  ];
+  const diwaliCards = DIWALI_NEW_CONCEPTS.map(([asset, title, copy, unit, regular, festive, discount], index) => {
     const diwaliCard = new Element("work-card");
     diwaliCard.caption = new Element("figcaption");
     diwaliCard.image = { getAttribute: () => `assets/${asset}` };
@@ -217,6 +246,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ];
     diwaliCard.priceRows = [
       ["Estimated from", `₹${festive}`],
+      diwaliSizes[index],
     ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return diwaliCard;
   });
@@ -446,6 +476,24 @@ test("leaves catalogue dimensions blank when the catalogue has no real size", ()
   flow.catalogueButton.dispatch("click");
   const seed = submittedSeed(flow.posted);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+});
+
+test("carries direct, range, inferred, and custom catalogue sizes into order details", () => {
+  const flow = runFlow();
+  const cases = [
+    [flow.catalogueButton, "Size: 4 in", "Test frame"],
+    [flow.romanticExistingButtons[0], "Size: 8–10 in", "Rose hexagon"],
+    [flow.generatedCatalogueButtons[2], "Size: Custom size in inches — confirm with Saloni", "A tray full of celebration"],
+    [flow.generatedCatalogueButtons[3], "Suggested size: 3 in each — confirm with Saloni", "Little messages, shared"],
+    [flow.generatedCatalogueButtons[1], "Size: Custom size in inches — confirm with Saloni", "A little blue hour"],
+  ];
+  cases.forEach(([button, sizeDetails, productName]) => {
+    button.dispatch("click");
+    const seed = submittedSeed(flow.posted);
+    assert.equal(seed.productName, productName);
+    assert.match(seed.designDetails, new RegExp(sizeDetails.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
+    assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+  });
 });
 
 test("uses the shared catalogue CTA and preserves generated-design details in a catalogue seed", () => {
