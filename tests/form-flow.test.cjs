@@ -40,6 +40,7 @@ test("catalogue quote context is safe and customizer dimensions remain selected"
   assert.equal(standard.elements.get("product-image").getAttribute("src"), "https://saloniresinart.com/assets/romantic-heart-trinket-tray.webp");
   assert.equal(standard.elements.get("product-image").getAttribute("alt"), "Test frame product photo");
   assert.equal(standard.elements.get("dimension-fields").hidden, true);
+  assert.equal(standard.elements.get("shipping-fields").hidden, true);
   ["height-feet", "height-inches-part", "width-feet", "width-inches-part"].forEach((id) => assert.equal(standard.elements.get(id).getAttribute("required"), ""));
 
   const general = makeFormRuntime({ sourceId: "catalogue:general-custom-gift" });

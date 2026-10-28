@@ -56,6 +56,7 @@ class Element {
   dispatch(type, event = {}) { if (this.listeners[type]) this.listeners[type](Object.assign({ target: this }, event)); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] || ""; }
+  removeAttribute(name) { delete this.attributes[name]; }
   hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }
   appendChild(child) { this.children.push(child); return child; }
   remove() {}
@@ -92,6 +93,11 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   if (intakeReady !== undefined) embed.attributes["data-intake-ready"] = String(intakeReady);
   const frame = new Element("order-form-frame"); frame.name = "order-frame"; frame.hidden = true;
   const status = new Element("order-form-status");
+  const selectedProductSummary = new Element("selected-product-summary"); selectedProductSummary.hidden = true;
+  const selectedProductImage = new Element("selected-product-image");
+  const selectedProductName = new Element("selected-product-name");
+  const selectedProductPrice = new Element("selected-product-price"); selectedProductPrice.hidden = true;
+  const selectedProductSize = new Element("selected-product-size"); selectedProductSize.hidden = true;
   const customizer = new Element("order-from-customizer");
   const continueWithoutPreview = new Element("customizer-continue-without-preview"); continueWithoutPreview.hidden = true;
   const generalRequest = new Element("general-custom-gift");
@@ -103,7 +109,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, frame, status, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, frame, status, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -167,7 +173,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ];
     const size = index === 0 ? ["Size", "20×22 in"] : index === 3 ? ["Size", "3 in each"] : null;
     generatedCard.priceRows = [
-      ["Estimated from", `₹${festive}`],
+      ["From", `₹${festive}`],
       size,
     ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return generatedCard;
@@ -196,7 +202,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ];
     const size = index === 0 ? ["Size", "1.5–2 in each"] : index === 1 ? ["Size", "5–6 in each"] : index === 2 ? ["Size", "3 in"] : index === 4 ? ["Size", "4 in"] : null;
     romanticCard.priceRows = [
-      ["Estimated from", `₹${festive}`],
+      ["From", `₹${festive}`],
       size,
     ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return romanticCard;
@@ -225,7 +231,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
       { textContent: unit },
     ];
     corporateCard.priceRows = [
-      ["Estimated from", `₹${offer}`],
+      ["From", `₹${offer}`],
       corporateSizes[index],
     ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return corporateCard;
@@ -247,7 +253,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
       { textContent: unit },
     ];
     diwaliCard.priceRows = [
-      ["Estimated from", `₹${festive}`],
+      ["From", `₹${festive}`],
       diwaliSizes[index],
     ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return diwaliCard;
@@ -324,6 +330,53 @@ test("opens a general custom-gift enquiry through the existing catalogue seed co
   assert.equal(seed.requestStage, "quote");
   assert.match(seed.designDetails, /General custom gift enquiry/);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+});
+
+test("shows selected catalogue photo, exact price, and only known size above the form", () => {
+  const flow = runFlow();
+  const summary = flow.elements.get("selected-product-summary");
+  const image = flow.elements.get("selected-product-image");
+  const name = flow.elements.get("selected-product-name");
+  const price = flow.elements.get("selected-product-price");
+  const size = flow.elements.get("selected-product-size");
+  assert.equal(summary.hidden, true);
+
+  flow.catalogueButton.dispatch("click");
+  assert.equal(summary.hidden, false);
+  assert.equal(image.getAttribute("src"), "assets/test-frame.png");
+  assert.equal(image.getAttribute("alt"), "Test frame product photo");
+  assert.equal(name.textContent, "Test frame");
+  assert.equal(price.hidden, false);
+  assert.equal(price.textContent, "Price: ₹249");
+  assert.equal(size.hidden, false);
+  assert.equal(size.textContent, "Size: 4 in");
+
+  flow.generatedCatalogueButtons[1].dispatch("click");
+  assert.equal(size.hidden, true);
+  assert.equal(size.textContent, "");
+  assert.doesNotMatch(summary.textContent, /Suggested size|confirm with Saloni|Custom size in inches/i);
+});
+
+test("clears a catalogue summary when general or customizer ordering takes over", () => {
+  const flow = runFlow();
+  const summary = flow.elements.get("selected-product-summary");
+  flow.catalogueButton.dispatch("click");
+  assert.equal(summary.hidden, false);
+
+  flow.generalRequest.dispatch("click", { preventDefault() {} });
+  assert.equal(summary.hidden, true);
+
+  flow.catalogueButton.dispatch("click");
+  assert.equal(summary.hidden, false);
+  flow.customizer.dispatch("click");
+  assert.equal(summary.hidden, true);
+});
+
+test("routes Resin art and Explore the keepsakes to the active catalogue categories", () => {
+  assert.match(page, /<a href="#studio-art">Resin art<\/a>/);
+  assert.match(page, /<a class="text-link" href="#romantic-keepsakes" data-category-shortcut="couple">Explore the keepsakes/);
+  assert.doesNotMatch(page, /<a href="#romantic-keepsakes">Resin art<\/a>/);
+  assert.doesNotMatch(page, /<a class="text-link" href="#studio-art">Explore the keepsakes/);
 });
 
 test("Let Saloni design it for me uses an explicit design-help seed while general enquiry stays unchanged", () => {
@@ -525,7 +578,7 @@ test("includes each generated design pricing in order seed details", () => {
     const seed = submittedSeed(flow.posted);
     assert.equal(seed.sourceId, `catalogue:${asset}`);
     assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
-    assert.ok(seed.designDetails.includes(`Estimated from: ₹${festive}`));
+    assert.ok(seed.designDetails.includes(`From: ₹${festive}`));
     assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
     assert.doesNotMatch(seed.designDetails, new RegExp(FINAL_QUOTE_NOTE));
     assert.doesNotMatch(seed.designDetails, /Average listed price/);
@@ -548,7 +601,7 @@ test("seeds every corporate catalogue card with identity, unit, concept, and pri
     assert.match(seed.designDetails, new RegExp(unit.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
     assert.match(seed.designDetails, /Illustrative\/reference image; final design to confirm with Saloni\./);
     assert.doesNotMatch(seed.designDetails, /Concept preview · made to order/);
-    assert.match(seed.designDetails, new RegExp(`Estimated from: ₹${offer}`));
+    assert.match(seed.designDetails, new RegExp(`From: ₹${offer}`));
     assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
   });
 });
@@ -568,7 +621,7 @@ test("seeds every new Diwali concept with identity, unit, concept, and pricing d
     assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
     assert.match(seed.designDetails, new RegExp(unit.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
     assert.doesNotMatch(seed.designDetails, /Concept preview · made to order/);
-    assert.match(seed.designDetails, new RegExp(`Estimated from: ₹${festive}`));
+    assert.match(seed.designDetails, new RegExp(`From: ₹${festive}`));
     assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
   });
 });
@@ -596,7 +649,7 @@ test("seeds every romantic concept with its disclosure, exact price, and blank d
     assert.equal(seed.productName, title);
     assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(seed.designDetails, /Concept preview · made to order/);
-    assert.match(seed.designDetails, new RegExp(`Estimated from: ₹${festive}`));
+    assert.match(seed.designDetails, new RegExp(`From: ₹${festive}`));
     assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
     assert.doesNotMatch(seed.designDetails, /Average listed price/);
     assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
