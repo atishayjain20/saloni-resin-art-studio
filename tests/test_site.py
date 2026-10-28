@@ -248,12 +248,12 @@ class StaticSiteContractTests(unittest.TestCase):
                 card = next((card for card in cards if f">{title}</strong>" in card), None)
                 self.assertIsNotNone(card)
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card).group(0)
-                self.assertRegex(pricing, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{festive}</dd>')
+                self.assertRegex(pricing, rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{festive}</dd>')
                 self.assertIn(pricing.count("<dt"), (1, 2))
         happy_diwali_card = re.search(r'<article\b[^>]*id=["\']diwali-happy-glow["\'][\s\S]*?</article>', section_html)
         self.assertIsNotNone(happy_diwali_card)
         happy_diwali_pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', happy_diwali_card.group(0)).group(0)
-        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹250–₹400</dd>')
+        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹250–₹400</dd>')
         self.assertIn(happy_diwali_pricing.count("<dt"), (1, 2))
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".diwali-section", css)
@@ -295,7 +295,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
-                self.assertRegex(pricing.group(0), rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
 
     def test_corporate_expansion_appends_ten_new_concept_cards(self):
         section = re.search(r'<section\b[^>]*id=["\']corporate-resin-gifts["\'][\s\S]*?</section>', self.html)
@@ -326,7 +326,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
-                self.assertRegex(pricing.group(0), rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
+                self.assertRegex(pricing.group(0), rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
 
     def test_diwali_anchor_offset_clears_sticky_header_at_responsive_breakpoints(self):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -350,7 +350,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(
             nav,
             r'<a href="#diwali">Diwali</a>\s*'
-            r'<a href="#romantic-keepsakes">Resin art</a>\s*'
+            r'<a href="#studio-art">Resin art</a>\s*'
             r'<a href="#hamper-rail">Hampers</a>\s*'
             r'<a href="#diwali">Festive offers</a>\s*'
             r'<a href="#customizer">Design a frame</a>\s*'
@@ -363,7 +363,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn(">The process<", nav)
         footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', self.html)
         self.assertIsNotNone(footer)
-        self.assertIn('<a href="#romantic-keepsakes">Resin art</a>', footer.group(0))
+        self.assertIn('<a href="#studio-art">Resin art</a>', footer.group(0))
         self.assertIn('<a href="#order">Order</a>', footer.group(0))
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -645,7 +645,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-labelledby="romantic-keepsakes-title"', section_html)
         self.assertIn("For the two of you", section_html)
         self.assertIn('<h2 id="romantic-keepsakes-title">Keep the moment close.</h2>', section_html)
-        self.assertIn('href="#studio-art">Explore the keepsakes', section_html)
+        self.assertIn('href="#romantic-keepsakes" data-category-shortcut="couple">Explore the keepsakes', section_html)
         for phrase in (
             "Rose hexagon",
             "Personalized photo clock",
@@ -707,7 +707,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)
-                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
+                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
         script = (ROOT / "script.js").read_text(encoding="utf-8")
         self.assertIn(".romantic-keepsake-card", script)
         self.assertIn('data-order-prefill", "catalogue"', script)
@@ -814,7 +814,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)
                 self.assertIn(pricing_html.count("<dt"), (1, 2))
-                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
+                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
                 image = re.search(r'<img\b[^>]*>', card)
                 self.assertIsNotNone(image)
                 image_tag = image.group(0)
@@ -908,7 +908,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)
-                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
+                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
 
         self.assertEqual(corporate.count("data-lightbox-trigger"), len(CORPORATE_RESIN_GIFTS))
         self.assertEqual(corporate.count('class="product-pricing"'), len(CORPORATE_RESIN_GIFTS))
@@ -1205,7 +1205,7 @@ class StaticSiteContractTests(unittest.TestCase):
                     pricing_blocks = re.findall(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                     self.assertEqual(len(pricing_blocks), 1)
                     pricing = pricing_blocks[0]
-                    self.assertRegex(pricing, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
+                    self.assertRegex(pricing, rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
 
         assert_matrix(studio, studio_matrix, expected_cards=16, expected_pricing_blocks=16)
         assert_matrix(hamper, hamper_matrix)
@@ -1283,7 +1283,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIsNotNone(pricing)
                 pricing_html = pricing.group(0)
                 self.assertIn(pricing_html.count("<dt"), (1, 2))
-                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From|Estimated from)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
+                self.assertRegex(pricing_html, rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
                 image = re.search(r'<img\b[^>]*>', card)
                 self.assertIsNotNone(image)
                 image_tag = image.group(0)

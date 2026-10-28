@@ -179,8 +179,10 @@ test("pricing keeps current quotes without unsupported discount claims", () => {
   assert.equal(cards.length, 77);
   cards.forEach((card) => {
     assert.doesNotMatch(card, /<s>|Regular price|Discount|off/);
-    assert.match(card, /<dt>(?:Price|From|Estimated from)<\/dt>/);
+    assert.match(card, /<dt>(?:Price|From)<\/dt>/);
   });
+  assert.doesNotMatch(html, /<dt>Estimated from<\/dt>/);
+  assert.match(html, /<dt>Price<\/dt><dd>₹2,499<\/dd>/);
   assert.match(section("diwali"), /Diwali prices ₹249–₹1,799/);
 });
 
@@ -346,7 +348,7 @@ test("all 77 catalogue cards keep price first and show only known size rows", ()
     const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g)].map((match) => match.slice(1));
     assert.equal(pricing.match(/aria-label="([^"]+)"/)?.[1], "Catalogue price and size");
     assert.ok(rows.length === 1 || rows.length === 2, `card ${index + 1} has price and optional size rows`);
-    assert.match(rows[0][0], /^(?:Price|From|Estimated from)$/);
+    assert.match(rows[0][0], /^(?:Price|From)$/);
     assert.match(rows[0][1], /^₹/);
     if (expectedRows[index]) {
       assert.equal(rows.length, 2, `card ${index + 1} has its known size row`);
