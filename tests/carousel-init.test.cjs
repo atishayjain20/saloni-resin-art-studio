@@ -16,10 +16,12 @@ function card() {
   };
 }
 
-test("shows the first two carousel cards immediately", () => {
+test("shows the first four catalogue cards immediately", () => {
   const first = card();
   const second = card();
   const third = card();
+  const fourth = card();
+  const fifth = card();
   const observed = [];
   class IntersectionObserverMock {
     constructor() {}
@@ -32,8 +34,8 @@ test("shows the first two carousel cards immediately", () => {
     body: {},
     addEventListener(type, listener) { if (type === "DOMContentLoaded") ready = listener; },
     querySelectorAll(selector) {
-      if (selector === "[data-carousel-track] > :nth-child(-n+2)") return [first, second];
-      if (selector === ".reveal") return [first, second, third];
+      if (selector === ".catalogue-grid > :nth-child(-n+4)") return [first, second, third, fourth];
+      if (selector === ".reveal") return [first, second, third, fourth, fifth];
       return [];
     },
     querySelector() { return null; },
@@ -46,6 +48,8 @@ test("shows the first two carousel cards immediately", () => {
   ready();
   assert.equal(first.classList.contains("is-visible"), true);
   assert.equal(second.classList.contains("is-visible"), true);
-  assert.equal(third.classList.contains("is-visible"), false);
-  assert.deepEqual(observed, [third]);
+  assert.equal(third.classList.contains("is-visible"), true);
+  assert.equal(fourth.classList.contains("is-visible"), true);
+  assert.equal(fifth.classList.contains("is-visible"), false);
+  assert.deepEqual(observed, [fifth]);
 });

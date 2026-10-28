@@ -162,14 +162,13 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
         self.assertIn("Diwali prices ₹249–₹1,799", section_html)
         self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
-        self.assertIn('data-carousel="diwali"', section_html)
-        self.assertIn('id="diwali-track"', section_html)
-        self.assertIn('data-carousel-track', section_html)
-        self.assertIn('tabindex="0"', section_html)
+        self.assertIn('id="diwali-grid"', section_html)
+        self.assertIn('class="catalogue-grid"', section_html)
+        self.assertIn('role="list"', section_html)
         self.assertIn('aria-label="Diwali designs"', section_html)
-        self.assertIn('aria-controls="diwali-track"', section_html)
-        self.assertIn('aria-label="Previous Diwali designs"', section_html)
-        self.assertIn('aria-label="Next Diwali designs"', section_html)
+        self.assertIn('aria-controls="diwali-grid"', section_html)
+        self.assertIn('data-catalogue-disclosure', section_html)
+        self.assertIn('aria-expanded="false"', section_html)
         all_cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(all_cards), 24)
         cards = all_cards[:14]
@@ -188,16 +187,16 @@ class StaticSiteContractTests(unittest.TestCase):
         )
         self.assertNotIn('data-order-prefill="catalogue"', section_html)
         reference_notes = {
-            "diwali-jewel-glow-tealight.jpg": "Reference design · price per holder.",
+            "diwali-jewel-glow-tealight.jpg": "price per holder.",
             "diwali-happy-diwali-glow.webp": "Price depends on size.",
-            "diwali-shubh-labh-welcome-pair.jpg": "Reference design · price for the pair.",
-            "diwali-festive-welcome-hamper.jpeg": "Reference design · contents are confirmed before ordering.",
-            "diwali-rose-gold-festive-set.jpeg": "Reference design · contents are confirmed before ordering.",
-            "diwali-lotus-blue-festive-set.jpeg": "Reference design · contents are confirmed before ordering.",
-            "diwali-gold-fleck-lotus-light.jpeg": "Reference design · price per holder.",
-            "diwali-pastel-lotus-tealight.jpeg": "Reference design · price per holder.",
-            "diwali-ocean-bloom-pooja-platter.jpg": "Reference design · price per platter.",
-            "diwali-golden-ganesha-pooja-plate.jpg": "Reference design · price per plate.",
+            "diwali-shubh-labh-welcome-pair.jpg": "price for the pair.",
+            "diwali-festive-welcome-hamper.jpeg": "contents are confirmed before ordering.",
+            "diwali-rose-gold-festive-set.jpeg": "contents are confirmed before ordering.",
+            "diwali-lotus-blue-festive-set.jpeg": "contents are confirmed before ordering.",
+            "diwali-gold-fleck-lotus-light.jpeg": "price per holder.",
+            "diwali-pastel-lotus-tealight.jpeg": "price per holder.",
+            "diwali-ocean-bloom-pooja-platter.jpg": "price per platter.",
+            "diwali-golden-ganesha-pooja-plate.jpg": "price per plate.",
             "diwali-om-mini-tilak-plate.webp": "price per plate",
             "diwali-lotus-diya-pair.webp": "price for the pair",
             "diwali-peacock-mini-pooja-thali.webp": "price per thali",
@@ -235,6 +234,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertRegex(trigger.group(0), r'aria-label=["\']Open larger view: [^"\']+["\']')
                 self.assertEqual(card.count('class="diwali-card-note"'), 1)
                 self.assertIn(reference_notes[asset], card)
+                self.assertNotIn("Reference design", card)
                 if asset in {
                     "diwali-om-mini-tilak-plate.webp",
                     "diwali-lotus-diya-pair.webp",
@@ -262,7 +262,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotRegex(css, r"\.diwali-section \.eyebrow, \.diwali-section \.work-card figcaption span\s*\{[^}]*var\(--marigold\)")
         self.assertRegex(css, r"\.diwali-section \.diwali-card-note\s*\{[^}]*color:\s*var\(--cocoa\)")
         script = (ROOT / "script.js").read_text(encoding="utf-8")
-        self.assertIn('document.querySelectorAll("[data-carousel] .work-card, .romantic-keepsake-card")', script)
+        self.assertIn('document.querySelectorAll(".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card")', script)
         self.assertIn('card.querySelectorAll("figcaption p")', script)
         self.assertIn('button.textContent = "Request this item"', script)
 
@@ -270,7 +270,7 @@ class StaticSiteContractTests(unittest.TestCase):
         section = re.search(r'<section\b[^>]*id=["\']diwali["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
-        self.assertIn("Twenty-four festive designs for your home and your people.", section_html)
+        self.assertIn("A preview of 24 festive designs for your home and your people.", section_html)
         self.assertNotIn("Crossed-out regular prices", section_html)
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 24)
@@ -301,7 +301,7 @@ class StaticSiteContractTests(unittest.TestCase):
         section = re.search(r'<section\b[^>]*id=["\']corporate-resin-gifts["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
-        self.assertIn("Twenty branded keepsakes", section_html)
+        self.assertIn("20 branded keepsakes", section_html)
         self.assertNotIn("Crossed-out regular prices", section_html)
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 20)
@@ -536,7 +536,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 customer_markup = re.sub(r'\s(?:src|href)=["\'][^"\']*["\']', "", page, flags=re.IGNORECASE)
                 customer_markup = re.sub(r'\scontent=["\'][^"\']*(?:/assets/|\.(?:webp|jpe?g|png|svg))[^"\']*["\']', "", customer_markup, flags=re.IGNORECASE)
                 self.assertNotRegex(customer_markup, re.compile(r"\bconcept\b", re.IGNORECASE))
-        self.assertIn("14 keepsake ideas — swipe or use the arrows to explore.", self.html)
+        self.assertIn("A preview of 14 keepsake ideas", self.html)
         self.assertIn("Corporate gifting", self.html)
         corporate = re.search(r'<section\b[^>]*id=["\']corporate-resin-gifts["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(corporate)
@@ -655,12 +655,13 @@ class StaticSiteContractTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, section_html)
-        track = re.search(r'<div\b[^>]*class=["\']carousel-track["\'][^>]*>', section_html)
-        self.assertIsNotNone(track)
-        self.assertIn('id="romantic-keepsakes-track"', track.group(0))
-        self.assertIn('data-carousel-track', track.group(0))
-        self.assertIn('tabindex="0"', track.group(0))
-        self.assertIn('aria-label="Romantic keepsakes"', track.group(0))
+        grid = re.search(r'<div\b[^>]*class=["\']catalogue-grid["\'][^>]*>', section_html)
+        self.assertIsNotNone(grid)
+        self.assertIn('id="romantic-keepsakes-grid"', grid.group(0))
+        self.assertIn('role="list"', grid.group(0))
+        self.assertIn('aria-label="Romantic keepsakes"', grid.group(0))
+        self.assertIn('data-catalogue-disclosure', section_html)
+        self.assertIn('aria-expanded="false"', section_html)
 
         assets = re.findall(r'<img\b[^>]*src=["\'](assets/[^"\']+)["\'][^>]*>', section_html)
         self.assertEqual(
@@ -681,7 +682,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertRegex(image, r'\bheight=["\']\d+["\']')
 
         self.assertEqual(section_html.count("<h3"), 14)
-        self.assertIn('data-carousel="romantic-keepsakes"', section_html)
+        self.assertIn('data-catalogue-disclosure', section_html)
         self.assertNotIn("work-card", section_html)
         self.assertEqual(section_html.count("data-lightbox-trigger"), 14)
         for asset in assets:
@@ -734,20 +735,20 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotRegex(section_html, re.compile(r"<blockquote|<cite|Gaurav Jain|Aarti Suthar|★★★★★", re.I))
 
         self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#catalogue-filters["\']')
-        self.assertEqual(self.html.count('data-carousel='), 5)
+        self.assertEqual(self.html.count('class="catalogue-grid"'), 5)
         self.assertEqual(self.html.count('data-lightbox-trigger'), 77)
         self.assertEqual(self.html.count('class="product-pricing"'), 77)
         self.assertEqual(self.html.count('data-testimonial-card'), 0)
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".romantic-keepsakes", css)
-        self.assertIn(".carousel-track", css)
+        self.assertIn(".catalogue-grid", css)
         self.assertRegex(css, r":is\(\.work-card, \.romantic-keepsake-card, \.collection-card\) img\s*\{[^}]*object-fit:\s*cover")
         self.assertRegex(css, r"\.romantic-keepsake-card figcaption > p:first-of-type, \.studio-art-section \.work-card figcaption > p:first-of-type\s*\{[^}]*font-size:\s*0\.75rem")
-        self.assertRegex(css, r"\.carousel-track\s*\{[^}]*grid-auto-flow:\s*column[^}]*overflow-x:\s*auto")
+        self.assertRegex(css, r"\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4")
         medium_media = re.search(r"@media \(max-width: 840px\) \{([\s\S]*?)\n\}\n\n@media \(max-width: 620px\)", css)
         self.assertIsNotNone(medium_media)
-        self.assertRegex(medium_media.group(1), r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\(245px, 38vw\)")
+        self.assertRegex(medium_media.group(1), r"\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2")
         small_media = re.search(r"@media \(max-width: 620px\) \{([\s\S]*?)\n\}\n\n@media \(prefers-reduced-motion: reduce\)", css)
         self.assertIsNotNone(small_media)
         self.assertRegex(small_media.group(1), r"\.romantic-keepsake-card\s*\{[^}]*padding:\s*0\.7rem")
@@ -755,20 +756,20 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(small_media.group(1), r"\.romantic-keepsake-card figcaption \.product-pricing > div\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto")
         self.assertRegex(small_media.group(1), r"\.romantic-keepsake-card figcaption \.product-pricing dd\s*\{[^}]*white-space:\s*nowrap[^}]*overflow-wrap:\s*normal")
 
-    def test_romantic_keepsake_collection_carousel_contract(self):
+    def test_romantic_keepsake_collection_grid_contract(self):
         section = re.search(r'<section\b[^>]*id=["\']romantic-keepsakes["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
-        self.assertEqual(section_html.count('data-carousel="romantic-keepsakes"'), 1)
-        self.assertIn('id="romantic-keepsakes-track"', section_html)
-        self.assertIn('data-carousel-track', section_html)
-        track = re.search(r'<div\b[^>]*class=["\']carousel-track["\'][^>]*>', section_html)
+        self.assertEqual(section_html.count('id="romantic-keepsakes-grid"'), 1)
+        self.assertIn('id="romantic-keepsakes-grid"', section_html)
+        self.assertIn('class="catalogue-grid"', section_html)
+        track = re.search(r'<div\b[^>]*class=["\']catalogue-grid["\'][^>]*>', section_html)
         self.assertIsNotNone(track)
         self.assertIn('role="list"', track.group(0))
-        self.assertIn('aria-controls="romantic-keepsakes-track"', section_html)
-        self.assertIn('aria-label="Previous romantic keepsakes"', section_html)
-        self.assertIn('aria-label="Next romantic keepsakes"', section_html)
-        self.assertIn("14 keepsake ideas — swipe or use the arrows to explore.", section_html)
+        self.assertIn('aria-controls="romantic-keepsakes-grid"', section_html)
+        self.assertIn('data-catalogue-disclosure', section_html)
+        self.assertIn('aria-expanded="false"', section_html)
+        self.assertIn("A preview of 14 keepsake ideas", section_html)
         self.assertNotIn("Concept previews are illustrative.", section_html)
         self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
@@ -839,28 +840,21 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertNotIn(studio_concept, section_html)
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
-        self.assertRegex(css, r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\(255px, 26\.5vw\)[^}]*overflow-x:\s*auto")
-        self.assertRegex(css, r"\.carousel-track\s*\{[^}]*scroll-snap-type:\s*x mandatory")
-        self.assertRegex(css, r"\.carousel\s*\{[^}]*overflow-x:\s*hidden")
+        self.assertRegex(css, r"\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4")
+        self.assertNotRegex(css, r"\.carousel-track\s*\{")
+        self.assertNotRegex(css, r"\.carousel\s*\{")
         medium_media = re.search(r"@media \(max-width: 840px\) \{([\s\S]*?)\n\}\n\n@media \(max-width: 620px\)", css)
         self.assertIsNotNone(medium_media)
-        self.assertRegex(medium_media.group(1), r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\(245px, 38vw\)")
+        self.assertRegex(medium_media.group(1), r"\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2")
         small_media = re.search(r"@media \(max-width: 620px\) \{([\s\S]*?)\n\}\n\n@media \(prefers-reduced-motion: reduce\)", css)
         self.assertIsNotNone(small_media)
-        self.assertRegex(small_media.group(1), r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\(64vw, 64vw\)")
+        self.assertRegex(small_media.group(1), r"\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2")
 
-    def test_mobile_carousel_peek_is_visible_before_swipe(self):
+    def test_mobile_catalogue_grid_uses_two_columns(self):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         small_media = re.search(r"@media \(max-width: 620px\) \{([\s\S]*?)\n\}\n\n@media \(prefers-reduced-motion: reduce\)", css)
         self.assertIsNotNone(small_media)
-        width_match = re.search(r"\.carousel-track\s*\{[^}]*grid-auto-columns:\s*minmax\((\d+)vw, \1vw\)[^}]*gap:\s*1rem", small_media.group(1))
-        self.assertIsNotNone(width_match)
-        card_width_vw = int(width_match.group(1))
-        for viewport in (390, 375):
-            with self.subTest(viewport=viewport):
-                romantic_clip_width = viewport - 72
-                next_card_peek = romantic_clip_width - (viewport * card_width_vw / 100) - 16
-                self.assertGreaterEqual(next_card_peek, viewport * 0.12)
+        self.assertRegex(small_media.group(1), r"\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2")
 
     def test_corporate_resin_gifts_catalogue_contract(self):
         romantic_start = self.html.index('<section class="romantic-keepsakes shell"')
@@ -876,16 +870,14 @@ class StaticSiteContractTests(unittest.TestCase):
 
         self.assertIn('<a href="#corporate-resin-gifts">Corporate Resin Gifts</a>', self.html)
         self.assertIn('<a href="corporate-gifting/">Corporate gifting</a>', self.html)
-        self.assertIn('data-carousel="corporate-resin-gifts"', corporate)
+        self.assertIn('id="corporate-resin-gifts-grid"', corporate)
         self.assertIn('aria-labelledby="corporate-resin-gifts-title"', corporate)
         self.assertIn('<h2 id="corporate-resin-gifts-title">Corporate Resin Gifts</h2>', corporate)
-        self.assertIn('id="corporate-resin-gifts-track"', corporate)
-        self.assertIn('data-carousel-track', corporate)
+        self.assertIn('class="catalogue-grid"', corporate)
         self.assertIn('role="list"', corporate)
-        self.assertIn('tabindex="0"', corporate)
         self.assertIn('aria-label="Corporate resin gifts"', corporate)
-        self.assertIn('aria-label="Previous corporate resin gifts"', corporate)
-        self.assertIn('aria-label="Next corporate resin gifts"', corporate)
+        self.assertIn('data-catalogue-disclosure', corporate)
+        self.assertIn('aria-expanded="false"', corporate)
         self.assertNotIn(FINAL_QUOTE_NOTE, corporate)
         self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
@@ -1012,43 +1004,64 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertGreater(len(alt.group(1).strip()), 8)
                 self.assertRegex(image, r'\b(?:width|aspect-ratio)')
 
-    def test_each_carousel_owner_contains_its_track_and_controls(self):
+    def test_each_catalogue_section_contains_its_grid_and_disclosure(self):
         parser = MarkupTreeParser()
         parser.feed(self.html)
         owners = []
         for root in parser.roots:
-            owners.extend(find_nodes(root, "data-carousel"))
+            owners.extend(find_nodes(root, "data-catalogue-disclosure"))
         self.assertEqual(len(owners), 5)
-        for owner in owners:
-            with self.subTest(carousel=owner["attrs"].get("data-carousel")):
-                self.assertEqual(len(find_nodes(owner, "data-carousel-track")), 1)
-                self.assertEqual(len(find_nodes(owner, "data-carousel-prev")), 1)
-                self.assertEqual(len(find_nodes(owner, "data-carousel-next")), 1)
+        for disclosure in owners:
+            with self.subTest(disclosure=disclosure["attrs"].get("aria-controls")):
+                self.assertEqual(disclosure["attrs"].get("aria-expanded"), "false")
+                self.assertTrue(disclosure["attrs"].get("aria-controls"))
 
-    def test_studio_art_carousel_contract(self):
+    def test_catalogue_grids_have_listitem_article_children(self):
         parser = MarkupTreeParser()
         parser.feed(self.html)
-        owners = []
-        for root in parser.roots:
-            owners.extend(find_nodes(root, "data-carousel"))
-        studio_owners = [owner for owner in owners if owner["attrs"].get("data-carousel") == "studio-art"]
-        self.assertEqual(len(studio_owners), 1)
-        owner = studio_owners[0]
-        tracks = find_nodes(owner, "data-carousel-track")
-        self.assertEqual(len(tracks), 1)
-        self.assertEqual(tracks[0]["attrs"].get("id"), "studio-art-track")
-        self.assertEqual(tracks[0]["attrs"].get("tabindex"), "0")
-        self.assertEqual(len(find_nodes(owner, "data-carousel-prev")), 1)
-        self.assertEqual(len(find_nodes(owner, "data-carousel-next")), 1)
+        grid_ids = {
+            "diwali-grid",
+            "romantic-keepsakes-grid",
+            "corporate-resin-gifts-grid",
+            "studio-art-grid",
+            "hamper-grid",
+        }
+        grids = []
 
+        def collect(node):
+            if node["attrs"].get("id") in grid_ids:
+                grids.append(node)
+            for child in node["children"]:
+                collect(child)
+
+        for root in parser.roots:
+            collect(root)
+
+        self.assertEqual({grid["attrs"].get("id") for grid in grids}, grid_ids)
+        for grid in grids:
+            with self.subTest(grid=grid["attrs"].get("id")):
+                self.assertEqual(grid["attrs"].get("role"), "list")
+                articles = [child for child in grid["children"] if child["tag"] == "article"]
+                self.assertGreater(len(articles), 0)
+                self.assertTrue(all(article["attrs"].get("role") == "listitem" for article in articles))
+
+    def test_studio_art_grid_contract(self):
         section = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
         self.assertIn("Resin keepsakes from the studio", section_html)
-        self.assertIn("Swipe or use the arrows to explore all 16 pieces.", section_html)
+        self.assertIn("A preview of 16 studio pieces", section_html)
+        grid = re.search(r'<div\b[^>]*class=["\'][^"\']*catalogue-grid[^"\']*["\'][^>]*>', section_html)
+        self.assertIsNotNone(grid)
+        self.assertIn('id="studio-art-grid"', grid.group(0))
+        self.assertIn('role="list"', grid.group(0))
+        self.assertIn('aria-label="Art from the studio"', grid.group(0))
+        self.assertIn('data-catalogue-disclosure', section_html)
+        self.assertIn('aria-expanded="false"', section_html)
+        self.assertIn('aria-controls="studio-art-grid"', section_html)
         self.assertEqual(self.html.count('id="studio-art"'), 1)
-        self.assertEqual(self.html.count('id="studio-art-track"'), 1)
-        self.assertEqual(section_html.count('aria-controls="studio-art-track"'), 2)
+        self.assertEqual(self.html.count('id="studio-art-grid"'), 1)
+        self.assertEqual(section_html.count('aria-controls="studio-art-grid"'), 1)
 
     def test_studio_art_has_labeled_keepsake_ideas_on_floral_cards(self):
         section = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
@@ -1287,10 +1300,10 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotRegex((ROOT / "styles.css").read_text(encoding="utf-8"), r'\.concept-(?:section|card|note)')
 
     def test_carousel_enhancement_is_progressive(self):
-        self.assertGreaterEqual(self.html.count('data-carousel'), 2)
-        self.assertIn('data-carousel-prev', self.html)
-        self.assertIn('data-carousel-next', self.html)
-        self.assertIn('scroll-snap-type', (ROOT / "styles.css").read_text(encoding="utf-8") if (ROOT / "styles.css").exists() else "")
+        self.assertEqual(self.html.count('class="catalogue-grid"'), 5)
+        self.assertIn('data-catalogue-disclosure', self.html)
+        self.assertIn('aria-expanded="false"', self.html)
+        self.assertIn('.catalogue-grid', (ROOT / "styles.css").read_text(encoding="utf-8") if (ROOT / "styles.css").exists() else "")
         self.assertIn('DOMContentLoaded', (ROOT / "script.js").read_text(encoding="utf-8") if (ROOT / "script.js").exists() else "")
 
     def test_customizer_markup_contract(self):

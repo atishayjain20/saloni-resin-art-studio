@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const script = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
-const start = script.indexOf("  function refreshCatalogueCarousels(resetScroll)");
+const start = script.indexOf("  function initCatalogueExperience()");
 const end = script.indexOf("\n  function initOrderRequestFlow()", start);
 const catalogueFunction = script.slice(start, end);
 
@@ -24,9 +24,16 @@ class FakeControl {
 }
 
 class FakeSection {
-  constructor(id) { this.id = id; this.hidden = false; this.cards = []; }
+  constructor(id) {
+    this.id = id;
+    this.hidden = false;
+    this.cards = [];
+    this.disclosure = new FakeControl("");
+    this.disclosure.hidden = false;
+  }
   querySelector(selector) {
-    return selector === ".work-card, .romantic-keepsake-card" ? this.cards[0] || null : null;
+    if (selector === ".work-card, .romantic-keepsake-card") return this.cards[0] || null;
+    return selector === "[data-catalogue-disclosure]" ? this.disclosure : null;
   }
 }
 
@@ -64,10 +71,23 @@ function createHarness({ hash = "", count = 77 } = {}) {
     new FakeSection("studio-art"),
     new FakeSection("hamper-rail"),
   ];
-  const sectionForIndex = (index) => sections[Math.floor(index / 16) % sections.length];
+  const sectionForIndex = (index) => index < 24
+    ? sections[0]
+    : index < 38
+      ? sections[1]
+      : index < 58
+        ? sections[2]
+        : index < 74
+          ? sections[3]
+          : sections[4];
   const cards = Array.from({ length: count }, (_, index) => {
     const section = sectionForIndex(index);
-    return new FakeCard(section, index % 5 === 0 ? "₹2,499" : `₹${149 + index * 25}`, `product-${index + 1}`, index < 8, eventLog);
+    const price = index % 5 === 0
+      ? "₹2,499"
+      : section.id === "corporate-resin-gifts"
+        ? `₹${499 + (index % 3) * 100}`
+        : `₹${149 + index * 25}`;
+    return new FakeCard(section, price, `product-${index + 1}`, index < 8, eventLog);
   });
   const tools = {};
   const typeFilter = new FakeControl("all");
@@ -84,7 +104,6 @@ function createHarness({ hash = "", count = 77 } = {}) {
   heading.events = [];
   heading.scrollIntoView = () => heading.events.push("scroll");
   heading.focus = () => heading.events.push("focus");
-  const carousels = [{ refreshes: [], refreshControls(reset) { this.refreshes.push(reset); if (reset) eventLog.push("refresh"); } }];
   const browseFilters = new FakeLink("#catalogue-filters");
   const browseAll = new FakeLink("#catalogue-filters");
   const corporateShortcut = new FakeLink("#corporate-resin-gifts", "corporate");
@@ -109,7 +128,6 @@ function createHarness({ hash = "", count = 77 } = {}) {
     getElementById(id) { return elements.get(id) || null; },
     querySelectorAll(selector) {
       if (selector === ".work-card, .romantic-keepsake-card") return cards;
-      if (selector === "[data-carousel]") return carousels;
       if (selector === "[data-browse-filters]") return [browseFilters];
       if (selector === "[data-browse-all]") return [browseAll];
       if (selector === "[data-category-shortcut]") return [corporateShortcut];
@@ -125,18 +143,42 @@ function createHarness({ hash = "", count = 77 } = {}) {
   const context = { document: documentObject, window: windowObject };
   vm.createContext(context);
   vm.runInContext(`${catalogueFunction}\ninitCatalogueExperience();`, context, { filename: "script.js" });
-  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, heading, carousels, browseFilters, browseAll, corporateShortcut, windowObject, eventLog };
+  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, heading, browseFilters, browseAll, corporateShortcut, windowObject, eventLog };
 }
 
 function visibleCards(harness) { return harness.cards.filter((card) => !card.hidden); }
 
-test("initial state shows exactly the eight featured picks", () => {
+test("initial state shows four-card previews per section", () => {
   const harness = createHarness();
-  assert.equal(visibleCards(harness).length, 8);
+  assert.equal(visibleCards(harness).length, 19);
+  harness.sections.forEach((section) => {
+    assert.equal(section.cards.filter((card) => !card.hidden).length, Math.min(4, section.cards.length));
+    assert.equal(section.disclosure.hidden, section.cards.length <= 4);
+    assert.equal(section.disclosure.getAttribute("aria-expanded"), "false");
+  });
   assert.equal(harness.pagePrevious.disabled, true);
   assert.equal(harness.pageNext.disabled, true);
   assert.equal(harness.pagination.hidden, true);
-  assert.match(harness.status.textContent, /Showing 1–8 of 8 featured gifts/);
+  assert.match(harness.status.textContent, /section previews/);
+});
+
+test("each section disclosure expands only its own cards and collapses on reset", () => {
+  const harness = createHarness();
+  const target = harness.sections[1];
+  target.disclosure.dispatch("click");
+  assert.equal(target.disclosure.getAttribute("aria-expanded"), "true");
+  assert.equal(target.cards.filter((card) => !card.hidden).length, target.cards.length);
+  harness.sections.filter((section) => section !== target).forEach((section) => {
+    assert.equal(section.cards.filter((card) => !card.hidden).length, Math.min(4, section.cards.length));
+  });
+  target.disclosure.dispatch("click");
+  assert.equal(target.disclosure.getAttribute("aria-expanded"), "false");
+  assert.equal(target.cards.filter((card) => !card.hidden).length, 4);
+  harness.browseAll.dispatch("click");
+  assert.ok(harness.sections.every((section) => section.disclosure.hidden));
+  harness.resetButton.dispatch("click");
+  assert.equal(target.disclosure.getAttribute("aria-expanded"), "false");
+  assert.equal(target.cards.filter((card) => !card.hidden).length, 4);
 });
 
 test("explicit full catalogue pages contain at most eight and traverse every item once", () => {
@@ -236,15 +278,4 @@ test("product and section hashes select bounded page one or the product page", (
   assert.equal(later.typeFilter.value, "corporate");
   assert.equal(later.pagePrevious.disabled, true);
   assert.ok(visibleCards(later).every((card) => card.getAttribute("data-product-type") === "corporate"));
-  assert.equal(later.carousels[0].refreshes.at(-1), true);
-});
-
-test("carousel controls refresh before a product hash scroll", () => {
-  const harness = createHarness();
-  harness.eventLog.length = 0;
-  harness.windowObject.location.hash = "#product-17";
-  harness.windowObject.listeners.hashchange();
-  assert.equal(harness.carousels[0].refreshes.at(-1), true);
-  assert.deepEqual(harness.eventLog, ["refresh", "scroll"]);
-  assert.deepEqual(harness.cards[16].events, ["scroll"]);
 });

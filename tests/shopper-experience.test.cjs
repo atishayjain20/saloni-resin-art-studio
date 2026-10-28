@@ -71,16 +71,16 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   assert.doesNotMatch(css.slice(reducedMotionStart), /#hero/);
 });
 
-test("catalogue enhancement has accessible filters, featured mode, and a no-result reset", () => {
+test("catalogue enhancement has accessible filters, preview mode, and a no-result reset", () => {
   assert.match(html, /id="catalogue-filters"/);
   assert.match(html, /id="catalogue-type-filter"/);
   assert.match(html, /id="catalogue-price-filter"/);
   assert.match(html, /id="catalogue-filter-reset"/);
   assert.match(html, /id="catalogue-filter-empty"/);
-  assert.match(html, /data-featured="true"/);
+  assert.match(html, /data-catalogue-disclosure/);
   assert.match(html, /See all 77 gifts/);
   assert.match(html, /Clear filters and browse all gifts/);
-  assert.match(html, /Back to featured picks/);
+  assert.match(html, /Back to section previews/);
   assert.match(html, /data-category-shortcut="corporate"/);
   assert.match(html, /id="catalogue-page-previous"/);
   assert.match(html, /id="catalogue-page-next"/);
@@ -88,6 +88,26 @@ test("catalogue enhancement has accessible filters, featured mode, and a no-resu
   assert.match(html, /id="catalogue-pagination"/);
   assert.match(css, /\.category-shortcuts\s*\{[^}]*repeat\(5/);
   assert.match(script, /initCatalogueExperience/);
+});
+
+test("catalogue sections use four-card responsive grids with independent disclosures", () => {
+  [
+    ["diwali", "diwali-grid"],
+    ["romantic-keepsakes", "romantic-keepsakes-grid"],
+    ["corporate-resin-gifts", "corporate-resin-gifts-grid"],
+    ["studio-art", "studio-art-grid"],
+    ["hamper-rail", "hamper-grid"]
+  ].forEach(([sectionId, gridId]) => {
+    const sectionMarkup = section(sectionId);
+    assert.match(sectionMarkup, new RegExp(`class="catalogue-grid"[^>]*id="${gridId}"`));
+    assert.match(sectionMarkup, new RegExp(`data-catalogue-disclosure[^>]*aria-controls="${gridId}"`));
+    assert.match(sectionMarkup, /aria-expanded="false"/);
+    assert.doesNotMatch(sectionMarkup, /data-carousel|data-carousel-prev|data-carousel-next|tabindex="0"/);
+    assert.doesNotMatch(sectionMarkup, /swipe|use the arrows|carousel/i);
+  });
+  assert.match(css, /\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2/);
+  assert.doesNotMatch(script, /track\.addEventListener\("keydown"/);
 });
 
 test("category shortcuts use three columns at tablet widths and two on mobile", () => {
@@ -140,8 +160,8 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   assert.match(mainMarkup, /id="order-title"/);
   assert.match(mainMarkup, /id="studio-art-title"/);
   assert.match(mainMarkup, /id="customizer-title"/);
-  assert.match(html, /<section[^>]*id="romantic-keepsakes"[^>]*data-carousel="romantic-keepsakes"/);
-  assert.match(html, /<section[^>]*class="[^"]*\bwork-section\b[^"]*"[^>]*data-carousel="[^"]+"/);
+  assert.match(html, /<section[^>]*id="romantic-keepsakes"[^>]*aria-labelledby="romantic-keepsakes-title"/);
+  assert.match(html, /<section[^>]*class="[^"]*\bwork-section\b[^"]*"[^>]*aria-labelledby="[^"]+"/);
   assert.match(contactButtonRule, /flex:\s*1 1 9rem/);
   assert.match(contactButtonRule, /min-width:\s*0/);
   assert.match(contactButtonRule, /flex-wrap:\s*wrap/);
@@ -150,7 +170,7 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   assert.match(shortcutsRule, /min-width:\s*0/);
   assert.match(shortcutsRule, /flex-wrap:\s*wrap/);
   assert.match(shortcutsRule, /overflow-wrap:\s*anywhere/);
-  assert.match(css, /\.carousel-track\s*\{[^}]*overflow-x:\s*auto/);
+  assert.match(css, /\.catalogue-grid\s*\{[^}]*display:\s*grid/);
   assert.doesNotMatch(css, /body\s*\{[^}]*overflow-x:\s*hidden/);
 });
 

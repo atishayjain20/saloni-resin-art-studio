@@ -70,7 +70,6 @@
 
   function initializePage() {
     var root = document.documentElement;
-    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var skipLink = document.querySelector(".skip-link");
     var mainContent = document.getElementById("main-content");
     if (skipLink && mainContent) {
@@ -101,55 +100,6 @@
       siteNav.querySelectorAll("a").forEach(function (link) { link.addEventListener("click", function () { setNavOpen(false); }); });
       document.addEventListener("keydown", function (event) { if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true") setNavOpen(false, true); });
     }
-
-    document.querySelectorAll("[data-carousel]").forEach(function (carousel) {
-      var track = carousel.querySelector("[data-carousel-track]");
-      var previous = carousel.querySelector("[data-carousel-prev]");
-      var next = carousel.querySelector("[data-carousel-next]");
-      if (!track || !previous || !next) return;
-
-      function stepSize() {
-        var firstCard = Array.prototype.find.call(track.children || [], function (card) {
-          return !card.hidden && (!card.getAttribute || card.getAttribute("aria-hidden") !== "true");
-        });
-        if (!firstCard) return track.clientWidth * 0.85;
-        var styles = window.getComputedStyle(track);
-        var gap = parseFloat(styles.columnGap || styles.gap || "0");
-        return firstCard.getBoundingClientRect().width + gap;
-      }
-
-      function updateControls() {
-        var maxScroll = Math.max(0, track.scrollWidth - track.clientWidth - 2);
-        previous.disabled = track.scrollLeft <= 2;
-        next.disabled = track.scrollLeft >= maxScroll;
-      }
-
-      function refreshControls(resetScroll) {
-        if (resetScroll) track.scrollLeft = 0;
-        var maxScroll = Math.max(0, track.scrollWidth - track.clientWidth - 2);
-        if (track.scrollLeft > maxScroll) track.scrollLeft = maxScroll;
-        updateControls();
-      }
-
-      function move(direction) {
-        track.scrollBy({
-          left: direction * stepSize(),
-          behavior: reduceMotion ? "auto" : "smooth"
-        });
-      }
-
-      previous.addEventListener("click", function () { move(-1); });
-      next.addEventListener("click", function () { move(1); });
-      track.addEventListener("keydown", function (event) {
-        if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); }
-        if (event.key === "ArrowRight") { event.preventDefault(); move(1); }
-      });
-      track.addEventListener("scroll", updateControls, { passive: true });
-      window.addEventListener("resize", updateControls, { passive: true });
-      carousel.refreshControls = refreshControls;
-      refreshControls(false);
-      carousel.classList.add("is-ready");
-    });
 
     var lightbox = document.getElementById("art-lightbox");
     var lightboxImage = document.getElementById("lightbox-image");
@@ -185,7 +135,7 @@
     initCatalogueExperience();
 
     var reveals = document.querySelectorAll(".reveal");
-    document.querySelectorAll("[data-carousel-track] > :nth-child(-n+2)").forEach(function (element) {
+    document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
       element.classList.add("is-visible");
     });
     if ("IntersectionObserver" in window) {
@@ -206,12 +156,6 @@
 
     initReferralAttribution();
     initOrderRequestFlow();
-  }
-
-  function refreshCatalogueCarousels(resetScroll) {
-    document.querySelectorAll("[data-carousel]").forEach(function (carousel) {
-      if (typeof carousel.refreshControls === "function") carousel.refreshControls(resetScroll === true);
-    });
   }
 
   function initCatalogueExperience() {
@@ -237,11 +181,23 @@
     var sections = [];
     var allVisible = false;
     var page = 1;
+    var previewLimit = 4;
+    var expandedSections = [];
 
     function sectionFor(card) {
       var section = card.closest ? card.closest("section") : null;
       if (section && sections.indexOf(section) === -1) sections.push(section);
       return section;
+    }
+
+    cards.forEach(sectionFor);
+
+    function cardsForSection(section) {
+      return cards.filter(function (card) { return card.closest && card.closest("section") === section; });
+    }
+
+    function isExpanded(section) {
+      return expandedSections.indexOf(section) !== -1;
     }
 
     function typeFor(card) {
@@ -281,8 +237,11 @@
 
     function catalogueCards() {
       return cards.filter(function (card) {
+        var section = sectionFor(card);
+        var sectionCards = cardsForSection(section);
+        var isInOverview = allVisible || isExpanded(section) || sectionCards.indexOf(card) < previewLimit;
         var type = typeFor(card);
-        return (allVisible || card.getAttribute("data-featured") === "true") &&
+        return isInOverview &&
           ((typeFilter.value || "all") === "all" || (typeFilter.value || "all") === type) &&
           matchesPrice(card, priceFilter.value || "all");
       });
@@ -295,11 +254,11 @@
 
     function updatePageControls(total, pageCount) {
       if (pagePrevious) {
-        pagePrevious.disabled = page <= 1 || total === 0;
+        pagePrevious.disabled = !allVisible || page <= 1 || total === 0;
         pagePrevious.setAttribute("aria-disabled", String(pagePrevious.disabled));
       }
       if (pageNext) {
-        pageNext.disabled = page >= pageCount || total === 0;
+        pageNext.disabled = !allVisible || page >= pageCount || total === 0;
         pageNext.setAttribute("aria-disabled", String(pageNext.disabled));
       }
     }
@@ -309,7 +268,7 @@
       var pageCount = Math.max(1, Math.ceil(matchingCards.length / pageSize));
       if (page > pageCount) page = pageCount;
       var pageStart = matchingCards.length ? (page - 1) * pageSize : 0;
-      var pageCards = matchingCards.slice(pageStart, pageStart + pageSize);
+      var pageCards = allVisible ? matchingCards.slice(pageStart, pageStart + pageSize) : matchingCards;
       cards.forEach(function (card) {
         var type = typeFor(card);
         var price = priceFor(card);
@@ -325,8 +284,15 @@
         setVisibility(card, visible);
       });
       sections.forEach(function (section) {
-        var hasVisibleCard = cards.some(function (card) { return card.closest && card.closest("section") === section && !card.hidden; });
+        var sectionCards = cardsForSection(section);
+        var hasVisibleCard = sectionCards.some(function (card) { return !card.hidden; });
         section.hidden = !hasVisibleCard;
+        var disclosure = section.querySelector && section.querySelector("[data-catalogue-disclosure]");
+        if (!disclosure) return;
+        var canExpand = !allVisible && sectionCards.length > previewLimit;
+        disclosure.hidden = !canExpand;
+        disclosure.setAttribute("aria-expanded", String(canExpand && isExpanded(section)));
+        disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : "See all";
       });
       empty.hidden = matchingCards.length !== 0;
       if (pagination) pagination.hidden = !allVisible;
@@ -334,18 +300,18 @@
       if (!matchingCards.length) {
         status.textContent = "No gifts match those choices.";
       } else if (!allVisible) {
-        status.textContent = "Showing 1–" + matchingCards.length + " of " + matchingCards.length + " featured gifts.";
+        status.textContent = "Showing " + matchingCards.length + " section previews.";
       } else {
         status.textContent = "Showing " + (pageStart + 1) + "–" + pageEnd + " of " + matchingCards.length + " gifts · Page " + page + " of " + pageCount + ".";
       }
       setPageStatus(matchingCards.length, pageCount);
       updatePageControls(matchingCards.length, pageCount);
-      refreshCatalogueCarousels(true);
       document.documentElement.classList.add("catalogue-ready");
     }
 
     function showAll() {
       allVisible = true;
+      expandedSections = [];
       typeFilter.value = "all";
       priceFilter.value = "all";
       page = 1;
@@ -354,6 +320,7 @@
 
     function showFeatured() {
       allVisible = false;
+      expandedSections = [];
       typeFilter.value = "all";
       priceFilter.value = "all";
       page = 1;
@@ -384,6 +351,7 @@
 
     function selectCategory(category, href) {
       allVisible = true;
+      expandedSections = [];
       typeFilter.value = category || "all";
       priceFilter.value = "all";
       page = 1;
@@ -400,6 +368,7 @@
         var productIndex = cards.indexOf(target);
         if (productIndex === -1) return false;
         allVisible = true;
+        expandedSections = [];
         typeFilter.value = "all";
         priceFilter.value = "all";
         page = Math.floor(productIndex / pageSize) + 1;
@@ -447,6 +416,17 @@
         if (!category) return;
         event.preventDefault();
         selectCategory(category, link.getAttribute("href"));
+      });
+    });
+    sections.forEach(function (section) {
+      var disclosure = section.querySelector && section.querySelector("[data-catalogue-disclosure]");
+      if (!disclosure) return;
+      disclosure.addEventListener("click", function () {
+        if (allVisible) return;
+        var expandedIndex = expandedSections.indexOf(section);
+        if (expandedIndex === -1) expandedSections.push(section);
+        else expandedSections.splice(expandedIndex, 1);
+        applyFilters();
       });
     });
     typeFilter.addEventListener("change", function () { allVisible = true; page = 1; applyFilters(); });
@@ -766,7 +746,7 @@
       return sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details });
     }
 
-    document.querySelectorAll("[data-carousel] .work-card, .romantic-keepsake-card").forEach(function (card) {
+    document.querySelectorAll(".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card").forEach(function (card) {
       var seed = catalogueSeed(card);
       var caption = card.querySelector("figcaption");
       if (!seed || !caption || caption.querySelector("[data-order-prefill]")) return;
