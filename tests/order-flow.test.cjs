@@ -372,9 +372,9 @@ test("clears a catalogue summary when general or customizer ordering takes over"
   assert.equal(summary.hidden, true);
 });
 
-test("routes Resin art and Explore the keepsakes to the active catalogue categories", () => {
+test("routes Resin art to the active catalogue categories without a romantic heading link", () => {
   assert.match(page, /<a href="#studio-art" data-category-shortcut="frames">Resin art<\/a>/);
-  assert.match(page, /<a class="text-link" href="#romantic-keepsakes" data-category-shortcut="couple">Explore the keepsakes/);
+  assert.doesNotMatch(page, /<a class="text-link" href="#romantic-keepsakes" data-category-shortcut="couple">Explore the keepsakes/);
   assert.doesNotMatch(page, /<a href="#romantic-keepsakes">Resin art<\/a>/);
   assert.doesNotMatch(page, /<a class="text-link" href="#studio-art">Explore the keepsakes/);
 });
