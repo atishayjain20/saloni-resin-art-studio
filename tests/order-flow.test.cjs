@@ -244,7 +244,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
     querySelectorAll(selector) {
-      if (selector === "[data-carousel] .work-card, .romantic-keepsake-card") return [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards, ...corporateCards, ...diwaliCards];
+      if (selector === ".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card") return [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards, ...corporateCards, ...diwaliCards];
       if (selector === '[data-order-prefill="general"]') return [generalRequest, designHelp];
       return [];
     },
