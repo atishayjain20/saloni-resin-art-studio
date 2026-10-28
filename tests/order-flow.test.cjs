@@ -127,11 +127,11 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     existingCard.title = { textContent: title };
     existingCard.titleTag = "h3";
     existingCard.detailNodes = [{ textContent: copy }];
-    const size = title === "Rose hexagon" ? ["Size", "8–10 in"] : title === "Personalized photo clock" ? ["Size", "16–18 in"] : ["Size", "Custom size in inches — confirm with Saloni"];
+    const size = title === "Rose hexagon" ? ["Size", "8–10 in"] : title === "Personalized photo clock" ? ["Size", "16–18 in"] : null;
     existingCard.priceRows = [
       ["Price", "₹599"],
       size,
-    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
+    ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return existingCard;
   });
   const highlightCard = romanticExistingCards[3];
@@ -165,10 +165,11 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     generatedCard.detailNodes = [
       { textContent: "Flowers from a favourite day, held in a soft arch." },
     ];
+    const size = index === 0 ? ["Size", "20×22 in"] : index === 3 ? ["Size", "3 in each"] : null;
     generatedCard.priceRows = [
       ["Estimated from", `₹${festive}`],
-      index === 0 ? ["Suggested size", "20×22 in — confirm with Saloni"] : index === 1 || index === 2 ? ["Size", "Custom size in inches — confirm with Saloni"] : ["Suggested size", "3 in each — confirm with Saloni"],
-    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
+      size,
+    ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return generatedCard;
   });
   const romanticCatalogue = [
@@ -193,23 +194,24 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     romanticCard.detailNodes = [
       { textContent: copy },
     ];
+    const size = index === 0 ? ["Size", "1.5–2 in each"] : index === 1 ? ["Size", "5–6 in each"] : index === 2 ? ["Size", "3 in"] : index === 4 ? ["Size", "4 in"] : null;
     romanticCard.priceRows = [
       ["Estimated from", `₹${festive}`],
-      index === 0 ? ["Suggested size", "1.5–2 in each — confirm with Saloni"] : index === 1 ? ["Suggested size", "5–6 in each — confirm with Saloni"] : index === 2 ? ["Suggested size", "3 in — confirm with Saloni"] : index === 4 ? ["Size", "4 in"] : ["Size", "Custom size in inches — confirm with Saloni"],
-    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
+      size,
+    ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return romanticCard;
   });
   const corporateSizes = [
-    ["Suggested size", "1.5–2 in — confirm with Saloni"], ["Suggested size", "5–6 in — confirm with Saloni"],
-    ["Suggested size", "4 in — confirm with Saloni"], ["Suggested size", "6 in — confirm with Saloni"],
-    ["Suggested size", "3 in each — confirm with Saloni"], ["Suggested size", "2 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "6–8 in"], ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"], ["Suggested size", "4 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"], ["Size", "Custom size in inches — confirm with Saloni"],
+    ["Size", "1.5–2 in"], ["Size", "5–6 in"],
+    ["Size", "4 in"], ["Size", "6 in"],
+    ["Size", "3 in each"], ["Size", "2 in"],
+    null, null,
+    ["Size", "6–8 in"], null,
+    null, null,
+    null, ["Size", "4 in"],
+    null, null,
+    null, null,
+    null, null,
   ];
   const corporateCards = CORPORATE_RESIN_GIFTS.map(([asset, title, copy, unit, regular, offer, discount], index) => {
     const corporateCard = new Element("work-card");
@@ -225,12 +227,12 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     corporateCard.priceRows = [
       ["Estimated from", `₹${offer}`],
       corporateSizes[index],
-    ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
+    ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return corporateCard;
   });
   const diwaliSizes = [
-    ["Size", "3 in"], ["Suggested size", "3 in — confirm with Saloni"], ["Size", "6 in"], ["Size", "2–3 in each"],
-    ["Suggested size", "3–4 in — confirm with Saloni"], ["Size", "3–4 in each"], ["Suggested size", "4–5 in — confirm with Saloni"], ["Size", "2 in each"],
+    ["Size", "3 in"], ["Size", "3 in"], ["Size", "6 in"], ["Size", "2–3 in each"],
+    ["Size", "3–4 in"], ["Size", "3–4 in each"], ["Size", "4–5 in"], ["Size", "2 in each"],
     ["Size", "3–4 in each"], ["Size", "3–4 in"],
   ];
   const diwaliCards = DIWALI_NEW_CONCEPTS.map(([asset, title, copy, unit, regular, festive, discount], index) => {
@@ -478,20 +480,21 @@ test("leaves catalogue dimensions blank when the catalogue has no real size", ()
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
 });
 
-test("carries direct, range, inferred, and custom catalogue sizes into order details", () => {
+test("carries known catalogue sizes and preserves no-size selections in order details", () => {
   const flow = runFlow();
   const cases = [
     [flow.catalogueButton, "Size: 4 in", "Test frame"],
     [flow.romanticExistingButtons[0], "Size: 8–10 in", "Rose hexagon"],
-    [flow.generatedCatalogueButtons[2], "Size: Custom size in inches — confirm with Saloni", "A tray full of celebration"],
-    [flow.generatedCatalogueButtons[3], "Suggested size: 3 in each — confirm with Saloni", "Little messages, shared"],
-    [flow.generatedCatalogueButtons[1], "Size: Custom size in inches — confirm with Saloni", "A little blue hour"],
+    [flow.generatedCatalogueButtons[3], "Size: 3 in each", "Little messages, shared"],
+    [flow.generatedCatalogueButtons[1], null, "A little blue hour"],
+    [flow.generatedCatalogueButtons[2], null, "A tray full of celebration"],
   ];
   cases.forEach(([button, sizeDetails, productName]) => {
     button.dispatch("click");
     const seed = submittedSeed(flow.posted);
     assert.equal(seed.productName, productName);
-    assert.match(seed.designDetails, new RegExp(sizeDetails.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
+    if (sizeDetails) assert.match(seed.designDetails, new RegExp(sizeDetails.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
+    else assert.doesNotMatch(seed.designDetails, /Size:/);
     assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
   });
 });
