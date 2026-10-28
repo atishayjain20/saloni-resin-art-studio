@@ -145,6 +145,32 @@ h1 em { color: var(--rose); font-style: italic; }
 .diwali-section .eyebrow, .diwali-section .work-card figcaption span { color: var(--cocoa); }
 .diwali-section .rail-heading h2 { max-width: 13ch; }
 .diwali-section .diwali-card-note { max-width: 30ch; margin-top: 0.45rem; color: var(--cocoa); font-size: 0.76rem; }
+.premium-collection-section {
+  --premium-gold: #e7c883;
+  scroll-margin-top: 3rem;
+  padding-inline: clamp(1rem, 4vw, 3.5rem);
+  border-radius: 1.5rem;
+  background: #2f2522;
+  color: #fbf5e9;
+}
+.premium-collection-section .eyebrow,
+.premium-collection-section .work-card figcaption span { color: var(--premium-gold); }
+.premium-collection-section .rail-heading .catalogue-note,
+.premium-collection-section .work-card figcaption p { color: #e5d8ca; }
+.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing { border-color: rgba(251, 245, 233, 0.26); }
+.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dt { color: #cdbdae; }
+.premium-collection-section .premium-photo-card figcaption .product-pricing > div:last-child dt { color: #cdbdae; }
+.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dd,
+.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dd { color: #fbf5e9; }
+.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:first-child dd { color: var(--premium-gold); }
+.premium-collection-section .catalogue-section-disclosure,
+.premium-collection-section .catalogue-order-button { border-color: var(--premium-gold); color: #fbf5e9; }
+.premium-collection-section .catalogue-section-disclosure:hover,
+.premium-collection-section .catalogue-section-disclosure:focus-visible,
+.premium-collection-section .catalogue-order-button:hover,
+.premium-collection-section .catalogue-order-button:focus-visible { background: var(--premium-gold); color: #2f2522; }
+.premium-collection-section .premium-photo-card img,
+.studio-sunflower-card img { object-fit: contain; background: #f7f0e7; }
 .rail-heading { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
 .rail-heading > div:first-child { min-width: 0; }
 .rail-heading h2 { max-width: 10ch; margin-bottom: 0; }
@@ -341,7 +367,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 }
 
 /* Progressive catalogue controls: the original cards remain the no-JS source of truth. */
-.category-shortcuts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .65rem; padding-block: 1.2rem 0; }
+.category-shortcuts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .65rem; padding-block: 1.2rem 0; }
 @media (max-width: 840px) {
   .category-shortcuts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
