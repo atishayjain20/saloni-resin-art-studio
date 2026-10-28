@@ -178,7 +178,7 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   assert.doesNotMatch(page, /Your entries stay in the form/);
   assert.match(page, /title="Saloni Resin Art Studio organisation gifting enquiry form"/);
   assert.match(page, /Organisation discounts available on quotation\./);
-  assert.match(page, /Bulk and recurring resin art/);
+  assert.match(page, /Bulk and recurring resin-art gifts/);
   assert.match(page, /Partner Circle/);
   assert.match(page, /href="\.\.\/partners\/"/);
   assert.match(formHtml, /name="enquiryId"/);
@@ -190,7 +190,7 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
 
 test("corporate page names resin-art gifts and keeps a compact studio photo strip", () => {
   assert.match(page, /resin-art gifts/i);
-  assert.match(page, /hamper/i);
+  assert.doesNotMatch(page, /hamper/i);
   assert.match(page, /class="corporate-gift-strip"/);
   assert.match(page, /aria-label="Resin-art gift examples"/);
   for (const asset of [

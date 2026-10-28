@@ -92,21 +92,22 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
     new FakeSection("romantic-keepsakes"),
     new FakeSection("corporate-resin-gifts"),
     new FakeSection("studio-art"),
-    new FakeSection("hamper-rail"),
   ];
-  if (includePremium) sections.splice(4, 0, new FakeSection("premium-collection"));
+  if (realCatalogue) sections.push(new FakeSection("premium-collection"));
+  else if (includePremium) {
+    sections.push(new FakeSection("premium-collection"));
+    sections.push(new FakeSection("hamper-rail"));
+  } else sections.push(new FakeSection("hamper-rail"));
   const sectionForIndex = (index) => realCatalogue
-    ? index < 24
+    ? index < 23
       ? sections[0]
-      : index < 38
+      : index < 36
         ? sections[1]
-        : index < 58
+        : index < 55
           ? sections[2]
-          : index < 79
+          : index < 75
             ? sections[3]
-            : index < 93
-              ? sections[4]
-              : sections[5]
+            : sections[4]
     : index < 24
       ? sections[0]
       : index < 38
@@ -120,7 +121,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
                   : includePremium ? sections[5] : sections[4];
   const cards = Array.from({ length: count }, (_, index) => {
     const section = sectionForIndex(index);
-    const premiumPrice = ["₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000"][index - (realCatalogue ? 79 : 74)];
+    const premiumPrice = ["₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000"][index - (realCatalogue ? 75 : 74)];
     const price = section.id === "premium-collection"
       ? premiumPrice
       : index % 5 === 0
@@ -275,8 +276,8 @@ test("explicit full catalogue pages contain at most eight and traverse every ite
   assert.match(harness.status.textContent, /Showing 75–77 of 77 gifts · Page 11 of 11\./);
 });
 
-test("full catalogue pages never mix product sections and cover the real 96-card catalogue in fourteen pages", () => {
-  const harness = createHarness({ count: 96, includePremium: true, realCatalogue: true });
+test("full catalogue pages never mix product sections and cover the real 89-card catalogue in thirteen pages", () => {
+  const harness = createHarness({ count: 89, includePremium: true, realCatalogue: true });
   harness.browseAll.dispatch("click");
   const pageCounts = [];
   const pageSections = [];
@@ -287,12 +288,12 @@ test("full catalogue pages never mix product sections and cover the real 96-card
     if (harness.pageNext.disabled) break;
     harness.pageNext.dispatch("click");
   }
-  assert.deepEqual(pageCounts, [8, 8, 8, 8, 6, 8, 8, 4, 8, 8, 5, 8, 6, 3]);
-  assert.equal(pageSections.length, 14);
+  assert.deepEqual(pageCounts, [8, 8, 7, 8, 5, 8, 8, 3, 8, 8, 4, 8, 6]);
+  assert.equal(pageSections.length, 13);
   assert.ok(pageSections.every((sections) => sections.size === 1));
   assert.equal(pageSections[4].has("romantic-keepsakes"), true);
   assert.equal(pageSections[5].has("corporate-resin-gifts"), true);
-  assert.match(harness.status.textContent, /Showing 94–96 of 96 gifts · Page 14 of 14\./);
+  assert.match(harness.status.textContent, /Showing 84–89 of 89 gifts · Page 13 of 13\./);
 });
 
 test("filters use AND logic and reset pagination to page one", () => {
@@ -446,6 +447,26 @@ test("premium filter includes priced and on-request photos, while budget exclude
   assert.match(harness.status.textContent, /of 6 gifts/);
   assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "premium"));
   assert.ok(visibleCards(harness).every((card) => card.querySelector(".product-pricing dd").textContent !== "Price on request"));
+});
+
+test("budget filters overlap at ₹2,000 and keep higher-priced gifts in the upper range", () => {
+  const harness = createHarness({ count: 8 });
+  harness.cards[0].price = "₹2,000";
+  harness.cards[1].price = "₹2,001";
+  harness.cards[2].price = "₹1,999";
+  harness.browseAll.dispatch("click");
+
+  harness.priceFilter.value = "1999";
+  harness.priceFilter.dispatch("change");
+  assert.ok(visibleCards(harness).some((card) => card.id === "product-1"));
+  assert.ok(visibleCards(harness).some((card) => card.id === "product-3"));
+  assert.ok(visibleCards(harness).every((card) => card.id !== "product-2"));
+
+  harness.priceFilter.value = "2000";
+  harness.priceFilter.dispatch("change");
+  assert.ok(visibleCards(harness).some((card) => card.id === "product-1"));
+  assert.ok(visibleCards(harness).some((card) => card.id === "product-2"));
+  assert.ok(visibleCards(harness).every((card) => card.id !== "product-3"));
 });
 
 test("premium section hash selects the premium category", () => {

@@ -18,7 +18,6 @@ const CORPORATE_RESIN_GIFTS = [
   ["corporate-desk-logo-stand-concept.webp", "Mini resin desk stand", "A small decorative resin stand for desks, reception counters or car dashboards.", "Price for one piece.", "249", "179", 28],
   ["corporate-recognition-award-concept.webp", "Recognition resin award", "A modern personalised memento for milestones and appreciation.", "Price for one piece.", "1,299", "899", 31],
   ["corporate-desk-organizer-concept.webp", "Resin desk organiser", "A compact pen and visiting-card holder with custom colours.", "Price for one piece.", "899", "699", 22],
-  ["corporate-festive-hamper-concept.webp", "Corporate festive hamper", "A coordinated resin gift box for festive or thank-you occasions.", "Price for one gift set.", "1,999", "1,499", 25],
   ["corporate-business-card-holder-concept.webp", "Resin Business Card Holder", "A compact resin holder for a tidy stack of visiting cards.", "Price for one card holder; cards not included.", "599", "449", 25],
   ["corporate-phone-rest-concept.webp", "Resin Phone Rest", "A steady resin rest for a phone on a desk or bedside table.", "Price for one phone rest; phone not included.", "699", "499", 29],
   ["corporate-pen-cup-concept.webp", "Resin Pen Cup", "A polished pen cup with a clean, colourful resin finish.", "Price for one pen cup; stationery not included.", "899", "699", 22],
@@ -123,7 +122,6 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const romanticExistingCatalogue = [
     ["studio-rose-hexagon-keepsake.jpeg", "Rose hexagon", "First rose from a boyfriend, held in love."],
     ["studio-personalized-photo-clock.jpeg", "Personalized photo clock", "A favourite couple photo, held in a clock."],
-    ["romantic-hamper.jpg", "Say it without a speech", "Photos, flowers, and the little words that are better kept close."],
     ["studio-red-rose-resin-display.jpeg", "Preserved rose display", "Preserved red roses, held close for a lasting moment."],
   ];
   const romanticExistingCards = romanticExistingCatalogue.map(([asset, title, copy]) => {
@@ -140,7 +138,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return existingCard;
   });
-  const highlightCard = romanticExistingCards[3];
+  const highlightCard = romanticExistingCards[2];
   const movedStudioCatalogue = [
     ["resin-clock.jpg", "Blue hour resin clock", "A little sky, a little shoreline, and a moment that keeps time."],
     ["resin-message-coasters.jpg", "Personalized message coasters", "Playful coasters for the person who makes ordinary days better."],
@@ -159,7 +157,6 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const generatedCatalogue = [
     ["concept-floral-memory-frame.webp", "Your flowers, held close", "4,999", "3,999", 20],
     ["concept-ocean-clock.webp", "A little blue hour", "2,999", "2,199", 27],
-    ["concept-tray-hamper.webp", "A tray full of celebration", "1,999", "1,499", 25],
     ["concept-floral-coasters.webp", "Little messages, shared", "1,299", "999", 23],
   ];
   const generatedCards = generatedCatalogue.map(([asset, title, regular, festive, discount], index) => {
@@ -171,7 +168,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     generatedCard.detailNodes = [
       { textContent: "Flowers from a favourite day, held in a soft arch." },
     ];
-    const size = index === 0 ? ["Size", "20×22 in"] : index === 3 ? ["Size", "3 in each"] : null;
+    const size = index === 0 ? ["Size", "20×22 in"] : index === 2 ? ["Size", "3 in each"] : null;
     generatedCard.priceRows = [
       ["From", `₹${festive}`],
       size,
@@ -538,9 +535,8 @@ test("carries known catalogue sizes and preserves no-size selections in order de
   const cases = [
     [flow.catalogueButton, "Size: 4 in", "Test frame"],
     [flow.romanticExistingButtons[0], "Size: 8–10 in", "Rose hexagon"],
-    [flow.generatedCatalogueButtons[3], "Size: 3 in each", "Little messages, shared"],
+    [flow.generatedCatalogueButtons[2], "Size: 3 in each", "Little messages, shared"],
     [flow.generatedCatalogueButtons[1], null, "A little blue hour"],
-    [flow.generatedCatalogueButtons[2], null, "A tray full of celebration"],
   ];
   cases.forEach(([button, sizeDetails, productName]) => {
     button.dispatch("click");
@@ -570,7 +566,6 @@ test("includes each generated design pricing in order seed details", () => {
   const expected = [
     ["concept-floral-memory-frame.webp", "4,999", "3,999", 20],
     ["concept-ocean-clock.webp", "2,999", "2,199", 27],
-    ["concept-tray-hamper.webp", "1,999", "1,499", 25],
     ["concept-floral-coasters.webp", "1,299", "999", 23],
   ];
   expected.forEach(([asset, regular, festive, discount], index) => {
@@ -609,7 +604,7 @@ test("seeds every corporate catalogue card with identity, unit, concept, and pri
 test("seeds every new Diwali concept with identity, unit, concept, and pricing details", () => {
   const section = page.match(/<section\b[^>]*id=["']diwali["'][\s\S]*?<\/section>/);
   assert.ok(section, "Diwali catalogue section must exist before order extraction is tested");
-  assert.equal((section[0].match(/data-lightbox-trigger/g) || []).length, 24);
+  assert.equal((section[0].match(/data-lightbox-trigger/g) || []).length, 23);
   const flow = runFlow();
   DIWALI_NEW_CONCEPTS.forEach(([asset, title, copy, unit, regular, festive, discount], index) => {
     const button = flow.diwaliCatalogueButtons[index];
@@ -662,7 +657,7 @@ test("keeps order seeds correct at the first, tenth, eleventh, and fourteenth ro
     [flow.romanticConceptButtons[0], "catalogue:romantic-us-keychain-pair.webp", "Two keys, one little us"],
     [flow.romanticConceptButtons[9], "catalogue:romantic-couple-miniature.webp", "Your story, in 3D"],
     [flow.romanticExistingButtons[0], "catalogue:studio-rose-hexagon-keepsake.jpeg", "Rose hexagon"],
-    [flow.romanticExistingButtons[3], "catalogue:studio-red-rose-resin-display.jpeg", "Preserved rose display"],
+    [flow.romanticExistingButtons[2], "catalogue:studio-red-rose-resin-display.jpeg", "Preserved rose display"],
   ];
   selected.forEach(([button, sourceId, productName]) => {
     button.dispatch("click");

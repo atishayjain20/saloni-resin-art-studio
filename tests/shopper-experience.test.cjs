@@ -79,7 +79,7 @@ test("catalogue enhancement has accessible filters, preview mode, and a no-resul
   assert.match(html, /id="catalogue-filter-reset"/);
   assert.match(html, /id="catalogue-filter-empty"/);
   assert.match(html, /data-catalogue-disclosure/);
-  assert.match(html, /See all 96 gifts/);
+  assert.match(html, /See all 89 gifts/);
   assert.match(html, /Clear filters and browse all gifts/);
   assert.match(html, /Back to section previews/);
   assert.match(html, /data-category-shortcut="corporate"/);
@@ -102,7 +102,6 @@ test("catalogue sections use four-card responsive grids with independent disclos
     ["romantic-keepsakes", "romantic-keepsakes-grid"],
     ["corporate-resin-gifts", "corporate-resin-gifts-grid"],
     ["studio-art", "studio-art-grid"],
-    ["hamper-rail", "hamper-grid"]
   ].forEach(([sectionId, gridId]) => {
     const sectionMarkup = section(sectionId);
     assert.match(sectionMarkup, new RegExp(`class="catalogue-grid"[^>]*id="${gridId}"`));
@@ -182,7 +181,7 @@ test("small-screen layout keeps long labels inside the viewport without masking 
 
 test("pricing keeps current quotes without unsupported discount claims", () => {
   const cards = html.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/g) || [];
-  assert.equal(cards.length, 96);
+  assert.equal(cards.length, 89);
   cards.forEach((card) => {
     assert.doesNotMatch(card, /<s>|Regular price|Discount|off/);
     assert.match(card, /<dt>(?:Price|From)<\/dt>/);
@@ -192,11 +191,23 @@ test("pricing keeps current quotes without unsupported discount claims", () => {
   assert.match(section("diwali"), /Diwali prices ₹249–₹1,799/);
 });
 
-test("festive offers are an inline choice, not an automatic modal", () => {
-  assert.match(html, /class="[^"]*festive-banner/);
-  assert.match(html, /<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs/);
+test("festive banner is absent while Diwali remains in the collection", () => {
+  assert.doesNotMatch(html, /class="[^"]*festive-banner/);
+  assert.doesNotMatch(html, /<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs/);
+  assert.match(html, /<section[^>]+id="diwali"[\s\S]*Diwali prices/);
   assert.doesNotMatch(html, /<dialog[^>]+festive-offers|special discounts/);
   assert.doesNotMatch(script, /initFestiveOffers|aria-controls="festive-offers"/);
+});
+
+test("resin-only catalogue removes hamper products and keeps both ₹2,000 budget choices", () => {
+  ["diwali-festive-hamper", "romantic-hamper-title", "corporate-festive-hamper", "birthday-hamper", "car-theme-hamper", "holi-hamper", "hamper-rail"].forEach((id) => {
+    assert.doesNotMatch(html, new RegExp(`(?:id|aria-labelledby)="${id}"`));
+  });
+  assert.doesNotMatch(html, /concept-tray-hamper\.webp|festive-welcome-hamper|customised-hampers\//);
+  assert.doesNotMatch(html, /data-category-shortcut="hampers"|value="hampers"/);
+  assert.match(html, /See all 89 gifts/);
+  assert.match(html, /<option value="1999">Up to ₹2,000<\/option>/);
+  assert.match(html, /<option value="2000">₹2,000 and above<\/option>/);
 });
 
 test("customizer presents a keyboard-matched basics, preview, advanced, and save/share flow", () => {
@@ -256,14 +267,16 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("shopper confidence strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Couple keepsakes", "Resin frames", "Hampers", "Custom design", "Corporate orders", "Order"].forEach((label) => {
+  ["Gifts", "Couple keepsakes", "Resin frames", "Custom design", "Corporate orders", "Order"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
-  assert.equal((nav.match(/<a\b/g) || []).length, 7);
+  assert.equal((nav.match(/<a\b/g) || []).length, 6);
   assert.match(html, /class="hero-trust-strip"/);
   ["Ajmer studio", "Shipping across India", "Handmade to order", "Contact Saloni"].forEach((fact) => assert.match(html, new RegExp(fact)));
-  assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Browse Diwali designs/);
-  assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art<\/a>[\s\S]*<a href="#hamper-rail" data-category-shortcut="hampers">Hampers<\/a>/);
+  assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
+  assert.doesNotMatch(html, /<a href="#diwali" data-category-shortcut="diwali">Browse Diwali designs/);
+  assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art<\/a>/);
+  assert.doesNotMatch(html, /data-category-shortcut="hampers"|href="#hamper-rail"/);
   assert.match(html, /href="partners\/">Partner Circle<\/a>/);
 });
 
@@ -375,12 +388,11 @@ test("buying-help block replaces unsupported testimonial claims without a carous
   assert.doesNotMatch(css, /\.testimonial-card\s*\{|\.sample-rating\s*\{/);
 });
 
-test("all 96 catalogue cards keep price first and show only known size rows", () => {
+test("all 89 catalogue cards keep price first and show only known size rows", () => {
   const expectedRows = [
     ["Size", "4 in"],
     ["Size", "4–6 in"],
     ["Size", "4–6 in"],
-    null,
     ["Size", "6 in"],
     ["Size", "6 in"],
     ["Size", "4 in"],
@@ -414,7 +426,6 @@ test("all 96 catalogue cards keep price first and show only known size rows", ()
     ["Size", "8–10 in"],
     ["Size", "16–18 in"],
     null,
-    null,
     ["Size", "1.5–2 in"],
     ["Size", "5–6 in"],
     ["Size", "4 in"],
@@ -424,7 +435,6 @@ test("all 96 catalogue cards keep price first and show only known size rows", ()
     null,
     null,
     ["Size", "6–8 in"],
-    null,
     null,
     null,
     null,
@@ -445,16 +455,11 @@ test("all 96 catalogue cards keep price first and show only known size rows", ()
     null,
     ["Size", "20×22 in"],
     null,
-    null,
     ["Size", "3 in each"],
     null,
     ["Size", "3 in each"],
     ["Size", "20×22 in"],
     null,
-    null,
-    null,
-    null,
-
     null,
     null,
     null,
@@ -476,8 +481,8 @@ test("all 96 catalogue cards keep price first and show only known size rows", ()
     null,
   ];
   const cards = html.match(/<article\b[^>]*class="[^"]*(?:work-card|romantic-keepsake-card)[^"]*"[\s\S]*?<\/article>/g) || [];
-  assert.equal(cards.length, 96);
-  assert.equal(expectedRows.length, 96);
+  assert.equal(cards.length, 89);
+  assert.equal(expectedRows.length, 89);
   cards.forEach((card, index) => {
     const pricing = card.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/)?.[0] || "";
     const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g)].map((match) => match.slice(1));
@@ -517,7 +522,7 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
   };
   const rowsFor = (title) => [...(cardFor(title).match(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g) || [])].map((row) => row.match(/<dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>/).slice(1));
   assert.deepEqual(rowsFor("Shubh Labh Welcome Pair").slice(1), [["Size", "4–6 in"]]);
-  assert.deepEqual(rowsFor("Festive Welcome Hamper").slice(1), []);
+  assert.equal(cardFor("Festive Welcome Hamper"), "");
   assert.deepEqual(rowsFor("Ivory Mandala Holder").slice(1), [["Size", "3 in"]]);
   assert.deepEqual(rowsFor("Pearl Rangoli Accent").slice(1), [["Size", "3–4 in"]]);
   assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "4–5 in"]]);
