@@ -77,7 +77,7 @@
         <h1 id="hero-title">Made for the moment they’ll <em>remember.</em></h1>
         <p class="hero-intro">Thoughtful custom resin frames, resin art, personalized gifts, and customized hampers from Ajmer, Rajasthan, for the people and milestones that deserve something more personal.</p>
         <div class="hero-actions">
-          <a class="button button-dark" href="#catalogue-filters" data-browse-all>Browse gifts <span aria-hidden="true">↘</span></a>
+          <a class="button button-dark" href="#catalogue-filters" data-browse-filters>Browse gifts by type or budget <span aria-hidden="true">↘</span></a>
           <a class="button button-line" href="#order" data-order-prefill="general">Request a custom gift <span aria-hidden="true">↗</span></a>
         </div>
         <a class="instagram-mark" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Follow the studio <strong>@saloniresin_art_studio</strong></a>
@@ -100,12 +100,13 @@
       <a href="#diwali" data-category-shortcut="diwali">Diwali <span aria-hidden="true">↘</span></a>
       <a href="#studio-art" data-category-shortcut="frames">Frames <span aria-hidden="true">↘</span></a>
       <a href="#hamper-rail" data-category-shortcut="hampers">Hampers <span aria-hidden="true">↘</span></a>
+      <a href="#corporate-resin-gifts" data-category-shortcut="corporate">Corporate gifts <span aria-hidden="true">↘</span></a>
     </nav>
 
     <section class="catalogue-tools shell" id="catalogue-filters" aria-labelledby="catalogue-filters-title">
       <div>
         <p class="eyebrow">The collection</p>
-        <h2 id="catalogue-filters-title">Find a gift that fits the moment.</h2>
+        <h2 id="catalogue-filters-title" tabindex="-1">Find a gift that fits the moment.</h2>
         <p class="catalogue-note" id="catalogue-disclosure">Some catalogue images are illustrative or reference ideas. Saloni confirms availability, materials, final design, quote, and delivery.</p>
       </div>
       <div class="catalogue-enhancement" data-catalogue-enhancement>
@@ -129,12 +130,17 @@
               <option value="2000">₹2,000 and above</option>
             </select>
           </label>
-          <button class="button button-line" id="catalogue-filter-reset" type="button">Reset filters</button>
+          <button class="button button-line" id="catalogue-filter-reset" type="button">Back to featured picks</button>
         </div>
         <p class="catalogue-filter-status" id="catalogue-filter-status" role="status" aria-live="polite"></p>
-        <p class="catalogue-filter-empty" id="catalogue-filter-empty" role="status" hidden>No gifts match those choices. <button class="text-button" id="catalogue-empty-reset" type="button">Show all gifts</button></p>
+        <p class="catalogue-filter-empty" id="catalogue-filter-empty" role="status" hidden>No gifts match those choices. <button class="text-button" id="catalogue-empty-reset" type="button">Clear filters and browse all gifts</button></p>
+        <div class="catalogue-pagination" id="catalogue-pagination" aria-label="Catalogue pagination">
+          <button class="button button-line" id="catalogue-page-previous" type="button" aria-label="Previous catalogue page">Previous</button>
+          <span id="catalogue-page-status" role="status" aria-live="polite">Page 1</span>
+          <button class="button button-line" id="catalogue-page-next" type="button" aria-label="Next catalogue page">Next</button>
+        </div>
       </div>
-      <a class="button button-dark catalogue-browse-all" href="#diwali" id="browse-all-gifts" data-browse-all>Browse all gifts <span aria-hidden="true">↘</span></a>
+      <a class="button button-dark catalogue-browse-all" href="#catalogue-filters" id="browse-all-gifts" data-browse-all>See all 77 gifts <span aria-hidden="true">↘</span></a>
     </section>
 
     <p class="festive-banner shell" id="festive-offers"><span id="festive-offers-fallback" aria-hidden="true"></span><strong>Festive gifting, without the rush.</strong> <a href="#diwali">Browse Diwali designs <span aria-hidden="true">↘</span></a></p>
@@ -216,85 +222,85 @@
           </article>
           <article class="work-card reveal" id="diwali-om-mini-tilak-plate" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-om-mini-tilak-plate.webp" aria-label="Open larger view: Om mini tilak plate with floral resin details"><img src="assets/diwali-om-mini-tilak-plate.webp" alt="Original concept preview: Om mini tilak plate with floral resin details" width="1122" height="1402" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-om-mini-tilak-plate.webp" aria-label="Open larger view: Om mini tilak plate with floral resin details"><img src="assets/diwali-om-mini-tilak-plate.webp" alt="Illustrative preview: Om mini tilak plate with floral resin details" width="1122" height="1402" loading="lazy" decoding="async"></a>
               <figcaption><strong>Om Mini Tilak Plate</strong><p>A rosy Om plate for tilak, rice and a small festive welcome</p><p class="diwali-card-note">price per plate</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹249</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-lotus-diya-pair" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-lotus-diya-pair.webp" aria-label="Open larger view: Jewel-toned lotus diya pair with gold accents"><img src="assets/diwali-lotus-diya-pair.webp" alt="Original concept preview: Jewel-toned lotus diya pair with gold accents" width="1122" height="1402" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-lotus-diya-pair.webp" aria-label="Open larger view: Jewel-toned lotus diya pair with gold accents"><img src="assets/diwali-lotus-diya-pair.webp" alt="Illustrative preview: Jewel-toned lotus diya pair with gold accents" width="1122" height="1402" loading="lazy" decoding="async"></a>
               <figcaption><strong>Lotus Diya Pair</strong><p>A pair of jewel-toned lotus diyas for a glowing festive corner</p><p class="diwali-card-note">price for the pair</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹349</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="diwali-peacock-mini-pooja-thali" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-peacock-mini-pooja-thali.webp" aria-label="Open larger view: Peacock mini pooja thali with teal, lavender and gold details"><img src="assets/diwali-peacock-mini-pooja-thali.webp" alt="Original concept preview: Peacock mini pooja thali with teal, lavender and gold details" width="1122" height="1402" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-peacock-mini-pooja-thali.webp" aria-label="Open larger view: Peacock mini pooja thali with teal, lavender and gold details"><img src="assets/diwali-peacock-mini-pooja-thali.webp" alt="Illustrative preview: Peacock mini pooja thali with teal, lavender and gold details" width="1122" height="1402" loading="lazy" decoding="async"></a>
               <figcaption><strong>Peacock Mini Pooja Thali</strong><p>A peacock-feather pooja thali with space for tilak and rice</p><p class="diwali-card-note">price per thali</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="diwali-floral-swastik-tealight-set" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-floral-swastik-tealight-set.webp" aria-label="Open larger view: Floral Swastik tealight set with two holders and a matching flower accent"><img src="assets/diwali-floral-swastik-tealight-set.webp" alt="Original concept preview: Floral Swastik tealight set with two holders and a matching flower accent" width="1122" height="1402" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-floral-swastik-tealight-set.webp" aria-label="Open larger view: Floral Swastik tealight set with two holders and a matching flower accent"><img src="assets/diwali-floral-swastik-tealight-set.webp" alt="Illustrative preview: Floral Swastik tealight set with two holders and a matching flower accent" width="1122" height="1402" loading="lazy" decoding="async"></a>
               <figcaption><strong>Floral Swastik Tealight Set</strong><p>Two holders and a small matching flower accent for a bright festive corner</p><p class="diwali-card-note">price for the three-piece set</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-marigold-petal-holder" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-marigold-petal-holder-concept.webp" aria-label="Open larger view: Original concept preview: A warm marigold-inspired cup for a soft festive glow"><img src="assets/diwali-marigold-petal-holder-concept.webp" alt="Original concept preview: A warm marigold-inspired cup for a soft festive glow" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-marigold-petal-holder-concept.webp" aria-label="Open larger view: Illustrative preview: A warm marigold-inspired cup for a soft festive glow"><img src="assets/diwali-marigold-petal-holder-concept.webp" alt="Illustrative preview: A warm marigold-inspired cup for a soft festive glow" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Marigold Petal Holder</strong><p>A warm marigold-inspired cup for a soft festive glow.</p><p class="diwali-card-note">one LED tealight holder · LED not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹249</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-ivory-mandala-holder" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-ivory-mandala-holder-concept.webp" aria-label="Open larger view: Original concept preview: An ivory mandala cup with a calm, hand-finished festive feel"><img src="assets/diwali-ivory-mandala-holder-concept.webp" alt="Original concept preview: An ivory mandala cup with a calm, hand-finished festive feel" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-ivory-mandala-holder-concept.webp" aria-label="Open larger view: Illustrative preview: An ivory mandala cup with a calm, hand-finished festive feel"><img src="assets/diwali-ivory-mandala-holder-concept.webp" alt="Illustrative preview: An ivory mandala cup with a calm, hand-finished festive feel" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Ivory Mandala Holder</strong><p>An ivory mandala cup with a calm, hand-finished festive feel.</p><p class="diwali-card-note">one LED tealight holder · LED not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="diwali-ruby-leaf-dish" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-ruby-leaf-dish-concept.webp" aria-label="Open larger view: Original concept preview: A ruby-red leaf dish for a small festive offering or accent"><img src="assets/diwali-ruby-leaf-dish-concept.webp" alt="Original concept preview: A ruby-red leaf dish for a small festive offering or accent" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-ruby-leaf-dish-concept.webp" aria-label="Open larger view: Illustrative preview: A ruby-red leaf dish for a small festive offering or accent"><img src="assets/diwali-ruby-leaf-dish-concept.webp" alt="Illustrative preview: A ruby-red leaf dish for a small festive offering or accent" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Ruby Leaf Dish</strong><p>A ruby-red leaf dish for a small festive offering or accent.</p><p class="diwali-card-note">one decorative dish</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹799</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="diwali-saffron-tilak-duo" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-saffron-tilak-duo-concept.webp" aria-label="Open larger view: Original concept preview: Two saffron-toned mini dishes for tilak and rice"><img src="assets/diwali-saffron-tilak-duo-concept.webp" alt="Original concept preview: Two saffron-toned mini dishes for tilak and rice" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-saffron-tilak-duo-concept.webp" aria-label="Open larger view: Illustrative preview: Two saffron-toned mini dishes for tilak and rice"><img src="assets/diwali-saffron-tilak-duo-concept.webp" alt="Illustrative preview: Two saffron-toned mini dishes for tilak and rice" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Saffron Tilak Duo</strong><p>Two saffron-toned mini dishes for tilak and rice.</p><p class="diwali-card-note">two mini dishes</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹349</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-pearl-rangoli-accent" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-pearl-rangoli-accent-concept.webp" aria-label="Open larger view: Original concept preview: A pearly rangoli-inspired accent for an entryway or prayer corner"><img src="assets/diwali-pearl-rangoli-accent-concept.webp" alt="Original concept preview: A pearly rangoli-inspired accent for an entryway or prayer corner" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-pearl-rangoli-accent-concept.webp" aria-label="Open larger view: Illustrative preview: A pearly rangoli-inspired accent for an entryway or prayer corner"><img src="assets/diwali-pearl-rangoli-accent-concept.webp" alt="Illustrative preview: A pearly rangoli-inspired accent for an entryway or prayer corner" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Pearl Rangoli Accent</strong><p>A pearly rangoli-inspired accent for an entryway or prayer corner.</p><p class="diwali-card-note">one decorative accent</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-emerald-led-holder-pair" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-emerald-led-holder-pair-concept.webp" aria-label="Open larger view: Original concept preview: A pair of emerald cups for a jewel-toned LED-lit arrangement"><img src="assets/diwali-emerald-led-holder-pair-concept.webp" alt="Original concept preview: A pair of emerald cups for a jewel-toned LED-lit arrangement" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-emerald-led-holder-pair-concept.webp" aria-label="Open larger view: Illustrative preview: A pair of emerald cups for a jewel-toned LED-lit arrangement"><img src="assets/diwali-emerald-led-holder-pair-concept.webp" alt="Illustrative preview: A pair of emerald cups for a jewel-toned LED-lit arrangement" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Emerald Glow Pair</strong><p>A pair of emerald cups for a jewel-toned LED-lit arrangement.</p><p class="diwali-card-note">pair of LED tealight holders · LEDs not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹799</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="diwali-rose-petal-offering-plate" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-rose-petal-offering-plate-concept.webp" aria-label="Open larger view: Original concept preview: A rosy ritual plate with a gentle petal-inspired edge"><img src="assets/diwali-rose-petal-offering-plate-concept.webp" alt="Original concept preview: A rosy ritual plate with a gentle petal-inspired edge" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-rose-petal-offering-plate-concept.webp" aria-label="Open larger view: Illustrative preview: A rosy ritual plate with a gentle petal-inspired edge"><img src="assets/diwali-rose-petal-offering-plate-concept.webp" alt="Illustrative preview: A rosy ritual plate with a gentle petal-inspired edge" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Rose Petal Offering Plate</strong><p>A rosy ritual plate with a gentle petal-inspired edge.</p><p class="diwali-card-note">one decorative ritual plate</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="diwali-golden-toran-charms" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-golden-toran-charms-concept.webp" aria-label="Open larger view: Original concept preview: Three golden hanging charms to style a festive doorway or wall"><img src="assets/diwali-golden-toran-charms-concept.webp" alt="Original concept preview: Three golden hanging charms to style a festive doorway or wall" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-golden-toran-charms-concept.webp" aria-label="Open larger view: Illustrative preview: Three golden hanging charms to style a festive doorway or wall"><img src="assets/diwali-golden-toran-charms-concept.webp" alt="Illustrative preview: Three golden hanging charms to style a festive doorway or wall" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Golden Toran Charms</strong><p>Three golden hanging charms to style a festive doorway or wall.</p><p class="diwali-card-note">set of three hanging charms with cords</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="diwali-lotus-rangoli-duo" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-lotus-rangoli-duo-concept.webp" aria-label="Open larger view: Original concept preview: Two lotus pieces for a small layered rangoli arrangement"><img src="assets/diwali-lotus-rangoli-duo-concept.webp" alt="Original concept preview: Two lotus pieces for a small layered rangoli arrangement" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-lotus-rangoli-duo-concept.webp" aria-label="Open larger view: Illustrative preview: Two lotus pieces for a small layered rangoli arrangement"><img src="assets/diwali-lotus-rangoli-duo-concept.webp" alt="Illustrative preview: Two lotus pieces for a small layered rangoli arrangement" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Lotus Rangoli Duo</strong><p>Two lotus pieces for a small layered rangoli arrangement.</p><p class="diwali-card-note">set of two decorative lotus pieces</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="diwali-festive-keepsake-box" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-festive-keepsake-box-concept.webp" aria-label="Open larger view: Original concept preview: A small lidded box for a keepsake, note, or festive token"><img src="assets/diwali-festive-keepsake-box-concept.webp" alt="Original concept preview: A small lidded box for a keepsake, note, or festive token" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-festive-keepsake-box-concept.webp" aria-label="Open larger view: Illustrative preview: A small lidded box for a keepsake, note, or festive token"><img src="assets/diwali-festive-keepsake-box-concept.webp" alt="Illustrative preview: A small lidded box for a keepsake, note, or festive token" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Festive Keepsake Box</strong><p>A small lidded box for a keepsake, note, or festive token.</p><p class="diwali-card-note">one small lidded box · contents not included</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹649</dd></div></dl></figcaption>
             </figure>
           </article>
@@ -332,7 +338,7 @@
           <h2 id="romantic-keepsakes-title">Keep the moment close.</h2>
         </div>
         <div class="romantic-keepsakes-intro">
-          <p>14 keepsakes and concept previews — swipe or use the arrows to explore.</p>
+          <p>14 keepsake ideas — swipe or use the arrows to explore.</p>
           <a class="text-link" href="#studio-art">Explore the keepsakes <span aria-hidden="true">→</span></a>
           <div class="rail-controls" aria-label="Romantic keepsakes carousel controls">
             <button class="carousel-button" type="button" data-carousel-prev aria-controls="romantic-keepsakes-track" aria-label="Previous romantic keepsakes"><span class="arrow arrow-left" aria-hidden="true"></span></button>
@@ -344,61 +350,61 @@
         <div class="carousel-track" id="romantic-keepsakes-track" data-carousel-track role="list" tabindex="0" aria-label="Romantic keepsakes">
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-keychain-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-us-keychain-pair.webp" aria-label="Open larger view: Original concept preview of matching resin keychains with a shared heart detail"><img src="assets/romantic-us-keychain-pair.webp" alt="Original concept preview: Matching resin keychains with a shared heart detail" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-us-keychain-pair.webp" aria-label="Open larger view: Illustrative preview of matching resin keychains with a shared heart detail"><img src="assets/romantic-us-keychain-pair.webp" alt="Illustrative preview: Matching resin keychains with a shared heart detail" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-keychain-title">Two keys, one little us</h3><p>Made to travel together, even when you cannot.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-bookmark-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-floral-bookmark-set.webp" aria-label="Open larger view: Original concept preview of a dried-flower resin bookmark set"><img src="assets/romantic-floral-bookmark-set.webp" alt="Original concept preview: Dried-flower resin bookmark set in soft romantic colours" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-floral-bookmark-set.webp" aria-label="Open larger view: Illustrative preview of a dried-flower resin bookmark set"><img src="assets/romantic-floral-bookmark-set.webp" alt="Illustrative preview: Dried-flower resin bookmark set in soft romantic colours" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-bookmark-title">Save our page</h3><p>Three little places to keep the chapters that feel like yours.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹699</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-calendar-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-calendar-coaster.webp" aria-label="Open larger view: Original concept preview of an anniversary calendar coaster with a circled date"><img src="assets/romantic-calendar-coaster.webp" alt="Original concept preview: Anniversary calendar coaster with a circled date" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-calendar-coaster.webp" aria-label="Open larger view: Illustrative preview of an anniversary calendar coaster with a circled date"><img src="assets/romantic-calendar-coaster.webp" alt="Illustrative preview: Anniversary calendar coaster with a circled date" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-calendar-title">Our date, every day</h3><p>The day everything changed, circled for every ordinary morning after.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹899</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-bracelet-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-first-rose-bracelet.webp" aria-label="Open larger view: Original concept preview of a preserved-petal resin bracelet"><img src="assets/romantic-first-rose-bracelet.webp" alt="Original concept preview: Preserved-petal resin bracelet for a first rose" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-first-rose-bracelet.webp" aria-label="Open larger view: Illustrative preview of a preserved-petal resin bracelet"><img src="assets/romantic-first-rose-bracelet.webp" alt="Illustrative preview: Preserved-petal resin bracelet for a first rose" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-bracelet-title">The first rose, still with me</h3><p>One petal from the beginning, made wearable.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹599</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-trinket-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-heart-trinket-tray.webp" aria-label="Open larger view: Original concept preview of a coquette heart trinket tray"><img src="assets/romantic-heart-trinket-tray.webp" alt="Original concept preview: Coquette heart trinket tray in soft resin" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-heart-trinket-tray.webp" aria-label="Open larger view: Illustrative preview of a coquette heart trinket tray"><img src="assets/romantic-heart-trinket-tray.webp" alt="Illustrative preview: Coquette heart trinket tray in soft resin" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-trinket-title">Tiny tray, big feelings</h3><p>A soft place for rings, earbuds, and the little things you share.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹349</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-initial-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-initial-desk-stand.webp" aria-label="Open larger view: Original concept preview of a couple initial resin desk stand"><img src="assets/romantic-initial-desk-stand.webp" alt="Original concept preview: Couple initial resin desk stand" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-initial-desk-stand.webp" aria-label="Open larger view: Illustrative preview of a couple initial resin desk stand"><img src="assets/romantic-initial-desk-stand.webp" alt="Illustrative preview: Couple initial resin desk stand" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-initial-title">Your initial. Mine. Ours.</h3><p>Two letters, one small corner that belongs to both of you.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹699</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-pendant-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-botanical-pendant.webp" aria-label="Open larger view: Original concept preview of a botanical resin pendant with a name"><img src="assets/romantic-botanical-pendant.webp" alt="Original concept preview: Botanical resin pendant with a name" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-botanical-pendant.webp" aria-label="Open larger view: Illustrative preview of a botanical resin pendant with a name"><img src="assets/romantic-botanical-pendant.webp" alt="Illustrative preview: Botanical resin pendant with a name" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-pendant-title">A little piece of our season</h3><p>Pressed flowers and a name, kept close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-ocean-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-ocean-memory-tray.webp" aria-label="Open larger view: Original concept preview of an ocean memory resin tray"><img src="assets/romantic-ocean-memory-tray.webp" alt="Original concept preview: Ocean memory resin tray inspired by a special place" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-ocean-memory-tray.webp" aria-label="Open larger view: Illustrative preview of an ocean memory resin tray"><img src="assets/romantic-ocean-memory-tray.webp" alt="Illustrative preview: Ocean memory resin tray inspired by a special place" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-ocean-title">Our place, held in waves</h3><p>For the beach, trip, or city that became part of your story.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-scene-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-couple-scene.webp" aria-label="Open larger view: Original concept preview of a playful couple scene resin showpiece"><img src="assets/romantic-couple-scene.webp" alt="Original concept preview: Playful couple scene resin showpiece" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-couple-scene.webp" aria-label="Open larger view: Illustrative preview of a playful couple scene resin showpiece"><img src="assets/romantic-couple-scene.webp" alt="Illustrative preview: Playful couple scene resin showpiece" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-scene-title">Our favourite little scene</h3><p>A tiny version of the everyday moment you would replay.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹699</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-miniature-title">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-couple-miniature.webp" aria-label="Open larger view: Original concept preview of a custom couple miniature resin keepsake"><img src="assets/romantic-couple-miniature.webp" alt="Original concept preview: Custom couple miniature resin keepsake" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-couple-miniature.webp" aria-label="Open larger view: Illustrative preview of a custom couple miniature resin keepsake"><img src="assets/romantic-couple-miniature.webp" alt="Illustrative preview: Custom couple miniature resin keepsake" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-miniature-title">Your story, in 3D</h3><p>Two people, one meaningful detail, made into a shelf-sized memory.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,999</dd></div></dl></figcaption>
             </figure>
           </article>
@@ -428,11 +434,6 @@
           </article>
         </div>
       </div>
-      <div class="romantic-keepsake-notes" aria-label="Notes from the studio">
-        <p class="romantic-keepsake-notes-label">A few kind words about the studio</p>
-        <figure class="romantic-keepsake-note"><blockquote>“The colour story feels warm and personal — a lovely example of how a small idea can become a keepsake.”</blockquote><figcaption><cite>Gaurav Jain</cite></figcaption></figure>
-        <figure class="romantic-keepsake-note"><blockquote>“Soft tones and tiny details make this feel joyful, considered, and made for a moment worth remembering.”</blockquote><figcaption><cite>Aarti Suthar</cite></figcaption></figure>
-      </div>
     </section>
 
     <section class="work-section corporate-resin-gifts-section shell" id="corporate-resin-gifts" data-carousel="corporate-resin-gifts" aria-labelledby="corporate-resin-gifts-title">
@@ -450,92 +451,92 @@
       <div class="carousel">
         <div class="carousel-track" id="corporate-resin-gifts-track" data-carousel-track role="list" tabindex="0" aria-label="Corporate resin gifts">
           <article class="work-card reveal" id="corporate-logo-keychain" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-keychain-concept.webp" aria-label="Open larger view: Logo resin keychain concept product preview"><img src="assets/corporate-logo-keychain-concept.webp" alt="Logo resin keychain concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Logo resin keychain</strong><p>Clear resin with a name/initial and subtle brand-colour accents.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹199</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-keychain-concept.webp" aria-label="Open larger view: Illustrative preview: Logo resin keychain"><img src="assets/corporate-logo-keychain-concept.webp" alt="Illustrative preview: Logo resin keychain" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Logo resin keychain</strong><p>Clear resin with a name/initial and subtle brand-colour accents.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹199</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-floral-bookmark" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-floral-bookmark-concept.webp" aria-label="Open larger view: Pressed-flower bookmark concept product preview"><img src="assets/corporate-floral-bookmark-concept.webp" alt="Pressed-flower bookmark concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Pressed-flower bookmark</strong><p>A slim resin bookmark for welcome kits or thoughtful team gifts.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹149</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-floral-bookmark-concept.webp" aria-label="Open larger view: Illustrative preview: Pressed-flower bookmark"><img src="assets/corporate-floral-bookmark-concept.webp" alt="Illustrative preview: Pressed-flower bookmark" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Pressed-flower bookmark</strong><p>A slim resin bookmark for welcome kits or thoughtful team gifts.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹149</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="corporate-logo-paperweight" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-paperweight-concept.webp" aria-label="Open larger view: Logo paperweight concept product preview"><img src="assets/corporate-logo-paperweight-concept.webp" alt="Logo paperweight concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Logo paperweight</strong><p>A polished desk keepsake with a logo or short message sealed inside.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-paperweight-concept.webp" aria-label="Open larger view: Illustrative preview: Logo paperweight"><img src="assets/corporate-logo-paperweight-concept.webp" alt="Illustrative preview: Logo paperweight" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Logo paperweight</strong><p>A polished desk keepsake with a logo or short message sealed inside.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹399</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="corporate-desk-nameplate" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-nameplate-concept.webp" aria-label="Open larger view: Resin desk nameplate concept product preview"><img src="assets/corporate-desk-nameplate-concept.webp" alt="Resin desk nameplate concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin desk nameplate</strong><p>Personalised with a name, designation and brand colours.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹799</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-nameplate-concept.webp" aria-label="Open larger view: Illustrative preview: Resin desk nameplate"><img src="assets/corporate-desk-nameplate-concept.webp" alt="Illustrative preview: Resin desk nameplate" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Resin desk nameplate</strong><p>Personalised with a name, designation and brand colours.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹799</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal" id="corporate-logo-coaster-set" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-coaster-set-concept.webp" aria-label="Open larger view: Branded coaster set concept product preview"><img src="assets/corporate-logo-coaster-set-concept.webp" alt="Branded coaster set concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Branded coaster set</strong><p>Four coordinated coasters for desks, meeting rooms or client kits.</p><p class="corporate-card-note">Price for a set of four.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹749</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-logo-coaster-set-concept.webp" aria-label="Open larger view: Illustrative preview: Branded coaster set"><img src="assets/corporate-logo-coaster-set-concept.webp" alt="Illustrative preview: Branded coaster set" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Branded coaster set</strong><p>Four coordinated coasters for desks, meeting rooms or client kits.</p><p class="corporate-card-note">Price for a set of four.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹749</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-fridge-magnet" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-fridge-magnet-concept.webp" aria-label="Open larger view: Resin fridge magnet concept product preview"><img src="assets/corporate-fridge-magnet-concept.webp" alt="Resin fridge magnet concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin fridge magnet</strong><p>A compact branded keepsake for events and team celebrations.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹179</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-fridge-magnet-concept.webp" aria-label="Open larger view: Illustrative preview: Resin fridge magnet"><img src="assets/corporate-fridge-magnet-concept.webp" alt="Illustrative preview: Resin fridge magnet" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Resin fridge magnet</strong><p>A compact branded keepsake for events and team celebrations.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹179</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="corporate-desk-logo-stand" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-logo-stand-concept.webp" aria-label="Open larger view: Mini resin desk stand concept product preview"><img src="assets/corporate-desk-logo-stand-concept.webp" alt="Mini resin desk stand concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Mini resin desk stand</strong><p>A small decorative resin stand for desks, reception counters or car dashboards.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹179</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-logo-stand-concept.webp" aria-label="Open larger view: Illustrative preview: Mini resin desk stand"><img src="assets/corporate-desk-logo-stand-concept.webp" alt="Illustrative preview: Mini resin desk stand" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Mini resin desk stand</strong><p>A small decorative resin stand for desks, reception counters or car dashboards.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹179</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="corporate-recognition-award" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-recognition-award-concept.webp" aria-label="Open larger view: Recognition resin award concept product preview"><img src="assets/corporate-recognition-award-concept.webp" alt="Recognition resin award concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Recognition resin award</strong><p>A modern personalised memento for milestones and appreciation.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹899</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-recognition-award-concept.webp" aria-label="Open larger view: Illustrative preview: Recognition resin award"><img src="assets/corporate-recognition-award-concept.webp" alt="Illustrative preview: Recognition resin award" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Recognition resin award</strong><p>A modern personalised memento for milestones and appreciation.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹899</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal" id="corporate-desk-organizer" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-organizer-concept.webp" aria-label="Open larger view: Resin desk organiser concept product preview"><img src="assets/corporate-desk-organizer-concept.webp" alt="Resin desk organiser concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Resin desk organiser</strong><p>A compact pen and visiting-card holder with custom colours.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹999</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-organizer-concept.webp" aria-label="Open larger view: Illustrative preview: Resin desk organiser"><img src="assets/corporate-desk-organizer-concept.webp" alt="Illustrative preview: Resin desk organiser" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Resin desk organiser</strong><p>A compact pen and visiting-card holder with custom colours.</p><p class="corporate-card-note">Price for one piece.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹999</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-festive-hamper" role="listitem">
-            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-festive-hamper-concept.webp" aria-label="Open larger view: Corporate festive hamper concept product preview"><img src="assets/corporate-festive-hamper-concept.webp" alt="Corporate festive hamper concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting concept</span><strong>Corporate festive hamper</strong><p>A coordinated resin gift box for festive or thank-you occasions.</p><p class="corporate-card-note">Price for one gift set.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,499</dd></div></dl></figcaption></figure>
+            <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-festive-hamper-concept.webp" aria-label="Open larger view: Illustrative preview: Corporate festive hamper"><img src="assets/corporate-festive-hamper-concept.webp" alt="Illustrative preview: Corporate festive hamper" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><span>Corporate gifting</span><strong>Corporate festive hamper</strong><p>A coordinated resin gift box for festive or thank-you occasions.</p><p class="corporate-card-note">Price for one gift set.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,499</dd></div></dl></figcaption></figure>
           </article>
           <article class="work-card reveal" id="corporate-business-card-holder" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-business-card-holder-concept.webp" aria-label="Open larger view: Original concept preview: A compact resin holder for a tidy stack of visiting cards"><img src="assets/corporate-business-card-holder-concept.webp" alt="Original concept preview: A compact resin holder for a tidy stack of visiting cards concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-business-card-holder-concept.webp" aria-label="Open larger view: Illustrative preview: A compact resin holder for a tidy stack of visiting cards"><img src="assets/corporate-business-card-holder-concept.webp" alt="Illustrative preview: A compact resin holder for a tidy stack of visiting cards" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Resin Business Card Holder</strong><p>A compact resin holder for a tidy stack of visiting cards.</p><p class="corporate-card-note">Price for one card holder; cards not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-phone-rest" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-phone-rest-concept.webp" aria-label="Open larger view: Original concept preview: A steady resin rest for a phone on a desk or bedside table"><img src="assets/corporate-phone-rest-concept.webp" alt="Original concept preview: A steady resin rest for a phone on a desk or bedside table concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-phone-rest-concept.webp" aria-label="Open larger view: Illustrative preview: A steady resin rest for a phone on a desk or bedside table"><img src="assets/corporate-phone-rest-concept.webp" alt="Illustrative preview: A steady resin rest for a phone on a desk or bedside table" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Resin Phone Rest</strong><p>A steady resin rest for a phone on a desk or bedside table.</p><p class="corporate-card-note">Price for one phone rest; phone not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹499</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="corporate-pen-cup" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-pen-cup-concept.webp" aria-label="Open larger view: Original concept preview: A polished pen cup with a clean, colourful resin finish"><img src="assets/corporate-pen-cup-concept.webp" alt="Original concept preview: A polished pen cup with a clean, colourful resin finish concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-pen-cup-concept.webp" aria-label="Open larger view: Illustrative preview: A polished pen cup with a clean, colourful resin finish"><img src="assets/corporate-pen-cup-concept.webp" alt="Illustrative preview: A polished pen cup with a clean, colourful resin finish" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Resin Pen Cup</strong><p>A polished pen cup with a clean, colourful resin finish.</p><p class="corporate-card-note">Price for one pen cup; stationery not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹699</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="corporate-desk-trinket-tray" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-trinket-tray-concept.webp" aria-label="Open larger view: Original concept preview: A small catch-all tray for a desk, console, or bedside table"><img src="assets/corporate-desk-trinket-tray-concept.webp" alt="Original concept preview: A small catch-all tray for a desk, console, or bedside table concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-trinket-tray-concept.webp" aria-label="Open larger view: Illustrative preview: A small catch-all tray for a desk, console, or bedside table"><img src="assets/corporate-desk-trinket-tray-concept.webp" alt="Illustrative preview: A small catch-all tray for a desk, console, or bedside table" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Desk Trinket Tray</strong><p>A small catch-all tray for a desk, console, or bedside table.</p><p class="corporate-card-note">Price for one tray; contents not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="corporate-lanyard-charm" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-lanyard-charm-concept.webp" aria-label="Open larger view: Original concept preview: A personalised charm that clips onto a lanyard or bag"><img src="assets/corporate-lanyard-charm-concept.webp" alt="Original concept preview: A personalised charm that clips onto a lanyard or bag concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-lanyard-charm-concept.webp" aria-label="Open larger view: Illustrative preview: A personalised charm that clips onto a lanyard or bag"><img src="assets/corporate-lanyard-charm-concept.webp" alt="Illustrative preview: A personalised charm that clips onto a lanyard or bag" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Personalised Lanyard Charm</strong><p>A personalised charm that clips onto a lanyard or bag.</p><p class="corporate-card-note">Price for one charm with clasp; lanyard not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹199</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-mini-photo-stand" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-mini-photo-stand-concept.webp" aria-label="Open larger view: Original concept preview: A compact photo stand for a desk memory or team note"><img src="assets/corporate-mini-photo-stand-concept.webp" alt="Original concept preview: A compact photo stand for a desk memory or team note concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-mini-photo-stand-concept.webp" aria-label="Open larger view: Illustrative preview: A compact photo stand for a desk memory or team note"><img src="assets/corporate-mini-photo-stand-concept.webp" alt="Illustrative preview: A compact photo stand for a desk memory or team note" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Mini Photo Stand</strong><p>A compact photo stand for a desk memory or team note.</p><p class="corporate-card-note">Price for one base with metal clip; print not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-2" id="corporate-bag-tag" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-bag-tag-concept.webp" aria-label="Open larger view: Original concept preview: A personalised resin tag with a simple strap for a bag or case"><img src="assets/corporate-bag-tag-concept.webp" alt="Original concept preview: A personalised resin tag with a simple strap for a bag or case concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-bag-tag-concept.webp" aria-label="Open larger view: Illustrative preview: A personalised resin tag with a simple strap for a bag or case"><img src="assets/corporate-bag-tag-concept.webp" alt="Illustrative preview: A personalised resin tag with a simple strap for a bag or case" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Personalised Bag Tag</strong><p>A personalised resin tag with a simple strap for a bag or case.</p><p class="corporate-card-note">Price for one tag with strap.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹299</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-3" id="corporate-desk-clock" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-clock-concept.webp" aria-label="Open larger view: Original concept preview: A small resin clock to add a considered accent to a work desk"><img src="assets/corporate-desk-clock-concept.webp" alt="Original concept preview: A small resin clock to add a considered accent to a work desk concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-clock-concept.webp" aria-label="Open larger view: Illustrative preview: A small resin clock to add a considered accent to a work desk"><img src="assets/corporate-desk-clock-concept.webp" alt="Illustrative preview: A small resin clock to add a considered accent to a work desk" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Mini Resin Desk Clock</strong><p>A small resin clock to add a considered accent to a work desk.</p><p class="corporate-card-note">Price for one clock with stand; battery not included.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹999</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal" id="corporate-bookmark-keychain-duo" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-bookmark-keychain-duo-concept.webp" aria-label="Open larger view: Original concept preview: A bookmark and keychain duo for a useful welcome keepsake"><img src="assets/corporate-bookmark-keychain-duo-concept.webp" alt="Original concept preview: A bookmark and keychain duo for a useful welcome keepsake concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-bookmark-keychain-duo-concept.webp" aria-label="Open larger view: Illustrative preview: A bookmark and keychain duo for a useful welcome keepsake"><img src="assets/corporate-bookmark-keychain-duo-concept.webp" alt="Illustrative preview: A bookmark and keychain duo for a useful welcome keepsake" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Welcome Keepsake Duo</strong><p>A bookmark and keychain duo for a useful welcome keepsake.</p><p class="corporate-card-note">Price for a two-piece set.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹449</dd></div></dl></figcaption>
             </figure>
           </article>
           <article class="work-card reveal reveal-delay-1" id="corporate-desk-essentials-set" role="listitem">
             <figure>
-              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-essentials-set-concept.webp" aria-label="Open larger view: Original concept preview: A coordinated pen cup and trinket tray for a complete desk set"><img src="assets/corporate-desk-essentials-set-concept.webp" alt="Original concept preview: A coordinated pen cup and trinket tray for a complete desk set concept product preview" width="1024" height="1024" loading="lazy" decoding="async"></a>
+              <a class="lightbox-trigger" data-lightbox-trigger href="assets/corporate-desk-essentials-set-concept.webp" aria-label="Open larger view: Illustrative preview: A coordinated pen cup and trinket tray for a complete desk set"><img src="assets/corporate-desk-essentials-set-concept.webp" alt="Illustrative preview: A coordinated pen cup and trinket tray for a complete desk set" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><strong>Desk Essentials Set</strong><p>A coordinated pen cup and trinket tray for a complete desk set.</p><p class="corporate-card-note">Price for one pen cup and one trinket tray.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,199</dd></div></dl></figcaption>
             </figure>
           </article>
@@ -561,10 +562,10 @@
           <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-square-keepsake.jpeg" aria-label="Open larger view: Square resin keepsake filled with cream, peach, and green dried flowers"><img src="assets/studio-floral-square-keepsake.jpeg" alt="Square resin keepsake filled with cream, peach, and green dried flowers" width="1080" height="1188" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Pressed flower square</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> First bouquet, forever close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,999</dd></div></dl></figcaption></figure></article>
           <article class="work-card reveal reveal-delay-3"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-hexagon-keepsake.jpeg" aria-label="Open larger view: Hexagonal resin keepsake with pressed flowers in pink, peach, and lilac tones"><img src="assets/studio-floral-hexagon-keepsake.jpeg" alt="Hexagonal resin keepsake with pressed flowers in pink, peach, and lilac tones" width="959" height="1073" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Lilac flower hexagon</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> Handwritten note, kept close.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹1,999</dd></div></dl></figcaption></figure></article>
           <article class="work-card reveal"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-handled-tray.jpeg" aria-label="Open larger view: Clear handled resin tray with a colourful pressed-flower arrangement"><img src="assets/studio-floral-handled-tray.jpeg" alt="Clear handled resin tray with a colourful pressed-flower arrangement" width="851" height="1207" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Handled flower tray</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> Special-day flower, remembered.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹2,299</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal" id="floral-memory-frame" data-featured="true"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-floral-memory-frame.webp" aria-label="Open larger view: Original concept preview of a soft-arch floral memory frame"><img src="assets/concept-floral-memory-frame.webp" alt="Original concept preview: Soft-arch clear resin memory frame with dried blush roses and restrained gold flecks" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>Your flowers, held close</strong><p>A soft arch for the flowers and small date that belong to one favourite day.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹3,999</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-1"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-ocean-clock.webp" aria-label="Open larger view: Original concept preview of a blue and ivory shoreline resin clock"><img src="assets/concept-ocean-clock.webp" alt="Original concept preview: Round blue and ivory shoreline-inspired resin clock with restrained gold leaf" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>A little blue hour</strong><p>A shoreline-inspired clock for the room that could use a little more calm.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹2,199</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-tray-hamper.webp" aria-label="Open larger view: Original concept preview of a lilac handled celebration tray"><img src="assets/concept-tray-hamper.webp" alt="Original concept preview: Lilac handled resin tray with small wrapped gifts, a blank note card, and dried floral styling" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>A tray full of celebration</strong><p>A lilac tray to gather a few thoughtful surprises around one occasion.</p><p>Contents chosen separately; pictured styling is not included by default.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,499</dd></div></dl></figcaption></figure></article>
-          <article class="work-card reveal reveal-delay-3"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-floral-coasters.webp" aria-label="Open larger view: Original concept preview of four pressed-flower resin coasters"><img src="assets/concept-floral-coasters.webp" alt="Original concept preview: Four clear and lilac pressed-flower resin coasters with restrained gold detail" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>Little messages, shared</strong><p>Four small places for personal lettering, pressed flowers, and everyday rituals.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹999</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal" id="floral-memory-frame" data-featured="true"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-floral-memory-frame.webp" aria-label="Open larger view: Illustrative preview of a soft-arch floral memory frame"><img src="assets/concept-floral-memory-frame.webp" alt="Illustrative preview: Soft-arch clear resin memory frame with dried blush roses and restrained gold flecks" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>Your flowers, held close</strong><p>A soft arch for the flowers and small date that belong to one favourite day.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹3,999</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-1"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-ocean-clock.webp" aria-label="Open larger view: Illustrative preview of a blue and ivory shoreline resin clock"><img src="assets/concept-ocean-clock.webp" alt="Illustrative preview: Round blue and ivory shoreline-inspired resin clock with restrained gold leaf" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>A little blue hour</strong><p>A shoreline-inspired clock for the room that could use a little more calm.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹2,199</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-tray-hamper.webp" aria-label="Open larger view: Illustrative preview of a lilac handled celebration tray"><img src="assets/concept-tray-hamper.webp" alt="Illustrative preview: Lilac handled resin tray with small wrapped gifts, a blank note card, and dried floral styling" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>A tray full of celebration</strong><p>A lilac tray to gather a few thoughtful surprises around one occasion.</p><p>Contents chosen separately; pictured styling is not included by default.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹1,499</dd></div></dl></figcaption></figure></article>
+          <article class="work-card reveal reveal-delay-3"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/concept-floral-coasters.webp" aria-label="Open larger view: Illustrative preview of four pressed-flower resin coasters"><img src="assets/concept-floral-coasters.webp" alt="Illustrative preview: Four clear and lilac pressed-flower resin coasters with restrained gold detail" width="1024" height="1024" loading="lazy" decoding="async"></a><figcaption><strong>Little messages, shared</strong><p>Four small places for personal lettering, pressed flowers, and everyday rituals.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Estimated from</dt><dd>₹999</dd></div></dl></figcaption></figure></article>
           <article class="work-card work-card-tall reveal">
             <figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/resin-clock.jpg" aria-label="Open larger view: Blue and gold resin clock with a cloud-like white centre"><img src="assets/resin-clock.jpg" alt="Blue and gold resin clock with a cloud-like white centre" width="540" height="960" loading="lazy"></a><figcaption><span>Resin art</span><strong>Blue hour resin clock</strong><p>A little sky, a little shoreline, and a moment that keeps time.</p><dl class="product-pricing" aria-label="Catalogue pricing"><div><dt>Price</dt><dd>₹2,199</dd></div></dl></figcaption></figure>
           </article>
@@ -609,32 +610,28 @@
 
       <div class="customizer-layout">
         <form class="customizer-form" id="customizer-form" novalidate>
+          <div class="customizer-basics-flow">
           <fieldset class="customizer-fieldset customizer-basics">
-            <legend>Start with the basics</legend>
-            <label for="frame-template">Template
+            <legend>Start here</legend>
+            <label for="frame-template">Starting design
               <select id="frame-template" name="frame-template">
                 <option value="soft-bloom">Soft bloom</option>
                 <option value="golden-memory">Golden memory</option>
                 <option value="minimal-keepsake">Minimal keepsake</option>
               </select>
             </label>
-            <label for="colour-theme">Colour theme
+            <label for="colour-theme">Colour palette
               <select id="colour-theme" name="colour-theme">
                 <option value="warm-rose">Warm rose</option>
                 <option value="ocean-blue">Ocean blue</option>
                 <option value="ivory-gold">Ivory and gold</option>
               </select>
             </label>
-            <p class="field-hint">Add a photo or message below, then adjust only the details you want.</p>
+            <p class="field-hint">Start here. You can change any detail later.</p>
           </fieldset>
 
           <fieldset class="customizer-fieldset customizer-personal">
-            <legend>Personal details</legend>
-            <label for="personal-text">Text
-              <textarea id="personal-text" name="personal-text" rows="5" placeholder="One line per row" aria-describedby="personal-text-hint"></textarea>
-            </label>
-            <p class="field-hint" id="personal-text-hint">One line per row. Line breaks stay in the preview.</p>
-            <p class="customizer-status" id="text-status" role="status" aria-live="polite"></p>
+            <legend>Personal details · optional photo or text</legend>
             <label for="reference-image">One local reference image
               <input id="reference-image" name="reference-image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
             </label>
@@ -644,25 +641,16 @@
               <button class="mini-button" id="replace-image" type="button">Replace image</button>
               <button class="mini-button" id="remove-image" type="button">Remove image</button>
             </div>
+            <label for="personal-text">Text
+              <textarea id="personal-text" name="personal-text" rows="5" placeholder="One line per row" aria-describedby="personal-text-hint"></textarea>
+            </label>
+            <p class="field-hint" id="personal-text-hint">One line per row. Line breaks stay in the preview.</p>
+            <p class="customizer-status" id="text-status" role="status" aria-live="polite"></p>
           </fieldset>
 
           <fieldset class="customizer-fieldset customizer-frame-size">
-            <legend>Frame shape and size</legend>
-            <label for="frame-type">Frame type
-              <select id="frame-type" name="frame-type">
-                <option value="square">Square keepsake</option>
-                <option value="round">Round medallion</option>
-                <option value="arch">Soft arch · 3:4</option>
-              </select>
-            </label>
-            <label for="border-style">Border style
-              <select id="border-style" name="border-style">
-                <option value="scalloped">Scalloped outer edge</option>
-                <option value="stones">Crushed-stone border</option>
-                <option value="gold">Fine metallic gold edge</option>
-              </select>
-            </label>
-            <label for="frame-preset">Frame preset
+            <legend>Basic size</legend>
+            <label for="frame-preset">Size preset
               <select id="frame-preset" name="frame-preset">
                 <option value="6" data-inches="6">6 in size</option>
                 <option value="8" data-inches="8" selected>8 in size</option>
@@ -670,18 +658,57 @@
                 <option value="12" data-inches="12">12 in size</option>
               </select>
             </label>
-            <label for="frame-unit">Show dimensions in
-              <select id="frame-unit" name="frame-unit">
-                <option value="in" selected>inches</option>
-                <option value="ft">feet</option>
-              </select>
-            </label>
             <p class="dimension-note" id="frame-dimension-label" role="status" aria-live="polite">Square · 8 × 8 in</p>
           </fieldset>
+          </div>
+
+          <div class="customizer-preview-panel">
+            <figure class="customizer-preview" aria-label="Illustrative preview">
+              <p class="preview-label">Illustrative preview</p>
+              <div class="preview-stage" id="preview-stage">
+                <canvas class="scene-canvas" id="scene-canvas" width="1200" height="1200" role="img" tabindex="0" aria-label="Illustrative preview of custom resin frame" aria-describedby="preview-dimension-label image-placement-hint" aria-keyshortcuts="Arrow keys, Shift+Arrow, Escape"></canvas>
+                <span class="brush-cursor" id="brush-cursor" aria-hidden="true"></span>
+              </div>
+              <p class="preview-dimension-label" id="preview-dimension-label">Square · 8 × 8 in</p>
+              <figcaption>One responsive scene canvas powers this preview and the downloaded PNG. Saloni confirms the final size, materials, and quote.</figcaption>
+            </figure>
+          </div>
+
+          <div class="customizer-actions">
+            <button class="button button-dark download-button" id="order-from-customizer" type="button" data-order-prefill="customizer">Request this design</button>
+            <button class="button button-line download-button" id="customizer-design-help" type="button" data-order-prefill="general" data-design-help="true">Let Saloni design it for me</button>
+            <p class="customizer-status customizer-request-status" id="share-status" role="status" aria-live="polite"></p>
+            <button class="button button-line download-button" id="customizer-continue-without-preview" type="button" hidden>Continue without preview</button>
+            <p class="share-guidance customizer-request-note">Sends your design summary and size. Attach a downloaded preview separately.</p>
+          </div>
 
           <details class="customizer-advanced" id="customizer-advanced">
             <summary>Advanced options</summary>
-          <fieldset class="customizer-fieldset">
+            <p class="field-hint customizer-advanced-hint">For precise colours, image placement, crop, finishing details, and paint.</p>
+            <fieldset class="customizer-fieldset customizer-shape-controls">
+              <legend>Frame shape and size · advanced</legend>
+              <label for="frame-type">Frame type
+                <select id="frame-type" name="frame-type">
+                  <option value="square">Square keepsake</option>
+                  <option value="round">Round medallion</option>
+                  <option value="arch">Soft arch · 3:4</option>
+                </select>
+              </label>
+              <label for="border-style">Border style
+                <select id="border-style" name="border-style">
+                  <option value="scalloped">Scalloped outer edge</option>
+                  <option value="stones">Crushed-stone border</option>
+                  <option value="gold">Fine metallic gold edge</option>
+                </select>
+              </label>
+              <label for="frame-unit">Show dimensions in
+                <select id="frame-unit" name="frame-unit">
+                  <option value="in" selected>inches</option>
+                  <option value="ft">feet</option>
+                </select>
+              </label>
+            </fieldset>
+            <fieldset class="customizer-fieldset">
             <legend>Colour story</legend>
             <div class="colour-control">
               <label class="colour-label" for="filling-colour">Filling colour</label>
@@ -777,38 +804,31 @@
             </fieldset>
           </details>
 
-          <div class="customizer-actions">
+          <div class="customizer-actions customizer-reset-actions">
             <button class="button button-line" id="customizer-reset" type="button">Reset choices</button>
           </div>
-        </form>
 
-        <div class="customizer-preview-panel">
-          <figure class="customizer-preview" aria-label="Illustrative preview">
-            <p class="preview-label">Illustrative preview</p>
-            <div class="preview-stage" id="preview-stage">
-              <canvas class="scene-canvas" id="scene-canvas" width="1200" height="1200" role="img" tabindex="0" aria-label="Illustrative preview of custom resin frame" aria-describedby="preview-dimension-label image-placement-hint" aria-keyshortcuts="Arrow keys, Shift+Arrow, Escape"></canvas>
-              <span class="brush-cursor" id="brush-cursor" aria-hidden="true"></span>
+          <details class="customizer-save-share" id="customizer-save-share">
+            <summary>Save or share this preview</summary>
+            <div class="customizer-save-share-panel">
+              <div class="customizer-summary-card">
+                <div class="customizer-summary-card-body">
+                  <p class="panel-label">Ready to share</p>
+                  <output id="customizer-summary" aria-live="polite"></output>
+                  <button class="button button-dark download-button" id="download-preview" type="button">Download preview PNG</button>
+                  <p class="customizer-status" id="download-status" role="status" aria-live="polite"></p>
+                  <button class="button button-line download-button" id="copy-summary" type="button">Copy design summary</button>
+                  <p class="customizer-status" id="copy-status" role="status" aria-live="polite"></p>
+                  <a class="button button-line download-button" href="https://ig.me/m/saloniresin_art_studio" target="_blank" rel="noreferrer" aria-describedby="instagram-chat-guidance">Open Saloni’s Instagram chat <span aria-hidden="true">↗</span></a>
+                  <p class="share-guidance" id="instagram-chat-guidance">For Instagram, use these controls in order: Download preview PNG, then Copy design summary, then open this chat. Attach the downloaded PNG, paste the copied details, then tap Send.</p>
+                  <button class="button button-line download-button" id="share-design" type="button" aria-describedby="share-guidance">Share design</button>
+                  <p class="share-guidance" id="share-guidance">Optional native Share can pass the PNG and summary to the destination you choose. Some apps may omit the text or PNG; for Instagram, use the manual steps above.</p>
+                  <p class="share-guidance">This preview stays on your device until you choose a save or share action.</p>
+                </div>
+              </div>
             </div>
-            <p class="preview-dimension-label" id="preview-dimension-label">Square · 8 × 8 in</p>
-            <figcaption>One responsive scene canvas powers this preview and the downloaded PNG. Saloni confirms the final size, materials, and quote.</figcaption>
-          </figure>
-          <div class="customizer-summary-card">
-            <p class="panel-label">Ready to share</p>
-            <output id="customizer-summary" aria-live="polite"></output>
-            <button class="button button-dark download-button" id="download-preview" type="button">Download preview PNG</button>
-            <p class="customizer-status" id="download-status" role="status" aria-live="polite"></p>
-            <button class="button button-line download-button" id="copy-summary" type="button">Copy design summary</button>
-            <p class="customizer-status" id="copy-status" role="status" aria-live="polite"></p>
-            <a class="button button-line download-button" href="https://ig.me/m/saloniresin_art_studio" target="_blank" rel="noreferrer" aria-describedby="instagram-chat-guidance">Open Saloni’s Instagram chat <span aria-hidden="true">↗</span></a>
-            <p class="share-guidance" id="instagram-chat-guidance">For Instagram, use these controls in order: Download preview PNG, then Copy design summary, then open this chat. Attach the downloaded PNG, paste the copied details, then tap Send.</p>
-            <button class="button button-line download-button" id="share-design" type="button" aria-describedby="share-guidance">Share design</button>
-            <p class="share-guidance" id="share-guidance">Optional native Share can pass the PNG and summary to the destination you choose. Some apps may omit the text or PNG; for Instagram, use the manual steps above.</p>
-            <p class="customizer-status" id="share-status" role="status" aria-live="polite"></p>
-            <button class="button button-dark download-button" id="order-from-customizer" type="button" data-order-prefill="customizer">Request this design</button>
-            <button class="button button-line download-button" id="customizer-design-help" type="button" data-order-prefill="general">Let Saloni design it for me</button>
-            <p class="share-guidance">This request carries the current design summary and size. Automatic PNG handoff stays deferred until the request form can validate it safely; attach a downloaded PNG separately if needed.</p>
-          </div>
-        </div>
+          </details>
+        </form>
       </div>
 
       <div class="customizer-handoff">
@@ -823,42 +843,12 @@
       </div>
     </section>
 
-    <section class="testimonials-section shell" id="testimonials" data-carousel="testimonials" aria-labelledby="testimonials-title">
-      <div class="rail-heading reveal">
-        <div><p class="eyebrow">A few kind words</p><h2 id="testimonials-title">Small notes, kept intentionally simple.</h2></div>
-        <div class="rail-controls" aria-label="Testimonials carousel controls">
-          <button class="carousel-button" type="button" data-carousel-prev aria-controls="testimonials-track" aria-label="Previous testimonials"><span class="arrow arrow-left" aria-hidden="true"></span></button>
-          <button class="carousel-button" type="button" data-carousel-next aria-controls="testimonials-track" aria-label="Next testimonials"><span class="arrow arrow-right" aria-hidden="true"></span></button>
-        </div>
-      </div>
-      <div class="carousel">
-        <div class="carousel-track" id="testimonials-track" data-carousel-track tabindex="0" aria-label="Testimonials">
-          <article class="testimonial-card reveal" data-testimonial-card aria-labelledby="testimonial-gaurav">
-            <div class="testimonial-meta"><span class="sample-rating"><span aria-hidden="true">★★★★★</span><span class="sr-only">Rating: 5 out of 5</span></span></div>
-            <blockquote>“The colour story feels warm and personal — a lovely example of how a small idea can become a keepsake.”</blockquote>
-            <cite id="testimonial-gaurav">Gaurav Jain</cite>
-          </article>
-          <article class="testimonial-card reveal reveal-delay-1" data-testimonial-card aria-labelledby="testimonial-atishay">
-            <div class="testimonial-meta"><span class="sample-rating"><span aria-hidden="true">★★★★<span class="star-muted">★</span></span><span class="sr-only">Rating: 4 out of 5</span></span></div>
-            <blockquote>“The details come together with such care. This captures the studio’s thoughtful, handmade spirit.”</blockquote>
-            <cite id="testimonial-atishay">Atishay Jain</cite>
-          </article>
-          <article class="testimonial-card reveal reveal-delay-2" data-testimonial-card aria-labelledby="testimonial-aarti">
-            <div class="testimonial-meta"><span class="sample-rating"><span aria-hidden="true">★★★★★</span><span class="sr-only">Rating: 5 out of 5</span></span></div>
-            <blockquote>“Soft tones and tiny details make this feel joyful, considered, and made for a moment worth remembering.”</blockquote>
-            <cite id="testimonial-aarti">Aarti Suthar</cite>
-          </article>
-          <article class="testimonial-card reveal reveal-delay-3" data-testimonial-card aria-labelledby="testimonial-bharat">
-            <div class="testimonial-meta"><span class="sample-rating"><span aria-hidden="true">★★★★<span class="star-muted">★</span></span><span class="sr-only">Rating: 4 out of 5</span></span></div>
-            <blockquote>“A playful arrangement with personality in every corner. This shows how a theme can guide the whole piece.”</blockquote>
-            <cite id="testimonial-bharat">Bharat Sharma</cite>
-          </article>
-          <article class="testimonial-card reveal" data-testimonial-card aria-labelledby="testimonial-puchki">
-            <div class="testimonial-meta"><span class="sample-rating"><span aria-hidden="true">★★★★★</span><span class="sr-only">Rating: 5 out of 5</span></span></div>
-            <blockquote>“A playful palette and a thoughtful little detail can make a space feel entirely its own — this keeps that feeling close.”</blockquote>
-            <cite id="testimonial-puchki">Puchki</cite>
-          </article>
-        </div>
+    <section class="testimonials-section shell" id="testimonials" aria-labelledby="testimonials-title">
+      <div class="buying-help reveal">
+        <p class="eyebrow">Before you order</p>
+        <h2 id="testimonials-title">Know what your gift will include.</h2>
+        <p>Ask Saloni about your chosen product, personalisation, finish, packaging and delivery before confirming your order.</p>
+        <a class="button button-dark" href="#order" data-order-prefill="general">Ask Saloni about a gift <span aria-hidden="true">↗</span></a>
       </div>
     </section>
 
