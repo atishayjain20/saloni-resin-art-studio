@@ -452,6 +452,11 @@
     var embed = document.getElementById("order-form-embed");
     var frame = document.getElementById("order-form-frame");
     var status = document.getElementById("order-form-status");
+    var selectedProductSummary = document.getElementById("selected-product-summary");
+    var selectedProductImage = document.getElementById("selected-product-image");
+    var selectedProductName = document.getElementById("selected-product-name");
+    var selectedProductPrice = document.getElementById("selected-product-price");
+    var selectedProductSize = document.getElementById("selected-product-size");
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
     if (!embed || !frame || !status) return;
@@ -571,6 +576,48 @@
       embed.scrollIntoView({ behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     }
 
+    function clearSelectedProductSummary() {
+      if (!selectedProductSummary) return;
+      selectedProductSummary.hidden = true;
+      if (selectedProductImage) {
+        selectedProductImage.removeAttribute("src");
+        selectedProductImage.setAttribute("alt", "Selected product photo");
+      }
+      if (selectedProductName) selectedProductName.textContent = "";
+      [selectedProductPrice, selectedProductSize].forEach(function (element) {
+        if (!element) return;
+        element.textContent = "";
+        element.hidden = true;
+      });
+    }
+
+    function showSelectedProductSummary(card) {
+      if (!selectedProductSummary || !selectedProductImage || !selectedProductName || !card) return;
+      var image = card.querySelector("img[src]");
+      var title = card.querySelector("figcaption strong") || card.querySelector("figcaption h3");
+      if (!image || !title) return;
+      var price = null;
+      var size = null;
+      Array.prototype.forEach.call(card.querySelectorAll(".product-pricing > div"), function (row) {
+        var label = row.querySelector("dt");
+        var value = row.querySelector("dd");
+        if (!label || !value) return;
+        var labelText = label.textContent.trim();
+        var valueText = value.textContent.trim();
+        if (!valueText) return;
+        if (!price && /^(?:price|from)$/i.test(labelText)) price = labelText + ": " + valueText;
+        if (!size && /^size$/i.test(labelText) && !/suggested size|confirm with saloni|custom size in inches|component size to confirm/i.test(valueText)) size = "Size: " + valueText;
+      });
+      selectedProductImage.setAttribute("src", image.getAttribute("src"));
+      selectedProductImage.setAttribute("alt", (title.textContent.trim() || "Selected item") + " product photo");
+      selectedProductName.textContent = title.textContent.trim();
+      selectedProductPrice.textContent = price || "";
+      selectedProductPrice.hidden = !price;
+      selectedProductSize.textContent = size || "";
+      selectedProductSize.hidden = !size;
+      selectedProductSummary.hidden = false;
+    }
+
     function sourceSeed(source) {
       function parts(value, unit) {
         var number = Number(value);
@@ -688,6 +735,8 @@
       if (frameState.loaded && !options.confirmed && !window.confirm("This order form is already loaded. Replace it with the selected item?")) return false;
       var seed = sourceSeed(source);
       seed.requestId = options.requestId || source.requestId || requestId();
+      if (options.card) showSelectedProductSummary(options.card);
+      else clearSelectedProductSummary();
       submitSeed(seed, true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected);
       return true;
     }
@@ -753,7 +802,7 @@
       var button = document.createElement("button");
       button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "catalogue");
       button.textContent = "Request this item";
-      button.addEventListener("click", function () { chooseSource(seed); });
+      button.addEventListener("click", function () { chooseSource(seed, { card: card }); });
       caption.appendChild(button);
     });
 
@@ -801,6 +850,7 @@
         if (event.preventDefault) event.preventDefault();
       }
       if (frameState.loaded && !window.confirm("This order form is already loaded. Replace it with the selected item?")) return;
+      clearSelectedProductSummary();
       clearCustomizerFallback();
       var identity = { requestId: requestId(), nonce: channelNonce() };
       if (!identity.requestId || !identity.nonce || typeof window.saloniCustomizerCapture !== "function") {
