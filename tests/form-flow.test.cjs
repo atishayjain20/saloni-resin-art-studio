@@ -57,6 +57,17 @@ test("catalogue quote context is safe and customizer dimensions remain selected"
   ["height-feet", "height-inches-part", "width-feet", "width-inches-part"].forEach((id) => assert.equal(customizer.elements.get(id).getAttribute("required"), "required"));
 });
 
+test("descriptive catalogue filenames are allowlisted while lookalikes stay hidden", () => {
+  const filename = "premium-midnight-blue-tiered-set.jpeg";
+  const selected = makeFormRuntime({ sourceId: `catalogue:${filename}` });
+  assert.equal(selected.elements.get("product-context").hidden, false);
+  assert.equal(selected.elements.get("product-image").getAttribute("src"), `https://saloniresinart.com/assets/${filename}`);
+
+  const unknown = makeFormRuntime({ sourceId: "catalogue:premium-midnight-blue-tiered-set-v2.jpeg" });
+  assert.equal(unknown.elements.get("product-context").hidden, true);
+  assert.equal(unknown.elements.get("product-image").getAttribute("src"), "");
+});
+
 test("customizer form requests one embedded preview port with the seeded identity", () => {
   const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
   const requests = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-preview-request");

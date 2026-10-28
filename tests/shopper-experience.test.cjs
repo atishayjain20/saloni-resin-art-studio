@@ -79,7 +79,7 @@ test("catalogue enhancement has accessible filters, preview mode, and a no-resul
   assert.match(html, /id="catalogue-filter-reset"/);
   assert.match(html, /id="catalogue-filter-empty"/);
   assert.match(html, /data-catalogue-disclosure/);
-  assert.match(html, /See all 77 gifts/);
+  assert.match(html, /See all 96 gifts/);
   assert.match(html, /Clear filters and browse all gifts/);
   assert.match(html, /Back to section previews/);
   assert.match(html, /data-category-shortcut="corporate"/);
@@ -87,7 +87,7 @@ test("catalogue enhancement has accessible filters, preview mode, and a no-resul
   assert.match(html, /id="catalogue-page-next"/);
   assert.match(html, /id="catalogue-page-status"/);
   assert.match(html, /id="catalogue-pagination"/);
-  assert.match(css, /\.category-shortcuts\s*\{[^}]*repeat\(5/);
+  assert.match(css, /\.category-shortcuts\s*\{[^}]*repeat\(6/);
   assert.match(script, /initCatalogueExperience/);
 });
 
@@ -113,7 +113,7 @@ test("catalogue sections use four-card responsive grids with independent disclos
 
 test("category shortcuts use three columns at tablet widths and two on mobile", () => {
   const base = css.indexOf(".category-shortcuts {");
-  const baseColumns = css.indexOf("repeat(5", base);
+  const baseColumns = css.indexOf("repeat(6", base);
   const tablet = css.indexOf(".category-shortcuts { grid-template-columns: repeat(3", css.indexOf("@media (max-width: 840px)"));
   const mobile = css.indexOf(".category-shortcuts { grid-template-columns: repeat(2", css.indexOf("@media (max-width: 620px)"));
   assert.ok(base >= 0);
@@ -177,7 +177,7 @@ test("small-screen layout keeps long labels inside the viewport without masking 
 
 test("pricing keeps current quotes without unsupported discount claims", () => {
   const cards = html.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/g) || [];
-  assert.equal(cards.length, 77);
+  assert.equal(cards.length, 96);
   cards.forEach((card) => {
     assert.doesNotMatch(card, /<s>|Regular price|Discount|off/);
     assert.match(card, /<dt>(?:Price|From)<\/dt>/);
@@ -370,7 +370,7 @@ test("buying-help block replaces unsupported testimonial claims without a carous
   assert.doesNotMatch(css, /\.testimonial-card\s*\{|\.sample-rating\s*\{/);
 });
 
-test("all 77 catalogue cards keep price first and show only known size rows", () => {
+test("all 96 catalogue cards keep price first and show only known size rows", () => {
   const expectedRows = [
     ["Size", "4 in"],
     ["Size", "4–6 in"],
@@ -449,17 +449,37 @@ test("all 77 catalogue cards keep price first and show only known size rows", ()
     null,
     null,
     null,
+
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
   ];
   const cards = html.match(/<article\b[^>]*class="[^"]*(?:work-card|romantic-keepsake-card)[^"]*"[\s\S]*?<\/article>/g) || [];
-  assert.equal(cards.length, 77);
-  assert.equal(expectedRows.length, 77);
+  assert.equal(cards.length, 96);
+  assert.equal(expectedRows.length, 96);
   cards.forEach((card, index) => {
     const pricing = card.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/)?.[0] || "";
     const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g)].map((match) => match.slice(1));
     assert.equal(pricing.match(/aria-label="([^"]+)"/)?.[1], "Catalogue price and size");
     assert.ok(rows.length === 1 || rows.length === 2, `card ${index + 1} has price and optional size rows`);
     assert.match(rows[0][0], /^(?:Price|From)$/);
-    assert.match(rows[0][1], /^₹/);
+    assert.match(rows[0][1], /^(?:₹|Starting at ₹|Price on request)/);
     if (expectedRows[index]) {
       assert.equal(rows.length, 2, `card ${index + 1} has its known size row`);
       assert.deepEqual(rows[1], expectedRows[index], `card ${index + 1} size row`);
@@ -496,4 +516,14 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
   assert.deepEqual(rowsFor("Ivory Mandala Holder").slice(1), [["Size", "3 in"]]);
   assert.deepEqual(rowsFor("Pearl Rangoli Accent").slice(1), [["Size", "3–4 in"]]);
   assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "4–5 in"]]);
+});
+
+test("studio edit leads directly into the order conversation", () => {
+  const studioStart = html.indexOf('<section class="intro-band shell reveal" id="offerings"');
+  const orderStart = html.indexOf('<section class="order-section shell" id="order"');
+  assert.ok(studioStart >= 0, "expected #offerings section");
+  assert.ok(orderStart >= 0, "expected #order section");
+  const studioEnd = html.indexOf("</section>", studioStart) + "</section>".length;
+  assert.ok(studioEnd < orderStart, "#offerings must come before #order");
+  assert.equal(html.slice(studioEnd, orderStart).trim(), "", "#offerings must be immediately before #order");
 });
