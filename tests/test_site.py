@@ -644,7 +644,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-labelledby="romantic-keepsakes-title"', section_html)
         self.assertIn("For the two of you", section_html)
         self.assertIn('<h2 id="romantic-keepsakes-title">Keep the moment close.</h2>', section_html)
-        self.assertIn('href="#romantic-keepsakes" data-category-shortcut="couple">Explore the keepsakes', section_html)
+        self.assertNotIn('href="#romantic-keepsakes" data-category-shortcut="couple">Explore the keepsakes', section_html)
         for phrase in (
             "Rose hexagon",
             "Personalized photo clock",
