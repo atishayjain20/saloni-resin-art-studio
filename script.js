@@ -262,7 +262,9 @@
     var emptyReset = document.getElementById("catalogue-empty-reset");
     var status = document.getElementById("catalogue-filter-status");
     var empty = document.getElementById("catalogue-filter-empty");
-    if (!tools || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty) return;
+    var results = document.getElementById("catalogue-results");
+    if (!tools || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty || !results) return;
+    var resultsHome = results.parentNode;
 
     var pagePrevious = document.getElementById("catalogue-page-previous");
     var pageNext = document.getElementById("catalogue-page-next");
@@ -392,6 +394,9 @@
         disclosure.setAttribute("aria-expanded", String(canExpand && isExpanded(section)));
         disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : section.id === "premium-collection" ? "View all" : "See all";
       });
+      var resultsSection = allVisible && pageCards.length ? sectionFor(pageCards[pageCards.length - 1]) : null;
+      if (resultsSection && resultsSection.appendChild) resultsSection.appendChild(results);
+      else if (resultsHome && resultsHome.appendChild) resultsHome.appendChild(results);
       empty.hidden = matchingCards.length !== 0;
       if (pagination) pagination.hidden = !allVisible;
       var pageEnd = Math.min(pageStart + pageSize, matchingCards.length);
@@ -401,7 +406,7 @@
       setPageStatus(matchingCards.length, pageCount);
       updatePageControls(matchingCards.length, pageCount);
       document.documentElement.classList.add("catalogue-ready");
-      return { total: matchingCards.length, pageCount: pageCount };
+      return { total: matchingCards.length, pageCount: pageCount, pageCards: pageCards };
     }
 
     function currentUrl() {
@@ -468,8 +473,10 @@
     }
 
     function showAll(commit) {
-      setFullState("all", "all", 1);
-      if (commit) writeUrl(urlWithState({ full: true, type: "all", budget: "all", page: page }, "#catalogue-filters"));
+      var state = setFullState("all", "all", 1);
+      var firstSection = state && state.pageCards && state.pageCards.length ? sectionFor(state.pageCards[0]) : null;
+      if (commit) writeUrl(urlWithState({ full: true, type: "all", budget: "all", page: page }, firstSection ? "#" + firstSection.id : "#catalogue-filters"));
+      return state;
     }
 
     function showFeatured(commit) {
@@ -488,10 +495,20 @@
       if (target && !target.hidden && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
     }
 
-    function focusCatalogueHeading() {
-      if (!catalogueHeading) return;
-      if (typeof catalogueHeading.scrollIntoView === "function") catalogueHeading.scrollIntoView({ behavior: "auto", block: "start" });
-      if (typeof catalogueHeading.focus === "function") catalogueHeading.focus({ preventScroll: true });
+    function focusCatalogueHeading(pageCards) {
+      var target = catalogueHeading;
+      if (allVisible && pageCards && pageCards.length) {
+        var firstSection = sectionFor(pageCards[0]);
+        var headingId = firstSection && firstSection.getAttribute ? firstSection.getAttribute("aria-labelledby") : "";
+        var sectionHeading = headingId ? document.getElementById(headingId) : null;
+        if (sectionHeading) {
+          if (sectionHeading.setAttribute) sectionHeading.setAttribute("tabindex", "-1");
+          target = sectionHeading;
+        }
+      }
+      if (!target) return;
+      if (typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
+      if (typeof target.focus === "function") target.focus({ preventScroll: true });
     }
 
     function selectCategory(category, href, commit) {
@@ -539,9 +556,10 @@
       var nextPage = Math.min(pageCount, Math.max(1, page + direction));
       if (nextPage === page) return;
       page = nextPage;
-      applyFilters();
-      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }));
-      focusCatalogueHeading();
+      var state = applyFilters();
+      var firstSection = state && state.pageCards && state.pageCards.length ? sectionFor(state.pageCards[0]) : null;
+      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }, firstSection ? "#" + firstSection.id : "#catalogue-filters"));
+      focusCatalogueHeading(state && state.pageCards);
     }
 
     document.querySelectorAll("[data-browse-filters]").forEach(function (link) {
@@ -553,8 +571,8 @@
     document.querySelectorAll("[data-browse-all]").forEach(function (link) {
       link.addEventListener("click", function (event) {
         event.preventDefault();
-        showAll(true);
-        scrollToHash(link.getAttribute("href") || "#catalogue-filters");
+        var state = showAll(true);
+        focusCatalogueHeading(state && state.pageCards);
       });
     });
     document.querySelectorAll("[data-category-shortcut]").forEach(function (link) {
@@ -586,7 +604,10 @@
     typeFilter.addEventListener("change", commitFilterChange);
     priceFilter.addEventListener("change", commitFilterChange);
     resetButton.addEventListener("click", function () { showFeatured(true); });
-    emptyReset.addEventListener("click", function () { showAll(true); focusCatalogueHeading(); });
+    emptyReset.addEventListener("click", function () {
+      var state = showAll(true);
+      focusCatalogueHeading(state && state.pageCards);
+    });
     if (pagePrevious) pagePrevious.addEventListener("click", function () { movePage(-1); });
     if (pageNext) pageNext.addEventListener("click", function () { movePage(1); });
     window.addEventListener("hashchange", restoreFromLocation);

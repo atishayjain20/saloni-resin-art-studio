@@ -23,14 +23,37 @@ class FakeControl {
   focus() { this.focused = true; }
 }
 
+class FakeContainer {
+  constructor(id) { this.id = id; this.children = []; }
+  appendChild(child) {
+    if (child.parentNode && child.parentNode.children) {
+      child.parentNode.children = child.parentNode.children.filter((current) => current !== child);
+    }
+    this.children.push(child);
+    child.parentNode = this;
+    return child;
+  }
+}
+
 class FakeSection {
   constructor(id) {
     this.id = id;
+    this.attributes = { "aria-labelledby": `${id}-title` };
     this.hidden = false;
     this.cards = [];
+    this.children = [];
     this.disclosure = new FakeControl("");
     this.disclosure.hidden = false;
   }
+  appendChild(child) {
+    if (child.parentNode && child.parentNode.children) {
+      child.parentNode.children = child.parentNode.children.filter((current) => current !== child);
+    }
+    this.children.push(child);
+    child.parentNode = this;
+    return child;
+  }
+  getAttribute(name) { return this.attributes[name] || ""; }
   querySelector(selector) {
     if (selector === ".work-card, .romantic-keepsake-card") return this.cards[0] || null;
     return selector === "[data-catalogue-disclosure]" ? this.disclosure : null;
@@ -106,6 +129,11 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   const pageNext = new FakeControl("");
   const pageStatus = { textContent: "" };
   const pagination = { hidden: false };
+  const enhancement = new FakeContainer("catalogue-enhancement");
+  const results = new FakeContainer("catalogue-results");
+  enhancement.appendChild(results);
+  results.appendChild(status);
+  results.appendChild(pagination);
   const heading = new FakeControl("");
   heading.events = [];
   heading.scrollIntoView = () => heading.events.push("scroll");
@@ -123,6 +151,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
     ["catalogue-empty-reset", emptyReset],
     ["catalogue-filter-status", status],
     ["catalogue-filter-empty", empty],
+    ["catalogue-results", results],
     ["catalogue-page-previous", pagePrevious],
     ["catalogue-page-next", pageNext],
     ["catalogue-page-status", pageStatus],
@@ -131,6 +160,14 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   ]);
   cards.forEach((card) => elements.set(card.id, card));
   sections.forEach((section) => elements.set(section.id, section));
+  const sectionHeadings = sections.map((section) => {
+    const sectionHeading = new FakeControl("");
+    sectionHeading.events = [];
+    sectionHeading.scrollIntoView = () => sectionHeading.events.push("scroll");
+    sectionHeading.focus = () => sectionHeading.events.push("focus");
+    elements.set(`${section.id}-title`, sectionHeading);
+    return sectionHeading;
+  });
   const documentObject = {
     documentElement: { classList: { add() {} } },
     getElementById(id) { return elements.get(id) || null; },
@@ -170,7 +207,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   const context = { document: documentObject, window: windowObject, URL, URLSearchParams };
   vm.createContext(context);
   vm.runInContext(`${catalogueFunction}\ninitCatalogueExperience();`, context, { filename: "script.js" });
-  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, heading, browseFilters, browseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, eventLog };
+  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, results, enhancement, sectionHeadings, heading, browseFilters, browseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, eventLog };
 }
 
 function visibleCards(harness) { return harness.cards.filter((card) => !card.hidden); }
@@ -242,13 +279,41 @@ test("filters use AND logic and reset pagination to page one", () => {
   assert.match(harness.status.textContent, /Page 1/);
 });
 
-test("paging replaces cards and returns focus to the catalogue heading", () => {
+test("paging replaces cards and returns focus to the first visible section heading", () => {
   const harness = createHarness();
   harness.browseAll.dispatch("click");
   const firstPage = visibleCards(harness).map((card) => card.id);
   harness.pageNext.dispatch("click");
   assert.notDeepEqual(visibleCards(harness).map((card) => card.id), firstPage);
-  assert.deepEqual(harness.heading.events, ["scroll", "focus"]);
+  assert.deepEqual(harness.sectionHeadings[0].events, ["scroll", "focus", "scroll", "focus"]);
+  assert.deepEqual(harness.heading.events, []);
+});
+
+test("full catalogue moves the results below the last visible section and focuses the first section heading", () => {
+  const harness = createHarness();
+  harness.browseAll.dispatch("click");
+  assert.equal(harness.results.parentNode, harness.sections[0]);
+  assert.equal(harness.windowObject.location.hash, "#diwali");
+  assert.deepEqual(harness.sectionHeadings[0].events, ["scroll", "focus"]);
+  assert.deepEqual(harness.heading.events, []);
+  for (let index = 0; index < 4; index += 1) harness.pageNext.dispatch("click");
+  assert.equal(harness.results.parentNode, harness.sections[2]);
+  assert.deepEqual(harness.sectionHeadings[0].events, ["scroll", "focus", "scroll", "focus", "scroll", "focus"]);
+  assert.deepEqual(harness.sectionHeadings[1].events, ["scroll", "focus", "scroll", "focus"]);
+  assert.deepEqual(harness.sectionHeadings[2].events, []);
+  assert.equal(harness.windowObject.location.hash, "#romantic-keepsakes");
+});
+
+test("preview and no-result states return the results block to the filter enhancement", () => {
+  const harness = createHarness();
+  assert.equal(harness.results.parentNode, harness.enhancement);
+  harness.browseAll.dispatch("click");
+  assert.notEqual(harness.results.parentNode, harness.enhancement);
+  harness.resetButton.dispatch("click");
+  assert.equal(harness.results.parentNode, harness.enhancement);
+  harness.typeFilter.value = "not-a-real-type";
+  harness.typeFilter.dispatch("change");
+  assert.equal(harness.results.parentNode, harness.enhancement);
 });
 
 test("back to featured picks hides pagination again", () => {
@@ -383,6 +448,13 @@ test("invalid URL state falls back to a safe full catalogue tuple without discar
   assert.match(harness.windowObject.location.search, /(?:^|&)page=1(?:&|$)/);
   assert.match(harness.windowObject.location.search, /(?:\?|&)ref=keep(?:&|$)/);
   assert.match(harness.windowObject.location.search, /(?:\?|&)x=1(?:&|$)/);
+});
+
+test("explicit catalogue filter hash remains a filter anchor on full URL restore", () => {
+  const harness = createHarness({ url: "https://example.test/?type=all&budget=all&page=1#catalogue-filters" });
+  assert.deepEqual(harness.sectionHeadings[0].events, []);
+  assert.deepEqual(harness.heading.events, []);
+  assert.equal(harness.results.parentNode, harness.sections[0]);
 });
 
 test("reset removes only catalogue URL keys, writes a neutral hash, and popstate restores without pushing", () => {
