@@ -17,6 +17,9 @@
     fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fff; }
     legend { padding: 0 .35rem; font-weight: 700; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+    .product-context { margin: 0 0 1rem; }
+    .product-context img { display: block; width: min(100%, 22rem); max-height: 16rem; object-fit: cover; border-radius: .7rem; }
+    .reference-preview { display: block; width: min(100%, 18rem); max-height: 14rem; margin-top: .65rem; object-fit: contain; border: 1px solid #dccbc1; border-radius: .7rem; background: #fffaf4; }
     label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; }
     input, select, textarea, button { font: inherit; }
     input, select, textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; }
@@ -44,29 +47,35 @@
   <h1>Send an order request</h1>
   <p class="intro">This is a request only. Saloni will contact you to confirm the design, price, and delivery before any production begins.</p>
   <form id="order-form" novalidate>
+    <input id="request-id" name="requestId" type="hidden">
+    <input id="request-stage" name="requestStage" type="hidden">
+    <input id="source-kind" name="sourceKind" type="hidden">
+    <input id="source-id" name="sourceId" type="hidden">
     <fieldset>
       <legend>Selected design</legend>
+      <div id="product-context" class="product-context" hidden>
+        <img id="product-image" alt="" loading="lazy" decoding="async">
+      </div>
       <div class="grid">
-        <label for="request-id">Request ID <input id="request-id" name="requestId" readonly></label>
-        <label for="source-kind">Source <input id="source-kind" name="sourceKind" readonly></label>
-        <label for="source-id">Source ID <input id="source-id" name="sourceId" readonly></label>
         <label for="product-name">Product name <input id="product-name" name="productName" maxlength="160" required></label>
       </div>
-      <p class="hint">Source ID and source type identify the catalogue or customizer item. You can edit the product name.</p>
+      <p class="hint">You can edit the product name before sending the request.</p>
     </fieldset>
 
     <fieldset>
       <legend>What should Saloni make?</legend>
       <label for="quantity">Quantity <input id="quantity" name="quantity" type="number" min="1" max="100" step="1" inputmode="numeric" required></label>
-      <div class="dimension-pair">
-        <label for="height-feet">Height feet <input id="height-feet" name="heightFeet" type="number" min="0" max="5" step="1" inputmode="numeric" required></label>
-        <label for="height-inches-part">Height inches <input id="height-inches-part" name="heightInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal" required></label>
+      <div id="dimension-fields">
+        <div class="dimension-pair">
+          <label for="height-feet">Height feet <input id="height-feet" name="heightFeet" type="number" min="0" max="5" step="1" inputmode="numeric"></label>
+          <label for="height-inches-part">Height inches <input id="height-inches-part" name="heightInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal"></label>
+        </div>
+        <div class="dimension-pair">
+          <label for="width-feet">Width feet <input id="width-feet" name="widthFeet" type="number" min="0" max="5" step="1" inputmode="numeric"></label>
+          <label for="width-inches-part">Width inches <input id="width-inches-part" name="widthInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal"></label>
+        </div>
+        <p class="hint">Enter each dimension as feet plus an inch remainder. Each total must be greater than 0 and no more than 60 inches. For example, 3 ft × 4 ft is valid.</p>
       </div>
-      <div class="dimension-pair">
-        <label for="width-feet">Width feet <input id="width-feet" name="widthFeet" type="number" min="0" max="5" step="1" inputmode="numeric" required></label>
-        <label for="width-inches-part">Width inches <input id="width-inches-part" name="widthInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal" required></label>
-      </div>
-      <p class="hint">Enter each dimension as feet plus an inch remainder. Each total must be greater than 0 and no more than 60 inches. For example, 3 ft × 4 ft is valid.</p>
       <label for="design-details">Design details <textarea id="design-details" name="designDetails" maxlength="2000" required placeholder="Colours, words, occasion, reference notes, or anything Saloni should know."></textarea></label>
     </fieldset>
 
@@ -90,16 +99,26 @@
           <div class="grid">
             <label for="city">City <input id="city" name="city" maxlength="100" autocomplete="address-level2"></label>
             <label for="state">State <input id="state" name="state" maxlength="100" autocomplete="address-level1"></label>
-            <label for="pin">PIN <input id="pin" name="pin" maxlength="6" inputmode="numeric" autocomplete="postal-code"></label>
           </div>
         </div>
+      </div>
+      <div class="shipping-fields" id="pin-field">
+        <label for="pin">PIN <input id="pin" name="pin" maxlength="6" inputmode="numeric" autocomplete="postal-code"></label>
       </div>
     </fieldset>
 
     <fieldset>
       <legend>Optional reference image</legend>
       <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
-      <p class="hint">For a customizer PNG, download it first, then attach it here. Files must be reattached if you start another request.</p>
+      <div id="reference-image-preview-wrap" hidden>
+        <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
+      </div>
+      <p id="reference-image-status" class="hint" role="status" aria-live="polite">For a customizer PNG, download it first, then attach it here. Files must be reattached if you start another request.</p>
+      <div id="reference-image-actions" class="actions" hidden>
+        <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
+        <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
+        <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
+      </div>
     </fieldset>
 
     <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
@@ -125,7 +144,18 @@
   var submitButton = document.getElementById("submit-button");
   var anotherButton = document.getElementById("another-button");
   var shippingFields = document.getElementById("shipping-fields");
+  var pinField = document.getElementById("pin-field");
+  var productContext = document.getElementById("product-context");
+  var productImage = document.getElementById("product-image");
+  var dimensionFields = document.getElementById("dimension-fields");
   var referenceImage = document.getElementById("reference-image");
+  var referenceImagePreviewWrap = document.getElementById("reference-image-preview-wrap");
+  var referenceImagePreview = document.getElementById("reference-image-preview");
+  var referenceImageStatus = document.getElementById("reference-image-status");
+  var referenceImageActions = document.getElementById("reference-image-actions");
+  var retryPreviewButton = document.getElementById("retry-preview");
+  var continueWithoutPreviewButton = document.getElementById("continue-without-preview");
+  var removeReferenceImageButton = document.getElementById("remove-reference-image");
   var referralInput = form.elements.referralCode || document.getElementById("referral-code");
   var referralStatus = document.getElementById("referral-status");
   var checkReferral = document.getElementById("check-referral");
@@ -135,6 +165,46 @@
   var referralCheckVersion = 0;
   var referralAcceptedCode = "";
   var PARENT_ORIGIN = "https://saloniresinart.com";
+  var PREVIEW_TIMEOUT_MS = 10000;
+  var PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
+  var PREVIEW_FILENAME = "saloni-customizer-preview.png";
+  var previewExpected = false;
+  var previewResolved = true;
+  var previewPending = false;
+  var previewCanRetry = false;
+  var previewCanContinue = false;
+  var previewAttempt = null;
+  var previewTimeoutId = null;
+  var attachmentGeneration = 0;
+  var previewObjectUrl = "";
+  var PRODUCT_IMAGE_ALLOWLIST = {
+    "birthday-hamper.jpg": true, "car-theme-hamper.jpg": true,
+    "concept-floral-coasters.webp": true, "concept-floral-memory-frame.webp": true, "concept-ocean-clock.webp": true, "concept-tray-hamper.webp": true,
+    "corporate-bag-tag-concept.webp": true, "corporate-bookmark-keychain-duo-concept.webp": true, "corporate-business-card-holder-concept.webp": true,
+    "corporate-desk-clock-concept.webp": true, "corporate-desk-essentials-set-concept.webp": true, "corporate-desk-logo-stand-concept.webp": true,
+    "corporate-desk-nameplate-concept.webp": true, "corporate-desk-organizer-concept.webp": true, "corporate-desk-trinket-tray-concept.webp": true,
+    "corporate-festive-hamper-concept.webp": true, "corporate-floral-bookmark-concept.webp": true, "corporate-fridge-magnet-concept.webp": true,
+    "corporate-lanyard-charm-concept.webp": true, "corporate-logo-coaster-set-concept.webp": true, "corporate-logo-keychain-concept.webp": true,
+    "corporate-logo-paperweight-concept.webp": true, "corporate-mini-photo-stand-concept.webp": true, "corporate-pen-cup-concept.webp": true,
+    "corporate-phone-rest-concept.webp": true, "corporate-recognition-award-concept.webp": true,
+    "diwali-emerald-led-holder-pair-concept.webp": true, "diwali-festive-keepsake-box-concept.webp": true, "diwali-festive-welcome-hamper.jpeg": true,
+    "diwali-floral-swastik-tealight-set.webp": true, "diwali-gold-fleck-lotus-light.jpeg": true, "diwali-golden-ganesha-pooja-plate.jpg": true,
+    "diwali-golden-toran-charms-concept.webp": true, "diwali-happy-diwali-glow.webp": true, "diwali-ivory-mandala-holder-concept.webp": true,
+    "diwali-jewel-glow-tealight.jpg": true, "diwali-lotus-blue-festive-set.jpeg": true, "diwali-lotus-diya-pair.webp": true,
+    "diwali-lotus-rangoli-duo-concept.webp": true, "diwali-marigold-petal-holder-concept.webp": true, "diwali-ocean-bloom-pooja-platter.jpg": true,
+    "diwali-om-mini-tilak-plate.webp": true, "diwali-pastel-lotus-tealight.jpeg": true, "diwali-peacock-mini-pooja-thali.webp": true,
+    "diwali-pearl-rangoli-accent-concept.webp": true, "diwali-rose-gold-festive-set.jpeg": true, "diwali-rose-petal-offering-plate-concept.webp": true,
+    "diwali-ruby-leaf-dish-concept.webp": true, "diwali-saffron-tilak-duo-concept.webp": true, "diwali-shubh-labh-welcome-pair.jpg": true,
+    "holi-hamper.webp": true, "navkar-resin-frame.jpg": true, "personalized-floral-hoop.jpg": true, "resin-clock.jpg": true, "resin-message-coasters.jpg": true,
+    "romantic-botanical-pendant.webp": true, "romantic-calendar-coaster.webp": true, "romantic-couple-miniature.webp": true,
+    "romantic-couple-scene.webp": true, "romantic-first-rose-bracelet.webp": true, "romantic-floral-bookmark-set.webp": true,
+    "romantic-hamper.jpg": true, "romantic-heart-trinket-tray.webp": true, "romantic-initial-desk-stand.webp": true,
+    "romantic-ocean-memory-tray.webp": true, "romantic-us-keychain-pair.webp": true,
+    "studio-blue-mantra-frame.jpeg": true, "studio-floral-handled-tray.jpeg": true, "studio-floral-hexagon-keepsake.jpeg": true,
+    "studio-floral-square-keepsake.jpeg": true, "studio-lilac-scalloped-tray.jpeg": true, "studio-lilac-symbol-rakhi.jpeg": true,
+    "studio-little-brother-rakhi.jpeg": true, "studio-personalized-photo-clock.jpeg": true, "studio-red-rose-resin-display.jpeg": true,
+    "studio-rose-hexagon-keepsake.jpeg": true, "studio-white-mantra-frame.jpeg": true
+  };
 
   function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
   function setError(field, message) {
@@ -157,20 +227,54 @@
     Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); });
   }
   function setStatus(message, kind) { status.textContent = message || ""; status.className = "status" + (kind ? " " + kind : ""); }
+  function isQuoteRequest() {
+    return seed.requestStage === "quote" && ["catalogue", "general", "customizer"].indexOf(seed.sourceKind) >= 0;
+  }
   function toggleShipping() {
     var shipping = value("fulfillment") === "shipping";
     shippingFields.hidden = !shipping;
     shippingFields.setAttribute("aria-hidden", String(!shipping));
+    var showPin = shipping || isQuoteRequest();
+    pinField.hidden = !showPin;
+    pinField.setAttribute("aria-hidden", String(!showPin));
   }
   function updateDimensionMaxes() {
     ["heightFeet", "widthFeet"].forEach(function (name) { form.elements[name].setAttribute("max", "5"); });
     ["heightInchesPart", "widthInchesPart"].forEach(function (name) { form.elements[name].setAttribute("max", "11.99"); });
   }
+  function dimensionsRequired() { return String(seed.sourceKind || "").toLowerCase() === "customizer"; }
+  function setDimensionsRequired(required) {
+    dimensionFields.hidden = !required;
+    dimensionFields.setAttribute("aria-hidden", String(!required));
+    ["heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"].forEach(function (name) {
+      var input = form.elements[name];
+      if (!input) return;
+      if (required) input.setAttribute("required", "required"); else input.removeAttribute("required");
+    });
+  }
+  function productImagePath() {
+    var match = /^catalogue:([A-Za-z0-9][A-Za-z0-9._-]{0,159})$/.exec(String(seed.sourceId || ""));
+    return match && PRODUCT_IMAGE_ALLOWLIST[match[1]] ? PARENT_ORIGIN + "/assets/" + match[1] : "";
+  }
+  function applyProductContext() {
+    var imagePath = productImagePath();
+    if (!imagePath) {
+      productContext.hidden = true;
+      productImage.removeAttribute("src");
+      productImage.removeAttribute("alt");
+      return;
+    }
+    productImage.setAttribute("src", imagePath);
+    productImage.setAttribute("alt", (value("productName") || "Selected product") + " product photo");
+    productContext.hidden = false;
+  }
   function applySeed(next) {
-    var fields = ["requestId", "sourceKind", "sourceId", "productName", "quantity", "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate", "referralCode"];
+    var fields = ["requestId", "requestStage", "sourceKind", "sourceId", "productName", "quantity", "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate", "referralCode"];
     fields.forEach(function (field) { if (form.elements[field]) form.elements[field].value = next[field] == null ? "" : next[field]; });
     toggleShipping();
     updateDimensionMaxes();
+    setDimensionsRequired(dimensionsRequired());
+    applyProductContext();
   }
   function normalizeReferralCode(value) { var code = String(value || "").trim().toUpperCase(); return /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code) ? code : ""; }
   function showReferralStatus(message, kind) { if (!referralStatus) return; referralStatus.textContent = message; referralStatus.className = "hint" + (kind ? " " + kind : ""); }
@@ -216,6 +320,219 @@
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
     return "request-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
   }
+  function isCustomizerOrderRequest() {
+    return seed.sourceKind === "customizer" && seed.previewExpected === true;
+  }
+  function setReferenceImageStatus(message, kind) {
+    if (!referenceImageStatus) return;
+    referenceImageStatus.textContent = message || "";
+    referenceImageStatus.className = "hint" + (kind ? " " + kind : "");
+  }
+  function revokePreviewObjectUrl() {
+    if (!previewObjectUrl) return;
+    var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+    if (urlApi && typeof urlApi.revokeObjectURL === "function") {
+      try { urlApi.revokeObjectURL(previewObjectUrl); } catch (error) {}
+    }
+    previewObjectUrl = "";
+  }
+  function updateReferenceImageActions() {
+    var hasFile = Boolean(referenceImage.files && referenceImage.files[0]);
+    if (referenceImageActions) referenceImageActions.hidden = !(previewExpected && (previewCanRetry || previewCanContinue || hasFile));
+    if (retryPreviewButton) retryPreviewButton.hidden = !(previewExpected && previewCanRetry);
+    if (continueWithoutPreviewButton) continueWithoutPreviewButton.hidden = !(previewExpected && previewCanContinue);
+    if (removeReferenceImageButton) removeReferenceImageButton.hidden = !hasFile;
+  }
+  function closePreviewAttempt(attempt) {
+    if (attempt && previewAttempt !== attempt) return;
+    var current = attempt || previewAttempt;
+    if (previewTimeoutId) window.clearTimeout(previewTimeoutId);
+    previewTimeoutId = null;
+    previewPending = false;
+    if (current && current.port && current.port.close) {
+      try { current.port.close(); } catch (error) {}
+    }
+    if (!attempt || previewAttempt === attempt) previewAttempt = null;
+  }
+  function previewCurrent(attempt) {
+    return previewExpected && previewAttempt === attempt && previewPending && !attempt.done &&
+      attachmentGeneration === attempt.attachmentGeneration &&
+      String(seed.channelNonce || "") === attempt.nonce && String(seed.requestId || "") === attempt.requestId;
+  }
+  function previewFailure(message) {
+    closePreviewAttempt();
+    previewResolved = false;
+    previewCanRetry = true;
+    previewCanContinue = true;
+    setReferenceImageStatus((message || "The customizer preview could not be attached.") + " Retry preview or continue without a preview.", "error");
+    updateReferenceImageActions();
+  }
+  function validPreviewBlob(blob) {
+    return Boolean(blob && Object.prototype.toString.call(blob) === "[object Blob]" &&
+      typeof blob.size === "number" && blob.size > 0 && blob.size <= PREVIEW_MAX_BYTES &&
+      String(blob.type || "").toLowerCase() === "image/png");
+  }
+  function attachPreviewBlob(attempt, blob) {
+    if (!validPreviewBlob(blob)) {
+      previewFailure("The customizer preview was not a non-empty PNG of 5 MB or less.");
+      return;
+    }
+    var FileCtor = window.File || (typeof File !== "undefined" ? File : null);
+    var DataTransferCtor = window.DataTransfer || (typeof DataTransfer !== "undefined" ? DataTransfer : null);
+    if (!FileCtor || !DataTransferCtor) {
+      previewFailure("This browser cannot attach the customizer preview automatically.");
+      return;
+    }
+    try {
+      var file = new FileCtor([blob], PREVIEW_FILENAME, { type: "image/png" });
+      var transfer = new DataTransferCtor();
+      if (!transfer.items || typeof transfer.items.add !== "function") throw new Error("DataTransfer is unavailable");
+      transfer.items.add(file);
+      referenceImage.files = transfer.files;
+      var assigned = referenceImage.files && referenceImage.files[0];
+      if (!assigned || assigned.name !== PREVIEW_FILENAME || String(assigned.type || "").toLowerCase() !== "image/png" || assigned.size !== blob.size) {
+        throw new Error("The preview file could not be assigned");
+      }
+      revokePreviewObjectUrl();
+      var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+      if (urlApi && typeof urlApi.createObjectURL === "function") {
+        previewObjectUrl = urlApi.createObjectURL(assigned);
+        referenceImagePreview.setAttribute("src", previewObjectUrl);
+        referenceImagePreviewWrap.hidden = false;
+      }
+      referenceImagePreview.setAttribute("alt", "Attached customizer preview");
+      previewResolved = true;
+      previewCanRetry = false;
+      previewCanContinue = false;
+      setReferenceImageStatus("Customizer preview attached as " + PREVIEW_FILENAME + ".");
+      updateReferenceImageActions();
+    } catch (error) {
+      try { referenceImage.value = ""; } catch (clearError) {}
+      try { referenceImage.files = []; } catch (clearError) {}
+      previewFailure("This browser cannot attach the customizer preview automatically.");
+    }
+  }
+  function startPreviewAttempt() {
+    if (!previewExpected) return;
+    closePreviewAttempt();
+    previewResolved = false;
+    previewPending = true;
+    previewCanRetry = false;
+    previewCanContinue = false;
+    var attempt = {
+      nonce: String(seed.channelNonce || ""), requestId: String(seed.requestId || ""),
+      attachmentGeneration: attachmentGeneration, transferId: newRequestId(), port: null, done: false
+    };
+    previewAttempt = attempt;
+    setReferenceImageStatus("Preparing the customizer preview…");
+    updateReferenceImageActions();
+    if (!attempt.nonce || !attempt.requestId || !window.MessageChannel || !window.top || window.top === window) {
+      previewFailure("The customizer preview is unavailable in this browser.");
+      return;
+    }
+    try {
+      var channel = new window.MessageChannel();
+      attempt.port = channel.port1;
+      channel.port1.onmessage = function (event) {
+        var data = event && event.data || {};
+        if (!previewCurrent(attempt) || data.type !== "saloni-preview-response" || data.version !== 1 ||
+            data.nonce !== attempt.nonce || data.requestId !== attempt.requestId || data.mode !== "order" ||
+            data.transferId !== attempt.transferId) return;
+        attempt.done = true;
+        closePreviewAttempt(attempt);
+        if (data.ok === true) attachPreviewBlob(attempt, data.blob);
+        else {
+          var responseError = typeof data.error === "string" ? data.error : "";
+          previewFailure(typeof responseError === "string" && responseError.trim() ? responseError.trim() : "The customizer preview could not be attached.");
+        }
+      };
+      window.top.postMessage({ type: "saloni-preview-request", version: 1, nonce: attempt.nonce, requestId: attempt.requestId, mode: "order", transferId: attempt.transferId }, PARENT_ORIGIN, [channel.port2]);
+      previewTimeoutId = window.setTimeout(function () {
+        if (!previewCurrent(attempt)) return;
+        attempt.done = true;
+        previewFailure("The customizer preview took too long to load.");
+      }, PREVIEW_TIMEOUT_MS);
+    } catch (error) {
+      previewFailure("The customizer preview is unavailable in this browser.");
+    }
+  }
+  function handleReferenceImageChange() {
+    attachmentGeneration += 1;
+    closePreviewAttempt();
+    previewResolved = true;
+    previewCanRetry = false;
+    previewCanContinue = false;
+    revokePreviewObjectUrl();
+    if (referenceImagePreviewWrap) referenceImagePreviewWrap.hidden = true;
+    var file = referenceImage.files && referenceImage.files[0];
+    if (file) {
+      var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+      if (urlApi && typeof urlApi.createObjectURL === "function") {
+        previewObjectUrl = urlApi.createObjectURL(file);
+        referenceImagePreview.setAttribute("src", previewObjectUrl);
+        referenceImagePreviewWrap.hidden = false;
+      }
+      referenceImagePreview.setAttribute("alt", "Attached reference image");
+      setReferenceImageStatus("Reference image attached.");
+    } else {
+      setReferenceImageStatus(previewExpected ? "Reference image removed. You can retry the customizer preview." : "No reference image attached.");
+      previewCanRetry = previewExpected;
+    }
+    updateReferenceImageActions();
+  }
+  function continueWithoutPreview() {
+    if (!previewExpected) return;
+    attachmentGeneration += 1;
+    closePreviewAttempt();
+    previewResolved = true;
+    previewCanRetry = false;
+    previewCanContinue = false;
+    setReferenceImageStatus("Continuing without a customizer preview.");
+    updateReferenceImageActions();
+  }
+  function resetPreviewState() {
+    attachmentGeneration += 1;
+    closePreviewAttempt();
+    revokePreviewObjectUrl();
+    previewCanRetry = false;
+    previewCanContinue = false;
+    previewResolved = !previewExpected;
+    if (referenceImagePreviewWrap) referenceImagePreviewWrap.hidden = true;
+    if (referenceImagePreview) referenceImagePreview.removeAttribute("src");
+    updateReferenceImageActions();
+  }
+  function disablePreviewForNewRequest() {
+    previewExpected = false;
+    previewPending = false;
+    previewResolved = true;
+    previewCanRetry = false;
+    previewCanContinue = false;
+    setReferenceImageStatus("This is a new request. Return to the designer and choose \"Request this design\" again for a new generated preview.");
+    updateReferenceImageActions();
+  }
+  function handlePageHide(event) {
+    if (event && event.persisted) {
+      closePreviewAttempt();
+      if (previewExpected && !previewResolved) {
+        previewCanRetry = true;
+        previewCanContinue = true;
+        setReferenceImageStatus("The customizer preview was paused. Retry preview or continue without a preview.", "error");
+        updateReferenceImageActions();
+      }
+      return;
+    }
+    resetPreviewState();
+  }
+  function handlePageShow(event) {
+    if (!event || !event.persisted || !previewExpected) return;
+    if (!previewResolved) {
+      previewPending = false;
+      previewCanRetry = true;
+      previewCanContinue = true;
+      setReferenceImageStatus("The customizer preview was paused. Retry preview or continue without a preview.", "error");
+    }
+    updateReferenceImageActions();
+  }
   function getCaptchaToken(attempt, done) {
     if (!captchaEnabled || !captchaSiteKey || !seed.channelNonce || !window.MessageChannel || !window.top || window.top === window) { done(null); return; }
     var channel;
@@ -257,6 +574,9 @@
   function showSuccess(result, attempt) {
     if (attempt && !isCurrent(attempt)) return;
     restoreSubmitState(attempt);
+    resetPreviewState();
+    previewExpected = false;
+    previewResolved = true;
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
     anotherButton.hidden = false;
     var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
@@ -286,19 +606,26 @@
       if (Number.isFinite(total) && total <= 0) errors[name + "Feet"] = label + " must be greater than 0 inches.";
       if (Number.isFinite(total) && total > 60) errors[name + "Feet"] = label + " must be no more than 60 inches.";
     }
-    dimension("height", "Height");
-    dimension("width", "Width");
+    if (dimensionsRequired()) {
+      dimension("height", "Height");
+      dimension("width", "Width");
+    }
     required("designDetails", "This field is required.");
     required("customerName", "This field is required.");
     if (!value("phone") || (value("phone").match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number.";
     if (value("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("email"))) errors.email = "Enter a valid email address or leave it blank.";
     var fulfillment = value("fulfillment");
     if (["shipping", "pickup"].indexOf(fulfillment) === -1) errors.fulfillment = "Choose shipping or pickup.";
+    var quoteRequest = isQuoteRequest();
     if (fulfillment === "shipping") {
-      required("shippingAddress", "Shipping address is required.");
-      required("city", "City is required.");
-      required("state", "State is required.");
-      if (!/^\d{6}$/.test(value("pin"))) errors.pin = "Enter a 6-digit PIN for shipping.";
+      if (!quoteRequest) {
+        required("shippingAddress", "Shipping address is required.");
+        required("city", "City is required.");
+        required("state", "State is required.");
+      }
+    }
+    if (fulfillment === "shipping" || quoteRequest) {
+      if (!/^\d{6}$/.test(value("pin"))) errors.pin = quoteRequest ? "Enter a 6-digit PIN for this quote request." : "Enter a 6-digit PIN for shipping.";
     }
     if (value("requestedDate") && !validIsoDate(value("requestedDate"))) errors.requestedDate = "Use a valid requested date.";
     var file = referenceImage.files && referenceImage.files[0];
@@ -311,12 +638,31 @@
     return errors;
   }
   form.addEventListener("change", function () { toggleShipping(); updateDimensionMaxes(); });
+  if (referenceImage) referenceImage.addEventListener("change", handleReferenceImageChange);
+  if (retryPreviewButton) retryPreviewButton.addEventListener("click", function () {
+    if (!previewExpected) return;
+    attachmentGeneration += 1;
+    startPreviewAttempt();
+  });
+  if (continueWithoutPreviewButton) continueWithoutPreviewButton.addEventListener("click", continueWithoutPreview);
+  if (removeReferenceImageButton) removeReferenceImageButton.addEventListener("click", function () {
+    try { referenceImage.value = ""; } catch (error) {}
+    if (referenceImage.files) {
+      try { referenceImage.files = []; } catch (error) {}
+    }
+    handleReferenceImageChange();
+  });
   if (referralInput) { referralInput.addEventListener("input", clearReferralStatus); referralInput.addEventListener("change", clearReferralStatus); }
   if (checkReferral) checkReferral.addEventListener("click", checkReferralCode);
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;
     clearErrors();
+    if (previewExpected && !previewResolved) {
+      setStatus(previewPending ? "The customizer preview is still loading. Please wait, retry, or continue without a preview." : "Attach the customizer preview, retry it, or continue without a preview.", "error");
+      if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+      return;
+    }
     var validationErrors = clientValidationErrors();
     if (Object.keys(validationErrors).length) {
       showFailure("Please correct the highlighted fields and try again.", validationErrors);
@@ -351,14 +697,25 @@
     });
   });
   anotherButton.addEventListener("click", function () {
+    var wasCustomizerRequest = isCustomizerOrderRequest();
+    resetPreviewState();
     form.reset();
-    clearReferralStatus();
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
     anotherButton.hidden = true; clearErrors(); setStatus("", "");
-    form.elements.requestId.value = newRequestId(); form.elements.fulfillment.value = "shipping"; toggleShipping();
-    updateDimensionMaxes();
+    applySeed(seed);
+    form.elements.requestId.value = newRequestId();
+    clearReferralStatus();
+    if (wasCustomizerRequest) disablePreviewForNewRequest();
   });
   applySeed(seed);
+  previewExpected = isCustomizerOrderRequest();
+  previewResolved = !previewExpected;
+  updateReferenceImageActions();
+  if (previewExpected) startPreviewAttempt();
+  if (window.addEventListener) {
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
+  }
   if (captchaEnabled && captchaSiteKey && seed.channelNonce && window.top && window.top !== window) {
     try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey }, PARENT_ORIGIN); } catch (error) {}
   }
