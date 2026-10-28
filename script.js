@@ -224,11 +224,19 @@
     var empty = document.getElementById("catalogue-filter-empty");
     if (!tools || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty) return;
 
+    var pagePrevious = document.getElementById("catalogue-page-previous");
+    var pageNext = document.getElementById("catalogue-page-next");
+    var pageStatus = document.getElementById("catalogue-page-status");
+    var pagination = document.getElementById("catalogue-pagination");
+    var catalogueHeading = document.getElementById("catalogue-filters-title");
+    var pageSize = 8;
+
     var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
       return !card.closest || !card.closest("#testimonials");
     });
     var sections = [];
     var allVisible = false;
+    var page = 1;
 
     function sectionFor(card) {
       var section = card.closest ? card.closest("section") : null;
@@ -271,10 +279,37 @@
       else card.setAttribute("aria-hidden", "true");
     }
 
+    function catalogueCards() {
+      return cards.filter(function (card) {
+        var type = typeFor(card);
+        return (allVisible || card.getAttribute("data-featured") === "true") &&
+          ((typeFilter.value || "all") === "all" || (typeFilter.value || "all") === type) &&
+          matchesPrice(card, priceFilter.value || "all");
+      });
+    }
+
+    function setPageStatus(total, pageCount) {
+      if (!pageStatus) return;
+      pageStatus.textContent = total ? "Page " + page + " of " + pageCount : "No pages";
+    }
+
+    function updatePageControls(total, pageCount) {
+      if (pagePrevious) {
+        pagePrevious.disabled = page <= 1 || total === 0;
+        pagePrevious.setAttribute("aria-disabled", String(pagePrevious.disabled));
+      }
+      if (pageNext) {
+        pageNext.disabled = page >= pageCount || total === 0;
+        pageNext.setAttribute("aria-disabled", String(pageNext.disabled));
+      }
+    }
+
     function applyFilters() {
-      var selectedType = typeFilter.value || "all";
-      var selectedPrice = priceFilter.value || "all";
-      var count = 0;
+      var matchingCards = catalogueCards();
+      var pageCount = Math.max(1, Math.ceil(matchingCards.length / pageSize));
+      if (page > pageCount) page = pageCount;
+      var pageStart = matchingCards.length ? (page - 1) * pageSize : 0;
+      var pageCards = matchingCards.slice(pageStart, pageStart + pageSize);
       cards.forEach(function (card) {
         var type = typeFor(card);
         var price = priceFor(card);
@@ -286,17 +321,25 @@
           card.removeAttribute("data-price-min");
           card.removeAttribute("data-price-max");
         }
-        var visible = (allVisible || card.getAttribute("data-featured") === "true") && (selectedType === "all" || selectedType === type) && matchesPrice(card, selectedPrice);
+        var visible = pageCards.indexOf(card) !== -1;
         setVisibility(card, visible);
-        if (visible) count += 1;
       });
       sections.forEach(function (section) {
         var hasVisibleCard = cards.some(function (card) { return card.closest && card.closest("section") === section && !card.hidden; });
         section.hidden = !hasVisibleCard;
       });
-      empty.hidden = count !== 0;
-      var hasFilters = selectedType !== "all" || selectedPrice !== "all";
-      status.textContent = count + (count === 1 ? " gift" : " gifts") + " shown." + (hasFilters ? " Filters are applied." : allVisible ? " Browse the full collection." : " Featured picks are shown first.");
+      empty.hidden = matchingCards.length !== 0;
+      if (pagination) pagination.hidden = !allVisible;
+      var pageEnd = Math.min(pageStart + pageSize, matchingCards.length);
+      if (!matchingCards.length) {
+        status.textContent = "No gifts match those choices.";
+      } else if (!allVisible) {
+        status.textContent = "Showing 1–" + matchingCards.length + " of " + matchingCards.length + " featured gifts.";
+      } else {
+        status.textContent = "Showing " + (pageStart + 1) + "–" + pageEnd + " of " + matchingCards.length + " gifts · Page " + page + " of " + pageCount + ".";
+      }
+      setPageStatus(matchingCards.length, pageCount);
+      updatePageControls(matchingCards.length, pageCount);
       refreshCatalogueCarousels(true);
       document.documentElement.classList.add("catalogue-ready");
     }
@@ -305,6 +348,15 @@
       allVisible = true;
       typeFilter.value = "all";
       priceFilter.value = "all";
+      page = 1;
+      applyFilters();
+    }
+
+    function showFeatured() {
+      allVisible = false;
+      typeFilter.value = "all";
+      priceFilter.value = "all";
+      page = 1;
       applyFilters();
     }
 
@@ -314,10 +366,78 @@
       if (target && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
     }
 
+    function updateHash(href) {
+      if (!href) return;
+      var nextHash = String(href).charAt(0) === "#" ? String(href) : "#" + href;
+      if (window.location && window.location.hash === nextHash) return;
+      try {
+        if (window.history && window.history.pushState) window.history.pushState({}, "", nextHash);
+        else if (window.location) window.location.hash = nextHash;
+      } catch (error) {}
+    }
+
+    function focusCatalogueHeading() {
+      if (!catalogueHeading) return;
+      if (typeof catalogueHeading.scrollIntoView === "function") catalogueHeading.scrollIntoView({ behavior: "auto", block: "start" });
+      if (typeof catalogueHeading.focus === "function") catalogueHeading.focus({ preventScroll: true });
+    }
+
+    function selectCategory(category, href) {
+      allVisible = true;
+      typeFilter.value = category || "all";
+      priceFilter.value = "all";
+      page = 1;
+      applyFilters();
+      updateHash(href);
+      scrollToHash(href);
+    }
+
+    function showHashTarget() {
+      var id = String(window.location && window.location.hash || "").replace(/^#/, "");
+      var target = id ? document.getElementById(id) : null;
+      if (!target) return false;
+      if (target.matches && target.matches("article")) {
+        var productIndex = cards.indexOf(target);
+        if (productIndex === -1) return false;
+        allVisible = true;
+        typeFilter.value = "all";
+        priceFilter.value = "all";
+        page = Math.floor(productIndex / pageSize) + 1;
+        applyFilters();
+        scrollToHash("#" + id);
+        return true;
+      }
+      var sectionCards = target.querySelector && target.querySelector(".work-card, .romantic-keepsake-card");
+      if (sectionCards) {
+        var category = typeFor(sectionCards);
+        selectCategory(category, "#" + id);
+        return true;
+      }
+      if (id === "catalogue-filters") scrollToHash("#catalogue-filters");
+      return false;
+    }
+
+    function movePage(direction) {
+      var matchingCards = catalogueCards();
+      var pageCount = Math.max(1, Math.ceil(matchingCards.length / pageSize));
+      var nextPage = Math.min(pageCount, Math.max(1, page + direction));
+      if (nextPage === page) return;
+      page = nextPage;
+      applyFilters();
+      focusCatalogueHeading();
+    }
+
+    document.querySelectorAll("[data-browse-filters]").forEach(function (link) {
+      link.addEventListener("click", function (event) {
+        event.preventDefault();
+        scrollToHash(link.getAttribute("href") || "#catalogue-filters");
+      });
+    });
     document.querySelectorAll("[data-browse-all]").forEach(function (link) {
       link.addEventListener("click", function (event) {
         event.preventDefault();
         showAll();
+        updateHash(link.getAttribute("href") || "#catalogue-filters");
         scrollToHash(link.getAttribute("href") || "#catalogue-filters");
       });
     });
@@ -326,35 +446,23 @@
         var category = link.getAttribute("data-category-shortcut");
         if (!category) return;
         event.preventDefault();
-        allVisible = true;
-        typeFilter.value = category;
-        priceFilter.value = "all";
-        applyFilters();
-        scrollToHash(link.getAttribute("href"));
+        selectCategory(category, link.getAttribute("href"));
       });
     });
-    typeFilter.addEventListener("change", function () { allVisible = true; applyFilters(); });
-    priceFilter.addEventListener("change", function () { allVisible = true; applyFilters(); });
+    typeFilter.addEventListener("change", function () { allVisible = true; page = 1; applyFilters(); });
+    priceFilter.addEventListener("change", function () { allVisible = true; page = 1; applyFilters(); });
     resetButton.addEventListener("click", function () {
-      allVisible = false;
-      typeFilter.value = "all";
-      priceFilter.value = "all";
-      applyFilters();
+      showFeatured();
     });
-    emptyReset.addEventListener("click", showAll);
-    window.addEventListener("hashchange", function () {
-      var target = document.getElementById(String(window.location.hash || "").replace(/^#/, ""));
-      if (!target || (!target.matches || (!target.matches("article") && !target.matches("section")))) return;
-      if (target.matches("article") || target.querySelector(".work-card, .romantic-keepsake-card")) {
-        showAll();
-        scrollToHash(target.id);
-      }
-    });
+    emptyReset.addEventListener("click", function () { showAll(); focusCatalogueHeading(); });
+    if (pagePrevious) pagePrevious.addEventListener("click", function () { movePage(-1); });
+    if (pageNext) pageNext.addEventListener("click", function () { movePage(1); });
+    function handleHashChange() { showHashTarget(); }
+    window.addEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handleHashChange);
 
     if (window.location && window.location.hash) {
-      var initialTarget = document.getElementById(String(window.location.hash).replace(/^#/, ""));
-      if (initialTarget && (initialTarget.matches("article") || (initialTarget.matches("section") && initialTarget.querySelector(".work-card, .romantic-keepsake-card")))) showAll();
-      else applyFilters();
+      if (!showHashTarget()) applyFilters();
     } else {
       applyFilters();
     }
@@ -364,12 +472,14 @@
     var embed = document.getElementById("order-form-embed");
     var frame = document.getElementById("order-form-frame");
     var status = document.getElementById("order-form-status");
+    var customizerRequestStatus = document.getElementById("share-status");
+    var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
     if (!embed || !frame || !status) return;
     var orderUrl = embed.getAttribute("data-order-form-url") || "";
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
     var requestedMode = embed.getAttribute("data-form-mode");
-    var frameState = { loaded: false, nonce: "", siteKey: "", activeCaptcha: null, pinnedSender: null, pinnedOrigin: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
+    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
     var corporateIntakeReady = embed.getAttribute("data-intake-ready") === "true";
 
     function requestId() {
@@ -387,6 +497,40 @@
       return "";
     }
 
+    function previewOrigin(origin) {
+      if (typeof origin !== "string" || !origin) return "";
+      if (typeof URL === "undefined") return "";
+      try {
+        var parsed = new URL(origin);
+        if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.port || parsed.pathname !== "/" || parsed.search || parsed.hash || !/^n-[a-z0-9-]+-script\.googleusercontent\.com$/i.test(parsed.hostname)) return "";
+        return parsed.origin === origin || parsed.origin + ":443" === origin ? parsed.origin : "";
+      } catch (error) {
+        return "";
+      }
+    }
+
+    function previewIdentityPart(value) {
+      return typeof value === "string" && value.length > 0 && value.length <= 200;
+    }
+
+    function previewTransferId(value) {
+      return typeof value === "string" && value.length > 0 && value.length <= 120 && /^[A-Za-z0-9._:-]+$/.test(value);
+    }
+
+    function usablePreviewDetails(summary, dimensions) {
+      var validDimension = function (value, unit) {
+        var number = Number(value);
+        var inches = unit === "ft" ? number * 12 : number;
+        return (unit === "in" || unit === "ft") && Number.isFinite(inches) && inches > 0 && inches <= 60;
+      };
+      return Boolean(typeof summary === "string" && summary.trim() && summary.length <= 2000 && dimensions && typeof dimensions === "object" && validDimension(dimensions.height, dimensions.heightUnit) && validDimension(dimensions.width, dimensions.widthUnit));
+    }
+
+    function usablePreviewSnapshot(snapshot) {
+      var dimensions = snapshot && snapshot.dimensions;
+      return Boolean(snapshot && usablePreviewDetails(snapshot.summary, dimensions) && snapshot.blob && typeof snapshot.blob.size === "number" && snapshot.blob.size > 0 && snapshot.blob.size <= 5 * 1024 * 1024 && typeof snapshot.blob.type === "string" && snapshot.blob.type.toLowerCase() === "image/png");
+    }
+
     function invalidateChannel() {
       if (frameState.activeCaptcha) {
         if (frameState.activeCaptcha.timer) window.clearTimeout(frameState.activeCaptcha.timer);
@@ -394,7 +538,12 @@
       }
       frameState.activeCaptcha = null;
       frameState.nonce = "";
+      frameState.requestId = "";
+      frameState.pendingCustomizerRequestId = "";
+      frameState.customizerFallback = null;
       frameState.siteKey = "";
+      frameState.previewSnapshot = null;
+      frameState.previewTransfers = Object.create(null);
       frameState.pinnedSender = null;
       frameState.pinnedOrigin = "";
     }
@@ -455,7 +604,7 @@
       var widthParts = parts(source.width, source.widthUnit);
       var seed = {
         sourceKind: source.sourceKind || "catalogue", sourceId: source.sourceId || "",
-        productName: source.productName || "", quantity: "1", dimensionFormat: "feet-inches",
+        productName: source.productName || "", requestStage: "quote", quantity: "1", dimensionFormat: "feet-inches",
         heightFeet: heightParts ? heightParts.feet : "", heightInchesPart: heightParts ? heightParts.inches : "", widthFeet: widthParts ? widthParts.feet : "", widthInchesPart: widthParts ? widthParts.inches : "",
         height: source.height || "", heightUnit: source.heightUnit || "",
         width: source.width || "", widthUnit: source.widthUnit || "", designDetails: source.designDetails || "",
@@ -464,25 +613,9 @@
       return seed;
     }
 
-    function readCustomizerDimensions() {
-      var frameType = document.getElementById("frame-type");
-      var framePreset = document.getElementById("frame-preset");
-      var frameUnit = document.getElementById("frame-unit");
-      if (!frameType || !framePreset || !frameUnit) return null;
-      var type = String(frameType.value || "");
-      var presetInches = Number(framePreset.value);
-      var unit = String(frameUnit.value || "");
-      if (["square", "round", "arch"].indexOf(type) === -1 || !Number.isFinite(presetInches) || presetInches <= 0 || ["in", "ft"].indexOf(unit) === -1) return null;
-      var widthInches = presetInches;
-      var heightInches = type === "arch" ? presetInches * 4 / 3 : presetInches;
-      function format(value) {
-        return unit === "ft" ? (value / 12).toFixed(2) : String(value);
-      }
-      return { height: format(heightInches), width: format(widthInches), heightUnit: unit, widthUnit: unit };
-    }
-
-    function submitSeed(seed, shouldScroll) {
+    function submitSeed(seed, shouldScroll, identity, previewSnapshot, previewExpected) {
       if (!configured) {
+        invalidateChannel();
         status.innerHTML = frameState.mode === "corporate"
           ? "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>."
           : "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
@@ -491,14 +624,23 @@
         return;
       }
       invalidateChannel();
-      frameState.nonce = channelNonce();
+      var requestIdentity = identity || { requestId: seed.requestId || requestId(), nonce: channelNonce() };
+      frameState.nonce = requestIdentity.nonce;
+      frameState.requestId = seed.requestId || requestIdentity.requestId;
       if (!frameState.nonce) {
         status.textContent = "This browser cannot start a secure request. Please use the latest browser or contact Saloni directly.";
         status.hidden = false;
         return;
       }
+      if (!previewIdentityPart(frameState.requestId)) {
+        status.textContent = "This browser could not start a secure request. Please try again or contact Saloni directly.";
+        status.hidden = false;
+        return;
+      }
+      if (previewExpected !== false && previewSnapshot && usablePreviewSnapshot(previewSnapshot) && previewSnapshot.requestId === frameState.requestId && previewSnapshot.nonce === frameState.nonce && previewSnapshot.mode === frameState.mode) frameState.previewSnapshot = previewSnapshot;
       seed.channelNonce = frameState.nonce;
       seed.formMode = frameState.mode;
+      if (String(seed.sourceKind || "").toLowerCase() === "customizer") seed.previewExpected = previewExpected !== false;
       frame.hidden = false;
       status.hidden = true;
       // Normal POST action=seed keeps the existing iframe alive while replacing its document.
@@ -524,15 +666,58 @@
       if (shouldScroll !== false) scrollToForm();
     }
 
-    function chooseSource(source) {
-      if (frameState.loaded && !window.confirm("This order form is already loaded. Replace it with the selected item?")) return;
+    function previewResponse(request, ok, reason, blob) {
+      var response = {
+        type: "saloni-preview-response", version: 1, nonce: request.nonce, requestId: request.requestId,
+        mode: request.mode, transferId: request.transferId, ok: ok === true
+      };
+      if (ok === true) response.blob = blob;
+      else response.error = reason || "unavailable";
+      try { request.port.postMessage(response); } catch (error) {}
+      try { if (request.port.close) request.port.close(); } catch (error) {}
+    }
+
+    function handlePreviewRequest(event, data) {
+      if (!data || data.type !== "saloni-preview-request") return;
+      if (!frameState.loaded || !frameState.nonce || !frameState.requestId || data.version !== 1 || data.mode !== frameState.mode || data.nonce !== frameState.nonce || data.requestId !== frameState.requestId || !previewIdentityPart(data.nonce) || !previewIdentityPart(data.requestId) || !previewTransferId(data.transferId) || !event || !event.source || !event.ports || event.ports.length !== 1 || !event.origin) return;
+      var origin = previewOrigin(event.origin);
+      if (!origin || (frameState.pinnedOrigin && origin !== frameState.pinnedOrigin) || (frameState.pinnedSender && event.source !== frameState.pinnedSender)) return;
+      var port = event.ports[0];
+      if (!port || typeof port.postMessage !== "function") return;
+      if (frameState.previewTransfers[data.transferId]) return;
+      frameState.previewTransfers[data.transferId] = true;
+      if (!frameState.previewSnapshot || frameState.previewSnapshot.requestId !== data.requestId || frameState.previewSnapshot.nonce !== data.nonce || frameState.previewSnapshot.mode !== data.mode) {
+        if (!frameState.pinnedOrigin) frameState.pinnedOrigin = origin;
+        if (!frameState.pinnedSender) frameState.pinnedSender = event.source;
+        previewResponse({ port: port, nonce: data.nonce, requestId: data.requestId, mode: data.mode, transferId: data.transferId }, false, "unavailable");
+        return;
+      }
+      if (!usablePreviewSnapshot(frameState.previewSnapshot)) {
+        if (!frameState.pinnedOrigin) frameState.pinnedOrigin = origin;
+        if (!frameState.pinnedSender) frameState.pinnedSender = event.source;
+        previewResponse({ port: port, nonce: data.nonce, requestId: data.requestId, mode: data.mode, transferId: data.transferId }, false, "invalid-preview");
+        return;
+      }
+      if (!frameState.pinnedOrigin) frameState.pinnedOrigin = origin;
+      if (!frameState.pinnedSender) frameState.pinnedSender = event.source;
+      previewResponse({ port: port, nonce: data.nonce, requestId: data.requestId, mode: data.mode, transferId: data.transferId }, true, "", frameState.previewSnapshot.blob);
+    }
+
+    function chooseSource(source, options) {
+      options = options || {};
+      if (frameState.loaded && !options.confirmed && !window.confirm("This order form is already loaded. Replace it with the selected item?")) return false;
       var seed = sourceSeed(source);
-      seed.requestId = requestId();
-      submitSeed(seed);
+      seed.requestId = options.requestId || source.requestId || requestId();
+      submitSeed(seed, true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected);
+      return true;
     }
 
     window.addEventListener("message", function (event) {
       var data = event.data || {};
+      if (data.type === "saloni-preview-request") {
+        handlePreviewRequest(event, data);
+        return;
+      }
       if (!frameState.loaded || !frameState.nonce || data.nonce !== frameState.nonce || !event.source || !event.origin || event.origin === "null") return;
       if (data.type === "saloni-order-form-ready") {
         if (!frameState.pinnedSender) {
@@ -571,7 +756,7 @@
       var sourceId = "catalogue:" + image.getAttribute("src").replace(/^assets\//, "");
       var details = Array.prototype.map.call(card.querySelectorAll("figcaption p"), function (node) { return node.textContent.trim(); }).join(" ");
       var cardCopy = (card.textContent || "") + " " + (image.alt || "");
-      if (/concept preview|reference design|gifting concept/i.test(cardCopy)) details += (details ? " " : "") + "Illustrative/reference image; final design to confirm with Saloni.";
+      if (/concept preview|illustrative preview|reference image|reference design|gifting concept/i.test(cardCopy)) details += (details ? " " : "") + "Illustrative/reference image; final design to confirm with Saloni.";
       var pricingDetails = Array.prototype.map.call(card.querySelectorAll(".product-pricing > div"), function (row) {
         var priceLabel = row.querySelector("dt");
         var priceValue = row.querySelector("dd");
@@ -592,34 +777,110 @@
       caption.appendChild(button);
     });
 
-    var customizerButton = document.querySelector("[data-order-prefill=\"customizer\"]");
-    if (customizerButton) {
-      customizerButton.addEventListener("click", function () {
-        var summary = document.getElementById("customizer-summary");
-        var dimensions = readCustomizerDimensions();
-        if (!dimensions) {
-          var customizerStatus = document.getElementById("share-status");
-          if (customizerStatus) {
-            customizerStatus.textContent = "We could not read the customizer size. Choose a frame type, preset, and unit, then try again.";
-            customizerStatus.setAttribute("tabindex", "-1");
-            customizerStatus.focus();
-          }
+    function clearCustomizerFallback() {
+      frameState.customizerFallback = null;
+      if (continueCustomizerButton) continueCustomizerButton.hidden = true;
+      if (customizerRequestStatus && /Preview could not be prepared|Automatic preview/.test(customizerRequestStatus.textContent || "")) customizerRequestStatus.textContent = "";
+    }
+
+    function reportCustomizerFailure(error, identity) {
+      var fallback = error && error.previewFallback;
+      frameState.customizerFallback = fallback && identity && fallback.requestId === identity.requestId && fallback.nonce === identity.nonce && fallback.mode === frameState.mode && usablePreviewDetails(fallback.summary, fallback.dimensions) ? fallback : null;
+      if (customizerRequestStatus) {
+        customizerRequestStatus.textContent = frameState.customizerFallback
+          ? "Preview could not be prepared. Request this design again, or choose Continue without preview."
+          : "Automatic preview is unavailable. Request this design again, or use Let Saloni design it for me.";
+      } else {
+        status.textContent = frameState.customizerFallback
+          ? "Preview could not be prepared. Request this design again, or choose Continue without preview."
+          : "Automatic preview is unavailable. Request this design again, or use Let Saloni design it for me.";
+        status.hidden = false;
+      }
+      if (continueCustomizerButton) continueCustomizerButton.hidden = !frameState.customizerFallback;
+    }
+
+    function continueCustomizerWithoutPreview(event) {
+      if (event && event.preventDefault) event.preventDefault();
+      var fallback = frameState.customizerFallback;
+      if (!fallback || !usablePreviewDetails(fallback.summary, fallback.dimensions)) return;
+      var identity = { requestId: fallback.requestId, nonce: fallback.nonce };
+      clearCustomizerFallback();
+      chooseSource({
+        sourceKind: "customizer", sourceId: "customizer:resin-frame", productName: "Custom resin frame",
+        height: fallback.dimensions.height, width: fallback.dimensions.width, heightUnit: fallback.dimensions.heightUnit, widthUnit: fallback.dimensions.widthUnit,
+        designDetails: fallback.summary, requestId: identity.requestId
+      }, { identity: identity, requestId: identity.requestId, confirmed: true, previewExpected: false });
+    }
+
+    if (continueCustomizerButton) continueCustomizerButton.addEventListener("click", continueCustomizerWithoutPreview);
+
+    function startCustomizerRequest(event) {
+      if (event && event.__saloniCustomizerRequestStarted) return;
+      if (event) {
+        event.__saloniCustomizerRequestStarted = true;
+        if (event.preventDefault) event.preventDefault();
+      }
+      if (frameState.loaded && !window.confirm("This order form is already loaded. Replace it with the selected item?")) return;
+      clearCustomizerFallback();
+      var identity = { requestId: requestId(), nonce: channelNonce() };
+      if (!identity.requestId || !identity.nonce || typeof window.saloniCustomizerCapture !== "function") {
+        reportCustomizerFailure(null, identity);
+        return;
+      }
+      frameState.pendingCustomizerRequestId = identity.requestId;
+      var capture;
+      try {
+        capture = window.saloniCustomizerCapture({ requestId: identity.requestId, nonce: identity.nonce, mode: frameState.mode });
+      } catch (error) {
+        capture = Promise.reject(error);
+      }
+      var accept = function (snapshot) {
+        if (frameState.pendingCustomizerRequestId !== identity.requestId) return;
+        frameState.pendingCustomizerRequestId = "";
+        if (!snapshot || snapshot.requestId !== identity.requestId || snapshot.nonce !== identity.nonce || snapshot.mode !== frameState.mode || !usablePreviewSnapshot(snapshot)) {
+          reportCustomizerFailure(null);
           return;
         }
+        clearCustomizerFallback();
         chooseSource({
           sourceKind: "customizer", sourceId: "customizer:resin-frame", productName: "Custom resin frame",
-          height: dimensions.height, width: dimensions.width, heightUnit: dimensions.heightUnit, widthUnit: dimensions.widthUnit,
-          designDetails: summary ? summary.textContent.trim() : "Custom resin frame design from the site customizer."
-        });
+          height: snapshot.dimensions.height, width: snapshot.dimensions.width, heightUnit: snapshot.dimensions.heightUnit, widthUnit: snapshot.dimensions.widthUnit,
+          designDetails: snapshot.summary, previewSnapshot: snapshot, requestId: identity.requestId
+        }, { identity: identity, requestId: identity.requestId, previewSnapshot: snapshot, confirmed: true, previewExpected: true });
+      };
+      var reject = function (error) {
+        if (frameState.pendingCustomizerRequestId !== identity.requestId) return;
+        frameState.pendingCustomizerRequestId = "";
+        reportCustomizerFailure(error, identity);
+      };
+      if (capture && typeof capture.then === "function") Promise.resolve(capture).then(accept, reject);
+      else accept(capture);
+    }
+
+    document.addEventListener("click", function (event) {
+      var target = event && event.target;
+      if (target && target.id === "order-from-customizer") startCustomizerRequest(event);
+    }, true);
+
+    var customizerButton = document.querySelector("[data-order-prefill=\"customizer\"]");
+    if (customizerButton) {
+      customizerButton.addEventListener("click", function (event) {
+        if (event && event.__saloniCustomizerRequestStarted) return;
+        startCustomizerRequest(event);
       });
     }
 
     document.querySelectorAll('[data-order-prefill="general"]').forEach(function (button) {
       button.addEventListener("click", function (event) {
         if (event && event.preventDefault) event.preventDefault();
+        var isDesignHelp = button.getAttribute("data-design-help") === "true";
         chooseSource({
-          sourceKind: "catalogue", sourceId: "catalogue:general-custom-gift", productName: "Custom gift enquiry",
-          designDetails: "General custom gift enquiry. Saloni will confirm the occasion, size, materials, quote, and delivery."
+          sourceKind: "catalogue",
+          sourceId: isDesignHelp ? "catalogue:customizer-design-help" : "catalogue:general-custom-gift",
+          productName: isDesignHelp ? "Custom resin frame design help" : "Custom gift enquiry",
+          designDetails: isDesignHelp
+            ? "Design help request from the customizer. Saloni will choose a starting design with you, then confirm the occasion, size, materials, quote, and delivery."
+            : "General custom gift enquiry. Saloni will confirm the occasion, size, materials, quote, and delivery."
         });
       });
     });

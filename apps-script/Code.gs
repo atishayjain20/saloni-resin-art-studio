@@ -1210,6 +1210,7 @@ function collectPayload_(form) {
   var fulfillment = stringValue_(form.fulfillment);
   return {
     requestId: stringValue_(form.requestId),
+    requestStage: form.requestStage,
     sourceKind: stringValue_(form.sourceKind),
     sourceId: stringValue_(form.sourceId),
     productName: stringValue_(form.productName),
@@ -1231,7 +1232,7 @@ function collectPayload_(form) {
     shippingAddress: fulfillment.toLowerCase() === "shipping" ? stringValue_(form.shippingAddress) : "",
     city: fulfillment.toLowerCase() === "shipping" ? stringValue_(form.city) : "",
     state: fulfillment.toLowerCase() === "shipping" ? stringValue_(form.state) : "",
-    pin: fulfillment.toLowerCase() === "shipping" ? stringValue_(form.pin) : "",
+    pin: fulfillment.toLowerCase() === "shipping" || form.requestStage === "quote" ? stringValue_(form.pin) : "",
     requestedDate: stringValue_(form.requestedDate),
     referralCode: normalizeReferralCode_(form.referralCode),
     captchaToken: stringValue_(form.captchaToken),
@@ -1248,17 +1249,26 @@ function validatePayload_(payload) {
   var errors = {};
   var requestIdPattern = /^[A-Za-z0-9_-]{12,80}$/;
   if (!requestIdPattern.test(payload.requestId)) errors.requestId = "Please reload the form and try again.";
+  if (payload.requestStage !== undefined && payload.requestStage !== "" && payload.requestStage !== "quote") {
+    errors.requestStage = "This request stage is not recognised.";
+  }
   bounded_(errors, "sourceKind", payload.sourceKind, 80, false);
   bounded_(errors, "sourceId", payload.sourceId, 160, false);
-  if (payload.sourceKind && ["catalogue", "customizer"].indexOf(payload.sourceKind.toLowerCase()) === -1) errors.sourceKind = "This source is not recognised.";
+  if (payload.sourceKind && ["catalogue", "customizer", "general"].indexOf(payload.sourceKind.toLowerCase()) === -1) errors.sourceKind = "This source is not recognised.";
   if (payload.sourceId && !/^[A-Za-z0-9_.:/-]+$/.test(payload.sourceId)) errors.sourceId = "This source is not recognised.";
   bounded_(errors, "productName", payload.productName, 160, true);
 
   var quantity = Number(payload.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
 
-  var height = dimensionValue_(payload, "height");
-  var width = dimensionValue_(payload, "width");
+  var quoteRequest = payload.requestStage === "quote" && ["catalogue", "general"].indexOf(payload.sourceKind.toLowerCase()) >= 0;
+  var customizerQuoteRequest = payload.requestStage === "quote" && payload.sourceKind.toLowerCase() === "customizer";
+  var dimensionSupplied = [payload.heightFeet, payload.heightInchesPart, payload.widthFeet,
+    payload.widthInchesPart, payload.height, payload.heightUnit, payload.width, payload.widthUnit]
+    .some(function (value) { return value !== undefined && value !== null && String(value) !== ""; });
+  var emptyDimension = { value: "", expression: "", unit: "", field: "", error: "" };
+  var height = quoteRequest && !dimensionSupplied ? emptyDimension : dimensionValue_(payload, "height");
+  var width = quoteRequest && !dimensionSupplied ? emptyDimension : dimensionValue_(payload, "width");
   if (height.error) errors[height.field] = height.error;
   if (width.error) errors[width.field] = width.error;
 
@@ -1268,14 +1278,15 @@ function validatePayload_(payload) {
   if (payload.email && (payload.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))) errors.email = "Enter a valid email address or leave it blank.";
   if (["shipping", "pickup"].indexOf(payload.fulfillment.toLowerCase()) === -1) errors.fulfillment = "Choose shipping or pickup.";
   if (payload.fulfillment.toLowerCase() === "shipping") {
-    bounded_(errors, "shippingAddress", payload.shippingAddress, 300, true);
-    bounded_(errors, "city", payload.city, 100, true);
-    bounded_(errors, "state", payload.state, 100, true);
+    bounded_(errors, "shippingAddress", payload.shippingAddress, 300, !quoteRequest && !customizerQuoteRequest);
+    bounded_(errors, "city", payload.city, 100, !quoteRequest && !customizerQuoteRequest);
+    bounded_(errors, "state", payload.state, 100, !quoteRequest && !customizerQuoteRequest);
     if (!/^\d{6}$/.test(payload.pin)) errors.pin = "Enter a 6-digit PIN for shipping.";
   } else {
     ["shippingAddress", "city", "state", "pin"].forEach(function (field) {
       if (payload[field].length > 300) errors[field] = "This field is too long.";
     });
+    if ((quoteRequest || customizerQuoteRequest) && !/^\d{6}$/.test(payload.pin)) errors.pin = "Enter a 6-digit PIN for shipping.";
   }
   if (payload.requestedDate && !isIsoDate_(payload.requestedDate)) errors.requestedDate = "Use a valid requested date.";
   if (payload.referralCode && !PARTNER_CODE_PATTERN.test(payload.referralCode)) errors.referralCode = "Enter a valid referral code or clear this field.";
@@ -1641,6 +1652,7 @@ function payloadFingerprint_(payload) {
     canonical.widthInchesPart = payload.widthInchesPart;
   }
   if (payload.referralCode) canonical.referralCode = payload.referralCode;
+  if (payload.requestStage === "quote") canonical.requestStage = payload.requestStage;
   return digestHex_(JSON.stringify(canonical));
 }
 
@@ -1675,6 +1687,8 @@ function parseSeed_(json) {
   var useSuppliedParts = suppliedFormat === "feet-inches" && suppliedHeightFeet && suppliedHeightInches && suppliedWidthFeet && suppliedWidthInches;
   return {
     requestId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.requestId || "")) ? String(seed.requestId) : Utilities.getUuid(),
+    requestStage: seed.requestStage === "quote" ? "quote" : "",
+    previewExpected: seed.previewExpected === true,
     sourceKind: boundedSeed_(seed.sourceKind, 80), sourceId: boundedSeed_(seed.sourceId, 160),
     productName: boundedSeed_(seed.productName, 160), quantity: boundedSeed_(seed.quantity, 4) || "1",
     dimensionFormat: "feet-inches",

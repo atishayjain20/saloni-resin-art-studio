@@ -30,6 +30,136 @@ test("accepts combined feet-and-inches dimensions through 60 inches", () => {
   assert.equal(runtime.rows[0][12], 60);
 });
 
+test("collects the request stage marker without coercion", () => {
+  const marker = { toString: () => "quote" };
+  const payload = context.collectPayload_(Object.assign(validForm(), { requestStage: marker }));
+  assert.equal(payload.requestStage, marker);
+});
+
+test("accepts catalogue and general quote requests without dimensions or address fields, while keeping PIN required", () => {
+  for (const sourceKind of ["catalogue", "general"]) {
+    const runtime = makeRuntime();
+    const result = runtime.context.submitOrder(validForm({
+      requestId: "request-quote-" + sourceKind,
+      requestStage: "quote",
+      sourceKind,
+      dimensionFormat: "feet-inches",
+      heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "",
+      height: "", heightUnit: "", width: "", widthUnit: "",
+      fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "305001"
+    }));
+    assert.equal(result.ok, true);
+    assert.equal(runtime.rows[0].length, 26);
+    assert.deepEqual(Array.from(runtime.rows[0].slice(7, 13)), ["", "", "", "", "", ""]);
+    assert.deepEqual(Array.from(runtime.rows[0].slice(18, 22)), ["", "", "", "305001"]);
+  }
+  const missingPin = makeRuntime();
+  const result = missingPin.context.submitOrder(validForm({
+    requestStage: "quote", dimensionFormat: "feet-inches", heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "",
+    height: "", heightUnit: "", width: "", widthUnit: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: ""
+  }));
+  assert.match(result.errors.pin, /6-digit PIN/);
+  assert.equal(missingPin.state.captchaCalls, 0);
+  assert.equal(missingPin.state.appendCalls, 0);
+});
+
+test("keeps dimensions required for customizer and non-quote requests", () => {
+  for (const overrides of [
+    { requestStage: "quote", sourceKind: "customizer" },
+    { requestStage: "", sourceKind: "catalogue" },
+  ]) {
+    const runtime = makeRuntime();
+    const result = runtime.context.submitOrder(validForm(Object.assign(overrides, {
+      dimensionFormat: "", heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "",
+      height: "", heightUnit: "", width: "", widthUnit: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "305001"
+    })));
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.height || result.errors.width || result.errors.heightFeet || result.errors.widthFeet);
+    assert.equal(runtime.state.captchaCalls, 0);
+    assert.equal(runtime.state.appendCalls, 0);
+  }
+});
+
+test("accepts customizer quote requests without address fields while requiring PIN and dimensions", () => {
+  const runtime = makeRuntime();
+  const result = runtime.context.submitOrder(combinedForm({
+    requestId: "request-customizer-quote",
+    requestStage: "quote", sourceKind: "customizer", fulfillment: "shipping",
+    shippingAddress: "", city: "", state: "", pin: "305001"
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(runtime.rows[0][7], "4 ft 2 in");
+  assert.equal(runtime.rows[0][12], 60);
+  assert.deepEqual(Array.from(runtime.rows[0].slice(18, 22)), ["", "", "", "305001"]);
+
+  const pickup = makeRuntime();
+  assert.equal(pickup.context.submitOrder(combinedForm({
+    requestId: "request-customizer-pickup",
+    requestStage: "quote", sourceKind: "customizer", fulfillment: "pickup", pin: "305001"
+  })).ok, true);
+  const missingPickupPin = makeRuntime();
+  const missingPickupResult = missingPickupPin.context.submitOrder(combinedForm({
+    requestId: "request-customizer-pickup-missing-pin",
+    requestStage: "quote", sourceKind: "customizer", fulfillment: "pickup", pin: ""
+  }));
+  assert.match(missingPickupResult.errors.pin, /6-digit PIN/);
+
+  const legacyCustomizer = makeRuntime();
+  const legacyResult = legacyCustomizer.context.submitOrder(combinedForm({
+    requestId: "request-customizer-legacy",
+    requestStage: "", sourceKind: "customizer", fulfillment: "shipping",
+    shippingAddress: "", city: "", state: "", pin: "305001"
+  }));
+  assert.equal(legacyResult.ok, false);
+  assert.match(legacyResult.errors.shippingAddress, /required/i);
+
+  for (const overrides of [
+    { pin: "" },
+    { heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "" },
+    { heightFeet: "4", heightInchesPart: "", widthFeet: "5", widthInchesPart: "0" },
+    { heightFeet: "4", heightInchesPart: "12", widthFeet: "5", widthInchesPart: "0" },
+  ]) {
+    const invalid = makeRuntime();
+    const failed = invalid.context.submitOrder(combinedForm(Object.assign({
+      requestId: "request-customizer-invalid-" + Object.keys(overrides).join("-"),
+      requestStage: "quote", sourceKind: "customizer", fulfillment: "shipping",
+      shippingAddress: "", city: "", state: "", pin: "305001"
+    }, overrides)));
+    assert.equal(failed.ok, false);
+    assert.ok(failed.errors.pin || failed.errors.height || failed.errors.width || failed.errors.heightFeet || failed.errors.heightInchesPart || failed.errors.widthFeet || failed.errors.widthInchesPart);
+    assert.equal(invalid.state.captchaCalls, 0);
+    assert.equal(invalid.state.appendCalls, 0);
+  }
+});
+
+test("validates the complete dimension format when a quote supplies any dimension value", () => {
+  for (const overrides of [
+    { height: "3", heightUnit: "ft", width: "", widthUnit: "" },
+    { heightFeet: "4", heightInchesPart: "", widthFeet: "", widthInchesPart: "" },
+  ]) {
+    const runtime = makeRuntime();
+    const result = runtime.context.submitOrder(validForm(Object.assign({
+      requestStage: "quote", dimensionFormat: "feet-inches", heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "",
+      height: "", heightUnit: "", width: "", widthUnit: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "305001"
+    }, overrides)));
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.height || result.errors.width || result.errors.heightFeet || result.errors.widthFeet);
+    assert.equal(runtime.state.captchaCalls, 0);
+    assert.equal(runtime.state.appendCalls, 0);
+  }
+});
+
+test("rejects invalid request stage markers before CAPTCHA verification or writes", () => {
+  for (const requestStage of ["Quote", "QUOTE", "quote ", 1, true, null, {}, ["quote"]]) {
+    const runtime = makeRuntime({ captchaThrows: true });
+    const result = runtime.context.submitOrder(validForm({ requestStage }));
+    assert.equal(result.ok, false);
+    assert.match(result.errors.requestStage, /request stage/i);
+    assert.equal(runtime.state.captchaCalls, 0);
+    assert.equal(runtime.state.appendCalls, 0);
+  }
+});
+
 test("rejects invalid combined dimension parts and unknown dimension formats", () => {
   for (const overrides of [
     { heightFeet: "5", heightInchesPart: "0.01" },
@@ -53,6 +183,24 @@ test("converts legacy fractional feet seeds without reversing axes", () => {
   assert.equal(seed.heightInchesPart, "8.04");
   assert.equal(seed.widthFeet, "0");
   assert.equal(seed.widthInchesPart, "6");
+});
+
+test("preserves only the exact quote stage in seeds and keeps invalid markers before CAPTCHA", () => {
+  const quoteSeed = context.parseSeed_(JSON.stringify({ requestStage: "quote" }));
+  assert.equal(quoteSeed.requestStage, "quote");
+  assert.equal(makeRuntime().context.submitOrder(validForm({
+    requestStage: quoteSeed.requestStage, dimensionFormat: quoteSeed.dimensionFormat,
+    heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "", height: "", heightUnit: "", width: "", widthUnit: "",
+    shippingAddress: "", city: "", state: "", pin: "305001"
+  })).ok, true);
+  for (const marker of ["Quote", "quote ", "preview"]) {
+    const seed = context.parseSeed_(JSON.stringify({ requestStage: marker }));
+    assert.equal(seed.requestStage, "");
+    const runtime = makeRuntime({ captchaThrows: true });
+    const result = runtime.context.submitOrder(validForm({ requestStage: marker }));
+    assert.match(result.errors.requestStage, /request stage/i);
+    assert.equal(runtime.state.captchaCalls, 0);
+  }
 });
 
 test("requires exact CAPTCHA hostname, action, and finite score", () => {
@@ -117,6 +265,28 @@ test("bounds seed values and escapes seed JSON before HTMLService output", () =>
   assert.match(escaped, /\\u003c/);
 });
 
+test("round-trips only exact customizer previewExpected booleans through doPost and render", () => {
+  for (const [input, expected] of [[true, true], [false, false], [undefined, false], ["true", false], [1, false], [{ value: true }, false]]) {
+    const seed = { requestId: "request-preview-roundtrip", sourceKind: "customizer", productName: "Custom resin frame" };
+    if (input !== undefined) seed.previewExpected = input;
+    const runtime = makeRuntime();
+    runtime.context.doPost({ parameter: { action: "seed", mode: "order", seed: JSON.stringify(seed) } });
+    assert.equal(runtime.state.templateName, "Form");
+    const renderedSeed = JSON.parse(runtime.state.renderedSeedJson);
+    assert.equal(renderedSeed.formMode, "order");
+    assert.equal(renderedSeed.previewExpected, expected);
+  }
+
+  const invalidMode = makeRuntime();
+  invalidMode.context.doPost({ parameter: {
+    action: "seed", mode: "order-no-preview",
+    seed: JSON.stringify({ sourceKind: "customizer", previewExpected: true })
+  } });
+  assert.equal(invalidMode.state.templateName, "Form");
+  assert.equal(JSON.parse(invalidMode.state.renderedSeedJson).formMode, "order");
+  assert.equal(JSON.parse(invalidMode.state.renderedSeedJson).previewExpected, true);
+});
+
 function validForm(overrides = {}) {
   return Object.assign({
     requestId: "request-1234567890", sourceKind: "catalogue", sourceId: "catalogue:test.png",
@@ -144,7 +314,8 @@ function makeRuntime(options = {}) {
   const rows = (options.rows || []).map((row) => row.slice());
   const folderFiles = (options.folderFiles || []).map((file) => Object.assign({}, file));
   const state = {
-    appendCalls: 0, fileCreates: 0, trashed: 0, dataReads: 0,
+    appendCalls: 0, fileCreates: 0, trashed: 0, dataReads: 0, captchaCalls: 0,
+    templateName: "", renderedSeedJson: "", renderedFormModeJson: "",
     appendMode: options.appendMode || "success",
     failRecheck: Boolean(options.failRecheck),
     folderAccess: options.folderAccess || "PRIVATE",
@@ -230,7 +401,30 @@ function makeRuntime(options = {}) {
         return builder;
       },
     },
-    UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(state.captchaResponse) }) },
+    UrlFetchApp: { fetch: () => {
+      state.captchaCalls += 1;
+      if (options.captchaThrows) throw new Error("captcha should not be called");
+      return { getContentText: () => JSON.stringify(state.captchaResponse) };
+    } },
+    HtmlService: {
+      XFrameOptionsMode: { ALLOWALL: "ALLOWALL" },
+      createTemplateFromFile: (name) => {
+        state.templateName = name;
+        const template = {
+          seedJson: "", captchaSiteKeyJson: "", captchaEnabledJson: "", formModeJson: "",
+          evaluate: () => {
+            state.renderedSeedJson = template.seedJson;
+            state.renderedFormModeJson = template.formModeJson;
+            const evaluated = {
+              setTitle: (title) => { state.renderedTitle = title; return evaluated; },
+              setXFrameOptionsMode: (mode) => { state.xFrameOptionsMode = mode; return evaluated; },
+            };
+            return evaluated;
+          },
+        };
+        return template;
+      },
+    },
     Session: {
       getScriptTimeZone: () => "UTC",
       getActiveUser: () => ({ getEmail: () => options.activeEmail || "" }),
@@ -313,6 +507,52 @@ test("keeps the legacy fingerprint for retries without a dimension marker", () =
   const retry = makeRuntime({ rows: [[form.requestId, legacyFingerprint, new Date(), form.sourceKind, form.sourceId]] });
   assert.equal(retry.context.submitOrder(form).ok, true);
   assert.equal(retry.state.appendCalls, 0);
+});
+
+test("preserves all legacy fingerprint vectors and appends quote stage after referral", () => {
+  const vectors = [
+    validForm(),
+    validForm({ referralCode: "ABC123" }),
+    combinedForm(),
+    combinedForm({ referralCode: "ABC123" }),
+  ];
+  for (const form of vectors) {
+    const runtime = makeRuntime();
+    const payload = runtime.context.collectPayload_(form);
+    const canonical = {
+      requestId: payload.requestId, sourceKind: payload.sourceKind, sourceId: payload.sourceId,
+      productName: payload.productName, quantity: payload.quantity, height: payload.height,
+      heightUnit: payload.heightUnit, width: payload.width, widthUnit: payload.widthUnit,
+      designDetails: payload.designDetails, customerName: payload.customerName, phone: payload.phone,
+      email: payload.email, fulfillment: payload.fulfillment, shippingAddress: payload.shippingAddress,
+      city: payload.city, state: payload.state, pin: payload.pin, requestedDate: payload.requestedDate,
+      fileDigest: ""
+    };
+    if (payload.dimensionFormat === "feet-inches") {
+      canonical.dimensionFormat = payload.dimensionFormat;
+      canonical.heightFeet = payload.heightFeet;
+      canonical.heightInchesPart = payload.heightInchesPart;
+      canonical.widthFeet = payload.widthFeet;
+      canonical.widthInchesPart = payload.widthInchesPart;
+    }
+    if (payload.referralCode) canonical.referralCode = payload.referralCode;
+    assert.equal(runtime.context.payloadFingerprint_(payload), runtime.context.digestHex_(JSON.stringify(canonical)));
+  }
+
+  const runtime = makeRuntime();
+  const quote = runtime.context.collectPayload_(combinedForm({ requestStage: "quote", referralCode: "ABC123" }));
+  const expected = {
+    requestId: quote.requestId, sourceKind: quote.sourceKind, sourceId: quote.sourceId,
+    productName: quote.productName, quantity: quote.quantity, height: quote.height,
+    heightUnit: quote.heightUnit, width: quote.width, widthUnit: quote.widthUnit,
+    designDetails: quote.designDetails, customerName: quote.customerName, phone: quote.phone,
+    email: quote.email, fulfillment: quote.fulfillment, shippingAddress: quote.shippingAddress,
+    city: quote.city, state: quote.state, pin: quote.pin, requestedDate: quote.requestedDate,
+    fileDigest: "", dimensionFormat: quote.dimensionFormat, heightFeet: quote.heightFeet,
+    heightInchesPart: quote.heightInchesPart, widthFeet: quote.widthFeet, widthInchesPart: quote.widthInchesPart,
+    referralCode: quote.referralCode, requestStage: "quote"
+  };
+  assert.equal(runtime.context.payloadFingerprint_(quote), runtime.context.digestHex_(JSON.stringify(expected)));
 });
 
 test("reconciles append failures without deleting a file after persisted-then-threw", () => {

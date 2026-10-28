@@ -93,14 +93,17 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frame = new Element("order-form-frame"); frame.name = "order-frame"; frame.hidden = true;
   const status = new Element("order-form-status");
   const customizer = new Element("order-from-customizer");
+  const continueWithoutPreview = new Element("customizer-continue-without-preview"); continueWithoutPreview.hidden = true;
   const generalRequest = new Element("general-custom-gift");
+  const designHelp = new Element("customizer-design-help");
+  designHelp.attributes["data-design-help"] = "true";
   const summary = new Element("customizer-summary"); summary.textContent = "Custom details";
   const dimension = new Element("preview-dimension-label");
   dimension.textContent = "Soft arch · 0.50 ft × 0.67 ft (3:4)";
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, frame, status, customizer, generalRequest, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, frame, status, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -188,7 +191,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const corporateCards = CORPORATE_RESIN_GIFTS.map(([asset, title, copy, unit, regular, offer, discount]) => {
     const corporateCard = new Element("work-card");
     corporateCard.caption = new Element("figcaption");
-    corporateCard.image = { getAttribute: () => `assets/${asset}` };
+    corporateCard.image = { getAttribute: () => `assets/${asset}`, alt: `Illustrative preview: ${title}` };
     corporateCard.title = { textContent: title };
     corporateCard.titleTag = "strong";
     corporateCard.disclosure = { textContent: "Corporate gift concept" };
@@ -221,6 +224,13 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
     crypto: { randomUUID: (() => { let n = 0; return () => "request-" + (++n); })() },
+    saloniCustomizerCapture(identity) {
+      const preset = Number(framePresetControl.value);
+      const unit = frameUnitControl.value;
+      const height = frameTypeControl.value === "arch" ? preset * 4 / 3 : preset;
+      const format = (value) => unit === "ft" ? (value / 12).toFixed(2) : String(value);
+      return { blob: { type: "image/png", size: 42 }, summary: summary.textContent, dimensions: { height: format(height), width: format(preset), heightUnit: unit, widthUnit: unit }, requestId: identity.requestId, nonce: identity.nonce, mode: identity.mode };
+    },
     matchMedia: () => ({ matches: true }),
     confirm: () => confirms.length ? confirms.shift() : true,
     addEventListener(type, listener) { if (type === "message") this.messageListener = listener; },
@@ -235,10 +245,13 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     getElementById(id) { return elements.get(id) || null; },
     querySelectorAll(selector) {
       if (selector === "[data-carousel] .work-card, .romantic-keepsake-card") return [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards, ...corporateCards, ...diwaliCards];
-      if (selector === '[data-order-prefill="general"]') return [generalRequest];
+      if (selector === '[data-order-prefill="general"]') return [generalRequest, designHelp];
       return [];
     },
-    querySelector(selector) { return selector === '[data-order-prefill="customizer"]' ? customizer : null; },
+    querySelector(selector) {
+      if (selector === '[data-order-prefill="customizer"]') return customizer;
+      return null;
+    },
     createElement(tag) {
       const element = new Element(tag);
       if (tag === "form") {
@@ -247,7 +260,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
       return element;
     },
   };
-  const context = { console, document: documentObject, window: windowObject, IntersectionObserver: undefined, Date, Math };
+  const context = { console, document: documentObject, window: windowObject, URL, IntersectionObserver: undefined, Date, Math };
   vm.createContext(context);
   vm.runInContext(source, context, { filename: "script.js" });
   documentObject.ready();
@@ -259,7 +272,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, generalRequest, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, posted, windowObject };
+  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, posted, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -276,7 +289,21 @@ test("opens a general custom-gift enquiry through the existing catalogue seed co
   assert.equal(seed.sourceKind, "catalogue");
   assert.equal(seed.sourceId, "catalogue:general-custom-gift");
   assert.equal(seed.productName, "Custom gift enquiry");
+  assert.equal(seed.requestStage, "quote");
   assert.match(seed.designDetails, /General custom gift enquiry/);
+  assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+});
+
+test("Let Saloni design it for me uses an explicit design-help seed while general enquiry stays unchanged", () => {
+  const flow = runFlow();
+  flow.designHelp.dispatch("click", { preventDefault() {} });
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.sourceKind, "catalogue");
+  assert.equal(seed.sourceId, "catalogue:customizer-design-help");
+  assert.equal(seed.productName, "Custom resin frame design help");
+  assert.equal(seed.requestStage, "quote");
+  assert.match(seed.designDetails, /Design help request from the customizer/);
+  assert.match(seed.designDetails, /starting design/);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
 });
 
@@ -308,6 +335,7 @@ test("keeps the existing order and Partner Circle seed paths active", () => {
   const order = runFlow();
   order.catalogueButton.dispatch("click");
   assert.equal(order.posted.length, 1);
+  assert.equal(submittedSeed(order.posted).requestStage, "quote");
   const partner = runFlow({ mode: "partner", intakeReady: false });
   assert.equal(partner.posted.length, 1);
   assert.equal(partner.posted[0].children.find((child) => child.name === "mode").value, "partner");
@@ -354,6 +382,7 @@ test("reads square, round, and arch dimensions from customizer controls, includi
   const square = runFlow({ frameType: "square", framePreset: "8", frameUnit: "in" });
   square.customizer.dispatch("click");
   let seed = submittedSeed(square.posted);
+  assert.equal(seed.requestStage, "quote");
   assert.deepEqual([seed.height, seed.heightUnit, seed.width, seed.widthUnit], ["8", "in", "8", "in"]);
   assert.deepEqual([seed.dimensionFormat, seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["feet-inches", "0", "8", "0", "8"]);
 
@@ -367,6 +396,49 @@ test("reads square, round, and arch dimensions from customizer controls, includi
   seed = submittedSeed(arch.posted);
   assert.deepEqual([seed.height, seed.heightUnit, seed.width, seed.widthUnit], ["0.67", "ft", "0.50", "ft"]);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["0", "8.04", "0", "6"]);
+});
+
+test("preview rejection keeps the draft until explicit continuation and retry reruns capture", async () => {
+  const flow = runFlow();
+  let attempts = 0;
+  flow.windowObject.saloniCustomizerCapture = (identity) => {
+    attempts += 1;
+    const error = new Error("preview-export-failed");
+    error.previewFallback = {
+      summary: "Custom details",
+      dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+      requestId: identity.requestId, nonce: identity.nonce, mode: identity.mode
+    };
+    return Promise.reject(error);
+  };
+
+  flow.customizer.dispatch("click");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(attempts, 1);
+  assert.equal(flow.posted.length, 0);
+  assert.equal(flow.continueWithoutPreview.hidden, false);
+
+  flow.customizer.dispatch("click");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(attempts, 2);
+  assert.equal(flow.posted.length, 0);
+  assert.equal(flow.continueWithoutPreview.hidden, false);
+
+  flow.continueWithoutPreview.dispatch("click", { preventDefault() {} });
+  assert.equal(flow.posted.length, 1);
+  const form = flow.posted[0];
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.sourceKind, "customizer");
+  assert.equal(seed.designDetails, "Custom details");
+  assert.deepEqual([seed.height, seed.heightUnit, seed.width, seed.widthUnit], ["8", "in", "8", "in"]);
+  assert.equal(seed.formMode, "order");
+  assert.equal(seed.previewExpected, false);
+  assert.equal(form.children.find((child) => child.name === "mode").value, "order");
+  const latePreview = new CapturingPort();
+  flow.windowObject.messageListener({ origin: "https://n-1234567890-1lu-script.googleusercontent.com", source: {}, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "no-preview" }, ports: [latePreview] });
+  assert.equal(latePreview.messages[0].ok, false);
+  assert.equal(latePreview.messages[0].error, "unavailable");
+  assert.equal(Object.hasOwn(latePreview.messages[0], "blob"), false);
 });
 
 test("leaves catalogue dimensions blank when the catalogue has no real size", () => {
@@ -423,6 +495,7 @@ test("seeds every corporate catalogue card with identity, unit, concept, and pri
     assert.equal(seed.productName, title);
     assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
     assert.match(seed.designDetails, new RegExp(unit.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
+    assert.match(seed.designDetails, /Illustrative\/reference image; final design to confirm with Saloni\./);
     assert.doesNotMatch(seed.designDetails, /Concept preview · made to order/);
     assert.match(seed.designDetails, new RegExp(`Estimated from: ₹${offer}`));
     assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
@@ -532,4 +605,137 @@ test("pins a nested form sender and observed sandbox origin, then rejects stale 
   flow.windowObject.messageListener({ origin: replacementOrigin, source: replacementSource, data: { type: "saloni-order-captcha-request", nonce: second.channelNonce, attemptId: "attempt-2" }, ports: [replacementPort] });
   await Promise.resolve();
   assert.equal(replacementPort.messages[0].token, "parent-token");
+});
+
+test("direct preview bootstrap pins only after the complete identity and origin checks", () => {
+  const flow = runFlow();
+  flow.customizer.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  const source = {};
+  const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
+  const port = new CapturingPort();
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "bootstrap-1" }, ports: [port] });
+  assert.equal(port.messages.length, 1);
+  assert.equal(port.messages[0].ok, true);
+  assert.equal(port.messages[0].blob.type, "image/png");
+});
+
+test("preview rejects two ports without pinning, and the separate CAPTCHA channel remains distinct", async () => {
+  const flow = runFlow();
+  flow.customizer.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  const source = {};
+  const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
+  const firstPort = new CapturingPort();
+  const secondPort = new CapturingPort();
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "two-port" }, ports: [firstPort, secondPort] });
+  assert.equal(firstPort.messages.length, 0);
+  assert.equal(secondPort.messages.length, 0);
+
+  const previewPort = new CapturingPort();
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "protocol-preview" }, ports: [previewPort] });
+  assert.equal(previewPort.messages.length, 1);
+  assert.equal(previewPort.messages[0].type, "saloni-preview-response");
+  assert.equal(Object.hasOwn(previewPort.messages[0], "token"), false);
+
+  const captchaPort = new CapturingPort();
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: "captcha-after-preview" }, ports: [captchaPort] });
+  await Promise.resolve();
+  assert.equal(captchaPort.messages[0].type, "saloni-order-captcha-response");
+  assert.equal(Object.hasOwn(captchaPort.messages[0], "blob"), false);
+  assert.equal(captchaPort.messages[0].token, "parent-token");
+});
+
+test("serves exactly one immutable preview snapshot per validated request and allows a new retry id", () => {
+  const flow = runFlow();
+  flow.customizer.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  const nestedSource = {};
+  const sandboxOrigin = "https://n-1234567890-1lu-script.googleusercontent.com";
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
+
+  const valid = new CapturingPort();
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "preview-1" }, ports: [valid] });
+  assert.equal(valid.messages.length, 1);
+  assert.equal(valid.messages[0].type, "saloni-preview-response");
+  assert.equal(valid.messages[0].ok, true);
+  assert.equal(valid.messages[0].blob.size, 42);
+  assert.equal(valid.messages[0].blob.type, "image/png");
+  assert.equal(seed.formMode, "order");
+  assert.equal(seed.previewExpected, true);
+  assert.equal(submittedSeed(flow.posted).designDetails, "Custom details");
+  flow.elements.get("customizer-summary").textContent = "Edited after request";
+
+  const duplicate = new CapturingPort();
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "preview-1" }, ports: [duplicate] });
+  assert.equal(duplicate.messages.length, 0);
+
+  const retry = new CapturingPort();
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "preview-2" }, ports: [retry] });
+  assert.equal(retry.messages.length, 1);
+  assert.equal(retry.messages[0].blob, valid.messages[0].blob);
+});
+
+test("reports preview failures through the bounded error field without a Blob", () => {
+  const flow = runFlow();
+  let captured;
+  const capture = flow.windowObject.saloniCustomizerCapture;
+  flow.windowObject.saloniCustomizerCapture = (identity) => {
+    captured = capture(identity);
+    return captured;
+  };
+  flow.customizer.dispatch("click");
+  captured.blob = { type: "image/png", size: 0 };
+  const seed = submittedSeed(flow.posted);
+  const source = {};
+  const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
+  const port = new CapturingPort();
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "invalid-preview" }, ports: [port] });
+  assert.equal(port.messages.length, 1);
+  assert.equal(port.messages[0].ok, false);
+  assert.equal(port.messages[0].error, "invalid-preview");
+  assert.equal(Object.hasOwn(port.messages[0], "reason"), false);
+  assert.equal(Object.hasOwn(port.messages[0], "blob"), false);
+});
+
+test("rejects wrong preview origin, source, identity, mode, version, and port shape without a Blob", () => {
+  const flow = runFlow();
+  flow.customizer.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  const nestedSource = {};
+  const sandboxOrigin = "https://n-1234567890-1lu-script.googleusercontent.com";
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
+  const cases = [
+    { origin: "https://evil.example", source: nestedSource, data: {} },
+    { origin: "https://user:nopass@n-1234567890-1lu-script.googleusercontent.com", source: nestedSource, data: {} },
+    { origin: "http://n-1234567890-1lu-script.googleusercontent.com", source: nestedSource, data: {} },
+    { origin: "https://n-1234567890-1lu-script.googleusercontent.com.evil.example", source: nestedSource, data: {} },
+    { origin: sandboxOrigin, source: {}, data: {} },
+    { origin: sandboxOrigin, source: nestedSource, data: { requestId: "stale" } },
+    { origin: sandboxOrigin, source: nestedSource, data: { mode: "partner" } },
+    { origin: sandboxOrigin, source: nestedSource, data: { version: 2 } },
+  ];
+  cases.forEach((entry, index) => {
+    const port = new CapturingPort();
+    const data = Object.assign({ type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "bad-" + index }, entry.data);
+    flow.windowObject.messageListener({ origin: entry.origin, source: entry.source, data, ports: [port] });
+    assert.equal(port.messages.length, 0, "case " + index);
+  });
+  const noPort = new CapturingPort();
+  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "no-port" }, ports: [] });
+  assert.equal(noPort.messages.length, 0);
+});
+
+test("invalidates a prior preview snapshot when a newer source is selected", () => {
+  const flow = runFlow();
+  flow.customizer.dispatch("click");
+  const first = submittedSeed(flow.posted);
+  const nestedSource = {};
+  const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
+  flow.windowObject.messageListener({ origin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: first.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
+  flow.catalogueButton.dispatch("click");
+  const stale = new CapturingPort();
+  flow.windowObject.messageListener({ origin, source: nestedSource, data: { type: "saloni-preview-request", version: 1, nonce: first.channelNonce, requestId: first.requestId, mode: "order", transferId: "stale" }, ports: [stale] });
+  assert.equal(stale.messages.length, 0);
 });

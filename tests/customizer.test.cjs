@@ -15,6 +15,8 @@ const {
   stoneChipPlan,
   createSharePayload,
   shareDesignFlow,
+  capturePreviewSnapshot,
+  validPreviewBlob,
 } = require("../customizer.js");
 
 const rendererSource = fs.readFileSync(path.join(__dirname, "..", "customizer.js"), "utf8");
@@ -387,4 +389,85 @@ test("announces fallback for export and native share failures", async () => {
   await Promise.resolve();
   assert.match(shareFailure.shareStatus.textContent, /download.*copy.*open.*chat/i);
   assert.equal(shareFailure.state.shareInProgress, false);
+});
+
+test("captures one immutable PNG snapshot with bounded summary and dimensions", async () => {
+  const state = { imageLoading: false, textOverflow: false, captureInProgress: false };
+  const canvas = {
+    toBlob(callback, type) {
+      assert.equal(type, "image/png");
+      callback({ type: "image/png", size: 42 });
+    },
+  };
+  const snapshot = await capturePreviewSnapshot({
+    state,
+    canvas,
+    summary: "Custom resin frame\nText: hello",
+    dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+    timeoutMs: 50,
+  });
+
+  assert.equal(snapshot.blob.type, "image/png");
+  assert.equal(snapshot.blob.size, 42);
+  assert.equal(snapshot.summary, "Custom resin frame\nText: hello");
+  assert.deepEqual(snapshot.dimensions, { height: "8", width: "8", heightUnit: "in", widthUnit: "in" });
+  assert.equal(state.captureInProgress, false);
+
+  snapshot.summary = "changed";
+  snapshot.dimensions.width = "99";
+  assert.equal(snapshot.summary, "Custom resin frame\nText: hello");
+  assert.equal(snapshot.dimensions.width, "8");
+  assert.equal(snapshot.blob.size, 42);
+});
+
+test("rejects blocked or unsafe preview snapshot inputs", async () => {
+  const reasons = [
+    [{ imageLoading: true, textOverflow: false }, "preview-not-ready"],
+    [{ imageLoading: false, textOverflow: true }, "preview-not-ready"],
+  ];
+  for (const [state, reason] of reasons) {
+    await assert.rejects(() => capturePreviewSnapshot({
+      state,
+      canvas: { toBlob() {} },
+      summary: "ok",
+      dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+      timeoutMs: 5,
+    }), new RegExp(reason));
+  }
+  await assert.rejects(() => capturePreviewSnapshot({
+    state: { imageLoading: false, textOverflow: false, captureInProgress: true },
+    canvas: { toBlob() {} },
+    summary: "ok",
+    dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+  }), /capture-in-progress/);
+  await assert.rejects(() => capturePreviewSnapshot({
+    state: { imageLoading: false, textOverflow: false },
+    canvas: { toBlob() {} },
+    summary: "ok",
+    dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+    timeoutMs: 5,
+  }), /timeout/);
+
+  assert.equal(validPreviewBlob({ type: "image/png", size: 1 }), true);
+  assert.equal(validPreviewBlob({ type: "image/jpeg", size: 1 }), false);
+  assert.equal(validPreviewBlob({ type: "image/png", size: 0 }), false);
+  assert.equal(validPreviewBlob({ type: "image/png", size: 5 * 1024 * 1024 + 1 }), false);
+  await assert.rejects(() => capturePreviewSnapshot({
+    state: { imageLoading: false, textOverflow: false },
+    canvas: { toBlob(callback) { callback({ type: "image/png", size: 1 }); } },
+    summary: "x".repeat(2001),
+    dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+  }), /summary/);
+  await assert.rejects(() => capturePreviewSnapshot({
+    state: { imageLoading: false, textOverflow: false },
+    canvas: { toBlob(callback) { callback({ type: "image/png", size: 1 }); } },
+    summary: "",
+    dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+  }), /summary/);
+  await assert.rejects(() => capturePreviewSnapshot({
+    state: { imageLoading: false, textOverflow: false },
+    canvas: { toBlob(callback) { callback({ type: "image/png", size: 1 }); } },
+    summary: "ok",
+    dimensions: { height: "61", width: "8", heightUnit: "in", widthUnit: "in" },
+  }), /dimensions/);
 });

@@ -4,6 +4,9 @@
   var CANVAS_SIZE = 1200;
   var PAINT_WIDTH = 13 / CANVAS_SIZE;
   var MAX_FILE_SIZE = 10 * 1024 * 1024;
+  var MAX_PREVIEW_BYTES = 5 * 1024 * 1024;
+  var MAX_PREVIEW_SUMMARY = 2000;
+  var PREVIEW_CAPTURE_TIMEOUT = 10000;
   var HEX_RE = /^#[0-9A-Fa-f]{6}$/;
   var ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
   var ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
@@ -34,6 +37,59 @@
     { x: 0.36, y: 0.66, width: 0.58, height: 0.2, bend: 0.22, alpha: 0.13 },
     { x: 0.08, y: 0.82, width: 0.34, height: 0.14, bend: 0.16, alpha: 0.1 }
   ];
+
+  function validPreviewBlob(blob) {
+    return Boolean(blob && typeof blob.size === "number" && blob.size > 0 && blob.size <= MAX_PREVIEW_BYTES && typeof blob.type === "string" && blob.type.toLowerCase() === "image/png");
+  }
+
+  function previewDimensions(dimensions) {
+    if (!dimensions || typeof dimensions !== "object") throw new Error("invalid dimensions");
+    var heightUnit = String(dimensions.heightUnit || "");
+    var widthUnit = String(dimensions.widthUnit || "");
+    if (["in", "ft"].indexOf(heightUnit) === -1 || ["in", "ft"].indexOf(widthUnit) === -1) throw new Error("invalid dimensions");
+    var height = Number(dimensions.height);
+    var width = Number(dimensions.width);
+    var heightInches = heightUnit === "ft" ? height * 12 : height;
+    var widthInches = widthUnit === "ft" ? width * 12 : width;
+    if (!Number.isFinite(heightInches) || !Number.isFinite(widthInches) || heightInches <= 0 || widthInches <= 0 || heightInches > 60 || widthInches > 60) throw new Error("invalid dimensions");
+    return Object.freeze({ height: String(dimensions.height), width: String(dimensions.width), heightUnit: heightUnit, widthUnit: widthUnit });
+  }
+
+  function capturePreviewSnapshot(options) {
+    options = options || {};
+    var state = options.state || {};
+    var summary = typeof options.summary === "string" ? options.summary : String(options.summary || "");
+    if (state.imageLoading || state.textOverflow) return Promise.reject(new Error("preview-not-ready"));
+    if (state.captureInProgress) return Promise.reject(new Error("capture-in-progress"));
+    if (!summary.trim() || summary.length > MAX_PREVIEW_SUMMARY) return Promise.reject(new Error("invalid summary"));
+    var dimensions;
+    try {
+      dimensions = previewDimensions(options.dimensions);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    if (!options.canvas || typeof options.canvas.toBlob !== "function") return Promise.reject(new Error("preview-export-unavailable"));
+    state.captureInProgress = true;
+    var timeout = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : PREVIEW_CAPTURE_TIMEOUT;
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function () { finish(new Error("preview-export-timeout")); }, timeout);
+      function finish(error, blob) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        state.captureInProgress = false;
+        if (error) { reject(error); return; }
+        if (!validPreviewBlob(blob)) { reject(new Error("invalid-preview")); return; }
+        resolve(Object.freeze({ blob: blob, summary: summary, dimensions: dimensions }));
+      }
+      try {
+        options.canvas.toBlob(function (blob) { finish(null, blob); }, "image/png");
+      } catch (error) {
+        finish(new Error("preview-export-failed"));
+      }
+    });
+  }
 
   function clampValue(value, minimum, maximum) {
     return Math.max(minimum, Math.min(maximum, value));
@@ -378,7 +434,10 @@
       pigmentPatchPlan: pigmentPatchPlan,
       stoneChipPlan: stoneChipPlan,
       createSharePayload: createSharePayload,
-      shareDesignFlow: shareDesignFlow
+      shareDesignFlow: shareDesignFlow,
+      validPreviewBlob: validPreviewBlob,
+      previewDimensions: previewDimensions,
+      capturePreviewSnapshot: capturePreviewSnapshot
     };
   }
   if (typeof document === "undefined") return;
@@ -446,6 +505,7 @@
       photoLayout: clonePhotoDefaults(),
       photoDrag: null,
       textOverflow: false,
+      captureInProgress: false,
       shareInProgress: false,
       strokes: [],
       cursor: { x: CANVAS_SIZE / 2, y: CANVAS_SIZE / 2 },
@@ -1208,19 +1268,84 @@
     }
 
     function updateDownloadState() {
-      downloadPreview.disabled = state.imageLoading || state.textOverflow;
+      downloadPreview.disabled = state.imageLoading || state.textOverflow || state.captureInProgress;
       if (state.imageLoading) downloadStatus.textContent = "Preparing preview while the reference image loads…";
       else if (state.textOverflow) downloadStatus.textContent = "Shorten the message before downloading a PNG.";
       else if (/^(Preparing preview while the reference image loads|Shorten the message before downloading)/.test(downloadStatus.textContent)) downloadStatus.textContent = "";
     }
 
     function updateShareState() {
-      if (shareDesign) shareDesign.disabled = state.imageLoading || state.textOverflow || state.shareInProgress;
+      if (shareDesign) shareDesign.disabled = state.imageLoading || state.textOverflow || state.shareInProgress || state.captureInProgress;
       if (!shareStatus) return;
       if (state.imageLoading) shareStatus.textContent = "Preparing preview while the reference image loads…";
       else if (state.textOverflow) shareStatus.textContent = "Shorten the message before sharing.";
       else if (/^(Preparing preview while the reference image loads|Shorten the message before sharing)/.test(shareStatus.textContent)) shareStatus.textContent = "";
     }
+
+    function customizerPreviewDimensions() {
+      var type = String(frameType.value || "");
+      var preset = Number(framePreset.value);
+      var unit = String(frameUnit.value || "");
+      var height = type === "arch" ? preset * 4 / 3 : preset;
+      var format = function (value) { return unit === "ft" ? (value / 12).toFixed(2) : String(value); };
+      return { height: format(height), width: format(preset), heightUnit: unit, widthUnit: unit };
+    }
+
+    function captureCurrentPreview(identity) {
+      if (!identity || typeof identity.requestId !== "string" || typeof identity.nonce !== "string" || identity.mode !== "order") return Promise.reject(new Error("invalid preview identity"));
+      if (shareStatus) {
+        shareStatus.textContent = "Preparing preview for this request…";
+        shareStatus.setAttribute("aria-busy", "true");
+      }
+      renderPreview();
+      var capturedSummary = summaryOutput.textContent;
+      var capturedDimensions = customizerPreviewDimensions();
+      var capture = capturePreviewSnapshot({
+        state: state,
+        canvas: sceneCanvas,
+        summary: capturedSummary,
+        dimensions: capturedDimensions
+      });
+      updateDownloadState();
+      updateShareState();
+      return capture.then(function (snapshot) {
+        var result = Object.freeze({
+          blob: snapshot.blob,
+          summary: snapshot.summary,
+          dimensions: snapshot.dimensions,
+          requestId: identity.requestId,
+          nonce: identity.nonce,
+          mode: identity.mode
+        });
+        if (shareStatus) {
+          shareStatus.textContent = "Preview prepared for this request.";
+          shareStatus.removeAttribute("aria-busy");
+        }
+        updateDownloadState();
+        updateShareState();
+        return result;
+      }).catch(function (error) {
+        var fallback = Object.freeze({
+          summary: capturedSummary,
+          dimensions: capturedDimensions,
+          requestId: identity.requestId,
+          nonce: identity.nonce,
+          mode: identity.mode
+        });
+        try { if (error && typeof error === "object") error.previewFallback = fallback; } catch (fallbackError) {}
+        if (shareStatus) {
+          shareStatus.textContent = "Preview could not be prepared. Request this design again, or choose Continue without preview.";
+          shareStatus.removeAttribute("aria-busy");
+          shareStatus.setAttribute("tabindex", "-1");
+          shareStatus.focus();
+        }
+        updateDownloadState();
+        updateShareState();
+        throw error;
+      });
+    }
+
+    if (typeof window !== "undefined") window.saloniCustomizerCapture = captureCurrentPreview;
 
     function imageExtension(fileName) {
       var parts = fileName.toLowerCase().split(".");
