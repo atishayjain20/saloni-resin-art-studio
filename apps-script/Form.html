@@ -232,9 +232,10 @@
   }
   function toggleShipping() {
     var shipping = value("fulfillment") === "shipping";
-    shippingFields.hidden = !shipping;
-    shippingFields.setAttribute("aria-hidden", String(!shipping));
-    var showPin = shipping || isQuoteRequest();
+    var quoteRequest = isQuoteRequest();
+    shippingFields.hidden = !shipping || quoteRequest;
+    shippingFields.setAttribute("aria-hidden", String(!shipping || quoteRequest));
+    var showPin = shipping || quoteRequest;
     pinField.hidden = !showPin;
     pinField.setAttribute("aria-hidden", String(!showPin));
   }
