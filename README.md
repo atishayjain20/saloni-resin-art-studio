@@ -1,6 +1,6 @@
 # Saloni Resin Art Studio
 
-A buildless, responsive one-page portfolio for Saloni's resin art, personalized gifts, and occasion hampers.
+A buildless, responsive one-page portfolio for Saloni's resin art and personalized resin gifts.
 
 ## Preview locally
 

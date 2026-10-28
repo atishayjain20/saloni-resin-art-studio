@@ -272,7 +272,7 @@
     var pagination = document.getElementById("catalogue-pagination");
     var catalogueHeading = document.getElementById("catalogue-filters-title");
     var pageSize = 8;
-    var validTypes = ["all", "couple", "diwali", "frames", "premium", "hampers", "corporate"];
+    var validTypes = ["all", "couple", "diwali", "frames", "premium", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
 
     var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
@@ -307,7 +307,6 @@
       if (id === "diwali") return "diwali";
       if (id === "corporate-resin-gifts") return "corporate";
       if (id === "premium-collection") return "premium";
-      if (id === "hamper-rail") return "hampers";
       return "frames";
     }
 
@@ -327,6 +326,7 @@
       var limit = Number(selected);
       if (!Number.isFinite(limit)) return true;
       if (limit === 2000) return price.min >= 2000;
+      if (limit === 1999) limit = 2000;
       return price.max <= limit;
     }
 
