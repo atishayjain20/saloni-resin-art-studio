@@ -368,6 +368,18 @@ test("privacy details keep the full retention and correction wording below both 
   assert.match(form, /<details[^>]+id="privacy-details"[\s\S]*?90 days[\s\S]*?correction or deletion/);
 });
 
+test("order section keeps compact row and bottom spacing without changing its column gap", () => {
+  const orderRule = css.match(/(?:^|\n)\.order-section\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(orderRule, /column-gap:\s*clamp\(2rem,\s*8vw,\s*8rem\)/);
+  assert.match(orderRule, /row-gap:\s*2rem/);
+  assert.match(orderRule, /padding-block:\s*clamp\(5rem,\s*11vw,\s*10rem\)\s+clamp\(2rem,\s*5vw,\s*4rem\)/);
+  assert.doesNotMatch(orderRule, /(?:^|[; ])gap:\s*clamp/);
+  const pricingNoteRule = css.match(/\.order-size-pricing-note\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(pricingNoteRule, /margin:\s*0/);
+  const mobileOrderRule = css.match(/@media \(max-width: 620px\) \{[\s\S]*?\.order-section\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(mobileOrderRule, /padding-block:\s*4\.5rem 3rem/);
+});
+
 test("sticky header offset and contained lightbox controls remain reachable", () => {
   assert.match(css, /scroll-padding-top:\s*var\(--sticky-offset\)/);
   assert.match(css, /scroll-margin-top:\s*var\(--sticky-offset\)/);
