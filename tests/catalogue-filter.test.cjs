@@ -85,7 +85,7 @@ class FakeLink extends FakeControl {
   getAttribute(name) { return name === "href" ? this.href : name === "data-category-shortcut" ? this.value : super.getAttribute(name); }
 }
 
-function createHarness({ hash = "", url = "", count = 77, includePremium = false } = {}) {
+function createHarness({ hash = "", url = "", count = 77, includePremium = false, realCatalogue = false } = {}) {
   const eventLog = [];
   const sections = [
     new FakeSection("diwali"),
@@ -95,20 +95,32 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
     new FakeSection("hamper-rail"),
   ];
   if (includePremium) sections.splice(4, 0, new FakeSection("premium-collection"));
-  const sectionForIndex = (index) => index < 24
-    ? sections[0]
-    : index < 38
-      ? sections[1]
+  const sectionForIndex = (index) => realCatalogue
+    ? index < 24
+      ? sections[0]
+      : index < 38
+        ? sections[1]
         : index < 58
           ? sections[2]
-          : index < 74
+          : index < 79
             ? sections[3]
-            : includePremium && index < 88
+            : index < 93
               ? sections[4]
-              : includePremium ? sections[5] : sections[4];
+              : sections[5]
+    : index < 24
+      ? sections[0]
+      : index < 38
+        ? sections[1]
+          : index < 58
+            ? sections[2]
+              : index < 74
+                ? sections[3]
+                : includePremium && index < 88
+                  ? sections[4]
+                  : includePremium ? sections[5] : sections[4];
   const cards = Array.from({ length: count }, (_, index) => {
     const section = sectionForIndex(index);
-    const premiumPrice = ["₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000"][index - 74];
+    const premiumPrice = ["₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000"][index - (realCatalogue ? 79 : 74)];
     const price = section.id === "premium-collection"
       ? premiumPrice
       : index % 5 === 0
@@ -259,8 +271,28 @@ test("explicit full catalogue pages contain at most eight and traverse every ite
   }
   assert.equal(seen.length, 77);
   assert.equal(new Set(seen).size, 77);
-  assert.equal(visibleCards(harness).length, 5);
-  assert.match(harness.status.textContent, /Showing 73–77 of 77 gifts · Page 10 of 10\./);
+  assert.equal(visibleCards(harness).length, 3);
+  assert.match(harness.status.textContent, /Showing 75–77 of 77 gifts · Page 11 of 11\./);
+});
+
+test("full catalogue pages never mix product sections and cover the real 96-card catalogue in fourteen pages", () => {
+  const harness = createHarness({ count: 96, includePremium: true, realCatalogue: true });
+  harness.browseAll.dispatch("click");
+  const pageCounts = [];
+  const pageSections = [];
+  while (true) {
+    const visible = harness.cards.filter((card) => !card.hidden);
+    pageCounts.push(visible.length);
+    pageSections.push(new Set(visible.map((card) => card.section.id)));
+    if (harness.pageNext.disabled) break;
+    harness.pageNext.dispatch("click");
+  }
+  assert.deepEqual(pageCounts, [8, 8, 8, 8, 6, 8, 8, 4, 8, 8, 5, 8, 6, 3]);
+  assert.equal(pageSections.length, 14);
+  assert.ok(pageSections.every((sections) => sections.size === 1));
+  assert.equal(pageSections[4].has("romantic-keepsakes"), true);
+  assert.equal(pageSections[5].has("corporate-resin-gifts"), true);
+  assert.match(harness.status.textContent, /Showing 94–96 of 96 gifts · Page 14 of 14\./);
 });
 
 test("filters use AND logic and reset pagination to page one", () => {
@@ -297,7 +329,7 @@ test("full catalogue moves the results below the last visible section and focuse
   assert.deepEqual(harness.sectionHeadings[0].events, ["scroll", "focus"]);
   assert.deepEqual(harness.heading.events, []);
   for (let index = 0; index < 4; index += 1) harness.pageNext.dispatch("click");
-  assert.equal(harness.results.parentNode, harness.sections[2]);
+  assert.equal(harness.results.parentNode, harness.sections[1]);
   assert.deepEqual(harness.sectionHeadings[0].events, ["scroll", "focus", "scroll", "focus", "scroll", "focus"]);
   assert.deepEqual(harness.sectionHeadings[1].events, ["scroll", "focus", "scroll", "focus"]);
   assert.deepEqual(harness.sectionHeadings[2].events, []);
@@ -334,7 +366,7 @@ test("empty results recover to unfiltered page one", () => {
   assert.equal(harness.empty.hidden, true);
   assert.equal(harness.typeFilter.value, "all");
   assert.equal(visibleCards(harness).length, 8);
-  assert.match(harness.status.textContent, /Page 1 of 10/);
+  assert.match(harness.status.textContent, /Page 1 of 11/);
 });
 
 test("Corporate shortcut selects corporate page one", () => {
@@ -373,6 +405,11 @@ test("product and section hashes select bounded page one or the product page", (
   assert.equal(initial.cards[24].hidden, false);
   assert.match(initial.status.textContent, /Page 4/);
   assert.ok(visibleCards(initial).length <= 8);
+
+  const sectionBoundaryProduct = createHarness({ hash: "#product-39" });
+  assert.equal(sectionBoundaryProduct.cards[38].hidden, false);
+  assert.match(sectionBoundaryProduct.status.textContent, /Page 6 of 11/);
+  assert.ok(visibleCards(sectionBoundaryProduct).every((card) => card.section.id === "corporate-resin-gifts"));
 
   const later = createHarness();
   later.windowObject.location.hash = "#corporate-resin-gifts";
@@ -440,7 +477,7 @@ test("invalid URL state falls back to a safe full catalogue tuple without discar
   const harness = createHarness({ url: "https://example.test/?type=wat&budget=1.5&page=Infinity&ref=keep&x=1#catalogue-filters" });
   assert.equal(harness.typeFilter.value, "all");
   assert.equal(harness.priceFilter.value, "all");
-  assert.match(harness.pageStatus.textContent, /Page 1 of 10/);
+  assert.match(harness.pageStatus.textContent, /Page 1 of 11/);
   assert.equal(harness.windowObject.history.pushes.length, 0);
   assert.equal(harness.windowObject.history.replacements.length, 1);
   assert.match(harness.windowObject.location.search, /(?:^|&)type=all(?:&|$)/);

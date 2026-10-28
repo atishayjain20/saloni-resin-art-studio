@@ -348,6 +348,28 @@
       });
     }
 
+    function cataloguePages(filteredCards) {
+      var pages = [];
+      var currentPage = [];
+      var currentSection = null;
+      filteredCards.forEach(function (card) {
+        var section = sectionFor(card);
+        if (currentPage.length && (currentPage.length >= pageSize || section !== currentSection)) {
+          pages.push(currentPage);
+          currentPage = [];
+        }
+        if (!currentPage.length) currentSection = section;
+        currentPage.push(card);
+        if (currentPage.length === pageSize) {
+          pages.push(currentPage);
+          currentPage = [];
+          currentSection = null;
+        }
+      });
+      if (currentPage.length) pages.push(currentPage);
+      return pages;
+    }
+
     function setPageStatus(total, pageCount) {
       if (!pageStatus) return;
       pageStatus.textContent = total ? "Page " + page + " of " + pageCount : "No pages";
@@ -366,10 +388,11 @@
 
     function applyFilters() {
       var matchingCards = catalogueCards();
-      var pageCount = Math.max(1, Math.ceil(matchingCards.length / pageSize));
+      var pages = cataloguePages(matchingCards);
+      var pageCount = Math.max(1, pages.length);
       if (page > pageCount) page = pageCount;
-      var pageStart = matchingCards.length ? (page - 1) * pageSize : 0;
-      var pageCards = allVisible ? matchingCards.slice(pageStart, pageStart + pageSize) : matchingCards;
+      var pageCards = allVisible ? (pages[page - 1] || []) : matchingCards;
+      var pageStart = pageCards.length ? matchingCards.indexOf(pageCards[0]) : 0;
       cards.forEach(function (card) {
         var type = typeFor(card);
         var price = priceFor(card);
@@ -399,7 +422,7 @@
       else if (resultsHome && resultsHome.appendChild) resultsHome.appendChild(results);
       empty.hidden = matchingCards.length !== 0;
       if (pagination) pagination.hidden = !allVisible;
-      var pageEnd = Math.min(pageStart + pageSize, matchingCards.length);
+      var pageEnd = pageStart + pageCards.length;
       if (!matchingCards.length) status.textContent = "No gifts match those choices.";
       else if (!allVisible) status.textContent = "Showing " + matchingCards.length + " section previews.";
       else status.textContent = "Showing " + (pageStart + 1) + "–" + pageEnd + " of " + matchingCards.length + " gifts · Page " + page + " of " + pageCount + ".";
@@ -522,9 +545,9 @@
       var target = id ? document.getElementById(id) : null;
       if (!target) return false;
       if (target.matches && target.matches("article")) {
-        var productIndex = cards.indexOf(target);
-        if (productIndex === -1) return false;
-        setFullState("all", "all", Math.floor(productIndex / pageSize) + 1);
+        var productPage = cataloguePages(cards).findIndex(function (pageCards) { return pageCards.indexOf(target) !== -1; });
+        if (productPage === -1) return false;
+        setFullState("all", "all", productPage + 1);
         scrollToHash("#" + id);
         return true;
       }
@@ -552,7 +575,7 @@
 
     function movePage(direction) {
       var matchingCards = catalogueCards();
-      var pageCount = Math.max(1, Math.ceil(matchingCards.length / pageSize));
+      var pageCount = Math.max(1, cataloguePages(matchingCards).length);
       var nextPage = Math.min(pageCount, Math.max(1, page + direction));
       if (nextPage === page) return;
       page = nextPage;
