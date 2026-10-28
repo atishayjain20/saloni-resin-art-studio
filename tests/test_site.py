@@ -158,7 +158,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertLess(hero_end, diwali_start)
         self.assertNotIn('id="offerings"', self.html[hero_end:diwali_start])
         self.assertLess(diwali_start, self.html.index('<section class="intro-band shell reveal"'))
-        self.assertIn('<a href="#diwali">Diwali</a>', self.html)
+        self.assertRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
         self.assertIn("Diwali prices ₹249–₹1,799", section_html)
         self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
@@ -187,20 +187,20 @@ class StaticSiteContractTests(unittest.TestCase):
         )
         self.assertNotIn('data-order-prefill="catalogue"', section_html)
         reference_notes = {
-            "diwali-jewel-glow-tealight.jpg": "price per holder.",
-            "diwali-happy-diwali-glow.webp": "Price depends on size.",
-            "diwali-shubh-labh-welcome-pair.jpg": "price for the pair.",
-            "diwali-festive-welcome-hamper.jpeg": "contents are confirmed before ordering.",
-            "diwali-rose-gold-festive-set.jpeg": "contents are confirmed before ordering.",
-            "diwali-lotus-blue-festive-set.jpeg": "contents are confirmed before ordering.",
-            "diwali-gold-fleck-lotus-light.jpeg": "price per holder.",
-            "diwali-pastel-lotus-tealight.jpeg": "price per holder.",
-            "diwali-ocean-bloom-pooja-platter.jpg": "price per platter.",
-            "diwali-golden-ganesha-pooja-plate.jpg": "price per plate.",
-            "diwali-om-mini-tilak-plate.webp": "price per plate",
-            "diwali-lotus-diya-pair.webp": "price for the pair",
-            "diwali-peacock-mini-pooja-thali.webp": "price per thali",
-            "diwali-floral-swastik-tealight-set.webp": "price for the three-piece set",
+            "diwali-jewel-glow-tealight.jpg": "Price is shown per holder.",
+            "diwali-happy-diwali-glow.webp": "Price varies by size.",
+            "diwali-shubh-labh-welcome-pair.jpg": "Price is shown for the pair.",
+            "diwali-festive-welcome-hamper.jpeg": "Contents are confirmed before ordering.",
+            "diwali-rose-gold-festive-set.jpeg": "Contents are confirmed before ordering.",
+            "diwali-lotus-blue-festive-set.jpeg": "Contents are confirmed before ordering.",
+            "diwali-gold-fleck-lotus-light.jpeg": "Price is shown per holder.",
+            "diwali-pastel-lotus-tealight.jpeg": "Price is shown per holder.",
+            "diwali-ocean-bloom-pooja-platter.jpg": "Price is shown per platter.",
+            "diwali-golden-ganesha-pooja-plate.jpg": "Price is shown per plate.",
+            "diwali-om-mini-tilak-plate.webp": "Price is shown per plate.",
+            "diwali-lotus-diya-pair.webp": "Price is shown for the pair.",
+            "diwali-peacock-mini-pooja-thali.webp": "Price is shown per thali.",
+            "diwali-floral-swastik-tealight-set.webp": "Price is shown for the three-piece set.",
         }
         price_matrix = {
             "Jewel Glow Tealight": ("349", "249", "29"),
@@ -349,21 +349,20 @@ class StaticSiteContractTests(unittest.TestCase):
         nav = nav_match.group(0)
         self.assertRegex(
             nav,
-            r'<a href="#diwali">Diwali</a>\s*'
-            r'<a href="#studio-art">Resin art</a>\s*'
-            r'<a href="#hamper-rail">Hampers</a>\s*'
-            r'<a href="#diwali">Festive offers</a>\s*'
-            r'<a href="#customizer">Design a frame</a>\s*'
-            r'<a href="partners/">Join Partner Circle</a>\s*'
-            r'<a href="#corporate-resin-gifts">Corporate Resin Gifts</a>\s*'
-            r'<a href="corporate-gifting/">Corporate gifting</a>',
+            r'<a href="#catalogue-filters" data-browse-all>Gifts[\s\S]*?'
+            r'<a href="#romantic-keepsakes" data-category-shortcut="couple">Couple keepsakes[\s\S]*?'
+            r'<a href="#studio-art" data-category-shortcut="frames">Resin frames[\s\S]*?'
+            r'<a href="#hamper-rail" data-category-shortcut="hampers">Hampers[\s\S]*?'
+            r'<a href="#customizer">Custom design[\s\S]*?'
+            r'<a href="corporate-gifting/">Corporate orders[\s\S]*?'
+            r'<a class="nav-cta" href="#order" data-order-prefill="general">Order',
         )
         self.assertIn('class="nav-cta" href="#order" data-order-prefill="general"', nav)
         self.assertNotIn('href="#process"', nav)
         self.assertNotIn(">The process<", nav)
         footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', self.html)
         self.assertIsNotNone(footer)
-        self.assertIn('<a href="#studio-art">Resin art</a>', footer.group(0))
+        self.assertIn('<a href="#studio-art" data-category-shortcut="frames">Resin art</a>', footer.group(0))
         self.assertIn('<a href="#order">Order</a>', footer.group(0))
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -375,7 +374,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn(".site-nav a:not(.nav-cta):focus-visible", css)
         self.assertIn("background: var(--paper)", css)
         self.assertRegex(css, r"\.site-nav \{[^}]*flex-wrap: wrap")
-        self.assertRegex(css, r"@media \(max-width: 620px\) \{[\s\S]*?html \{ scroll-padding-top: 7\.5rem; \}")
+        self.assertRegex(css, r":root \{ --sticky-offset: 7\.5rem; \}")
 
     def test_removed_homepage_sections_have_no_markup_or_internal_links(self):
         for removed_id in ("process", "gallery", "resin-art"):
@@ -868,7 +867,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertLess(corporate_start, studio_start)
         self.assertNotRegex(self.html[romantic_end:corporate_start], r'<section\b')
 
-        self.assertIn('<a href="#corporate-resin-gifts">Corporate Resin Gifts</a>', self.html)
+        self.assertIn('<a href="corporate-gifting/">Corporate orders', self.html)
         self.assertIn('<a href="corporate-gifting/">Corporate gifting</a>', self.html)
         self.assertIn('id="corporate-resin-gifts-grid"', corporate)
         self.assertIn('aria-labelledby="corporate-resin-gifts-title"', corporate)
@@ -958,7 +957,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(order)
         order_html = order.group(0)
         details = re.findall(r'<details\b[\s\S]*?</details>', order_html)
-        self.assertEqual(len(details), 3)
+        self.assertEqual(len(details), 4)
         for question in (
             "What can I personalize?",
             "Is the preview final?",
@@ -1145,7 +1144,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotRegex(self.html, re.compile(r'"@type"\s*:\s*"(?:Review|AggregateRating)"', re.I))
 
     def test_festive_offers_area_stays_inline_without_unsupported_claims(self):
-        self.assertIn('<a href="#diwali">Festive offers</a>', self.html)
+        self.assertRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
         self.assertIn('<p class="festive-banner shell" id="festive-offers">', self.html)
         self.assertIn('id="festive-offers"', self.html)
         self.assertIn('id="festive-offers-fallback"', self.html)

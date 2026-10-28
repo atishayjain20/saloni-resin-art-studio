@@ -62,7 +62,7 @@ class FakeLink extends FakeControl {
   getAttribute(name) { return name === "href" ? this.href : name === "data-category-shortcut" ? this.value : super.getAttribute(name); }
 }
 
-function createHarness({ hash = "", count = 77 } = {}) {
+function createHarness({ hash = "", url = "", count = 77 } = {}) {
   const eventLog = [];
   const sections = [
     new FakeSection("diwali"),
@@ -106,6 +106,7 @@ function createHarness({ hash = "", count = 77 } = {}) {
   heading.focus = () => heading.events.push("focus");
   const browseFilters = new FakeLink("#catalogue-filters");
   const browseAll = new FakeLink("#catalogue-filters");
+  const diwaliShortcut = new FakeLink("#diwali", "diwali");
   const corporateShortcut = new FakeLink("#corporate-resin-gifts", "corporate");
   const elements = new Map([
     ["catalogue-filters", tools],
@@ -130,20 +131,39 @@ function createHarness({ hash = "", count = 77 } = {}) {
       if (selector === ".work-card, .romantic-keepsake-card") return cards;
       if (selector === "[data-browse-filters]") return [browseFilters];
       if (selector === "[data-browse-all]") return [browseAll];
-      if (selector === "[data-category-shortcut]") return [corporateShortcut];
+      if (selector === "[data-category-shortcut]") return [diwaliShortcut, corporateShortcut];
       return [];
     },
   };
+  const initialUrl = new URL(url || `https://example.test/${hash ? hash : ""}`);
+  const location = {
+    pathname: initialUrl.pathname,
+    search: initialUrl.search,
+    hash: initialUrl.hash,
+    href: initialUrl.href,
+  };
+  const setLocation = (next) => {
+    const parsed = new URL(next, location.href);
+    location.pathname = parsed.pathname;
+    location.search = parsed.search;
+    location.hash = parsed.hash;
+    location.href = parsed.href;
+  };
   const windowObject = {
-    location: { hash },
-    history: { pushState(_state, _title, next) { windowObject.location.hash = next; } },
+    location,
+    history: {
+      pushes: [],
+      replacements: [],
+      pushState(_state, _title, next) { this.pushes.push(String(next)); setLocation(next); },
+      replaceState(_state, _title, next) { this.replacements.push(String(next)); setLocation(next); },
+    },
     listeners: {},
     addEventListener(type, listener) { this.listeners[type] = listener; },
   };
-  const context = { document: documentObject, window: windowObject };
+  const context = { document: documentObject, window: windowObject, URL, URLSearchParams };
   vm.createContext(context);
   vm.runInContext(`${catalogueFunction}\ninitCatalogueExperience();`, context, { filename: "script.js" });
-  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, heading, browseFilters, browseAll, corporateShortcut, windowObject, eventLog };
+  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, heading, browseFilters, browseAll, diwaliShortcut, corporateShortcut, windowObject, eventLog };
 }
 
 function visibleCards(harness) { return harness.cards.filter((card) => !card.hidden); }
@@ -253,6 +273,16 @@ test("Corporate shortcut selects corporate page one", () => {
   assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "corporate"));
 });
 
+test("category shortcuts replace a conflicting explicit filter state", () => {
+  const harness = createHarness({ url: "https://example.test/?type=couple&budget=999&page=2&ref=keep#romantic-keepsakes" });
+  harness.diwaliShortcut.dispatch("click");
+  assert.equal(harness.typeFilter.value, "diwali");
+  assert.equal(harness.priceFilter.value, "all");
+  assert.equal(harness.windowObject.location.hash, "#diwali");
+  assert.match(harness.windowObject.location.search, /(?:^|&)type=diwali(?:&|$)/);
+  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "diwali"));
+});
+
 test("hero browse-by-filter CTA preserves the current catalogue state", () => {
   const harness = createHarness();
   harness.browseAll.dispatch("click");
@@ -278,4 +308,55 @@ test("product and section hashes select bounded page one or the product page", (
   assert.equal(later.typeFilter.value, "corporate");
   assert.equal(later.pagePrevious.disabled, true);
   assert.ok(visibleCards(later).every((card) => card.getAttribute("data-product-type") === "corporate"));
+});
+
+test("explicit URL state restores filters, clamps pages, preserves unrelated params, and pushes once per page action", () => {
+  const harness = createHarness({ url: "https://example.test/?type=corporate&budget=999&page=999&ref=partner-7&unknown=keep#corporate-resin-gifts" });
+  assert.equal(harness.typeFilter.value, "corporate");
+  assert.equal(harness.priceFilter.value, "999");
+  assert.match(harness.pageStatus.textContent, /Page 2 of 2/);
+  assert.equal(harness.windowObject.history.pushes.length, 0);
+  harness.pagePrevious.dispatch("click");
+  assert.equal(harness.windowObject.history.pushes.length, 1);
+  assert.match(harness.windowObject.location.search, /(?:^|&)type=corporate(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:^|&)budget=999(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)page=1(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)ref=partner-7(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:^|&)unknown=keep(?:&|$)/);
+  assert.equal(harness.windowObject.location.hash, "#corporate-resin-gifts");
+});
+
+test("invalid URL state falls back to a safe full catalogue tuple without discarding unknown params", () => {
+  const harness = createHarness({ url: "https://example.test/?type=wat&budget=1.5&page=Infinity&ref=keep&x=1#catalogue-filters" });
+  assert.equal(harness.typeFilter.value, "all");
+  assert.equal(harness.priceFilter.value, "all");
+  assert.match(harness.pageStatus.textContent, /Page 1 of 10/);
+  assert.equal(harness.windowObject.history.pushes.length, 0);
+  assert.equal(harness.windowObject.history.replacements.length, 1);
+  assert.match(harness.windowObject.location.search, /(?:^|&)type=all(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:^|&)budget=all(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:^|&)page=1(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)ref=keep(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)x=1(?:&|$)/);
+});
+
+test("reset removes only catalogue URL keys, writes a neutral hash, and popstate restores without pushing", () => {
+  const harness = createHarness({ url: "https://example.test/?type=corporate&budget=999&page=2&ref=keep&x=1#corporate-resin-gifts" });
+  harness.resetButton.dispatch("click");
+  assert.equal(harness.windowObject.history.pushes.length, 1);
+  assert.doesNotMatch(harness.windowObject.location.search, /(?:^|&)(?:type|budget|page)=/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)ref=keep(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)x=1(?:&|$)/);
+  assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
+  assert.equal(harness.typeFilter.value, "all");
+  assert.equal(harness.pagination.hidden, true);
+  const previousPushes = harness.windowObject.history.pushes.length;
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.typeFilter.value, "all");
+  assert.equal(harness.pagination.hidden, true);
+  assert.equal(harness.windowObject.history.pushes.length, previousPushes);
+  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=diwali&budget=all&page=1&ref=keep#diwali");
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.typeFilter.value, "diwali");
+  assert.equal(harness.windowObject.history.pushes.length, previousPushes);
 });

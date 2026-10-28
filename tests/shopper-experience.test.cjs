@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
@@ -188,7 +189,7 @@ test("pricing keeps current quotes without unsupported discount claims", () => {
 
 test("festive offers are an inline choice, not an automatic modal", () => {
   assert.match(html, /class="[^"]*festive-banner/);
-  assert.match(html, /<a href="#diwali">Festive offers<\/a>/);
+  assert.match(html, /<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs/);
   assert.doesNotMatch(html, /<dialog[^>]+festive-offers|special discounts/);
   assert.doesNotMatch(script, /initFestiveOffers|aria-controls="festive-offers"/);
 });
@@ -246,6 +247,115 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
   assert.match(script, /button\.textContent = "Request this item"/);
   assert.match(script, /data-order-prefill="general"/);
   assert.match(script, /illustrative preview\|reference image/);
+});
+
+test("shopper confidence strip and primary navigation use the approved customer vocabulary", () => {
+  const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
+  ["Gifts", "Couple keepsakes", "Resin frames", "Hampers", "Custom design", "Corporate orders", "Order"].forEach((label) => {
+    assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
+  });
+  assert.equal((nav.match(/<a\b/g) || []).length, 7);
+  assert.match(html, /class="hero-trust-strip"/);
+  ["Ajmer studio", "Shipping across India", "Handmade to order", "Contact Saloni"].forEach((fact) => assert.match(html, new RegExp(fact)));
+  assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Browse Diwali designs/);
+  assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art<\/a>[\s\S]*<a href="#hamper-rail" data-category-shortcut="hampers">Hampers<\/a>/);
+  assert.match(html, /href="partners\/">Partner Circle<\/a>/);
+});
+
+test("lightbox exposes product-aware controls without changing the catalogue source cards", () => {
+  const dialog = html.match(/<dialog class="lightbox-dialog"[\s\S]*?<\/dialog>/)?.[0] || "";
+  assert.match(dialog, /id="lightbox-previous"/);
+  assert.match(dialog, /id="lightbox-next"/);
+  assert.match(dialog, /id="lightbox-product-name"/);
+  assert.match(dialog, /id="lightbox-product-price"/);
+  assert.match(dialog, /id="lightbox-product-size"/);
+  assert.match(dialog, /id="lightbox-request"/);
+  assert.match(dialog, /id="lightbox-position"/);
+  assert.match(script, /ArrowLeft/);
+  assert.match(script, /ArrowRight/);
+  assert.match(script, /pendingLightboxRequest[\s\S]*requestButton\.click\(\)[\s\S]*focusOrderLocation/);
+  assert.match(html, /id="order"[^>]*tabindex="-1"/);
+  assert.match(script, /data-lightbox-trigger/);
+});
+
+test("lightbox request focuses the order location after native close", () => {
+  const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
+  const end = script.indexOf("\n\n    initCatalogueExperience();", start);
+  assert.ok(start >= 0 && end > start);
+  const makeElement = (extra = {}) => Object.assign({
+      hidden: false,
+      attributes: {},
+      listeners: {},
+      addEventListener(type, listener) { this.listeners[type] = listener; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      closest() { return null; },
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      removeAttribute(name) { delete this.attributes[name]; },
+      focus() { this.focused = true; },
+    }, extra);
+  const order = makeElement();
+  const requestButton = makeElement({ clicked: 0, click() { this.clicked += 1; } });
+  const title = { textContent: "Sample gift" };
+  const image = { alt: "Sample gift photo" };
+  const card = makeElement({
+    querySelector(selector) {
+      if (selector === "figcaption strong") return title;
+      if (selector === "[data-order-prefill]") return requestButton;
+      return null;
+    },
+  });
+  const trigger = makeElement({
+    href: "assets/sample-gift.jpg",
+    querySelector(selector) { return selector === "img" ? image : null; },
+    closest(selector) { return selector === "article" ? card : null; },
+  });
+  const lightbox = makeElement({
+    showModal() { this.open = true; },
+    close() { this.open = false; this.listeners.close(); },
+  });
+  const imageTarget = makeElement();
+  const docElements = {
+    "art-lightbox": lightbox,
+    "lightbox-image": imageTarget,
+    "lightbox-caption": makeElement(),
+    "lightbox-product-name": makeElement(),
+    "lightbox-product-price": makeElement(),
+    "lightbox-product-size": makeElement(),
+    "lightbox-image-description": makeElement(),
+    "lightbox-previous": makeElement(),
+    "lightbox-next": makeElement(),
+    "lightbox-position": makeElement(),
+    "lightbox-request": makeElement(),
+    order,
+  };
+  const documentObject = {
+    getElementById(id) { return docElements[id] || null; },
+    querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [trigger] : []; },
+  };
+  const windowObject = { setTimeout(callback) { callback(); } };
+  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
+  trigger.listeners.click({ defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
+  docElements["lightbox-request"].listeners.click();
+  assert.equal(requestButton.clicked, 1);
+  assert.equal(order.focused, true);
+  assert.equal(trigger.focused, undefined);
+});
+
+test("privacy details keep the full retention and correction wording below both forms", () => {
+  const order = html.match(/<section[^>]+class="order-section shell"[\s\S]*?<\/section>/)?.[0] || "";
+  assert.match(order, /class="order-privacy-note"[^>]*>Your information is used only to handle your request\./);
+  assert.match(order, /<details[^>]+id="privacy-details"[\s\S]*?90 days[\s\S]*?correction or deletion/);
+  const form = fs.readFileSync(path.join(root, "apps-script", "Form.html"), "utf8");
+  assert.match(form, /<details[^>]+id="privacy-details"[\s\S]*?90 days[\s\S]*?correction or deletion/);
+});
+
+test("sticky header offset and contained lightbox controls remain reachable", () => {
+  assert.match(css, /scroll-padding-top:\s*var\(--sticky-offset\)/);
+  assert.match(css, /scroll-margin-top:\s*var\(--sticky-offset\)/);
+  assert.match(css, /\.lightbox-panel[\s\S]*overflow:\s*auto/);
+  assert.match(css, /\.lightbox-image\s*\{[^}]*background:\s*var\(--ivory\)/);
+  assert.match(css, /\.lightbox-nav-button\s*\{[^}]*min-height:\s*44px/);
 });
 
 test("buying-help block replaces unsupported testimonial claims without a carousel", () => {
