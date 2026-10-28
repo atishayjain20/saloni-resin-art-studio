@@ -258,12 +258,12 @@ test("buying-help block replaces unsupported testimonial claims without a carous
   assert.doesNotMatch(css, /\.testimonial-card\s*\{|\.sample-rating\s*\{/);
 });
 
-test("all 77 catalogue cards show one accessible inch-based size after the price", () => {
+test("all 77 catalogue cards keep price first and show only known size rows", () => {
   const expectedRows = [
     ["Size", "4 in"],
     ["Size", "4–6 in"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
+    ["Size", "4–6 in"],
+    null,
     ["Size", "6 in"],
     ["Size", "6 in"],
     ["Size", "4 in"],
@@ -275,68 +275,68 @@ test("all 77 catalogue cards show one accessible inch-based size after the price
     ["Size", "6 in"],
     ["Size", "4 in — component size to confirm"],
     ["Size", "3 in"],
-    ["Suggested size", "3 in — confirm with Saloni"],
+    ["Size", "3 in"],
     ["Size", "6 in"],
     ["Size", "2–3 in each"],
-    ["Suggested size", "3–4 in — confirm with Saloni"],
+    ["Size", "3–4 in"],
     ["Size", "3–4 in each"],
-    ["Suggested size", "4–5 in — confirm with Saloni"],
+    ["Size", "4–5 in"],
     ["Size", "2 in each"],
     ["Size", "3–4 in each"],
     ["Size", "3–4 in"],
-    ["Suggested size", "1.5–2 in each — confirm with Saloni"],
-    ["Suggested size", "5–6 in each — confirm with Saloni"],
-    ["Suggested size", "3 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
+    ["Size", "1.5–2 in each"],
+    ["Size", "5–6 in each"],
+    ["Size", "3 in"],
+    null,
     ["Size", "4 in"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
+    null,
+    null,
+    null,
+    null,
+    null,
     ["Size", "8–10 in"],
     ["Size", "16–18 in"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Suggested size", "1.5–2 in — confirm with Saloni"],
-    ["Suggested size", "5–6 in — confirm with Saloni"],
-    ["Suggested size", "4 in — confirm with Saloni"],
-    ["Suggested size", "6 in — confirm with Saloni"],
-    ["Suggested size", "3 in each — confirm with Saloni"],
-    ["Suggested size", "2 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
+    null,
+    null,
+    ["Size", "1.5–2 in"],
+    ["Size", "5–6 in"],
+    ["Size", "4 in"],
+    ["Size", "6 in"],
+    ["Size", "3 in each"],
+    ["Size", "2 in"],
+    null,
+    null,
     ["Size", "6–8 in"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Suggested size", "4 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Suggested size", "20×22 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Suggested size", "20×22 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Suggested size", "8–10 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Suggested size", "20×22 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Suggested size", "3 in each — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Suggested size", "3 in each — confirm with Saloni"],
-    ["Suggested size", "20×22 in — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
-    ["Size", "Custom size in inches — confirm with Saloni"],
+    null,
+    null,
+    null,
+    null,
+    ["Size", "4 in"],
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    ["Size", "20×22 in"],
+    null,
+    null,
+    ["Size", "20×22 in"],
+    null,
+    null,
+    ["Size", "8–10 in"],
+    null,
+    ["Size", "20×22 in"],
+    null,
+    null,
+    ["Size", "3 in each"],
+    null,
+    ["Size", "3 in each"],
+    ["Size", "20×22 in"],
+    null,
+    null,
+    null,
+    null,
   ];
   const cards = html.match(/<article\b[^>]*class="[^"]*(?:work-card|romantic-keepsake-card)[^"]*"[\s\S]*?<\/article>/g) || [];
   assert.equal(cards.length, 77);
@@ -345,20 +345,43 @@ test("all 77 catalogue cards show one accessible inch-based size after the price
     const pricing = card.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/)?.[0] || "";
     const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g)].map((match) => match.slice(1));
     assert.equal(pricing.match(/aria-label="([^"]+)"/)?.[1], "Catalogue price and size");
-    assert.equal(rows.length, 2, `card ${index + 1} has exactly price and size rows`);
+    assert.ok(rows.length === 1 || rows.length === 2, `card ${index + 1} has price and optional size rows`);
     assert.match(rows[0][0], /^(?:Price|From|Estimated from)$/);
     assert.match(rows[0][1], /^₹/);
-    assert.deepEqual(rows[1], expectedRows[index], `card ${index + 1} size row`);
-    assert.match(rows[1][1], /(?:\d|Custom size).*in/);
+    if (expectedRows[index]) {
+      assert.equal(rows.length, 2, `card ${index + 1} has its known size row`);
+      assert.deepEqual(rows[1], expectedRows[index], `card ${index + 1} size row`);
+      assert.match(rows[1][1], /\d.*in/);
+    } else {
+      assert.equal(rows.length, 1, `card ${index + 1} omits an unknown size row`);
+    }
+    assert.doesNotMatch(pricing, /<dt>Suggested size<\/dt>|confirm with Saloni|Custom size in inches/);
   });
   assert.match(css, /product-pricing[^}]*div:first-child dd/);
   assert.match(css, /product-pricing[^}]*div:not\(:first-child\) dd/);
 });
 
-test("order note explains that listed prices follow the displayed or confirmed size", () => {
+test("order note explains how listed and unlisted sizes affect pricing", () => {
   const order = section("order");
-  const note = "Where a size is listed, the displayed current or estimated price is for that size. Prices may change with size. For custom-size products, Saloni confirms the size in inches and final quote before you order.";
+  const note = "Where a size is listed, the displayed current or estimated price is for that size. If no size is listed, ask Saloni for the available size and final quote. Prices may change with size.";
   assert.match(order, new RegExp(`<p class="order-size-pricing-note">${note.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}<\/p>`));
   const noteTail = order.slice(order.indexOf(note));
   assert.match(noteTail, /<\/p>\s*<\/section>$/, "size note is the last item in the order section");
+});
+
+test("uses known size wording and omits unknown catalogue sizes", () => {
+  const cardFor = (title) => {
+    const marker = `<strong>${title}</strong>`;
+    const titleIndex = html.indexOf(marker);
+    if (titleIndex < 0) return "";
+    const start = html.lastIndexOf("<article", titleIndex);
+    const end = html.indexOf("</article>", titleIndex);
+    return start < 0 || end < 0 ? "" : html.slice(start, end + "</article>".length);
+  };
+  const rowsFor = (title) => [...(cardFor(title).match(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g) || [])].map((row) => row.match(/<dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>/).slice(1));
+  assert.deepEqual(rowsFor("Shubh Labh Welcome Pair").slice(1), [["Size", "4–6 in"]]);
+  assert.deepEqual(rowsFor("Festive Welcome Hamper").slice(1), []);
+  assert.deepEqual(rowsFor("Ivory Mandala Holder").slice(1), [["Size", "3 in"]]);
+  assert.deepEqual(rowsFor("Pearl Rangoli Accent").slice(1), [["Size", "3–4 in"]]);
+  assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "4–5 in"]]);
 });
