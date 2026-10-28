@@ -91,6 +91,11 @@ test("catalogue enhancement has accessible filters, preview mode, and a no-resul
   assert.match(script, /initCatalogueExperience/);
 });
 
+test("premium catalogue results keep readable text on the dark section", () => {
+  const resultsRule = css.match(/\.premium-collection-section \.catalogue-results \.catalogue-filter-status,\s*\.premium-collection-section \.catalogue-results \.catalogue-pagination span\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(resultsRule, /color:\s*#fbf5e9/);
+});
+
 test("catalogue sections use four-card responsive grids with independent disclosures", () => {
   [
     ["diwali", "diwali-grid"],
