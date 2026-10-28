@@ -270,7 +270,7 @@
     var pagination = document.getElementById("catalogue-pagination");
     var catalogueHeading = document.getElementById("catalogue-filters-title");
     var pageSize = 8;
-    var validTypes = ["all", "couple", "diwali", "frames", "hampers", "corporate"];
+    var validTypes = ["all", "couple", "diwali", "frames", "premium", "hampers", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
 
     var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
@@ -304,6 +304,7 @@
       if (id === "romantic-keepsakes") return "couple";
       if (id === "diwali") return "diwali";
       if (id === "corporate-resin-gifts") return "corporate";
+      if (id === "premium-collection") return "premium";
       if (id === "hamper-rail") return "hampers";
       return "frames";
     }
@@ -389,7 +390,7 @@
         var canExpand = !allVisible && sectionCards.length > previewLimit;
         disclosure.hidden = !canExpand;
         disclosure.setAttribute("aria-expanded", String(canExpand && isExpanded(section)));
-        disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : "See all";
+        disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : section.id === "premium-collection" ? "View all" : "See all";
       });
       empty.hidden = matchingCards.length !== 0;
       if (pagination) pagination.hidden = !allVisible;

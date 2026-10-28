@@ -62,7 +62,7 @@ class FakeLink extends FakeControl {
   getAttribute(name) { return name === "href" ? this.href : name === "data-category-shortcut" ? this.value : super.getAttribute(name); }
 }
 
-function createHarness({ hash = "", url = "", count = 77 } = {}) {
+function createHarness({ hash = "", url = "", count = 77, includePremium = false } = {}) {
   const eventLog = [];
   const sections = [
     new FakeSection("diwali"),
@@ -71,18 +71,24 @@ function createHarness({ hash = "", url = "", count = 77 } = {}) {
     new FakeSection("studio-art"),
     new FakeSection("hamper-rail"),
   ];
+  if (includePremium) sections.splice(4, 0, new FakeSection("premium-collection"));
   const sectionForIndex = (index) => index < 24
     ? sections[0]
     : index < 38
       ? sections[1]
-      : index < 58
-        ? sections[2]
-        : index < 74
-          ? sections[3]
-          : sections[4];
+        : index < 58
+          ? sections[2]
+          : index < 74
+            ? sections[3]
+            : includePremium && index < 88
+              ? sections[4]
+              : includePremium ? sections[5] : sections[4];
   const cards = Array.from({ length: count }, (_, index) => {
     const section = sectionForIndex(index);
-    const price = index % 5 === 0
+    const premiumPrice = ["₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000"][index - 74];
+    const price = section.id === "premium-collection"
+      ? premiumPrice
+      : index % 5 === 0
       ? "₹2,499"
       : section.id === "corporate-resin-gifts"
         ? `₹${499 + (index % 3) * 100}`
@@ -108,6 +114,7 @@ function createHarness({ hash = "", url = "", count = 77 } = {}) {
   const browseAll = new FakeLink("#catalogue-filters");
   const diwaliShortcut = new FakeLink("#diwali", "diwali");
   const corporateShortcut = new FakeLink("#corporate-resin-gifts", "corporate");
+  const premiumShortcut = new FakeLink("#premium-collection", "premium");
   const elements = new Map([
     ["catalogue-filters", tools],
     ["catalogue-type-filter", typeFilter],
@@ -131,7 +138,7 @@ function createHarness({ hash = "", url = "", count = 77 } = {}) {
       if (selector === ".work-card, .romantic-keepsake-card") return cards;
       if (selector === "[data-browse-filters]") return [browseFilters];
       if (selector === "[data-browse-all]") return [browseAll];
-      if (selector === "[data-category-shortcut]") return [diwaliShortcut, corporateShortcut];
+      if (selector === "[data-category-shortcut]") return includePremium ? [diwaliShortcut, corporateShortcut, premiumShortcut] : [diwaliShortcut, corporateShortcut];
       return [];
     },
   };
@@ -163,7 +170,7 @@ function createHarness({ hash = "", url = "", count = 77 } = {}) {
   const context = { document: documentObject, window: windowObject, URL, URLSearchParams };
   vm.createContext(context);
   vm.runInContext(`${catalogueFunction}\ninitCatalogueExperience();`, context, { filename: "script.js" });
-  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, heading, browseFilters, browseAll, diwaliShortcut, corporateShortcut, windowObject, eventLog };
+  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, heading, browseFilters, browseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, eventLog };
 }
 
 function visibleCards(harness) { return harness.cards.filter((card) => !card.hidden); }
@@ -308,6 +315,44 @@ test("product and section hashes select bounded page one or the product page", (
   assert.equal(later.typeFilter.value, "corporate");
   assert.equal(later.pagePrevious.disabled, true);
   assert.ok(visibleCards(later).every((card) => card.getAttribute("data-product-type") === "corporate"));
+});
+
+test("premium collection starts with four photos and expands only itself", () => {
+  const harness = createHarness({ count: 91, includePremium: true });
+  const premium = harness.sections.find((section) => section.id === "premium-collection");
+  assert.equal(premium.cards.length, 14);
+  assert.equal(premium.cards.filter((card) => !card.hidden).length, 4);
+  assert.equal(premium.disclosure.hidden, false);
+  assert.equal(premium.disclosure.textContent, "View all");
+  assert.equal(premium.disclosure.getAttribute("aria-expanded"), "false");
+  premium.disclosure.dispatch("click");
+  assert.equal(premium.cards.filter((card) => !card.hidden).length, 14);
+  assert.equal(premium.disclosure.textContent, "Show less");
+  harness.sections.filter((section) => section !== premium).forEach((section) => {
+    assert.equal(section.cards.filter((card) => !card.hidden).length, Math.min(4, section.cards.length));
+  });
+});
+
+test("premium filter includes priced and on-request photos, while budget excludes on-request", () => {
+  const harness = createHarness({ count: 91, includePremium: true });
+  harness.premiumShortcut.dispatch("click");
+  assert.equal(harness.typeFilter.value, "premium");
+  assert.match(harness.status.textContent, /Showing 1–8 of 14 gifts/);
+  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "premium"));
+  harness.priceFilter.value = "2000";
+  harness.priceFilter.dispatch("change");
+  assert.match(harness.status.textContent, /of 6 gifts/);
+  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "premium"));
+  assert.ok(visibleCards(harness).every((card) => card.querySelector(".product-pricing dd").textContent !== "Price on request"));
+});
+
+test("premium section hash selects the premium category", () => {
+  const harness = createHarness({ count: 91, includePremium: true });
+  harness.windowObject.location.hash = "#premium-collection";
+  harness.windowObject.listeners.hashchange();
+  assert.equal(harness.typeFilter.value, "premium");
+  assert.equal(harness.windowObject.location.hash, "#premium-collection");
+  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "premium"));
 });
 
 test("explicit URL state restores filters, clamps pages, preserves unrelated params, and pushes once per page action", () => {
