@@ -138,12 +138,14 @@
           </label>
           <button class="button button-line" id="catalogue-filter-reset" type="button">Back to section previews</button>
         </div>
-        <p class="catalogue-filter-status" id="catalogue-filter-status" role="status" aria-live="polite"></p>
         <p class="catalogue-filter-empty" id="catalogue-filter-empty" role="status" hidden>No gifts match those choices. <button class="text-button" id="catalogue-empty-reset" type="button">Clear filters and browse all gifts</button></p>
-        <div class="catalogue-pagination" id="catalogue-pagination" aria-label="Catalogue pagination">
-          <button class="button button-line" id="catalogue-page-previous" type="button" aria-label="Previous catalogue page">Previous</button>
-          <span id="catalogue-page-status" role="status" aria-live="polite">Page 1</span>
-          <button class="button button-line" id="catalogue-page-next" type="button" aria-label="Next catalogue page">Next</button>
+        <div class="catalogue-results" id="catalogue-results">
+          <p class="catalogue-filter-status" id="catalogue-filter-status" role="status" aria-live="polite"></p>
+          <div class="catalogue-pagination" id="catalogue-pagination" aria-label="Catalogue pagination">
+            <button class="button button-line" id="catalogue-page-previous" type="button" aria-label="Previous catalogue page">Previous</button>
+            <span id="catalogue-page-status" role="status" aria-live="polite">Page 1</span>
+            <button class="button button-line" id="catalogue-page-next" type="button" aria-label="Next catalogue page">Next</button>
+          </div>
         </div>
       </div>
       <a class="button button-dark catalogue-browse-all" href="#catalogue-filters" id="browse-all-gifts" data-browse-all>See all 96 gifts <span aria-hidden="true">↘</span></a>
