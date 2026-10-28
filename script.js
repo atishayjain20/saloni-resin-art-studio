@@ -104,18 +104,114 @@
     var lightbox = document.getElementById("art-lightbox");
     var lightboxImage = document.getElementById("lightbox-image");
     var lightboxCaption = document.getElementById("lightbox-caption");
+    var lightboxName = document.getElementById("lightbox-product-name");
+    var lightboxPrice = document.getElementById("lightbox-product-price");
+    var lightboxSize = document.getElementById("lightbox-product-size");
+    var lightboxDescription = document.getElementById("lightbox-image-description");
+    var lightboxPrevious = document.getElementById("lightbox-previous");
+    var lightboxNext = document.getElementById("lightbox-next");
+    var lightboxPosition = document.getElementById("lightbox-position");
+    var lightboxRequest = document.getElementById("lightbox-request");
     var lightboxTriggers = document.querySelectorAll("[data-lightbox-trigger]");
     var lastTrigger = null;
+    var lightboxItems = [];
+    var lightboxIndex = 0;
+    var pendingLightboxRequest = null;
     if (lightbox && lightboxImage && lightboxCaption && typeof lightbox.showModal === "function") {
+      function focusOrderLocation() {
+        var target = document.getElementById("order") || document.getElementById("order-form-embed");
+        if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
+      }
+
+      function productDetails(trigger) {
+        var card = trigger.closest ? trigger.closest("article") : null;
+        var image = trigger.querySelector("img");
+        var title = card && (card.querySelector("figcaption strong") || card.querySelector("figcaption h3"));
+        var price = null;
+        var size = null;
+        if (card) Array.prototype.forEach.call(card.querySelectorAll(".product-pricing > div"), function (row) {
+          var label = row.querySelector("dt");
+          var value = row.querySelector("dd");
+          if (!label || !value) return;
+          var labelText = label.textContent.trim();
+          var valueText = value.textContent.trim();
+          if (!valueText) return;
+          if (!price && /^(?:price|from)$/i.test(labelText)) price = labelText + ": " + valueText;
+          if (!size && /^size$/i.test(labelText) && !/suggested size|confirm with saloni|custom size in inches|component size to confirm/i.test(valueText)) size = "Size: " + valueText;
+        });
+        return { trigger: trigger, card: card, image: image, title: title ? title.textContent.trim() : "", price: price, size: size, description: image ? (image.alt || "") : "" };
+      }
+
+      function visibleCollection(trigger) {
+        var grid = trigger.closest ? trigger.closest(".catalogue-grid") : null;
+        var scope = grid || (trigger.closest ? trigger.closest("section") : null);
+        var candidates = scope && scope.querySelectorAll ? scope.querySelectorAll("[data-lightbox-trigger]") : [];
+        var items = Array.prototype.filter.call(candidates, function (candidate) {
+          var card = candidate.closest ? candidate.closest("article") : null;
+          return !card || (!card.hidden && !(card.closest && card.closest("[hidden]")));
+        }).map(productDetails);
+        return items.length ? items : [productDetails(trigger)];
+      }
+
+      function renderLightboxItem() {
+        var item = lightboxItems[lightboxIndex] || productDetails(lastTrigger);
+        if (!item) return;
+        lightboxImage.src = item.trigger.href;
+        lightboxImage.alt = item.description || "Artwork preview";
+        if (lightboxName) { lightboxName.textContent = item.title; lightboxName.hidden = !item.title; }
+        if (lightboxPrice) { lightboxPrice.textContent = item.price || ""; lightboxPrice.hidden = !item.price; }
+        if (lightboxSize) { lightboxSize.textContent = item.size || ""; lightboxSize.hidden = !item.size; }
+        if (lightboxDescription) lightboxDescription.textContent = item.description || "";
+        if (lightboxPosition) lightboxPosition.textContent = item.card ? (lightboxIndex + 1) + " of " + lightboxItems.length + (item.title ? " · " + item.title : "") : "";
+        if (lightboxPrevious) { lightboxPrevious.disabled = lightboxIndex <= 0 || lightboxItems.length < 2; lightboxPrevious.setAttribute("aria-disabled", String(lightboxPrevious.disabled)); }
+        if (lightboxNext) { lightboxNext.disabled = lightboxIndex >= lightboxItems.length - 1 || lightboxItems.length < 2; lightboxNext.setAttribute("aria-disabled", String(lightboxNext.disabled)); }
+        if (lightboxRequest) {
+          lightboxRequest.hidden = !item.card || !item.card.querySelector("[data-order-prefill]");
+          lightboxRequest.disabled = lightboxRequest.hidden;
+        }
+      }
+
+      function moveLightboxItem(direction) {
+        var nextIndex = Math.min(lightboxItems.length - 1, Math.max(0, lightboxIndex + direction));
+        if (nextIndex === lightboxIndex || !lightboxItems.length) return;
+        lightboxIndex = nextIndex;
+        renderLightboxItem();
+      }
+
       lightbox.addEventListener("click", function (event) {
         if (event.target === lightbox) lightbox.close();
       });
       lightbox.addEventListener("close", function () {
         lightboxImage.removeAttribute("src");
         lightboxImage.alt = "";
-        lightboxCaption.textContent = "";
-        if (lastTrigger) lastTrigger.focus();
+        if (lightboxName) lightboxName.textContent = "";
+        if (lightboxPrice) { lightboxPrice.textContent = ""; lightboxPrice.hidden = true; }
+        if (lightboxSize) { lightboxSize.textContent = ""; lightboxSize.hidden = true; }
+        if (lightboxDescription) lightboxDescription.textContent = "";
+        if (lightboxRequest) { lightboxRequest.hidden = true; lightboxRequest.disabled = true; }
+        if (pendingLightboxRequest) {
+          var requestButton = pendingLightboxRequest;
+          pendingLightboxRequest = null;
+          if (typeof requestButton.click === "function") requestButton.click();
+          if (typeof window.setTimeout === "function") window.setTimeout(focusOrderLocation, 0);
+          else focusOrderLocation();
+        } else if (lastTrigger) lastTrigger.focus();
         lastTrigger = null;
+        lightboxItems = [];
+        lightboxIndex = 0;
+      });
+      lightbox.addEventListener("keydown", function (event) {
+        if (event.key === "ArrowLeft") { event.preventDefault(); moveLightboxItem(-1); }
+        if (event.key === "ArrowRight") { event.preventDefault(); moveLightboxItem(1); }
+      });
+      if (lightboxPrevious) lightboxPrevious.addEventListener("click", function () { moveLightboxItem(-1); });
+      if (lightboxNext) lightboxNext.addEventListener("click", function () { moveLightboxItem(1); });
+      if (lightboxRequest) lightboxRequest.addEventListener("click", function () {
+        var item = lightboxItems[lightboxIndex];
+        var requestButton = item && item.card && item.card.querySelector("[data-order-prefill]");
+        if (!requestButton) return;
+        pendingLightboxRequest = requestButton;
+        lightbox.close();
       });
       lightboxTriggers.forEach(function (trigger) {
         trigger.addEventListener("click", function (event) {
@@ -124,9 +220,9 @@
           if (!image) return;
           event.preventDefault();
           lastTrigger = trigger;
-          lightboxImage.src = trigger.href;
-          lightboxImage.alt = image.alt || "";
-          lightboxCaption.textContent = image.alt || "";
+          lightboxItems = visibleCollection(trigger);
+          lightboxIndex = Math.max(0, lightboxItems.findIndex(function (item) { return item.trigger === trigger; }));
+          renderLightboxItem();
           lightbox.showModal();
         });
       });
@@ -174,6 +270,8 @@
     var pagination = document.getElementById("catalogue-pagination");
     var catalogueHeading = document.getElementById("catalogue-filters-title");
     var pageSize = 8;
+    var validTypes = ["all", "couple", "diwali", "frames", "hampers", "corporate"];
+    var validBudgets = ["all", "499", "999", "1999", "2000"];
 
     var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
       return !card.closest || !card.closest("#testimonials");
@@ -280,8 +378,7 @@
           card.removeAttribute("data-price-min");
           card.removeAttribute("data-price-max");
         }
-        var visible = pageCards.indexOf(card) !== -1;
-        setVisibility(card, visible);
+        setVisibility(card, pageCards.indexOf(card) !== -1);
       });
       sections.forEach(function (section) {
         var sectionCards = cardsForSection(section);
@@ -297,50 +394,97 @@
       empty.hidden = matchingCards.length !== 0;
       if (pagination) pagination.hidden = !allVisible;
       var pageEnd = Math.min(pageStart + pageSize, matchingCards.length);
-      if (!matchingCards.length) {
-        status.textContent = "No gifts match those choices.";
-      } else if (!allVisible) {
-        status.textContent = "Showing " + matchingCards.length + " section previews.";
-      } else {
-        status.textContent = "Showing " + (pageStart + 1) + "–" + pageEnd + " of " + matchingCards.length + " gifts · Page " + page + " of " + pageCount + ".";
-      }
+      if (!matchingCards.length) status.textContent = "No gifts match those choices.";
+      else if (!allVisible) status.textContent = "Showing " + matchingCards.length + " section previews.";
+      else status.textContent = "Showing " + (pageStart + 1) + "–" + pageEnd + " of " + matchingCards.length + " gifts · Page " + page + " of " + pageCount + ".";
       setPageStatus(matchingCards.length, pageCount);
       updatePageControls(matchingCards.length, pageCount);
       document.documentElement.classList.add("catalogue-ready");
+      return { total: matchingCards.length, pageCount: pageCount };
     }
 
-    function showAll() {
+    function currentUrl() {
+      var location = window.location || {};
+      if (location.href) return location.href;
+      return "https://saloniresinart.com" + (location.pathname || "/") + (location.search || "") + (location.hash || "");
+    }
+
+    function urlWithState(state, hash) {
+      var url = new URL(currentUrl(), "https://saloniresinart.com/");
+      var params = url.searchParams;
+      ["type", "budget", "page"].forEach(function (key) { params.delete(key); });
+      if (state && state.full) {
+        params.set("type", state.type || "all");
+        params.set("budget", state.budget || "all");
+        params.set("page", String(state.page || 1));
+      }
+      url.search = params.toString();
+      if (hash !== undefined) url.hash = hash ? (String(hash).charAt(0) === "#" ? String(hash) : "#" + hash) : "";
+      return url.pathname + (url.search ? url.search : "") + (url.hash ? url.hash : "");
+    }
+
+    function sameUrl(next) {
+      var current = new URL(currentUrl(), "https://saloniresinart.com/");
+      var expected = new URL(next, current.href);
+      return current.pathname === expected.pathname && current.search === expected.search && current.hash === expected.hash;
+    }
+
+    function writeUrl(next, replace) {
+      if (sameUrl(next)) return false;
+      try {
+        if (window.history && (replace ? window.history.replaceState : window.history.pushState)) {
+          window.history[replace ? "replaceState" : "pushState"]({}, "", next);
+          return true;
+        }
+        if (window.location) window.location.href = next;
+      } catch (error) {}
+      return false;
+    }
+
+    function readLocationState() {
+      var params = new URLSearchParams((window.location && window.location.search) || "");
+      var has = ["type", "budget", "page"].some(function (key) { return params.has(key); });
+      if (!has) return { full: false };
+      var type = params.get("type");
+      var budget = params.get("budget");
+      var rawPage = params.get("page");
+      var safePage = /^\d+$/.test(rawPage || "") ? Number(rawPage) : NaN;
+      return {
+        full: true,
+        type: validTypes.indexOf(type) !== -1 ? type : "all",
+        budget: validBudgets.indexOf(budget) !== -1 ? budget : "all",
+        page: Number.isSafeInteger(safePage) && safePage > 0 ? safePage : 1
+      };
+    }
+
+    function setFullState(type, budget, nextPage) {
       allVisible = true;
       expandedSections = [];
-      typeFilter.value = "all";
-      priceFilter.value = "all";
-      page = 1;
-      applyFilters();
+      typeFilter.value = validTypes.indexOf(type) !== -1 ? type : "all";
+      priceFilter.value = validBudgets.indexOf(budget) !== -1 ? budget : "all";
+      page = Number.isSafeInteger(nextPage) && nextPage > 0 ? nextPage : 1;
+      return applyFilters();
     }
 
-    function showFeatured() {
+    function showAll(commit) {
+      setFullState("all", "all", 1);
+      if (commit) writeUrl(urlWithState({ full: true, type: "all", budget: "all", page: page }, "#catalogue-filters"));
+    }
+
+    function showFeatured(commit) {
       allVisible = false;
       expandedSections = [];
       typeFilter.value = "all";
       priceFilter.value = "all";
       page = 1;
       applyFilters();
+      if (commit) writeUrl(urlWithState({ full: false }, "#catalogue-filters"));
     }
 
     function scrollToHash(href) {
       var id = String(href || "").replace(/^#/, "");
       var target = id ? document.getElementById(id) : null;
-      if (target && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
-    }
-
-    function updateHash(href) {
-      if (!href) return;
-      var nextHash = String(href).charAt(0) === "#" ? String(href) : "#" + href;
-      if (window.location && window.location.hash === nextHash) return;
-      try {
-        if (window.history && window.history.pushState) window.history.pushState({}, "", nextHash);
-        else if (window.location) window.location.hash = nextHash;
-      } catch (error) {}
+      if (target && !target.hidden && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
     }
 
     function focusCatalogueHeading() {
@@ -349,41 +493,43 @@
       if (typeof catalogueHeading.focus === "function") catalogueHeading.focus({ preventScroll: true });
     }
 
-    function selectCategory(category, href) {
-      allVisible = true;
-      expandedSections = [];
-      typeFilter.value = category || "all";
-      priceFilter.value = "all";
-      page = 1;
-      applyFilters();
-      updateHash(href);
-      scrollToHash(href);
+    function selectCategory(category, href, commit) {
+      setFullState(category || "all", "all", 1);
+      if (commit) writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }, href || "#catalogue-filters"));
+      scrollToHash(href || "#catalogue-filters");
     }
 
-    function showHashTarget() {
+    function restoreLegacyHash() {
       var id = String(window.location && window.location.hash || "").replace(/^#/, "");
       var target = id ? document.getElementById(id) : null;
       if (!target) return false;
       if (target.matches && target.matches("article")) {
         var productIndex = cards.indexOf(target);
         if (productIndex === -1) return false;
-        allVisible = true;
-        expandedSections = [];
-        typeFilter.value = "all";
-        priceFilter.value = "all";
-        page = Math.floor(productIndex / pageSize) + 1;
-        applyFilters();
+        setFullState("all", "all", Math.floor(productIndex / pageSize) + 1);
         scrollToHash("#" + id);
         return true;
       }
       var sectionCards = target.querySelector && target.querySelector(".work-card, .romantic-keepsake-card");
       if (sectionCards) {
-        var category = typeFor(sectionCards);
-        selectCategory(category, "#" + id);
+        selectCategory(typeFor(sectionCards), "#" + id, false);
         return true;
       }
       if (id === "catalogue-filters") scrollToHash("#catalogue-filters");
       return false;
+    }
+
+    function restoreFromLocation() {
+      var state = readLocationState();
+      if (state.full) {
+        setFullState(state.type, state.budget, state.page);
+        var normalized = urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page });
+        if (!sameUrl(normalized)) writeUrl(normalized, true);
+        scrollToHash(window.location && window.location.hash);
+        return;
+      }
+      showFeatured(false);
+      restoreLegacyHash();
     }
 
     function movePage(direction) {
@@ -393,6 +539,7 @@
       if (nextPage === page) return;
       page = nextPage;
       applyFilters();
+      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }));
       focusCatalogueHeading();
     }
 
@@ -405,8 +552,7 @@
     document.querySelectorAll("[data-browse-all]").forEach(function (link) {
       link.addEventListener("click", function (event) {
         event.preventDefault();
-        showAll();
-        updateHash(link.getAttribute("href") || "#catalogue-filters");
+        showAll(true);
         scrollToHash(link.getAttribute("href") || "#catalogue-filters");
       });
     });
@@ -415,7 +561,7 @@
         var category = link.getAttribute("data-category-shortcut");
         if (!category) return;
         event.preventDefault();
-        selectCategory(category, link.getAttribute("href"));
+        selectCategory(category, link.getAttribute("href"), true);
       });
     });
     sections.forEach(function (section) {
@@ -429,25 +575,23 @@
         applyFilters();
       });
     });
-    typeFilter.addEventListener("change", function () { allVisible = true; page = 1; applyFilters(); });
-    priceFilter.addEventListener("change", function () { allVisible = true; page = 1; applyFilters(); });
-    resetButton.addEventListener("click", function () {
-      showFeatured();
-    });
-    emptyReset.addEventListener("click", function () { showAll(); focusCatalogueHeading(); });
+    function commitFilterChange() {
+      allVisible = true;
+      expandedSections = [];
+      page = 1;
+      applyFilters();
+      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }, "#catalogue-filters"));
+    }
+    typeFilter.addEventListener("change", commitFilterChange);
+    priceFilter.addEventListener("change", commitFilterChange);
+    resetButton.addEventListener("click", function () { showFeatured(true); });
+    emptyReset.addEventListener("click", function () { showAll(true); focusCatalogueHeading(); });
     if (pagePrevious) pagePrevious.addEventListener("click", function () { movePage(-1); });
     if (pageNext) pageNext.addEventListener("click", function () { movePage(1); });
-    function handleHashChange() { showHashTarget(); }
-    window.addEventListener("hashchange", handleHashChange);
-    window.addEventListener("popstate", handleHashChange);
-
-    if (window.location && window.location.hash) {
-      if (!showHashTarget()) applyFilters();
-    } else {
-      applyFilters();
-    }
+    window.addEventListener("hashchange", restoreFromLocation);
+    window.addEventListener("popstate", restoreFromLocation);
+    restoreFromLocation();
   }
-
   function initOrderRequestFlow() {
     var embed = document.getElementById("order-form-embed");
     var frame = document.getElementById("order-form-frame");
