@@ -160,7 +160,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(self.html, r'<a href="#diwali" data-category-shortcut="diwali">Diwali')
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
         self.assertIn("Diwali prices ₹249–₹1,799", section_html)
-        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
+        self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
         self.assertIn('id="diwali-grid"', section_html)
         self.assertIn('class="catalogue-grid"', section_html)
         self.assertIn('role="list"', section_html)
@@ -759,7 +759,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-expanded="false"', section_html)
         self.assertIn("A preview of 13 keepsake ideas", section_html)
         self.assertNotIn("Concept previews are illustrative.", section_html)
-        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
+        self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*romantic-keepsake-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 13)
@@ -865,7 +865,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('data-catalogue-disclosure', corporate)
         self.assertIn('aria-expanded="false"', corporate)
         self.assertNotIn(FINAL_QUOTE_NOTE, corporate)
-        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
+        self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', corporate)
         self.assertEqual(len(cards), len(CORPORATE_RESIN_GIFTS))
