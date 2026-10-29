@@ -270,6 +270,9 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   assert.match(orderStatusMarkup, /href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\//);
   assert.match(filterRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   assert.match(selectRule, /min-width:\s*0/);
+  assert.match(selectRule, /min-height:\s*3rem/);
+  assert.match(selectRule, /padding:\s*\.72rem\s+\.75rem/);
+  assert.match(selectRule, /font-size:\s*1rem/);
   assert.match(mobilePreviewRule, /align-self:\s*stretch/);
   assert.match(railRule, /flex-direction:\s*column/);
   assert.match(railRule, /align-items:\s*flex-start/);
