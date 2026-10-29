@@ -653,16 +653,9 @@ test("sticky header offset and contained lightbox controls remain reachable", ()
   assert.match(css, /\.lightbox-nav-button\s*\{[^}]*min-height:\s*44px/);
 });
 
-test("buying-help block replaces unsupported testimonial claims without a carousel", () => {
-  const buyingHelp = html.match(/<section[^>]+id="testimonials"[\s\S]*?<\/section>/)?.[0] || "";
-  assert.match(buyingHelp, /<p class="eyebrow">Before you order<\/p>/);
-  assert.match(buyingHelp, /<h2 id="testimonials-title">Know what your gift will include\.<\/h2>/);
-  assert.match(buyingHelp, /Ask Saloni about your chosen product, personalisation, finish, packaging and delivery before confirming your order\./);
-  assert.match(buyingHelp, /<a[^>]+href="#order"[^>]+data-order-prefill="general"[^>]*>Ask Saloni about a gift/);
-  assert.doesNotMatch(buyingHelp, /data-carousel|data-testimonial-card|Rating:|★★★★★|<blockquote|<cite|Gaurav Jain|Atishay Jain|Aarti Suthar|Bharat Sharma|Puchki/);
-  assert.match(css, /\.testimonials-section\s*\{[^}]*padding-block:\s*clamp\(2\.5rem,\s*5vw,\s*4rem\)/);
-  assert.match(css, /\.testimonials-section \.buying-help\s*\{/);
-  assert.doesNotMatch(css, /\.testimonial-card\s*\{|\.sample-rating\s*\{/);
+test("before-you-order buying-help section is removed from the homepage", () => {
+  assert.doesNotMatch(html, /<section[^>]+id="testimonials"[\s\S]*?<\/section>/);
+  assert.doesNotMatch(html, /Before you order|Know what your gift will include\.|Ask Saloni about a gift/);
 });
 
 test("all 89 catalogue cards keep price first and show only known size rows", () => {
