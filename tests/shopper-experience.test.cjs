@@ -149,13 +149,17 @@ test("mobile catalogue cards keep full copy in source while reserving aligned ti
   assert.match(section("romantic-keepsakes"), /id="romantic-initial"/);
 });
 
-test("mobile copy compaction stays behind the JavaScript enhancement class", () => {
+test("mobile copy compaction keeps the full specification visible", () => {
   const mobileStart = css.indexOf("@media (max-width: 620px)");
   const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
   const mobileCss = css.slice(mobileStart, reducedMotionStart);
   assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > :is\(strong, h3\)/);
   assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:first-of-type/);
-  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)/);
+  const specificationRule = mobileCss.match(/html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(specificationRule, /display:\s*block/);
+  assert.match(specificationRule, /line-height:\s*1\.4/);
+  assert.match(specificationRule, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(specificationRule, /display:\s*none|overflow:\s*hidden|-webkit-line-clamp/);
 });
 
 test("catalogue cards expose shared semantic row tracks through native subgrid", () => {
@@ -660,9 +664,16 @@ test("sticky header offset and contained lightbox controls remain reachable", ()
   assert.match(css, /\.lightbox-nav-button\s*\{[^}]*min-height:\s*44px/);
 });
 
-test("before-you-order buying-help section is removed from the homepage", () => {
-  assert.doesNotMatch(html, /<section[^>]+id="testimonials"[\s\S]*?<\/section>/);
-  assert.doesNotMatch(html, /Before you order|Know what your gift will include\.|Ask Saloni about a gift/);
+test("buying-help block replaces unsupported testimonial claims without a carousel", () => {
+  const buyingHelp = html.match(/<section[^>]+id="testimonials"[\s\S]*?<\/section>/)?.[0] || "";
+  assert.match(buyingHelp, /<p class="eyebrow">Before you order<\/p>/);
+  assert.match(buyingHelp, /<h2 id="testimonials-title">Know what your gift will include\.<\/h2>/);
+  assert.match(buyingHelp, /Ask Saloni about your chosen product, personalisation, finish, packaging and delivery before confirming your order\./);
+  assert.match(buyingHelp, /<a[^>]+href="#order"[^>]+data-order-prefill="general"[^>]*>Ask Saloni about a gift/);
+  assert.doesNotMatch(buyingHelp, /data-carousel|data-testimonial-card|Rating:|★★★★★|<blockquote|<cite|Gaurav Jain|Atishay Jain|Aarti Suthar|Bharat Sharma|Puchki/);
+  assert.match(css, /\.testimonials-section\s*\{[^}]*padding-block:\s*clamp\(2\.5rem,\s*5vw,\s*4rem\)/);
+  assert.match(css, /\.testimonials-section \.buying-help\s*\{/);
+  assert.doesNotMatch(css, /\.testimonial-card\s*\{|\.sample-rating\s*\{/);
 });
 
 test("all 89 catalogue cards keep price first and show only known size rows", () => {
@@ -805,8 +816,12 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
   assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "4–5 in"]]);
 });
 
-test("studio edit section is removed before the order conversation", () => {
-  assert.doesNotMatch(html, /<section[^>]+id="offerings"[\s\S]*?<\/section>/);
-  assert.doesNotMatch(html, /The studio edit|A little more personal than a gift|Custom resin frames &amp; art|Explore resin photo frames|Join the Partner Circle/);
-  assert.match(html, /<section class="order-section shell" id="order"/);
+test("studio edit leads directly into the order conversation", () => {
+  const studioStart = html.indexOf('<section class="intro-band shell reveal" id="offerings"');
+  const orderStart = html.indexOf('<section class="order-section shell" id="order"');
+  assert.ok(studioStart >= 0, "expected #offerings section");
+  assert.ok(orderStart >= 0, "expected #order section");
+  const studioEnd = html.indexOf("</section>", studioStart) + "</section>".length;
+  assert.ok(studioEnd < orderStart, "#offerings must come before #order");
+  assert.equal(html.slice(studioEnd, orderStart).trim(), "", "#offerings must be immediately before #order");
 });
