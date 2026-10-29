@@ -349,7 +349,7 @@ class StaticSiteContractTests(unittest.TestCase):
             r'<a href="#catalogue-filters" data-browse-all>Gifts[\s\S]*?'
             r'<a href="#romantic-keepsakes" data-category-shortcut="couple">Couple keepsakes[\s\S]*?'
             r'<a href="#studio-art" data-category-shortcut="frames">Resin frames[\s\S]*?'
-            r'<a href="#customizer">Custom design[\s\S]*?'
+            r'<a href="#customizer" data-customizer-open>Design a frame[\s\S]*?'
             r'<a href="corporate-gifting/">Corporate orders[\s\S]*?'
             r'<a class="nav-cta" href="#order" data-order-prefill="general">Order',
         )

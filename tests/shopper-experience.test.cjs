@@ -328,6 +328,25 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   assert.doesNotMatch(customizerCss, /(?:^|[;}])\s*order\s*:/);
 });
 
+test("customizer starts compact and opens from the frame-design nav or hash", () => {
+  const customizerSection = section("customizer");
+  const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
+  const disclosureStart = customizerSection.indexOf('<details class="customizer-disclosure" id="customizer-disclosure">');
+  const disclosureEnd = customizerSection.indexOf("</details>\n    </section>", disclosureStart);
+  const disclosure = customizerSection.slice(disclosureStart, disclosureEnd === -1 ? undefined : disclosureEnd);
+
+  assert.match(nav, /<a href="#customizer"[^>]*>Design a frame/);
+  assert.match(disclosure, /<summary>Design a frame<\/summary>/);
+  assert.doesNotMatch(disclosure.match(/<details[^>]+id="customizer-disclosure"[^>]*>/)?.[0] || "", /\bopen\b/);
+  assert.ok(disclosure.indexOf('class="customizer-layout"') >= 0, "existing editor stays in the disclosure");
+  assert.ok(disclosure.indexOf('class="customizer-handoff"') >= 0, "existing handoff stays in the disclosure");
+  assert.match(customizerSection, /Choose colours, add a photo or message, and preview your custom frame\./);
+  assert.match(css, /\.customizer-disclosure\s*>\s*summary/);
+  assert.match(css, /\.customizer-heading h2\s*\{[^}]*max-width:\s*18ch[^}]*font-size:\s*clamp\(2rem, 4\.5vw, 3\.5rem\)/);
+  assert.match(script, /customizerDisclosure\.open\s*=\s*true/);
+  assert.match(script, /hashchange/);
+});
+
 test("request CTA vocabulary is consistent and supports general enquiries", () => {
   assert.match(html, /Request a custom gift/);
   assert.match(script, /button\.textContent = "Request this item"/);
@@ -337,7 +356,7 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("shopper confidence strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Couple keepsakes", "Resin frames", "Custom design", "Corporate orders", "Order"].forEach((label) => {
+  ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders", "Order"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
   assert.equal((nav.match(/<a\b/g) || []).length, 6);
