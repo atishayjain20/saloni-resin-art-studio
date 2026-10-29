@@ -539,8 +539,13 @@
     function urlWithState(state, hash) {
       var url = new URL(currentUrl(), "https://saloniresinart.com/");
       var params = url.searchParams;
-      ["type", "budget", "page", "q"].forEach(function (key) { params.delete(key); });
-      if (state && state.full) {
+      ["type", "budget", "page", "q", "view"].forEach(function (key) { params.delete(key); });
+      if (state && state.preview) {
+        params.set("view", "preview");
+        params.set("type", state.type || "all");
+        params.set("budget", state.budget || "all");
+        params.set("page", String(state.page || 1));
+      } else if (state && state.full) {
         params.set("type", state.type || "all");
         params.set("budget", state.budget || "all");
         params.set("page", String(state.page || 1));
@@ -573,12 +578,22 @@
     function readLocationState() {
       var params = new URLSearchParams((window.location && window.location.search) || "");
       var query = normalizeSearch(params.get("q"));
-      var has = ["type", "budget", "page"].some(function (key) { return params.has(key); }) || Boolean(query);
+      var preview = params.get("view") === "preview";
+      var has = preview || ["type", "budget", "page"].some(function (key) { return params.has(key); }) || Boolean(query);
       if (!has) return { full: false, hasQuery: params.has("q") };
       var type = params.get("type");
       var budget = params.get("budget");
       var rawPage = params.get("page");
       var safePage = /^\d+$/.test(rawPage || "") ? Number(rawPage) : NaN;
+      if (preview) {
+        return {
+          full: false,
+          preview: true,
+          type: validTypes.indexOf(type) !== -1 ? type : "all",
+          budget: validBudgets.indexOf(budget) !== -1 ? budget : "all",
+          page: Number.isSafeInteger(safePage) && safePage > 0 ? safePage : 1
+        };
+      }
       return {
         full: true,
         type: validTypes.indexOf(type) !== -1 ? type : "all",
@@ -604,11 +619,11 @@
       return state;
     }
 
-    function showFeatured(commit) {
+    function showFeatured(commit, type, budget) {
       allVisible = false;
       expandedSections = [];
-      typeFilter.value = "all";
-      priceFilter.value = "all";
+      typeFilter.value = validTypes.indexOf(type) !== -1 ? type : "all";
+      priceFilter.value = validBudgets.indexOf(budget) !== -1 ? budget : "all";
       searchFilter.value = "";
       page = 1;
       applyFilters();
@@ -662,6 +677,13 @@
         if (!sameUrl(normalized)) writeUrl(normalized, true);
         scrollToHash(window.location && window.location.hash);
         if ((window.location && window.location.hash) === "#catalogue-filters") focusCatalogueHeading();
+        return;
+      }
+      if (state.preview) {
+        showFeatured(false, state.type, state.budget);
+        var previewUrl = urlWithState({ preview: true, type: typeFilter.value, budget: priceFilter.value, page: page }, window.location && window.location.hash);
+        if (!sameUrl(previewUrl)) writeUrl(previewUrl, true);
+        scrollToHash(window.location && window.location.hash);
         return;
       }
       if (state.hasQuery) {
@@ -738,11 +760,14 @@
     }
     function commitSearchInput(event) {
       if (event && event.isComposing) return;
-      allVisible = true;
+      var query = normalizeSearch(searchFilter.value);
+      allVisible = Boolean(query);
       expandedSections = [];
       page = 1;
       applyFilters();
-      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page, q: normalizeSearch(searchFilter.value) }, "#catalogue-filters"), true);
+      var state = { full: allVisible, type: typeFilter.value, budget: priceFilter.value, page: page, q: query };
+      if (!allVisible && (typeFilter.value !== "all" || priceFilter.value !== "all")) state = { preview: true, type: typeFilter.value, budget: priceFilter.value, page: page };
+      writeUrl(urlWithState(state, "#catalogue-filters"), true);
     }
     typeFilter.addEventListener("change", commitFilterChange);
     priceFilter.addEventListener("change", commitFilterChange);
