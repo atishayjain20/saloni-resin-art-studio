@@ -414,6 +414,82 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(trigger.focused, undefined);
 });
 
+test("catalogue card body opens its existing preview while native link focus stays independent", () => {
+  const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
+  const end = script.indexOf("\n\n    initCatalogueExperience();", start);
+  const makeElement = (extra = {}) => Object.assign({
+    hidden: false,
+    attributes: {},
+    listeners: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    closest() { return null; },
+    getAttribute(name) { return this.attributes[name] || ""; },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
+    focus() { this.focused = true; },
+  }, extra);
+  const title = { textContent: "Sample gift" };
+  const paragraph = { textContent: "A sample gift description." };
+  const image = { alt: "Sample gift photo" };
+  const orderButton = makeElement({ closest(selector) { return selector.indexOf("button") !== -1 ? this : null; } });
+  const priceRow = makeElement({ querySelector(selector) {
+    if (selector === "dt") return { textContent: "Price" };
+    if (selector === "dd") return { textContent: "₹349" };
+    return null;
+  } });
+  const card = makeElement({ querySelector(selector) {
+    if (selector === "figcaption strong") return title;
+    if (selector === "[data-order-prefill]") return orderButton;
+    return null;
+  }, querySelectorAll(selector) {
+    if (selector === ".product-pricing > div") return [priceRow];
+    if (selector === "figcaption p") return [paragraph];
+    return [];
+  } });
+  const grid = makeElement({ querySelectorAll() { return [trigger]; } });
+  const trigger = makeElement({ href: "assets/sample-gift.jpg", querySelector(selector) { return selector === "img" ? image : null; }, closest(selector) {
+    if (selector === "article") return card;
+    if (selector === ".catalogue-grid") return grid;
+    return null;
+  } });
+  const lightbox = makeElement({ showModal() { this.open = true; }, close() { this.open = false; this.listeners.close(); } });
+  const imageTarget = makeElement();
+  const docElements = {
+    "art-lightbox": lightbox,
+    "lightbox-image": imageTarget,
+    "lightbox-caption": makeElement(),
+    "lightbox-product-name": makeElement(),
+    "lightbox-product-price": makeElement(),
+    "lightbox-product-size": makeElement(),
+    "lightbox-image-description": makeElement(),
+    "lightbox-previous": makeElement(),
+    "lightbox-next": makeElement(),
+    "lightbox-position": makeElement(),
+    "lightbox-request": makeElement(),
+  };
+  const documentObject = {
+    getElementById(id) { return docElements[id] || null; },
+    querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [trigger] : []; },
+  };
+  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: {} });
+  assert.equal(card.getAttribute("tabindex"), "");
+  assert.equal(typeof card.listeners.click, "function");
+  assert.equal(card.listeners.keydown, undefined);
+  const bodyTarget = makeElement();
+  card.listeners.click({ target: bodyTarget, defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
+  assert.equal(lightbox.open, true);
+  assert.equal(docElements["lightbox-product-name"].textContent, "Sample gift");
+  lightbox.close();
+  assert.equal(trigger.focused, true);
+  const orderEvent = { target: orderButton, defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() { this.defaultPrevented = true; } };
+  card.listeners.click(orderEvent);
+  assert.equal(lightbox.open, false);
+  assert.equal(orderEvent.defaultPrevented, false);
+  assert.match(css, /\.catalogue-ready \.catalogue-grid[^\{]*\{[^}]*cursor:\s*pointer/);
+});
+
 test("hero lightbox targets the hidden canonical card and restores focus to the hero opener", () => {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
