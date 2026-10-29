@@ -138,9 +138,12 @@ test("studio and corporate catalogue sections use distinct soft panels", () => {
 test("Diwali collection uses the compact vertical spacing of Couple gifts", () => {
   const diwaliRule = css.match(/\.diwali-section\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(diwaliRule, /padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)\s+clamp\(1rem, 4vw, 3\.5rem\)/);
+  assert.match(diwaliRule, /border:\s*1px solid rgba\(201, 139, 58, 0\.28\)/);
+  assert.match(diwaliRule, /border-radius:\s*1\.5rem/);
+  assert.match(diwaliRule, /margin-block:\s*1rem/);
   assert.match(css, /\.romantic-keepsakes\s*\{[^}]*padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)/);
   const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"));
-  assert.match(mobileCss, /\.diwali-section\s*\{[^}]*padding-block:\s*1\.2rem/);
+  assert.match(mobileCss, /\.diwali-section\s*\{[^}]*margin-block:\s*0\.75rem[^}]*padding-block:\s*1\.2rem[^}]*border-radius:\s*1\.1rem/);
   assert.ok(mobileCss.lastIndexOf(".diwali-section") > mobileCss.indexOf(".work-section, .work-section-warm"), "Diwali mobile padding must follow the shared work-section rule");
 });
 
