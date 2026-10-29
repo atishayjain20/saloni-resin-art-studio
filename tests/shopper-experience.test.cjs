@@ -151,6 +151,22 @@ test("mobile copy compaction stays behind the JavaScript enhancement class", () 
   assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)/);
 });
 
+test("catalogue cards expose shared semantic row tracks through native subgrid", () => {
+  assert.match(css, /@supports\s*\(grid-template-rows:\s*subgrid\)/);
+  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\)[^{]*\{[^}]*grid-row:\s*span 8;[^}]*grid-template-rows:\s*subgrid/);
+  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) > figure[^{]*\{[^}]*grid-row:\s*1 \/ -1;[^}]*grid-template-rows:\s*subgrid/);
+  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) > figure > figcaption[^{]*\{[^}]*grid-row:\s*2 \/ -1;[^}]*grid-template-rows:\s*subgrid/);
+  assert.match(css, /figcaption > span[^{]*\{[^}]*grid-row:\s*1/);
+  assert.match(css, /figcaption > :is\(strong, h3\)[^{]*\{[^}]*grid-row:\s*2/);
+  assert.match(css, /figcaption > p:first-of-type[^{]*\{[^}]*grid-row:\s*3/);
+  assert.match(css, /figcaption > p:nth-of-type\(2\)[^{]*\{[^}]*grid-row:\s*4/);
+  assert.match(css, /figcaption > \.product-pricing[^{]*\{[^}]*grid-row:\s*5 \/ 7;[^}]*grid-template-rows:\s*subgrid/);
+  assert.match(css, /product-pricing > div:first-child[^{]*\{[^}]*grid-row:\s*1/);
+  assert.match(css, /product-pricing > div:nth-child\(2\)[^{]*\{[^}]*grid-row:\s*2/);
+  assert.match(css, /figcaption > \.catalogue-order-button[^{]*\{[^}]*grid-row:\s*7/);
+  assert.match(css, /product-pricing[^{]*\{[^}]*margin-top:\s*0/);
+});
+
 test("catalogue section disclosures sit below their grids", () => {
   [
     ["diwali", "diwali-grid"],
