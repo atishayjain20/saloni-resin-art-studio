@@ -84,6 +84,22 @@ test("browse gifts keeps the first product row clear of the sticky header", () =
   assert.match(css, /\.catalogue-grid, \.festive-banner[^}]*scroll-margin-top:\s*var\(--sticky-offset\)/);
 });
 
+test("customer confidence strip sets clear fulfilment expectations near the catalogue", () => {
+  const confidence = html.match(/<section class="customer-confidence-strip shell"[\s\S]*?<\/section>/)?.[0] || "";
+  assert.ok(html.indexOf('class="customer-confidence-strip shell"') < html.indexOf('id="catalogue-filters"'));
+  assert.match(confidence, /<h2[^>]*>What happens next<\/h2>/);
+  assert.match(confidence, /repl(?:y|ies) within 5–6 working hours/);
+  assert.match(confidence, /4–5 days after design and advance confirmation/);
+  assert.match(confidence, /Shipping is across India/);
+  assert.match(confidence, /shipping charge is extra and depends on location/);
+  assert.match(confidence, /protective packaging/);
+  assert.match(confidence, /Advance amount and payment terms are confirmed with the final design and quote/);
+  assert.match(confidence, /urgent date/);
+  assert.match(confidence, /photos, packaging, and an unboxing video/);
+  assert.match(css, /\.customer-confidence-strip\s*\{/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customer-confidence-strip/);
+});
+
 test("catalogue enhancement has accessible filters, preview mode, and a no-result reset", () => {
   assert.match(html, /id="catalogue-filters"/);
   assert.match(html, /id="catalogue-type-filter"/);
@@ -459,6 +475,9 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
   assert.doesNotMatch(section("hero"), /Request a custom gift/);
   assert.doesNotMatch(html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "", /nav-cta/);
   assert.match(html, /<a href="#order" data-order-prefill="general">Contact Saloni<\/a>/);
+  const orderStatus = html.match(/<div class="order-form-status"[\s\S]*?<\/div>/)?.[0] || "";
+  assert.match(orderStatus, /<button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift<\/button>/);
+  assert.match(css, /\.order-form-status \.order-general-request\s*\{[^}]*background:\s*transparent[^}]*border-color:\s*#f0ddd4[^}]*color:\s*#f0ddd4/);
   assert.match(script, /button\.textContent = "Request this item"/);
   assert.match(script, /data-order-prefill="general"/);
   assert.match(script, /illustrative preview\|reference image/);

@@ -28,6 +28,9 @@
     input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
     .dimension-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
     .shipping-fields { margin-top: .85rem; }
+    .referral-disclosure { margin-top: .85rem; }
+    .referral-disclosure summary { padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
+    .referral-box { display: grid; gap: .65rem; margin-top: .65rem; }
     .field-error { margin: 0; color: #a41f33; }
     [hidden] { display: none !important; }
     .actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
@@ -87,11 +90,14 @@
         <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
         <label for="requested-date">Requested date (optional) <input id="requested-date" name="requestedDate" type="date"></label>
       </div>
-      <div class="referral-box">
-        <label for="referral-code">Partner referral code (optional) <input id="referral-code" name="referralCode" maxlength="32" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="referral-status"></label>
-        <button id="check-referral" class="secondary" type="button">Check code</button>
-        <p id="referral-status" class="hint" role="status" aria-live="polite">A code is optional. You can continue without partner credit.</p>
-      </div>
+      <details class="referral-disclosure">
+        <summary>Have a referral code?</summary>
+        <div class="referral-box">
+          <label for="referral-code">Partner referral code (optional) <input id="referral-code" name="referralCode" maxlength="32" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="referral-status"></label>
+          <button id="check-referral" class="secondary" type="button">Check code</button>
+          <p id="referral-status" class="hint" role="status" aria-live="polite">A code is optional. You can continue without partner credit.</p>
+        </div>
+      </details>
       <label for="fulfillment">Shipping or pickup <select id="fulfillment" name="fulfillment" required><option value="shipping">Shipping</option><option value="pickup">Pickup in Ajmer</option></select></label>
       <div class="shipping-fields" id="shipping-fields">
         <div class="grid">
@@ -113,7 +119,7 @@
       <div id="reference-image-preview-wrap" hidden>
         <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
       </div>
-      <p id="reference-image-status" class="hint" role="status" aria-live="polite">For a customizer PNG, download it first, then attach it here. Files must be reattached if you start another request.</p>
+      <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
       <div id="reference-image-actions" class="actions" hidden>
         <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
         <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>

@@ -40,6 +40,16 @@ test("adds the editable referral field to the order form", () => {
   assert.match(form, /aria-live/);
 });
 
+test("hides the optional customer referral field behind a collapsed disclosure", () => {
+  const form = fs.readFileSync(path.join(root, "apps-script", "Form.html"), "utf8");
+  const disclosure = form.match(/<details class="referral-disclosure">[\s\S]*?<\/details>/)?.[0] || "";
+  assert.match(disclosure, /<summary>Have a referral code\?<\/summary>/);
+  assert.doesNotMatch(disclosure, /<details[^>]+\bopen\b/);
+  assert.match(disclosure, /id="referral-code" name="referralCode"/);
+  assert.match(disclosure, /id="check-referral"/);
+  assert.match(form, /\.referral-disclosure\s+summary/);
+});
+
 test("returns only public active-code fields and rejects duplicate configuration", () => {
   const partnerHeaders = ["Partner ID", "Referral code", "Partner display name", "Contact name", "Category", "City / service area", "Phone / WhatsApp", "Email", "Instagram / website", "Commission rate", "Status", "Approved at", "Referral link", "Staff notes", "Closed at"];
   const rows = [partnerHeaders, ["partner-1", "AJMERPHOTO01", "Ajmer Photo Studio", "", "Photographer", "Ajmer", "", "", "", 0.05, "Active", new Date(), "https://saloniresinart.com/?ref=AJMERPHOTO01", "", ""]];
