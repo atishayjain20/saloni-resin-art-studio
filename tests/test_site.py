@@ -1381,7 +1381,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('id="scene-canvas"', section)
         self.assertIn('id="customizer-summary"', section)
         self.assertIn("Images and paint stay on this device until you choose to share", section)
-        self.assertIn("attach your image or a screenshot separately", section)
+        self.assertIn("Request this design sends the preview, choices and size with your request", section)
+        self.assertNotIn("attach your image or a screenshot separately", section)
         self.assertIn('href="tel:8209238541"', section)
         self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', section)
 
