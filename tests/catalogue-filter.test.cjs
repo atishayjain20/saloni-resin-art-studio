@@ -10,7 +10,7 @@ const end = script.indexOf("\n  function initOrderRequestFlow()", start);
 const catalogueFunction = script.slice(start, end);
 
 class FakeControl {
-  constructor(value = "") { this.value = value; this.listeners = {}; this.disabled = false; this.attributes = {}; }
+  constructor(value = "") { this.value = value; this.textContent = ""; this.listeners = {}; this.disabled = false; this.attributes = {}; }
   addEventListener(type, listener) { this.listeners[type] = listener; }
   dispatch(type) {
     if (!this.listeners[type]) return;
@@ -25,7 +25,7 @@ class FakeControl {
 }
 
 class FakeContainer {
-  constructor(id) { this.id = id; this.children = []; }
+  constructor(id) { this.id = id; this.children = []; this.attributes = {}; this.classList = { values: new Set(), toggle: (name, enabled) => enabled ? this.classList.values.add(name) : this.classList.values.delete(name), contains: (name) => this.classList.values.has(name) }; }
   appendChild(child) {
     if (child.parentNode && child.parentNode.children) {
       child.parentNode.children = child.parentNode.children.filter((current) => current !== child);
@@ -43,6 +43,7 @@ class FakeSection {
     this.hidden = false;
     this.cards = [];
     this.children = [];
+    this.classList = { values: new Set(), toggle: (name, enabled) => enabled ? this.classList.values.add(name) : this.classList.values.delete(name), contains: (name) => this.classList.values.has(name) };
     this.disclosure = new FakeControl("");
     this.disclosure.hidden = false;
   }
@@ -329,23 +330,40 @@ test("paging replaces cards and returns focus to the first visible section headi
   const firstPage = visibleCards(harness).map((card) => card.id);
   harness.pageNext.dispatch("click");
   assert.notDeepEqual(visibleCards(harness).map((card) => card.id), firstPage);
-  assert.deepEqual(harness.sectionHeadings[0].events, ["scroll", "focus", "scroll", "focus"]);
-  assert.deepEqual(harness.heading.events, []);
+  assert.deepEqual(harness.sectionHeadings[0].events, []);
+  assert.deepEqual(harness.heading.events, ["scroll", "focus", "scroll", "focus"]);
 });
 
-test("full catalogue moves the results below the last visible section and focuses the first section heading", () => {
+test("full catalogue moves pagination below the visible section and focuses the global heading", () => {
   const harness = createHarness();
   harness.browseAll.dispatch("click");
   assert.equal(harness.results.parentNode, harness.sections[0]);
-  assert.equal(harness.windowObject.location.hash, "#diwali");
-  assert.deepEqual(harness.sectionHeadings[0].events, ["scroll", "focus"]);
-  assert.deepEqual(harness.heading.events, []);
+  assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
+  assert.deepEqual(harness.sectionHeadings[0].events, []);
+  assert.deepEqual(harness.heading.events, ["scroll", "focus"]);
+  assert.equal(harness.heading.textContent, "All gifts");
   for (let index = 0; index < 4; index += 1) harness.pageNext.dispatch("click");
   assert.equal(harness.results.parentNode, harness.sections[1]);
-  assert.deepEqual(harness.sectionHeadings[0].events, ["scroll", "focus", "scroll", "focus", "scroll", "focus"]);
-  assert.deepEqual(harness.sectionHeadings[1].events, ["scroll", "focus", "scroll", "focus"]);
+  assert.deepEqual(harness.sectionHeadings[0].events, []);
+  assert.deepEqual(harness.sectionHeadings[1].events, []);
+  assert.deepEqual(harness.heading.events, ["scroll", "focus", "scroll", "focus", "scroll", "focus", "scroll", "focus", "scroll", "focus"]);
   assert.deepEqual(harness.sectionHeadings[2].events, []);
-  assert.equal(harness.windowObject.location.hash, "#romantic-keepsakes");
+  assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
+});
+
+test("full browse keeps the global title in sync with type and budget filters", () => {
+  const harness = createHarness({ count: 89, includePremium: true, realCatalogue: true });
+  harness.browseAll.dispatch("click");
+  assert.equal(harness.heading.textContent, "All gifts");
+  assert.match(harness.status.textContent, /Showing 1–8 of 89 gifts/);
+  harness.typeFilter.value = "premium";
+  harness.typeFilter.dispatch("change");
+  assert.equal(harness.heading.textContent, "Premium designs");
+  assert.match(harness.status.textContent, /of 14 gifts/);
+  harness.priceFilter.value = "2000";
+  harness.priceFilter.dispatch("change");
+  assert.equal(harness.heading.textContent, "Premium designs");
+  assert.match(harness.status.textContent, /of 6 gifts/);
 });
 
 test("preview and no-result states return the results block to the filter enhancement", () => {
@@ -502,7 +520,7 @@ test("explicit URL state restores filters, clamps pages, preserves unrelated par
   assert.match(harness.windowObject.location.search, /(?:\?|&)page=1(?:&|$)/);
   assert.match(harness.windowObject.location.search, /(?:\?|&)ref=partner-7(?:&|$)/);
   assert.match(harness.windowObject.location.search, /(?:^|&)unknown=keep(?:&|$)/);
-  assert.equal(harness.windowObject.location.hash, "#corporate-resin-gifts");
+  assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
 });
 
 test("invalid URL state falls back to a safe full catalogue tuple without discarding unknown params", () => {
@@ -522,7 +540,7 @@ test("invalid URL state falls back to a safe full catalogue tuple without discar
 test("explicit catalogue filter hash remains a filter anchor on full URL restore", () => {
   const harness = createHarness({ url: "https://example.test/?type=all&budget=all&page=1#catalogue-filters" });
   assert.deepEqual(harness.sectionHeadings[0].events, []);
-  assert.deepEqual(harness.heading.events, []);
+  assert.deepEqual(harness.heading.events, ["scroll", "focus"]);
   assert.equal(harness.results.parentNode, harness.sections[0]);
 });
 

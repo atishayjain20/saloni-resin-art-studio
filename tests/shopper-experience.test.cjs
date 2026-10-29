@@ -24,6 +24,8 @@ test("homepage leads with finished artwork and a browse-gifts CTA", () => {
   assert.match(hero, /assets\/romantic-initial-desk-stand\.webp/);
   assert.match(hero, /Your initial\. Mine\. Ours\./);
   assert.match(hero, /Two letters, one small corner that belongs to both of you\./);
+  assert.match(hero, /data-lightbox-target="romantic-trinket"/);
+  assert.match(hero, /data-lightbox-target="romantic-initial"/);
   assert.match(hero, /Browse gifts by type or budget/);
   assert.doesNotMatch(hero, /hero-floral-bouquet\.jpg/);
 });
@@ -91,6 +93,16 @@ test("catalogue enhancement has accessible filters, preview mode, and a no-resul
   assert.match(script, /initCatalogueExperience/);
 });
 
+test("full browse keeps one global status and a clear all-gifts heading while pagination stays section-bound", () => {
+  const enhancement = html.match(/<div class="catalogue-enhancement"[\s\S]*?<\/div>\s*<a class="button button-dark catalogue-browse-all"/)?.[0] || "";
+  assert.ok(enhancement.indexOf('id="catalogue-filter-status"') < enhancement.indexOf('id="catalogue-results"'));
+  assert.match(enhancement, /id="catalogue-results"[\s\S]*id="catalogue-pagination"/);
+  assert.doesNotMatch(enhancement.match(/<div class="catalogue-results"[\s\S]*?<\/div>/)?.[0] || "", /catalogue-filter-status/);
+  assert.match(script, /All gifts/);
+  assert.match(script, /focusCatalogueHeading\(state && state\.pageCards\)/);
+  assert.match(script, /catalogue-filters/);
+});
+
 test("premium catalogue results keep readable text on the dark section", () => {
   const resultsRule = css.match(/\.premium-collection-section \.catalogue-results \.catalogue-filter-status,\s*\.premium-collection-section \.catalogue-results \.catalogue-pagination span\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(resultsRule, /color:\s*#fbf5e9/);
@@ -113,6 +125,30 @@ test("catalogue sections use four-card responsive grids with independent disclos
   assert.match(css, /\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4/);
   assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2/);
   assert.doesNotMatch(script, /track\.addEventListener\("keydown"/);
+});
+
+test("mobile catalogue cards keep full copy in source while reserving aligned title, pricing, and action slots", () => {
+  const mobileStart = css.indexOf("@media (max-width: 620px)");
+  const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
+  const mobileCss = css.slice(mobileStart, reducedMotionStart);
+  assert.match(mobileCss, /\.catalogue-grid\s*>\s*:\s*is\(/);
+  assert.match(mobileCss, /display:\s*flex/);
+  assert.match(mobileCss, /-webkit-line-clamp:\s*2/);
+  assert.match(mobileCss, /grid-template-rows:\s*repeat\(2/);
+  assert.match(mobileCss, /\.catalogue-order-button\s*\{[^}]*min-height:/);
+  assert.match(script, /figcaption p/);
+  assert.match(script, /imageAlt/);
+  assert.match(section("romantic-keepsakes"), /id="romantic-trinket"/);
+  assert.match(section("romantic-keepsakes"), /id="romantic-initial"/);
+});
+
+test("mobile copy compaction stays behind the JavaScript enhancement class", () => {
+  const mobileStart = css.indexOf("@media (max-width: 620px)");
+  const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
+  const mobileCss = css.slice(mobileStart, reducedMotionStart);
+  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > :is\(strong, h3\)/);
+  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:first-of-type/);
+  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)/);
 });
 
 test("catalogue section disclosures sit below their grids", () => {
@@ -376,6 +412,81 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(requestButton.clicked, 1);
   assert.equal(order.focused, true);
   assert.equal(trigger.focused, undefined);
+});
+
+test("hero lightbox targets the hidden canonical card and restores focus to the hero opener", () => {
+  const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
+  const end = script.indexOf("\n\n    initCatalogueExperience();", start);
+  const makeElement = (extra = {}) => Object.assign({
+    hidden: false,
+    attributes: {},
+    listeners: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    closest() { return null; },
+    getAttribute(name) { return this.attributes[name] || ""; },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
+    focus() { this.focused = true; },
+  }, extra);
+  const heroImage = makeElement({ alt: "Coquette heart trinket tray in soft resin" });
+  const canonicalImage = makeElement({ alt: "Illustrative preview: Coquette heart trinket tray in soft resin" });
+  const priceRow = makeElement({ querySelector(selector) {
+    if (selector === "dt") return { textContent: "From" };
+    if (selector === "dd") return { textContent: "₹349" };
+    return null;
+  } });
+  const sizeRow = makeElement({ querySelector(selector) {
+    if (selector === "dt") return { textContent: "Size" };
+    if (selector === "dd") return { textContent: "4 in" };
+    return null;
+  } });
+  const orderButton = makeElement();
+  const title = { textContent: "Tiny tray, big feelings" };
+  const paragraph = { textContent: "A soft place for rings, earbuds, and the little things you share." };
+  const canonicalTrigger = makeElement({ href: "assets/romantic-heart-trinket-tray.webp", querySelector(selector) { return selector === "img" ? canonicalImage : null; } });
+  const canonicalCard = makeElement({ hidden: true, querySelector(selector) {
+    if (selector === "[data-lightbox-trigger]") return canonicalTrigger;
+    if (selector === "figcaption strong") return title;
+    if (selector === "[data-order-prefill]") return orderButton;
+    return null;
+  }, querySelectorAll(selector) {
+    if (selector === ".product-pricing > div") return [priceRow, sizeRow];
+    if (selector === "figcaption p") return [paragraph];
+    return [];
+  } });
+  canonicalTrigger.closest = (selector) => selector === "article" ? canonicalCard : null;
+  const heroTrigger = makeElement({ href: "assets/romantic-heart-trinket-tray.webp", attributes: { "data-lightbox-target": "romantic-trinket" }, querySelector(selector) { return selector === "img" ? heroImage : null; } });
+  const lightbox = makeElement({ showModal() { this.open = true; }, close() { this.open = false; this.listeners.close(); } });
+  const imageTarget = makeElement();
+  const docElements = {
+    "art-lightbox": lightbox,
+    "lightbox-image": imageTarget,
+    "lightbox-caption": makeElement(),
+    "lightbox-product-name": makeElement(),
+    "lightbox-product-price": makeElement(),
+    "lightbox-product-size": makeElement(),
+    "lightbox-image-description": makeElement(),
+    "lightbox-previous": makeElement(),
+    "lightbox-next": makeElement(),
+    "lightbox-position": makeElement(),
+    "lightbox-request": makeElement(),
+    "romantic-trinket": canonicalCard,
+  };
+  const documentObject = {
+    getElementById(id) { return docElements[id] || null; },
+    querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [heroTrigger] : []; },
+  };
+  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: {} });
+  heroTrigger.listeners.click({ defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
+  assert.equal(imageTarget.src, "assets/romantic-heart-trinket-tray.webp");
+  assert.equal(docElements["lightbox-product-name"].textContent, "Tiny tray, big feelings");
+  assert.equal(docElements["lightbox-product-price"].textContent, "From: ₹349");
+  assert.equal(docElements["lightbox-product-size"].textContent, "Size: 4 in");
+  assert.match(docElements["lightbox-image-description"].textContent, /A soft place for rings/);
+  lightbox.close();
+  assert.equal(heroTrigger.focused, true);
 });
 
 test("privacy details keep the full retention and correction wording below both forms", () => {
