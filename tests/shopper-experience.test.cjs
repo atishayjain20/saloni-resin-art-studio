@@ -152,32 +152,31 @@ test("mobile catalogue cards keep full copy in source while reserving aligned ti
   assert.match(section("romantic-keepsakes"), /id="romantic-initial"/);
 });
 
-test("mobile copy compaction keeps the full specification visible", () => {
-  const mobileStart = css.indexOf("@media (max-width: 620px)");
-  const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
-  const mobileCss = css.slice(mobileStart, reducedMotionStart);
-  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > :is\(strong, h3\)/);
-  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:first-of-type/);
-  const specificationRule = mobileCss.match(/html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(specificationRule, /display:\s*block/);
-  assert.match(specificationRule, /line-height:\s*1\.4/);
-  assert.match(specificationRule, /overflow-wrap:\s*anywhere/);
-  assert.doesNotMatch(specificationRule, /display:\s*none|overflow:\s*hidden|-webkit-line-clamp/);
+test("catalogue cards keep only essentials while popups retain full details", () => {
+  assert.match(css, /html\.js \.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) > figure > figcaption > :is\(span, p\)\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\)\s*\{[^}]*grid-row:\s*span 5/);
+  const subgrid = css.slice(css.indexOf("@supports (grid-template-rows: subgrid)"));
+  assert.match(subgrid, /html\.js \.catalogue-grid/);
+  assert.doesNotMatch(subgrid, /\n\s+\.catalogue-grid\s*(?:\{|>)/);
+  assert.match(css, /figcaption > :is\(strong, h3\)[^{]*\{[^}]*grid-row:\s*1/);
+  assert.match(css, /figcaption > \.product-pricing[^{]*\{[^}]*grid-row:\s*2 \/ 4/);
+  assert.match(css, /figcaption > \.catalogue-order-button[^{]*\{[^}]*grid-row:\s*4/);
+  assert.match(script, /querySelectorAll\("figcaption p"\)/);
+  assert.match(script, /lightboxDescription\) lightboxDescription\.textContent = item\.description/);
+  const card = section("diwali").match(/<article\b[^>]*class="[^"]*work-card[^"]*"[\s\S]*?<\/article>/)?.[0] || "";
+  assert.match(card, /<figcaption[\s\S]*<p>/);
 });
 
 test("catalogue cards expose shared semantic row tracks through native subgrid", () => {
   assert.match(css, /@supports\s*\(grid-template-rows:\s*subgrid\)/);
-  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\)[^{]*\{[^}]*grid-row:\s*span 8;[^}]*grid-template-rows:\s*subgrid/);
+  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\)[^{]*\{[^}]*grid-row:\s*span 5;[^}]*grid-template-rows:\s*subgrid/);
   assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) > figure[^{]*\{[^}]*grid-row:\s*1 \/ -1;[^}]*grid-template-rows:\s*subgrid/);
   assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) > figure > figcaption[^{]*\{[^}]*grid-row:\s*2 \/ -1;[^}]*grid-template-rows:\s*subgrid/);
-  assert.match(css, /figcaption > span[^{]*\{[^}]*grid-row:\s*1/);
-  assert.match(css, /figcaption > :is\(strong, h3\)[^{]*\{[^}]*grid-row:\s*2/);
-  assert.match(css, /figcaption > p:first-of-type[^{]*\{[^}]*grid-row:\s*3/);
-  assert.match(css, /figcaption > p:nth-of-type\(2\)[^{]*\{[^}]*grid-row:\s*4/);
-  assert.match(css, /figcaption > \.product-pricing[^{]*\{[^}]*grid-row:\s*5 \/ 7;[^}]*grid-template-rows:\s*subgrid/);
+  assert.match(css, /figcaption > :is\(strong, h3\)[^{]*\{[^}]*grid-row:\s*1/);
+  assert.match(css, /figcaption > \.product-pricing[^{]*\{[^}]*grid-row:\s*2 \/ 4;[^}]*grid-template-rows:\s*subgrid/);
   assert.match(css, /product-pricing > div:first-child[^{]*\{[^}]*grid-row:\s*1/);
   assert.match(css, /product-pricing > div:nth-child\(2\)[^{]*\{[^}]*grid-row:\s*2/);
-  assert.match(css, /figcaption > \.catalogue-order-button[^{]*\{[^}]*grid-row:\s*7/);
+  assert.match(css, /figcaption > \.catalogue-order-button[^{]*\{[^}]*grid-row:\s*4/);
   assert.match(css, /product-pricing[^{]*\{[^}]*margin-top:\s*0/);
 });
 
@@ -555,6 +554,7 @@ test("catalogue card body opens its existing preview while native link focus sta
   }, extra);
   const title = { textContent: "Sample gift" };
   const paragraph = { textContent: "A sample gift description." };
+  const included = { textContent: "one keepsake · display props not included" };
   const image = { alt: "Sample gift photo" };
   const orderButton = makeElement({ closest(selector) { return selector.indexOf("button") !== -1 ? this : null; } });
   const priceRow = makeElement({ querySelector(selector) {
@@ -568,7 +568,7 @@ test("catalogue card body opens its existing preview while native link focus sta
     return null;
   }, querySelectorAll(selector) {
     if (selector === ".product-pricing > div") return [priceRow];
-    if (selector === "figcaption p") return [paragraph];
+    if (selector === "figcaption p") return [paragraph, included];
     return [];
   } });
   const grid = makeElement({ querySelectorAll() { return [trigger]; } });
@@ -604,6 +604,7 @@ test("catalogue card body opens its existing preview while native link focus sta
   card.listeners.click({ target: bodyTarget, defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
   assert.equal(lightbox.open, true);
   assert.equal(docElements["lightbox-product-name"].textContent, "Sample gift");
+  assert.match(docElements["lightbox-image-description"].textContent, /one keepsake · display props not included/);
   lightbox.close();
   assert.equal(trigger.focused, true);
   const orderEvent = { target: orderButton, defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() { this.defaultPrevented = true; } };
