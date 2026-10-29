@@ -120,8 +120,8 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_page_has_required_sections_and_accessibility_hooks(self):
         required_ids = [
-            "main-content", "hero", "diwali", "offerings", "studio-art",
-            "testimonials", "order", "footer",
+            "main-content", "hero", "diwali", "studio-art",
+            "order", "footer",
         ]
         for section_id in required_ids:
             with self.subTest(section_id=section_id):
@@ -237,8 +237,7 @@ class StaticSiteContractTests(unittest.TestCase):
         hero_end = self.html.index('</section>', hero_start) + len('</section>')
         diwali_start = self.html.index(section_html)
         self.assertLess(hero_end, diwali_start)
-        self.assertNotIn('id="offerings"', self.html[hero_end:diwali_start])
-        self.assertLess(diwali_start, self.html.index('<section class="intro-band shell reveal"'))
+        self.assertNotIn('id="offerings"', self.html)
         self.assertNotRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
         self.assertRegex(self.html, r'<a href="#diwali" data-category-shortcut="diwali">Diwali')
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
@@ -1193,27 +1192,11 @@ class StaticSiteContractTests(unittest.TestCase):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertNotRegex(css, r"\.studio-art-section \.work-card img\s*\{")
 
-    def test_testimonial_section_is_compact_buying_help(self):
-        parser = MarkupTreeParser()
-        parser.feed(self.html)
-        owners = []
-        for root in parser.roots:
-            owners.extend(find_nodes(root, "data-carousel"))
-        testimonials = [owner for owner in owners if owner["attrs"].get("data-carousel") == "testimonials"]
-        self.assertEqual(len(testimonials), 0)
-
-        section = re.search(r'<section\b[^>]*id=["\']testimonials["\'][\s\S]*?</section>', self.html)
-        self.assertIsNotNone(section)
-        section_html = section.group(0)
-        self.assertIn('<p class="eyebrow">Before you order</p>', section_html)
-        self.assertIn('<h2 id="testimonials-title">Know what your gift will include.</h2>', section_html)
-        self.assertIn('Ask Saloni about your chosen product, personalisation, finish, packaging and delivery before confirming your order.', section_html)
-        self.assertRegex(section_html, r'<a\b[^>]*href=["\']#order["\'][^>]*data-order-prefill=["\']general["\'][^>]*>Ask Saloni about a gift')
-        self.assertNotIn('data-testimonial-card', section_html)
-        self.assertNotIn('data-carousel', section_html)
-        self.assertNotRegex(section_html, re.compile(r'Gaurav Jain|Atishay Jain|Aarti Suthar|Bharat Sharma|Puchki|Rating:|★★★★★|★★★★', re.I))
-        self.assertNotRegex(section_html, re.compile(r'<(?:blockquote|cite)\b', re.I))
-        self.assertNotRegex(self.html, re.compile(r'"@type"\s*:\s*"(?:Review|AggregateRating)"', re.I))
+    def test_testimonial_section_is_removed_from_homepage(self):
+        self.assertIsNone(re.search(r'<section\b[^>]*id=["\']testimonials["\'][\s\S]*?</section>', self.html))
+        self.assertNotIn('Before you order', self.html)
+        self.assertNotIn('Know what your gift will include.', self.html)
+        self.assertNotIn('Ask Saloni about a gift', self.html)
 
     def test_festive_offers_area_stays_inline_without_unsupported_claims(self):
         self.assertNotRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
