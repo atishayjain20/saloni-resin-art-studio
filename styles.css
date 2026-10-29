@@ -98,6 +98,7 @@ h1 em { color: var(--rose); font-style: italic; }
 .hero-trust-strip a { color: var(--ink); text-decoration: underline; text-underline-offset: .2em; }
 .hero-collage { position: relative; min-height: 590px; }
 .hero-image { position: absolute; margin: 0; overflow: hidden; box-shadow: var(--shadow); }
+.hero-image .lightbox-trigger { display: block; width: 100%; height: 100%; }
 .hero-image img { width: 100%; height: 100%; object-fit: cover; }
 .hero-image-main { inset: 3% 18% 0 4%; border-radius: 46% 46% 1.5rem 1.5rem; background: var(--rose); }
 .hero-image-main img { object-position: 53% center; }
@@ -348,6 +349,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   #hero .hero-actions .button { flex: 1 1 9.5rem; min-width: 0; gap: 0.45rem; padding: 0.62rem 0.8rem; font-size: 0.75rem; }
   #hero .hero-collage { display: grid; gap: 0.8rem; min-height: auto; max-height: none; min-width: 0; }
   #hero .hero-image { position: relative; inset: auto; width: 100%; transform: none; }
+  #hero .hero-image .lightbox-trigger { height: auto; }
   #hero .hero-image-main img { height: auto; }
   #hero .hero-image-clock { width: 55%; margin-left: auto; border-width: 0.45rem; }
   #hero .hero-image-clock img { height: auto; }
@@ -357,6 +359,16 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   .intro-band { display: block; padding-block: 4.5rem; }.intro-copy { margin-bottom: 2.4rem; }.section-heading h2, .rail-heading h2, .order-copy h2 { font-size: clamp(2.5rem, 12vw, 4rem); }.offering-list { display: grid; grid-template-columns: 1fr; margin-top: 2.5rem; padding-top: 1.4rem; }.offering-list li { max-width: 29rem; }
   .romantic-keepsakes { margin-block: 1.25rem; padding: 1.2rem; border-radius: 1.1rem; }.romantic-keepsakes-heading { display: block; margin-bottom: 1.35rem; }.romantic-keepsakes-heading h2 { font-size: clamp(2.35rem, 12vw, 3.8rem); }.romantic-keepsakes-intro { margin-top: 1rem; }.romantic-keepsake-card { padding: 0.7rem; }.romantic-keepsake-card figcaption .product-pricing > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0.75rem; }.romantic-keepsake-card figcaption .product-pricing dd { white-space: nowrap; overflow-wrap: normal; } .romantic-keepsake-card figcaption .product-pricing > div:not(:first-child) dd { white-space: normal; overflow-wrap: anywhere; }
   .work-section, .work-section-warm { padding-block: 4.5rem; }.rail-heading { flex-direction: column; align-items: flex-start; }.rail-heading h2 { max-width: 100%; }main h2 { overflow-wrap: anywhere; }.catalogue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding-bottom: 0.8rem; }.work-card figcaption strong { font-size: 1.8rem; }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) { display: flex; min-height: 100%; }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figure { display: flex; flex: 1; flex-direction: column; width: 100%; }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > :is(strong, h3) { display: -webkit-box; min-height: 2.2em; overflow: hidden; font-size: 1.05rem; line-height: 1.1; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > p:first-of-type { display: -webkit-box; min-height: 2.8em; overflow: hidden; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > p:not(:first-of-type) { display: none; }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing { grid-template-rows: repeat(2, minmax(2.35rem, auto)); margin-top: auto; }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); min-height: 2.35rem; align-items: start; }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dd { min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: right; }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) .catalogue-order-button { width: 100%; min-height: 2.75rem; margin-top: .7rem; }
   dialog.lightbox-dialog { width: calc(100vw - 1rem); max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }.lightbox-panel { max-height: calc(100dvh - 1rem); padding: 3rem 0.7rem 0.8rem; border-radius: 0.8rem; }.lightbox-image { max-height: calc(100dvh - 11rem); }.lightbox-caption { font-size: 0.76rem; }.lightbox-nav-button { min-width: 0; flex: 1 1 0; padding-inline: .45rem; }
   .customizer-heading { display: block; }.customizer-heading h2 { margin-bottom: 1rem; }.customizer-fieldset { grid-template-columns: 1fr; }.customizer-fieldset legend, .customizer-fieldset label[for="personal-text"], .customizer-fieldset label[for="reference-image"], .customizer-fieldset .field-hint, .customizer-fieldset .customizer-status, .customizer-fieldset .image-actions, .customizer-fieldset .paint-toggle, .customizer-fieldset .paint-tools, .customizer-fieldset .image-layout-controls { grid-column: 1; }.choice-grid, .position-options { grid-template-columns: 1fr; }.customizer-actions { flex-direction: column; }.customizer-actions .button { justify-content: center; }.customizer-preview { display: block; }.customizer-summary-card { margin-top: 1rem; }.customizer-handoff { display: block; }.customizer-contact-links { margin-top: 1rem; }.customizer-contact-links .button { flex: 1 1 9rem; min-width: 0; flex-wrap: wrap; overflow-wrap: anywhere; justify-content: center; }
   .order-section { display: block; padding-block: 4.5rem 3rem; }.order-size-pricing-note { margin: 1.25rem 0 0; }.order-copy { margin-bottom: 2.5rem; }.order-panel { padding: 1.4rem; }.contact-line strong { font-size: 1.35rem; }.partner-hero, .partner-details, .partner-apply, .corporate-hero, .corporate-offering, .corporate-process, .corporate-enquire { display: block; padding-block: 4.5rem; }.partner-hero h1 { max-width: 12ch; font-size: clamp(3rem, 14vw, 5rem); }.partner-terms { margin-top: 2.5rem; }.partner-details h2, .partner-apply h2, .corporate-hero h1, .corporate-offering h2, .corporate-process h2, .corporate-enquire h2 { max-width: 12ch; margin-bottom: 2rem; font-size: clamp(2.5rem, 12vw, 4rem); }.partner-steps { grid-template-columns: 1fr; }.partner-apply-copy, .corporate-enquire-copy { margin-bottom: 2.2rem; }.partner-apply .order-form-panel iframe, .corporate-enquire .order-form-panel iframe { min-height: 1040px; }.corporate-hero-image { margin-top: 2.5rem; }.corporate-gift-strip { gap: .5rem; margin-top: .5rem; }.corporate-gift-strip li { aspect-ratio: 1.1; }.corporate-offering ul { grid-template-columns: 1fr; }.corporate-process ol { grid-template-columns: 1fr; margin-top: 1rem; }.corporate-note { margin-top: 1.2rem; }
@@ -397,6 +409,9 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .catalogue-section-disclosure { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; margin-top: 1rem; padding: .65rem 1rem; border: 1px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font-size: .78rem; font-weight: 800; cursor: pointer; }
 .catalogue-section-disclosure:hover, .catalogue-section-disclosure:focus-visible { background: var(--ink); color: var(--ivory); }
 html:not(.js) .catalogue-section-disclosure { display: none; }
+.catalogue-full .rail-heading h2, .catalogue-full .romantic-keepsakes-heading h2 { max-width: none; margin: 0; color: inherit; font-size: 1.35rem; line-height: 1.1; }
+.catalogue-full .rail-heading .eyebrow, .catalogue-full .romantic-keepsakes-heading .eyebrow { display: none; }
+.catalogue-full .rail-heading > div > p:not(.eyebrow):not(.catalogue-note), .catalogue-full .romantic-keepsakes-intro { display: none; }
 .festive-banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem .8rem; margin-block: 0; padding-block: .9rem; border-block: 1px solid var(--line); color: var(--cocoa); font-size: .78rem; }
 .festive-banner a { color: var(--rose-ink); font-weight: 800; }
 .customizer-advanced { margin-top: 1rem; border-top: 1px solid var(--line); }
