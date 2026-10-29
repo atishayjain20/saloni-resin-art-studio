@@ -17,7 +17,7 @@ function section(id) {
   return match[0];
 }
 
-test("homepage leads with finished artwork without duplicate hero CTAs", () => {
+test("homepage hero has exactly two actions into gifts and customizer", () => {
   const hero = section("hero");
   assert.match(hero, /assets\/romantic-heart-trinket-tray\.webp/);
   assert.match(hero, /Tiny tray, big feelings/);
@@ -27,10 +27,12 @@ test("homepage leads with finished artwork without duplicate hero CTAs", () => {
   assert.match(hero, /Two letters, one small corner that belongs to both of you\./);
   assert.match(hero, /data-lightbox-target="romantic-trinket"/);
   assert.match(hero, /data-lightbox-target="romantic-initial"/);
-  assert.doesNotMatch(hero, /class="hero-actions"/);
-  assert.doesNotMatch(hero, /Browse gifts by type or budget/);
+  const heroActions = hero.match(/<div class="hero-actions">([\s\S]*?)<\/div>/)?.[1] || "";
+  const actionLinks = Array.from(heroActions.matchAll(/<a\b[\s\S]*?<\/a>/g));
+  assert.equal(actionLinks.length, 2);
+  assert.match(heroActions, /<a class="button button-dark" href="#catalogue-filters" data-browse-all>Explore gifts <span aria-hidden="true">↘<\/span><\/a>/);
+  assert.match(heroActions, /<a class="hero-secondary-action" href="#customizer" data-customizer-open>Design a custom frame<\/a>/);
   assert.doesNotMatch(hero, /Request a custom gift/);
-  assert.doesNotMatch(hero, /data-browse-filters/);
   assert.doesNotMatch(hero, /hero-floral-bouquet\.jpg/);
   assert.doesNotMatch(html, /Some catalogue images are illustrative or reference ideas\. Saloni confirms availability, materials, final design, quote, and delivery\./);
 });
@@ -43,6 +45,8 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   const copyContainerRule = mobileCss.match(/#hero \.hero-copy\s*\{([^}]*)\}/)?.[1] || "";
   const copyRule = mobileCss.match(/#hero h1\s*\{([^}]*)\}/)?.[1] || "";
   const actionsRule = mobileCss.match(/#hero \.hero-actions\s*\{([^}]*)\}/)?.[1] || "";
+  const secondaryActionRule = css.match(/\.hero-secondary-action\s*\{([^}]*)\}/)?.[1] || "";
+  const mobileSecondaryActionRule = mobileCss.match(/#hero \.hero-actions \.hero-secondary-action\s*\{([^}]*)\}/)?.[1] || "";
   const collageRule = mobileCss.match(/#hero \.hero-collage\s*\{([^}]*)\}/)?.[1] || "";
   const imageRule = mobileCss.match(/#hero \.hero-image\s*\{([^}]*)\}/)?.[1] || "";
   const mainImageRule = mobileCss.match(/#hero \.hero-image-main img\s*\{([^}]*)\}/)?.[1] || "";
@@ -59,6 +63,9 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   assert.match(copyRule, /overflow-wrap:\s*anywhere/);
   assert.match(actionsRule, /flex-direction:\s*row/);
   assert.match(actionsRule, /flex-wrap:\s*wrap/);
+  assert.match(secondaryActionRule, /font-size:\s*0\.75rem/);
+  assert.match(secondaryActionRule, /text-decoration:\s*underline/);
+  assert.match(mobileSecondaryActionRule, /font-size:\s*0\.7rem/);
   assert.match(collageRule, /display:\s*grid/);
   assert.match(collageRule, /min-height:\s*auto/);
   assert.match(collageRule, /min-width:\s*0/);
