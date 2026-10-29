@@ -84,9 +84,14 @@ test("browse gifts keeps the first product row clear of the sticky header", () =
   assert.match(css, /\.catalogue-grid, \.festive-banner[^}]*scroll-margin-top:\s*var\(--sticky-offset\)/);
 });
 
-test("customer confidence strip sets clear fulfilment expectations near the catalogue", () => {
-  const confidence = html.match(/<section class="customer-confidence-strip shell"[\s\S]*?<\/section>/)?.[0] || "";
-  assert.ok(html.indexOf('class="customer-confidence-strip shell"') < html.indexOf('id="catalogue-filters"'));
+test("customer confidence strip sits above the order conversation", () => {
+  const order = html.match(/<section class="order-section shell" id="order"[\s\S]*?<\/section>/)?.[0] || "";
+  const confidenceStart = order.indexOf('<div class="customer-confidence-strip"');
+  const conversationStart = order.indexOf('<div class="order-copy');
+  const confidence = order.slice(confidenceStart, conversationStart);
+  assert.ok(confidenceStart >= 0, "expected the confidence content inside the order section");
+  assert.ok(confidenceStart < conversationStart, "confidence content should precede the conversation copy");
+  assert.ok(html.indexOf('class="customer-confidence-strip"') > html.indexOf('id="order"'));
   assert.match(confidence, /<h2[^>]*>What happens next<\/h2>/);
   assert.match(confidence, /repl(?:y|ies) within 5–6 working hours/);
   assert.match(confidence, /4–5 days after design and advance confirmation/);
@@ -98,6 +103,24 @@ test("customer confidence strip sets clear fulfilment expectations near the cata
   assert.match(confidence, /photos, packaging, and an unboxing video/);
   assert.match(css, /\.customer-confidence-strip\s*\{/);
   assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customer-confidence-strip/);
+});
+
+test("order layout keeps the confidence copy left and the form right, then stacks on mobile", () => {
+  const order = html.match(/<section class="order-section shell" id="order"[\s\S]*?<\/section>/)?.[0] || "";
+  const leftPlacement = css.match(/\.order-left-column\s*\{([^}]*)\}/)?.[1] || "";
+  const formPlacement = css.match(/\.order-section > \.order-panel\s*\{([^}]*)\}/)?.[1] || "";
+  const mobileLeftRule = css.match(/@media \(max-width: 620px\) \{[\s\S]*?\.order-left-column\s*\{([^}]*)\}/)?.[1] || "";
+  const mobileOrderRule = css.match(/@media \(max-width: 620px\) \{[\s\S]*?\.order-section\s*\{([^}]*)\}/)?.[1] || "";
+
+  assert.match(order, /<div class="order-left-column">[\s\S]*class="customer-confidence-strip"[\s\S]*class="order-copy/);
+  assert.match(leftPlacement, /grid-column:\s*1/);
+  assert.match(leftPlacement, /gap:\s*2rem/);
+  assert.match(leftPlacement, /align-self:\s*start/);
+  assert.match(formPlacement, /grid-column:\s*2/);
+  assert.match(formPlacement, /align-self:\s*start/);
+  assert.doesNotMatch(formPlacement, /grid-row/);
+  assert.match(mobileLeftRule, /display:\s*block/);
+  assert.match(mobileOrderRule, /display:\s*block/);
 });
 
 test("catalogue enhancement has accessible filters, preview mode, and a no-result reset", () => {
