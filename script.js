@@ -299,6 +299,7 @@
 
   function initCatalogueExperience() {
     var tools = document.getElementById("catalogue-filters");
+    var searchFilter = document.getElementById("catalogue-search");
     var typeFilter = document.getElementById("catalogue-type-filter");
     var priceFilter = document.getElementById("catalogue-price-filter");
     var resetButton = document.getElementById("catalogue-filter-reset");
@@ -306,7 +307,7 @@
     var status = document.getElementById("catalogue-filter-status");
     var empty = document.getElementById("catalogue-filter-empty");
     var results = document.getElementById("catalogue-results");
-    if (!tools || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty || !results) return;
+    if (!tools || !searchFilter || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty || !results) return;
     var resultsHome = results.parentNode;
 
     var pagePrevious = document.getElementById("catalogue-page-previous");
@@ -319,6 +320,7 @@
     var validTypes = ["all", "couple", "diwali", "frames", "premium", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
     var typeLabels = { all: "All gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
+    var searchMaxLength = 100;
 
     var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
       return !card.closest || !card.closest("#testimonials");
@@ -375,6 +377,23 @@
       return price.max <= limit;
     }
 
+    function normalizeSearch(value) {
+      return String(value || "").trim().replace(/\s+/g, " ").slice(0, searchMaxLength);
+    }
+
+    function titleFor(card) {
+      var title = card.querySelector("figcaption strong") || card.querySelector("figcaption h3");
+      return title ? title.textContent : "";
+    }
+
+    function matchesSearch(card) {
+      var query = normalizeSearch(searchFilter.value).toLowerCase();
+      if (!query) return true;
+      var type = typeFor(card);
+      var searchable = [titleFor(card), type, typeLabels[type] || "", card.getAttribute("data-product-kind") || ""].join(" ").toLowerCase();
+      return searchable.indexOf(query) !== -1;
+    }
+
     function setVisibility(card, visible) {
       card.hidden = !visible;
       if (visible) card.removeAttribute("aria-hidden");
@@ -389,7 +408,8 @@
         var type = typeFor(card);
         return isInOverview &&
           ((typeFilter.value || "all") === "all" || (typeFilter.value || "all") === type) &&
-          matchesPrice(card, priceFilter.value || "all");
+          matchesPrice(card, priceFilter.value || "all") &&
+          matchesSearch(card);
       });
     }
 
@@ -496,6 +516,8 @@
       var resultsSection = allVisible && pageCards.length ? sectionFor(pageCards[pageCards.length - 1]) : null;
       if (resultsSection && resultsSection.appendChild) resultsSection.appendChild(results);
       else if (resultsHome && resultsHome.appendChild) resultsHome.appendChild(results);
+      var browseAllCta = document.getElementById("browse-all-gifts");
+      if (browseAllCta) browseAllCta.hidden = allVisible;
       empty.hidden = matchingCards.length !== 0;
       if (pagination) pagination.hidden = !allVisible;
       var pageEnd = pageStart + pageCards.length;
@@ -517,11 +539,13 @@
     function urlWithState(state, hash) {
       var url = new URL(currentUrl(), "https://saloniresinart.com/");
       var params = url.searchParams;
-      ["type", "budget", "page"].forEach(function (key) { params.delete(key); });
+      ["type", "budget", "page", "q"].forEach(function (key) { params.delete(key); });
       if (state && state.full) {
         params.set("type", state.type || "all");
         params.set("budget", state.budget || "all");
         params.set("page", String(state.page || 1));
+        var query = normalizeSearch(state.q);
+        if (query) params.set("q", query);
       }
       url.search = params.toString();
       if (hash !== undefined) url.hash = hash ? (String(hash).charAt(0) === "#" ? String(hash) : "#" + hash) : "";
@@ -548,8 +572,9 @@
 
     function readLocationState() {
       var params = new URLSearchParams((window.location && window.location.search) || "");
-      var has = ["type", "budget", "page"].some(function (key) { return params.has(key); });
-      if (!has) return { full: false };
+      var query = normalizeSearch(params.get("q"));
+      var has = ["type", "budget", "page"].some(function (key) { return params.has(key); }) || Boolean(query);
+      if (!has) return { full: false, hasQuery: params.has("q") };
       var type = params.get("type");
       var budget = params.get("budget");
       var rawPage = params.get("page");
@@ -558,15 +583,17 @@
         full: true,
         type: validTypes.indexOf(type) !== -1 ? type : "all",
         budget: validBudgets.indexOf(budget) !== -1 ? budget : "all",
-        page: Number.isSafeInteger(safePage) && safePage > 0 ? safePage : 1
+        page: Number.isSafeInteger(safePage) && safePage > 0 ? safePage : 1,
+        q: query
       };
     }
 
-    function setFullState(type, budget, nextPage) {
+    function setFullState(type, budget, nextPage, query) {
       allVisible = true;
       expandedSections = [];
       typeFilter.value = validTypes.indexOf(type) !== -1 ? type : "all";
       priceFilter.value = validBudgets.indexOf(budget) !== -1 ? budget : "all";
+      searchFilter.value = normalizeSearch(query);
       page = Number.isSafeInteger(nextPage) && nextPage > 0 ? nextPage : 1;
       return applyFilters();
     }
@@ -582,6 +609,7 @@
       expandedSections = [];
       typeFilter.value = "all";
       priceFilter.value = "all";
+      searchFilter.value = "";
       page = 1;
       applyFilters();
       if (commit) writeUrl(urlWithState({ full: false }, "#catalogue-filters"));
@@ -629,12 +657,16 @@
     function restoreFromLocation() {
       var state = readLocationState();
       if (state.full) {
-        setFullState(state.type, state.budget, state.page);
-        var normalized = urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page });
+        setFullState(state.type, state.budget, state.page, state.q);
+        var normalized = urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page, q: searchFilter.value });
         if (!sameUrl(normalized)) writeUrl(normalized, true);
         scrollToHash(window.location && window.location.hash);
         if ((window.location && window.location.hash) === "#catalogue-filters") focusCatalogueHeading();
         return;
+      }
+      if (state.hasQuery) {
+        var cleaned = urlWithState({ full: false }, window.location && window.location.hash);
+        if (!sameUrl(cleaned)) writeUrl(cleaned, true);
       }
       showFeatured(false);
       restoreLegacyHash();
@@ -647,7 +679,7 @@
       if (nextPage === page) return;
       page = nextPage;
       var state = applyFilters();
-      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }, "#catalogue-filters"));
+      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page, q: searchFilter.value }, "#catalogue-filters"));
       focusCatalogueHeading(state && state.pageCards);
     }
 
@@ -702,10 +734,20 @@
       expandedSections = [];
       page = 1;
       applyFilters();
-      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }, "#catalogue-filters"));
+      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page, q: searchFilter.value }, "#catalogue-filters"));
+    }
+    function commitSearchInput(event) {
+      if (event && event.isComposing) return;
+      allVisible = true;
+      expandedSections = [];
+      page = 1;
+      applyFilters();
+      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page, q: normalizeSearch(searchFilter.value) }, "#catalogue-filters"), true);
     }
     typeFilter.addEventListener("change", commitFilterChange);
     priceFilter.addEventListener("change", commitFilterChange);
+    searchFilter.addEventListener("input", commitSearchInput);
+    searchFilter.addEventListener("compositionend", commitSearchInput);
     resetButton.addEventListener("click", function () { showFeatured(true); });
     emptyReset.addEventListener("click", function () {
       var state = showAll(true);
