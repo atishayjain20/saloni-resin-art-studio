@@ -121,12 +121,18 @@ test("premium catalogue results keep readable text on the dark section", () => {
 test("studio and corporate catalogue sections use distinct soft panels", () => {
   const corporateRule = css.match(/\.corporate-resin-gifts-section\s*\{([^}]*)\}/)?.[1] || "";
   const studioRule = css.match(/\.studio-art-section\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(corporateRule, /border-block:\s*1px solid rgba\(85, 113, 95, 0\.24\)/);
+  assert.match(corporateRule, /border:\s*1px solid rgba\(85, 113, 95, 0\.24\)/);
+  assert.match(corporateRule, /border-radius:\s*1\.5rem/);
+  assert.match(corporateRule, /margin-block:\s*1rem/);
   assert.match(corporateRule, /background:\s*#edf2ec/);
   assert.match(corporateRule, /padding-inline:\s*clamp\(1rem, 4vw, 3\.5rem\)/);
-  assert.match(studioRule, /border-block:\s*1px solid rgba\(201, 101, 114, 0\.18\)/);
+  assert.match(studioRule, /border:\s*1px solid rgba\(201, 101, 114, 0\.18\)/);
+  assert.match(studioRule, /border-radius:\s*1\.5rem/);
+  assert.match(studioRule, /margin-block:\s*1rem/);
   assert.match(studioRule, /background:\s*#f6e9e5/);
   assert.match(studioRule, /padding-inline:\s*clamp\(1rem, 4vw, 3\.5rem\)/);
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"));
+  assert.match(mobileCss, /\.corporate-resin-gifts-section, \.studio-art-section\s*\{[^}]*margin-block:\s*0\.75rem[^}]*border-radius:\s*1\.1rem/);
 });
 
 test("Diwali collection uses the compact vertical spacing of Couple gifts", () => {
