@@ -724,7 +724,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
         self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#catalogue-filters["\']')
         self.assertEqual(self.html.count('class="catalogue-grid"'), 5)
-        self.assertEqual(self.html.count('data-lightbox-trigger'), 89)
+        self.assertEqual(self.html.count('data-lightbox-trigger'), 91)
         self.assertEqual(self.html.count('class="product-pricing"'), 89)
         self.assertEqual(self.html.count('data-testimonial-card'), 0)
 
@@ -1219,7 +1219,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
-        self.assertEqual(len(triggers), 89)
+        self.assertEqual(len(triggers), 91)
         for trigger in triggers:
             with self.subTest(trigger=trigger):
                 self.assertRegex(trigger, r'href=["\']assets/[^"\']+["\']')

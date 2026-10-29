@@ -139,7 +139,12 @@
           if (!price && /^(?:price|from)$/i.test(labelText)) price = labelText + ": " + valueText;
           if (!size && /^size$/i.test(labelText) && !/suggested size|confirm with saloni|custom size in inches|component size to confirm/i.test(valueText)) size = "Size: " + valueText;
         });
-        return { trigger: trigger, card: card, image: image, title: title ? title.textContent.trim() : "", price: price, size: size, description: image ? (image.alt || "") : "" };
+        var imageAlt = image ? (image.alt || "") : "";
+        var paragraphs = card ? Array.prototype.map.call(card.querySelectorAll("figcaption p"), function (paragraph) { return paragraph.textContent.trim(); }).filter(function (paragraph) { return paragraph; }) : [];
+        var description = paragraphs.join(" ");
+        if (!description) description = imageAlt;
+        else if (imageAlt && /illustrative preview|reference image|reference design/i.test(imageAlt) && description.indexOf(imageAlt) === -1) description += " " + imageAlt;
+        return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description };
       }
 
       function visibleCollection(trigger) {
@@ -157,7 +162,7 @@
         var item = lightboxItems[lightboxIndex] || productDetails(lastTrigger);
         if (!item) return;
         lightboxImage.src = item.trigger.href;
-        lightboxImage.alt = item.description || "Artwork preview";
+        lightboxImage.alt = item.imageAlt || item.description || "Artwork preview";
         if (lightboxName) { lightboxName.textContent = item.title; lightboxName.hidden = !item.title; }
         if (lightboxPrice) { lightboxPrice.textContent = item.price || ""; lightboxPrice.hidden = !item.price; }
         if (lightboxSize) { lightboxSize.textContent = item.size || ""; lightboxSize.hidden = !item.size; }
@@ -220,7 +225,10 @@
           if (!image) return;
           event.preventDefault();
           lastTrigger = trigger;
-          lightboxItems = visibleCollection(trigger);
+          var targetId = typeof trigger.getAttribute === "function" ? trigger.getAttribute("data-lightbox-target") : "";
+          var targetCard = targetId && document.getElementById ? document.getElementById(targetId) : null;
+          var targetTrigger = targetCard && targetCard.querySelector ? targetCard.querySelector("[data-lightbox-trigger]") : null;
+          lightboxItems = targetTrigger ? [productDetails(targetTrigger)] : visibleCollection(trigger);
           lightboxIndex = Math.max(0, lightboxItems.findIndex(function (item) { return item.trigger === trigger; }));
           renderLightboxItem();
           lightbox.showModal();
@@ -271,9 +279,11 @@
     var pageStatus = document.getElementById("catalogue-page-status");
     var pagination = document.getElementById("catalogue-pagination");
     var catalogueHeading = document.getElementById("catalogue-filters-title");
+    var originalCatalogueHeading = catalogueHeading ? catalogueHeading.textContent : "";
     var pageSize = 8;
     var validTypes = ["all", "couple", "diwali", "frames", "premium", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
+    var typeLabels = { all: "All gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
 
     var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
       return !card.closest || !card.closest("#testimonials");
@@ -386,6 +396,36 @@
       }
     }
 
+    function toggleClass(element, name, enabled) {
+      if (element && element.classList && typeof element.classList.toggle === "function") element.classList.toggle(name, enabled);
+    }
+
+    function sectionHeading(section) {
+      var headingId = section && section.getAttribute ? section.getAttribute("aria-labelledby") : "";
+      return headingId && document.getElementById ? document.getElementById(headingId) : null;
+    }
+
+    function updateCataloguePresentation() {
+      var selectedType = validTypes.indexOf(typeFilter.value) !== -1 ? typeFilter.value : "all";
+      if (catalogueHeading) catalogueHeading.textContent = allVisible ? (typeLabels[selectedType] || typeLabels.all) : originalCatalogueHeading;
+      toggleClass(tools, "catalogue-full", allVisible);
+      sections.forEach(function (section) {
+        var fullSection = allVisible && !section.hidden;
+        toggleClass(section, "catalogue-full", fullSection);
+        var heading = sectionHeading(section);
+        if (!heading) return;
+        if (fullSection) {
+          if (!heading.getAttribute("data-catalogue-original")) heading.setAttribute("data-catalogue-original", heading.textContent);
+          var firstCard = cardsForSection(section)[0];
+          heading.textContent = typeLabels[typeFor(firstCard)] || "Gifts";
+        } else {
+          var original = heading.getAttribute("data-catalogue-original");
+          if (original) heading.textContent = original;
+          heading.removeAttribute("data-catalogue-original");
+        }
+      });
+    }
+
     function applyFilters() {
       var matchingCards = catalogueCards();
       var pages = cataloguePages(matchingCards);
@@ -417,6 +457,7 @@
         disclosure.setAttribute("aria-expanded", String(canExpand && isExpanded(section)));
         disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : section.id === "premium-collection" ? "View all" : "See all";
       });
+      updateCataloguePresentation();
       var resultsSection = allVisible && pageCards.length ? sectionFor(pageCards[pageCards.length - 1]) : null;
       if (resultsSection && resultsSection.appendChild) resultsSection.appendChild(results);
       else if (resultsHome && resultsHome.appendChild) resultsHome.appendChild(results);
@@ -497,8 +538,7 @@
 
     function showAll(commit) {
       var state = setFullState("all", "all", 1);
-      var firstSection = state && state.pageCards && state.pageCards.length ? sectionFor(state.pageCards[0]) : null;
-      if (commit) writeUrl(urlWithState({ full: true, type: "all", budget: "all", page: page }, firstSection ? "#" + firstSection.id : "#catalogue-filters"));
+      if (commit) writeUrl(urlWithState({ full: true, type: "all", budget: "all", page: page }, "#catalogue-filters"));
       return state;
     }
 
@@ -520,15 +560,6 @@
 
     function focusCatalogueHeading(pageCards) {
       var target = catalogueHeading;
-      if (allVisible && pageCards && pageCards.length) {
-        var firstSection = sectionFor(pageCards[0]);
-        var headingId = firstSection && firstSection.getAttribute ? firstSection.getAttribute("aria-labelledby") : "";
-        var sectionHeading = headingId ? document.getElementById(headingId) : null;
-        if (sectionHeading) {
-          if (sectionHeading.setAttribute) sectionHeading.setAttribute("tabindex", "-1");
-          target = sectionHeading;
-        }
-      }
       if (!target) return;
       if (typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
       if (typeof target.focus === "function") target.focus({ preventScroll: true });
@@ -567,6 +598,7 @@
         var normalized = urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page });
         if (!sameUrl(normalized)) writeUrl(normalized, true);
         scrollToHash(window.location && window.location.hash);
+        if ((window.location && window.location.hash) === "#catalogue-filters") focusCatalogueHeading();
         return;
       }
       showFeatured(false);
@@ -580,8 +612,7 @@
       if (nextPage === page) return;
       page = nextPage;
       var state = applyFilters();
-      var firstSection = state && state.pageCards && state.pageCards.length ? sectionFor(state.pageCards[0]) : null;
-      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }, firstSection ? "#" + firstSection.id : "#catalogue-filters"));
+      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }, "#catalogue-filters"));
       focusCatalogueHeading(state && state.pageCards);
     }
 
