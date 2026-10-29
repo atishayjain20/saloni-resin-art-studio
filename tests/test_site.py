@@ -1222,8 +1222,8 @@ class StaticSiteContractTests(unittest.TestCase):
         studio_match = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(studio_match)
         studio = studio_match.group(0)
-        self.assertRegex(studio, r'Displayed prices are for pictured/base designs')
-        self.assertRegex(studio, r'Size, materials, and personalisation can change the final quote; Saloni confirms the final quote')
+        self.assertNotRegex(studio, r'Displayed prices are for pictured/base designs')
+        self.assertNotRegex(studio, r'Size, materials, and personalisation can change the final quote; Saloni confirms the final quote')
 
         studio_matrix = {
             "studio-blue-mantra-frame.jpeg": ("5,499", "4,099", 25),
