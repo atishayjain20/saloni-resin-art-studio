@@ -366,13 +366,19 @@ test("search clear, category navigation, previews, and no-result reset clear q b
   harness.searchFilter.dispatch("input");
   harness.typeFilter.value = "diwali";
   harness.typeFilter.dispatch("change");
+  harness.priceFilter.value = "999";
+  harness.priceFilter.dispatch("change");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "product");
 
   harness.searchFilter.value = "";
   harness.searchFilter.dispatch("input");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), null);
   assert.equal(harness.typeFilter.value, "diwali");
-  assert.equal(harness.pagination.hidden, false);
+  assert.equal(harness.priceFilter.value, "999");
+  assert.equal(harness.pagination.hidden, true);
+  assert.equal(harness.results.parentNode, harness.enhancement);
+  assert.equal(visibleCards(harness).length, 3);
+  assert.equal(harness.windowObject.history.pushes.length, 2);
 
   harness.corporateShortcut.dispatch("click");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), null);
@@ -385,6 +391,31 @@ test("search clear, category navigation, previews, and no-result reset clear q b
   harness.emptyReset.dispatch("click");
   assert.equal(harness.searchFilter.value, "");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), null);
+});
+
+test("cleared search keeps selected filters when Back returns from category navigation", () => {
+  const harness = createHarness({ count: 12 });
+  harness.searchFilter.value = "product";
+  harness.searchFilter.dispatch("input");
+  harness.typeFilter.value = "diwali";
+  harness.typeFilter.dispatch("change");
+  harness.priceFilter.value = "999";
+  harness.priceFilter.dispatch("change");
+
+  harness.searchFilter.value = "";
+  harness.searchFilter.dispatch("input");
+  const previewUrl = harness.windowObject.location.href;
+  assert.equal(new URL(previewUrl).searchParams.get("view"), "preview");
+  assert.equal(new URL(previewUrl).searchParams.get("type"), "diwali");
+  assert.equal(new URL(previewUrl).searchParams.get("budget"), "999");
+
+  harness.corporateShortcut.dispatch("click");
+  assert.equal(harness.typeFilter.value, "corporate");
+  harness.windowObject.history.replaceState({}, "", previewUrl);
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.typeFilter.value, "diwali");
+  assert.equal(harness.priceFilter.value, "999");
+  assert.equal(harness.pagination.hidden, true);
 });
 
 test("See all gifts stays hidden in full mode and returns for section previews", () => {
