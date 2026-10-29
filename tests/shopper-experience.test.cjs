@@ -397,12 +397,18 @@ test("shopper confidence strip and primary navigation use the approved customer 
 
 test("lightbox exposes product-aware controls without changing the catalogue source cards", () => {
   const dialog = html.match(/<dialog class="lightbox-dialog"[\s\S]*?<\/dialog>/)?.[0] || "";
+  const figure = dialog.match(/<figure class="lightbox-figure"[^>]*>[\s\S]*?<\/figure>/)?.[0] || "";
+  const summary = dialog.match(/<div class="lightbox-order-summary">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(dialog, /id="lightbox-previous"/);
   assert.match(dialog, /id="lightbox-next"/);
-  assert.match(dialog, /id="lightbox-product-name"/);
-  assert.match(dialog, /id="lightbox-product-price"/);
-  assert.match(dialog, /id="lightbox-product-size"/);
-  assert.match(dialog, /id="lightbox-request"/);
+  assert.match(summary, /id="lightbox-product-name"/);
+  assert.match(summary, /id="lightbox-product-price"/);
+  assert.match(summary, /id="lightbox-request"/);
+  assert.doesNotMatch(figure, /id="lightbox-product-name"|id="lightbox-product-price"/);
+  assert.match(figure, /tabindex="0"/);
+  assert.match(figure, /aria-label="Scrollable artwork details"/);
+  assert.match(figure, /id="lightbox-product-size"/);
+  assert.match(figure, /id="lightbox-image-description"/);
   assert.match(dialog, /id="lightbox-position"/);
   assert.match(script, /ArrowLeft/);
   assert.match(script, /ArrowRight/);
@@ -418,6 +424,8 @@ test("lightbox keeps the request action fixed below an independently scrolling f
   assert.match(css, /\.lightbox-figure\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*auto/);
   assert.match(css, /\.lightbox-request\s*\{[^}]*width:\s*100%[^}]*align-self:\s*stretch[^}]*justify-content:\s*center/);
   assert.match(mobileCss, /\.lightbox-request\s*\{[^}]*justify-content:\s*center/);
+  assert.match(css, /@media \(max-width: 620px\),\s*\(max-height: 620px\) and \(max-width: 900px\)/);
+  assert.match(css, /@media \(max-width: 620px\),\s*\(max-height: 620px\) and \(max-width: 900px\) \{[\s\S]*?\.lightbox-panel\s*\{[^}]*height:\s*calc\(100dvh - 1rem\)[^}]*max-height:\s*calc\(100dvh - 1rem\)/);
   assert.match(dialog, /<figure class="lightbox-figure" tabindex="0" aria-label="Scrollable artwork details">/);
 });
 

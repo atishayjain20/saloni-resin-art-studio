@@ -877,13 +877,15 @@
       <figure class="lightbox-figure" tabindex="0" aria-label="Scrollable artwork details">
         <img class="lightbox-image" id="lightbox-image" alt="Artwork preview" width="1200" height="900">
         <figcaption class="lightbox-caption" id="lightbox-caption">
-          <strong id="lightbox-product-name"></strong>
-          <span id="lightbox-product-price" hidden></span>
           <span id="lightbox-product-size" hidden></span>
           <span id="lightbox-image-description"></span>
         </figcaption>
       </figure>
-      <button class="button button-dark lightbox-request" id="lightbox-request" type="button" hidden>Request this item</button>
+      <div class="lightbox-order-summary">
+        <strong id="lightbox-product-name"></strong>
+        <span id="lightbox-product-price" hidden></span>
+        <button class="button button-dark lightbox-request" id="lightbox-request" type="button" hidden>Request this item</button>
+      </div>
     </div>
   </dialog>
 
