@@ -417,7 +417,8 @@ test("customizer starts compact and opens from the frame-design nav or hash", ()
 
 test("request CTA vocabulary is consistent and supports general enquiries", () => {
   assert.doesNotMatch(section("hero"), /Request a custom gift/);
-  assert.match(html, /class="nav-cta" href="#order" data-order-prefill="general"/);
+  assert.doesNotMatch(html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "", /nav-cta/);
+  assert.match(html, /<a href="#order" data-order-prefill="general">Contact Saloni<\/a>/);
   assert.match(script, /button\.textContent = "Request this item"/);
   assert.match(script, /data-order-prefill="general"/);
   assert.match(script, /illustrative preview\|reference image/);
@@ -425,10 +426,11 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("shopper confidence strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders", "Order"].forEach((label) => {
+  ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
-  assert.equal((nav.match(/<a\b/g) || []).length, 6);
+  assert.doesNotMatch(nav, />Order\s*<\/a>/);
+  assert.equal((nav.match(/<a\b/g) || []).length, 5);
   assert.match(html, /class="hero-trust-strip"/);
   ["Ajmer studio", "Shipping across India", "Handmade to order", "Contact Saloni"].forEach((fact) => assert.match(html, new RegExp(fact)));
   assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
