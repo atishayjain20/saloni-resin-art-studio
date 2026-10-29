@@ -654,6 +654,16 @@
     document.querySelectorAll("[data-browse-filters]").forEach(function (link) {
       link.addEventListener("click", function (event) {
         event.preventDefault();
+        var firstVisibleGrid = null;
+        for (var index = 0; index < sections.length; index += 1) {
+          if (sections[index].hidden || !sections[index].querySelector) continue;
+          firstVisibleGrid = sections[index].querySelector(".catalogue-grid");
+          if (firstVisibleGrid) break;
+        }
+        if (firstVisibleGrid && typeof firstVisibleGrid.scrollIntoView === "function") {
+          firstVisibleGrid.scrollIntoView({ behavior: "auto", block: "start" });
+          return;
+        }
         scrollToHash(link.getAttribute("href") || "#catalogue-filters");
       });
     });

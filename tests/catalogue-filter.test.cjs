@@ -46,6 +46,8 @@ class FakeSection {
     this.classList = { values: new Set(), toggle: (name, enabled) => enabled ? this.classList.values.add(name) : this.classList.values.delete(name), contains: (name) => this.classList.values.has(name) };
     this.disclosure = new FakeControl("");
     this.disclosure.hidden = false;
+    this.grid = new FakeControl("");
+    this.grid.scrollIntoView = (options) => { this.grid.scrolledIntoView = options; };
   }
   appendChild(child) {
     if (child.parentNode && child.parentNode.children) {
@@ -58,6 +60,7 @@ class FakeSection {
   getAttribute(name) { return this.attributes[name] || ""; }
   querySelector(selector) {
     if (selector === ".work-card, .romantic-keepsake-card") return this.cards[0] || null;
+    if (selector === ".catalogue-grid") return this.grid;
     return selector === "[data-catalogue-disclosure]" ? this.disclosure : null;
   }
 }
@@ -133,7 +136,8 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
         : `₹${149 + index * 25}`;
     return new FakeCard(section, price, `product-${index + 1}`, index < 8, eventLog);
   });
-  const tools = {};
+  const tools = new FakeControl("");
+  tools.scrollIntoView = (options) => { tools.scrolledIntoView = options; };
   const typeFilter = new FakeControl("all");
   const priceFilter = new FakeControl("all");
   const resetButton = new FakeControl("");
@@ -222,7 +226,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   const context = { document: documentObject, window: windowObject, URL, URLSearchParams };
   vm.createContext(context);
   vm.runInContext(`${catalogueFunction}\ninitCatalogueExperience();`, context, { filename: "script.js" });
-  return { cards, sections, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, results, enhancement, sectionHeadings, heading, browseFilters, browseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, eventLog };
+  return { cards, sections, tools, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, results, enhancement, sectionHeadings, heading, browseFilters, browseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, eventLog };
 }
 
 function visibleCards(harness) { return harness.cards.filter((card) => !card.hidden); }
@@ -322,6 +326,29 @@ test("filters use AND logic and reset pagination to page one", () => {
   harness.priceFilter.dispatch("change");
   assert.equal(harness.pagePrevious.disabled, true);
   assert.match(harness.status.textContent, /Page 1/);
+});
+
+test("hero browse link jumps to the first visible product grid without changing catalogue state", () => {
+  const harness = createHarness();
+  harness.browseFilters.dispatch("click");
+  assert.equal(harness.sections[0].grid.scrolledIntoView.behavior, "auto");
+  assert.equal(harness.sections[0].grid.scrolledIntoView.block, "start");
+  const before = visibleCards(harness).map((card) => card.id);
+
+  harness.corporateShortcut.dispatch("click");
+  harness.sections.forEach((section) => { section.grid.scrolledIntoView = undefined; });
+  const filtered = visibleCards(harness).map((card) => card.id);
+  harness.browseFilters.dispatch("click");
+  assert.deepEqual(visibleCards(harness).map((card) => card.id), filtered);
+  assert.equal(harness.sections[2].grid.scrolledIntoView.behavior, "auto");
+  assert.equal(harness.sections[2].grid.scrolledIntoView.block, "start");
+  assert.notDeepEqual(filtered, before);
+
+  harness.typeFilter.value = "not-a-real-type";
+  harness.typeFilter.dispatch("change");
+  harness.browseFilters.dispatch("click");
+  assert.equal(harness.tools.scrolledIntoView.behavior, "auto");
+  assert.equal(harness.tools.scrolledIntoView.block, "start");
 });
 
 test("paging replaces cards and returns focus to the first visible section heading", () => {

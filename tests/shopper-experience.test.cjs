@@ -27,7 +27,9 @@ test("homepage leads with finished artwork and a browse-gifts CTA", () => {
   assert.match(hero, /data-lightbox-target="romantic-trinket"/);
   assert.match(hero, /data-lightbox-target="romantic-initial"/);
   assert.match(hero, /Browse gifts by type or budget/);
+  assert.match(hero, /data-browse-filters/);
   assert.doesNotMatch(hero, /hero-floral-bouquet\.jpg/);
+  assert.doesNotMatch(html, /Some catalogue images are illustrative or reference ideas\. Saloni confirms availability, materials, final design, quote, and delivery\./);
 });
 
 test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable", () => {
@@ -72,6 +74,11 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   assert.doesNotMatch(css, /body\s*\{[^}]*overflow-x:\s*hidden/);
   assert.doesNotMatch(css.slice(0, mobileStart), /#hero/);
   assert.doesNotMatch(css.slice(reducedMotionStart), /#hero/);
+});
+
+test("browse gifts keeps the first product row clear of the sticky header", () => {
+  assert.match(css, /\.catalogue-tools, \.catalogue-grid, \.festive-banner/);
+  assert.match(css, /\.catalogue-grid, \.festive-banner[^}]*scroll-margin-top:\s*var\(--sticky-offset\)/);
 });
 
 test("catalogue enhancement has accessible filters, preview mode, and a no-result reset", () => {
