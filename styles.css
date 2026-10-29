@@ -179,6 +179,7 @@ h1 em { color: var(--rose); font-style: italic; }
 .rail-heading h2 { max-width: 10ch; margin-bottom: 0; }
 .catalogue-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(1rem, 2vw, 1.5rem); padding: 0.2rem 0 1rem; }
 .work-card { min-width: 0; }
+.catalogue-ready .catalogue-grid > :is(.work-card, .romantic-keepsake-card) { cursor: pointer; }
 .work-card figure { margin: 0; }
 .work-card img { width: 100%; border-radius: 1.2rem; box-shadow: 0 9px 25px rgba(86, 57, 45, 0.1); }
 :is(.work-card, .romantic-keepsake-card, .collection-card) img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; object-position: center; padding: 0.5rem; background: var(--paper); }

@@ -218,20 +218,31 @@
         pendingLightboxRequest = requestButton;
         lightbox.close();
       });
+      function openLightbox(trigger, restoreTarget) {
+        lastTrigger = restoreTarget || trigger;
+        var targetId = typeof trigger.getAttribute === "function" ? trigger.getAttribute("data-lightbox-target") : "";
+        var targetCard = targetId && document.getElementById ? document.getElementById(targetId) : null;
+        var targetTrigger = targetCard && targetCard.querySelector ? targetCard.querySelector("[data-lightbox-trigger]") : null;
+        lightboxItems = targetTrigger ? [productDetails(targetTrigger)] : visibleCollection(trigger);
+        lightboxIndex = Math.max(0, lightboxItems.findIndex(function (item) { return item.trigger === trigger; }));
+        renderLightboxItem();
+        lightbox.showModal();
+      }
       lightboxTriggers.forEach(function (trigger) {
+        var card = trigger.closest ? trigger.closest("article") : null;
+        if (card && card.addEventListener) {
+          card.addEventListener("click", function (event) {
+            var target = event && event.target;
+            if (!event || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || (target && target.closest && target.closest("a,button,input,select,textarea,summary,[role='button'],[role='link'],[contenteditable='true']"))) return;
+            openLightbox(trigger, trigger);
+          });
+        }
         trigger.addEventListener("click", function (event) {
           if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           var image = trigger.querySelector("img");
           if (!image) return;
           event.preventDefault();
-          lastTrigger = trigger;
-          var targetId = typeof trigger.getAttribute === "function" ? trigger.getAttribute("data-lightbox-target") : "";
-          var targetCard = targetId && document.getElementById ? document.getElementById(targetId) : null;
-          var targetTrigger = targetCard && targetCard.querySelector ? targetCard.querySelector("[data-lightbox-trigger]") : null;
-          lightboxItems = targetTrigger ? [productDetails(targetTrigger)] : visibleCollection(trigger);
-          lightboxIndex = Math.max(0, lightboxItems.findIndex(function (item) { return item.trigger === trigger; }));
-          renderLightboxItem();
-          lightbox.showModal();
+          openLightbox(trigger, trigger);
         });
       });
     }
