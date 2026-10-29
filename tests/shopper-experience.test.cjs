@@ -283,8 +283,8 @@ test("resin-only catalogue removes hamper products and keeps both ₹2,000 budge
 test("customizer presents a keyboard-matched basics, preview, advanced, and save/share flow", () => {
   const customizerSection = section("customizer");
   const order = [
-    "frame-template", "colour-theme", "reference-image", "personal-text", "frame-preset",
-    "preview-stage", "order-from-customizer", "customizer-design-help", "customizer-advanced",
+    "preview-stage", "frame-template", "colour-theme", "reference-image", "personal-text", "frame-preset",
+    "order-from-customizer", "customizer-advanced",
     "customizer-save-share"
   ];
   const positions = order.map((id) => customizerSection.indexOf(`id="${id}"`));
@@ -308,7 +308,16 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   const shareStatusPosition = customizerSection.indexOf('id="share-status"');
   const saveSharePosition = customizerSection.indexOf('id="customizer-save-share"');
   assert.ok(shareStatusPosition >= 0 && shareStatusPosition < saveSharePosition, "request status stays visible before the closed save/share disclosure");
-  assert.match(customizerSection, /Sends your design summary and size\. Attach a downloaded preview separately\./);
+  assert.match(customizerSection, /Sends this preview, your choices and size with your request\./);
+  assert.match(customizerSection, /Request this design sends the preview, choices and size with your request\./);
+  assert.match(customizerSection, /Preview your frame here; Saloni confirms final size, materials, and quote\./);
+  const previewPosition = customizerSection.indexOf('class="customizer-preview-panel"');
+  const basicsPosition = customizerSection.indexOf('class="customizer-basics-flow"');
+  assert.ok(previewPosition >= 0 && previewPosition < basicsPosition, "preview precedes the basic controls in the form");
+  const disclosureEnd = customizerSection.lastIndexOf("</details>");
+  const designHelpPosition = customizerSection.indexOf('id="customizer-design-help"');
+  assert.equal((customizerSection.match(/id="customizer-design-help"/g) || []).length, 1);
+  assert.ok(designHelpPosition > disclosureEnd, "design help stays outside the closed designer disclosure");
   assert.doesNotMatch(customizerSection.match(/<details[^>]*id="customizer-advanced"[^>]*>/)?.[0] || "", /\bopen\b/);
   assert.doesNotMatch(customizerSection.match(/<details[^>]*id="customizer-save-share"[^>]*>/)?.[0] || "", /\bopen\b/);
   assert.match(customizerSection, /Let Saloni design it for me/);
@@ -321,11 +330,36 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   assert.match(css, /\.customizer-preview-panel\s*\{[^}]*grid-row:\s*1\s*\/\s*span\s*5/);
   assert.match(css, /@media \(min-width: 841px\) and \(min-height: 720px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*sticky/);
   assert.match(css, /@media \(min-width: 841px\) and \(max-height: 719px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*static/);
-  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*static/);
-  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*grid-row:\s*auto/);
+  assert.match(css, /\.customizer-disclosure-row\s*\{[^}]*display:\s*block/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-layout\s*\{[^}]*display:\s*block/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-form\s*\{[^}]*display:\s*block/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*sticky/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview \.preview-stage\s*\{[^}]*width:\s*min\(100%, 20dvh, 13rem\)/);
+  assert.match(css, /\.customizer-form :is\(input, select, textarea, button, a, summary\)\s*\{[^}]*scroll-margin-block-start/);
+  assert.match(css, /\.customizer-form:has\(input\[type="text"\]:focus, input\[type="number"\]:focus, textarea:focus, button:focus, a:focus, summary:focus\)/);
+  assert.match(css, /@media \(max-width: 840px\) and \(max-height: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*static/);
   assert.match(css, /@media \(max-width: 840px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*grid-row:\s*auto/);
   const customizerCss = css.slice(css.indexOf(".customizer-layout"), css.indexOf(".order-section"));
   assert.doesNotMatch(customizerCss, /(?:^|[;}])\s*order\s*:/);
+});
+
+test("customizer starts compact and opens from the frame-design nav or hash", () => {
+  const customizerSection = section("customizer");
+  const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
+  const disclosureStart = customizerSection.indexOf('<details class="customizer-disclosure" id="customizer-disclosure">');
+  const disclosureEnd = customizerSection.indexOf("</details>\n    </section>", disclosureStart);
+  const disclosure = customizerSection.slice(disclosureStart, disclosureEnd === -1 ? undefined : disclosureEnd);
+
+  assert.match(nav, /<a href="#customizer"[^>]*>Design a frame/);
+  assert.match(disclosure, /<summary>Design a frame<\/summary>/);
+  assert.doesNotMatch(disclosure.match(/<details[^>]+id="customizer-disclosure"[^>]*>/)?.[0] || "", /\bopen\b/);
+  assert.ok(disclosure.indexOf('class="customizer-layout"') >= 0, "existing editor stays in the disclosure");
+  assert.ok(disclosure.indexOf('class="customizer-handoff"') >= 0, "existing handoff stays in the disclosure");
+  assert.match(customizerSection, /Choose colours, add a photo or message, and preview your custom frame\./);
+  assert.match(css, /\.customizer-disclosure\s*>\s*summary/);
+  assert.match(css, /\.customizer-heading h2\s*\{[^}]*max-width:\s*18ch[^}]*font-size:\s*clamp\(2rem, 4\.5vw, 3\.5rem\)/);
+  assert.match(script, /customizerDisclosure\.open\s*=\s*true/);
+  assert.match(script, /hashchange/);
 });
 
 test("request CTA vocabulary is consistent and supports general enquiries", () => {
@@ -337,7 +371,7 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("shopper confidence strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Couple keepsakes", "Resin frames", "Custom design", "Corporate orders", "Order"].forEach((label) => {
+  ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders", "Order"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
   assert.equal((nav.match(/<a\b/g) || []).length, 6);

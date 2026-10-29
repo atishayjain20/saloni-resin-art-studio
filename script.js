@@ -101,6 +101,30 @@
       document.addEventListener("keydown", function (event) { if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true") setNavOpen(false, true); });
     }
 
+    var customizer = document.getElementById("customizer");
+    var customizerDisclosure = document.getElementById("customizer-disclosure");
+    if (customizer && customizerDisclosure) {
+      function openCustomizer(shouldScroll, focusSummary) {
+        customizerDisclosure.open = true;
+        if (shouldScroll && typeof customizer.scrollIntoView === "function") customizer.scrollIntoView({ behavior: "instant", block: "start" });
+        var summary = customizerDisclosure.querySelector("summary");
+        if (focusSummary && summary && typeof summary.focus === "function") summary.focus({ preventScroll: true });
+      }
+      document.querySelectorAll('a[href="#customizer"]').forEach(function (link) {
+        link.addEventListener("click", function (event) {
+          if (!event || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          if (window.history && window.history.pushState) window.history.pushState({}, "", "#customizer");
+          else if (window.location) window.location.hash = "#customizer";
+          openCustomizer(true, true);
+        });
+      });
+      if (window.location && window.location.hash === "#customizer") openCustomizer(false);
+      window.addEventListener("hashchange", function () {
+        if (window.location && window.location.hash === "#customizer") openCustomizer(true);
+      });
+    }
+
     var lightbox = document.getElementById("art-lightbox");
     var lightboxImage = document.getElementById("lightbox-image");
     var lightboxCaption = document.getElementById("lightbox-caption");

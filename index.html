@@ -61,7 +61,7 @@
         <a href="#catalogue-filters" data-browse-all>Gifts <span aria-hidden="true">↘</span></a>
         <a href="#romantic-keepsakes" data-category-shortcut="couple">Couple keepsakes <span aria-hidden="true">↘</span></a>
         <a href="#studio-art" data-category-shortcut="frames">Resin frames <span aria-hidden="true">↘</span></a>
-        <a href="#customizer">Custom design <span aria-hidden="true">↘</span></a>
+        <a href="#customizer" data-customizer-open>Design a frame <span aria-hidden="true">↘</span></a>
         <a href="corporate-gifting/">Corporate orders <span aria-hidden="true">↗</span></a>
         <a class="nav-cta" href="#order" data-order-prefill="general">Order <span aria-hidden="true">↗</span></a>
       </nav>
@@ -600,11 +600,26 @@
       <div class="customizer-heading">
         <p class="eyebrow">A starting point</p>
         <h2 id="customizer-title">Design your custom resin frame.</h2>
-        <p>Choose curated details and make a visual brief to share with Saloni. The scene is illustrative; Saloni confirms the final size and quote.</p>
+        <p>Choose colours, add a photo or message, and preview your custom frame.</p>
       </div>
 
+      <div class="customizer-disclosure-row">
+      <details class="customizer-disclosure" id="customizer-disclosure">
+        <summary>Design a frame</summary>
       <div class="customizer-layout">
         <form class="customizer-form" id="customizer-form" novalidate>
+          <div class="customizer-preview-panel">
+            <figure class="customizer-preview" aria-label="Illustrative preview">
+              <p class="preview-label">Illustrative preview</p>
+              <div class="preview-stage" id="preview-stage">
+                <canvas class="scene-canvas" id="scene-canvas" width="1200" height="1200" role="img" tabindex="0" aria-label="Illustrative preview of custom resin frame" aria-describedby="preview-dimension-label image-placement-hint" aria-keyshortcuts="Arrow keys, Shift+Arrow, Escape"></canvas>
+                <span class="brush-cursor" id="brush-cursor" aria-hidden="true"></span>
+              </div>
+              <p class="preview-dimension-label" id="preview-dimension-label">Square · 8 × 8 in</p>
+              <figcaption>Preview your frame here; Saloni confirms final size, materials, and quote.</figcaption>
+            </figure>
+          </div>
+
           <div class="customizer-basics-flow">
           <fieldset class="customizer-fieldset customizer-basics">
             <legend>Start here</legend>
@@ -657,24 +672,11 @@
           </fieldset>
           </div>
 
-          <div class="customizer-preview-panel">
-            <figure class="customizer-preview" aria-label="Illustrative preview">
-              <p class="preview-label">Illustrative preview</p>
-              <div class="preview-stage" id="preview-stage">
-                <canvas class="scene-canvas" id="scene-canvas" width="1200" height="1200" role="img" tabindex="0" aria-label="Illustrative preview of custom resin frame" aria-describedby="preview-dimension-label image-placement-hint" aria-keyshortcuts="Arrow keys, Shift+Arrow, Escape"></canvas>
-                <span class="brush-cursor" id="brush-cursor" aria-hidden="true"></span>
-              </div>
-              <p class="preview-dimension-label" id="preview-dimension-label">Square · 8 × 8 in</p>
-              <figcaption>One responsive scene canvas powers this preview and the downloaded PNG. Saloni confirms the final size, materials, and quote.</figcaption>
-            </figure>
-          </div>
-
           <div class="customizer-actions">
             <button class="button button-dark download-button" id="order-from-customizer" type="button" data-order-prefill="customizer">Request this design</button>
-            <button class="button button-line download-button" id="customizer-design-help" type="button" data-order-prefill="general" data-design-help="true">Let Saloni design it for me</button>
             <p class="customizer-status customizer-request-status" id="share-status" role="status" aria-live="polite"></p>
             <button class="button button-line download-button" id="customizer-continue-without-preview" type="button" hidden>Continue without preview</button>
-            <p class="share-guidance customizer-request-note">Sends your design summary and size. Attach a downloaded preview separately.</p>
+            <p class="share-guidance customizer-request-note">Sends this preview, your choices and size with your request.</p>
           </div>
 
           <details class="customizer-advanced" id="customizer-advanced">
@@ -829,12 +831,15 @@
       <div class="customizer-handoff">
         <div>
           <strong>Take the summary to the studio.</strong>
-          <p>Images and paint stay on this device until you choose to share. Share design hands the PNG and summary to the destination you select; Download keeps a local PNG. When you contact Saloni, attach your image or a screenshot separately if needed.</p>
+          <p>Images and paint stay on this device until you choose to share. Request this design sends the preview, choices and size with your request. Download and Instagram remain optional ways to share a copy.</p>
         </div>
         <div class="customizer-contact-links">
           <a class="button button-dark" href="tel:8209238541">Call Saloni <span aria-hidden="true">↗</span></a>
           <a class="button button-line" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Instagram <span aria-hidden="true">↗</span></a>
         </div>
+      </div>
+      </details>
+      <button class="button button-line customizer-design-help" id="customizer-design-help" type="button" data-order-prefill="general" data-design-help="true">Let Saloni design it for me</button>
       </div>
     </section>
 

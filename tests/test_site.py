@@ -349,7 +349,7 @@ class StaticSiteContractTests(unittest.TestCase):
             r'<a href="#catalogue-filters" data-browse-all>Gifts[\s\S]*?'
             r'<a href="#romantic-keepsakes" data-category-shortcut="couple">Couple keepsakes[\s\S]*?'
             r'<a href="#studio-art" data-category-shortcut="frames">Resin frames[\s\S]*?'
-            r'<a href="#customizer">Custom design[\s\S]*?'
+            r'<a href="#customizer" data-customizer-open>Design a frame[\s\S]*?'
             r'<a href="corporate-gifting/">Corporate orders[\s\S]*?'
             r'<a class="nav-cta" href="#order" data-order-prefill="general">Order',
         )
@@ -1381,7 +1381,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('id="scene-canvas"', section)
         self.assertIn('id="customizer-summary"', section)
         self.assertIn("Images and paint stay on this device until you choose to share", section)
-        self.assertIn("attach your image or a screenshot separately", section)
+        self.assertIn("Request this design sends the preview, choices and size with your request", section)
+        self.assertNotIn("attach your image or a screenshot separately", section)
         self.assertIn('href="tel:8209238541"', section)
         self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', section)
 
