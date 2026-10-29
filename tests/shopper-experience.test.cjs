@@ -9,6 +9,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
 const customizer = fs.readFileSync(path.join(root, "customizer.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+const icons = fs.readFileSync(path.join(root, "assets/category-icons.svg"), "utf8");
 
 function section(id) {
   const match = html.match(new RegExp(`<section[^>]+id=["']${id}["'][\\s\\S]*?<\\/section>`));
@@ -209,6 +210,37 @@ test("category shortcuts use three columns at tablet widths and two on mobile", 
   assert.ok(mobile > tablet);
 });
 
+test("category shortcuts use accessible local icons while action arrows stay text", () => {
+  const shortcuts = html.match(/<nav class="category-shortcuts[^\"]*"[\s\S]*?<\/nav>/)?.[0] || "";
+  [
+    ["couple", "heart"],
+    ["diwali", "diya"],
+    ["frames", "frame"],
+    ["premium", "gem"],
+    ["corporate", "gift"],
+  ].forEach(([category, icon]) => {
+    const link = shortcuts.match(new RegExp(`<a[^>]+data-category-shortcut="${category}"[\\s\\S]*?<\\/a>`))?.[0] || "";
+    assert.match(link, new RegExp(`assets/category-icons\\.svg#${icon}`));
+    assert.match(link, /<svg class="category-icon" aria-hidden="true" focusable="false">/);
+  });
+  assert.doesNotMatch(shortcuts, /↘/);
+  const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
+  assert.match(nav, /data-browse-all>Gifts <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift/);
+  assert.match(nav, /data-category-shortcut="couple">Couple keepsakes <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#heart/);
+  assert.match(nav, /data-category-shortcut="frames">Resin frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(nav, /data-customizer-open>Design a frame <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(nav, /Corporate orders <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift[\s\S]*<\/svg> <span aria-hidden="true">↗<\/span>/);
+  const footer = html.match(/<div class="footer-links">[\s\S]*?<\/div>/)?.[0] || "";
+  assert.match(footer, /data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(footer, /href="resin-photo-frames\/">Photo frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(footer, /href="namokar-mantra-frames\/">Namokar frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(footer, /href="corporate-gifting\/">Corporate gifting <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift/);
+  assert.match(css, /\.category-icon\s*\{[^}]*width:\s*1\.25rem[^}]*height:\s*1\.25rem[^}]*color:\s*var\(--cocoa\)/);
+  assert.match(css, /\.site-nav \.category-icon, \.footer-links \.category-icon\s*\{[^}]*width:\s*1rem[^}]*height:\s*1rem/);
+  assert.match(icons, /ISC License[\s\S]*Copyright \(c\) 2026 Lucide Icons and Contributors[\s\S]*Permission to use, copy, modify, and\/or distribute[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
+  assert.match(icons, /The MIT License \(MIT\)[\s\S]*Copyright \(c\) 2013-present Cole Bemis[\s\S]*Permission is hereby granted, free of charge[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
+});
+
 test("small-screen layout keeps long labels inside the viewport without masking overflow", () => {
   const firstMobileStart = css.indexOf("@media (max-width: 620px)");
   const catalogueMobileStart = css.indexOf("@media (max-width: 620px)", firstMobileStart + 1);
@@ -399,7 +431,7 @@ test("shopper confidence strip and primary navigation use the approved customer 
   ["Ajmer studio", "Shipping across India", "Handmade to order", "Contact Saloni"].forEach((fact) => assert.match(html, new RegExp(fact)));
   assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
   assert.doesNotMatch(html, /<a href="#diwali" data-category-shortcut="diwali">Browse Diwali designs/);
-  assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art<\/a>/);
+  assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame[\s\S]*<\/a>/);
   assert.doesNotMatch(html, /data-category-shortcut="hampers"|href="#hamper-rail"/);
   assert.match(html, /href="partners\/">Partner Circle<\/a>/);
 });
