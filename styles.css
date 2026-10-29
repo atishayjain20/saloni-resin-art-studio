@@ -371,8 +371,6 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figure { display: flex; flex: 1; flex-direction: column; width: 100%; }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption { display: flex; flex: 1; flex-direction: column; min-width: 0; }
   html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > :is(strong, h3) { display: -webkit-box; min-height: 2.2em; overflow: hidden; font-size: 1.05rem; line-height: 1.1; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > p:first-of-type { display: -webkit-box; min-height: 2.8em; overflow: hidden; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > p:not(:first-of-type) { display: block; line-height: 1.4; overflow-wrap: anywhere; }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing { grid-template-rows: repeat(2, minmax(2.35rem, auto)); margin-top: auto; }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); min-height: 2.35rem; align-items: start; }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dd { min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: right; }
@@ -484,65 +482,55 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .customizer-preview .preview-stage { width: min(100%, 13rem); }
 }
 
+html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > :is(span, p) { display: none; }
+
 /* Align the same product fields across each catalogue row when subgrid is available. */
 @supports (grid-template-rows: subgrid) {
-  .catalogue-grid { row-gap: 0; }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) {
+  html.js .catalogue-grid { row-gap: 0; }
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) {
     display: grid;
-    grid-row: span 8;
+    grid-row: span 5;
     grid-template-rows: subgrid;
     min-height: 0;
     margin-block-end: clamp(1rem, 2vw, 1.5rem);
   }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure {
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure {
     display: grid;
     grid-row: 1 / -1;
     grid-template-rows: subgrid;
     min-width: 0;
     width: 100%;
   }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > .lightbox-trigger {
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > .lightbox-trigger {
     grid-row: 1;
     align-self: start;
   }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption {
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption {
     display: grid;
     grid-row: 2 / -1;
     grid-template-rows: subgrid;
     row-gap: .3rem;
     min-width: 0;
   }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > span {
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > :is(strong, h3) {
     grid-row: 1;
     margin-bottom: 0;
   }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > :is(strong, h3) {
-    grid-row: 2;
-    margin-bottom: 0;
-  }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > p:first-of-type {
-    grid-row: 3;
-    margin-top: 0;
-  }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > p:nth-of-type(2) {
-    grid-row: 4;
-    margin-top: 0;
-  }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing {
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing {
     display: grid;
-    grid-row: 5 / 7;
+    grid-row: 2 / 4;
     grid-template-rows: subgrid;
     row-gap: 0;
     margin-top: 0;
   }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing > div:first-child {
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing > div:first-child {
     grid-row: 1;
   }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing > div:nth-child(2) {
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing > div:nth-child(2) {
     grid-row: 2;
   }
-  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .catalogue-order-button {
-    grid-row: 7;
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .catalogue-order-button {
+    grid-row: 4;
     align-self: start;
     margin-top: 0;
   }
