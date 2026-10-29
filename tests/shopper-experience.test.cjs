@@ -274,6 +274,12 @@ test("pricing keeps current quotes without unsupported discount claims", () => {
   assert.match(section("diwali"), /Diwali prices ₹249–₹1,799/);
 });
 
+test("catalogue prices use lining tabular numerals", () => {
+  const priceRule = css.match(/^:is\(\.work-card, \.romantic-keepsake-card\) figcaption \.product-pricing\s*>\s*div:first-child dd\s*\{([^}]*)\}/m)?.[1] || "";
+  assert.match(priceRule, /font-family:\s*var\(--sans\)/);
+  assert.match(priceRule, /font-variant-numeric:\s*lining-nums tabular-nums/);
+});
+
 test("festive banner is absent while Diwali remains in the collection", () => {
   assert.doesNotMatch(html, /class="[^"]*festive-banner/);
   assert.doesNotMatch(html, /<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs/);
