@@ -195,7 +195,7 @@ h1 em { color: var(--rose); font-style: italic; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; min-width: 0; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dt { color: var(--muted); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dd { margin: 0; color: var(--ink); font-size: 0.82rem; font-weight: 800; text-align: right; overflow-wrap: anywhere; }
-:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:first-child dd { color: var(--cocoa); font: 500 1.35rem/1 var(--display); letter-spacing: -0.02em; }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:first-child dd { color: var(--cocoa); font: 500 1.35rem/1 var(--display); font-family: var(--sans); font-variant-numeric: lining-nums tabular-nums; letter-spacing: -0.02em; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:not(:first-child) dd { font-family: var(--sans); font-size: 0.82rem; font-weight: 800; line-height: 1.35; letter-spacing: normal; white-space: normal; overflow-wrap: anywhere; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dt, :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dd { color: var(--rose-ink); }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing s { color: var(--muted); font-weight: 500; }
