@@ -833,12 +833,10 @@ test("all 89 catalogue cards keep price first and show only known size rows", ()
   assert.match(css, /product-pricing[^}]*div:not\(:first-child\) dd/);
 });
 
-test("order note explains how listed and unlisted sizes affect pricing", () => {
+test("order section omits the removed size-pricing note", () => {
   const order = section("order");
-  const note = "Where a size is listed, the displayed current or estimated price is for that size. If no size is listed, ask Saloni for the available size and final quote. Prices may change with size.";
-  assert.match(order, new RegExp(`<p class="order-size-pricing-note">${note.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}<\/p>`));
-  const noteTail = order.slice(order.indexOf(note));
-  assert.match(noteTail, /<\/p>\s*<\/section>$/, "size note is the last item in the order section");
+  assert.doesNotMatch(order, /order-size-pricing-note/);
+  assert.doesNotMatch(order, /Where a size is listed|Prices may change with size/);
 });
 
 test("uses known size wording and omits unknown catalogue sizes", () => {
