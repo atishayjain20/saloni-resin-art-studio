@@ -500,7 +500,7 @@
       if (pagination) pagination.hidden = !allVisible;
       var pageEnd = pageStart + pageCards.length;
       if (!matchingCards.length) status.textContent = "No gifts match those choices.";
-      else if (!allVisible) status.textContent = "Showing " + matchingCards.length + " section previews.";
+      else if (!allVisible) status.textContent = "";
       else status.textContent = "Showing " + (pageStart + 1) + "–" + pageEnd + " of " + matchingCards.length + " gifts · Page " + page + " of " + pageCount + ".";
       setPageStatus(matchingCards.length, pageCount);
       updatePageControls(matchingCards.length, pageCount);

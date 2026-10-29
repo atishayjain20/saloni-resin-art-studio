@@ -9,6 +9,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
 const customizer = fs.readFileSync(path.join(root, "customizer.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+const icons = fs.readFileSync(path.join(root, "assets/category-icons.svg"), "utf8");
 
 function section(id) {
   const match = html.match(new RegExp(`<section[^>]+id=["']${id}["'][\\s\\S]*?<\\/section>`));
@@ -16,7 +17,7 @@ function section(id) {
   return match[0];
 }
 
-test("homepage leads with finished artwork and a browse-gifts CTA", () => {
+test("homepage leads with finished artwork without duplicate hero CTAs", () => {
   const hero = section("hero");
   assert.match(hero, /assets\/romantic-heart-trinket-tray\.webp/);
   assert.match(hero, /Tiny tray, big feelings/);
@@ -26,8 +27,10 @@ test("homepage leads with finished artwork and a browse-gifts CTA", () => {
   assert.match(hero, /Two letters, one small corner that belongs to both of you\./);
   assert.match(hero, /data-lightbox-target="romantic-trinket"/);
   assert.match(hero, /data-lightbox-target="romantic-initial"/);
-  assert.match(hero, /Browse gifts by type or budget/);
-  assert.match(hero, /data-browse-filters/);
+  assert.doesNotMatch(hero, /class="hero-actions"/);
+  assert.doesNotMatch(hero, /Browse gifts by type or budget/);
+  assert.doesNotMatch(hero, /Request a custom gift/);
+  assert.doesNotMatch(hero, /data-browse-filters/);
   assert.doesNotMatch(hero, /hero-floral-bouquet\.jpg/);
   assert.doesNotMatch(html, /Some catalogue images are illustrative or reference ideas\. Saloni confirms availability, materials, final design, quote, and delivery\./);
 });
@@ -115,6 +118,26 @@ test("premium catalogue results keep readable text on the dark section", () => {
   assert.match(resultsRule, /color:\s*#fbf5e9/);
 });
 
+test("Diwali collection uses the compact vertical spacing of Couple gifts", () => {
+  const diwaliRule = css.match(/\.diwali-section\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(diwaliRule, /padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)\s+clamp\(1rem, 4vw, 3\.5rem\)/);
+  assert.match(css, /\.romantic-keepsakes\s*\{[^}]*padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)/);
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"));
+  assert.match(mobileCss, /\.diwali-section\s*\{[^}]*padding-block:\s*1\.2rem/);
+  assert.ok(mobileCss.lastIndexOf(".diwali-section") > mobileCss.indexOf(".work-section, .work-section-warm"), "Diwali mobile padding must follow the shared work-section rule");
+});
+
+test("catalogue work sections use compact shared vertical spacing", () => {
+  const workRule = css.match(/\.work-section\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(workRule, /padding-block:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)/);
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"));
+  assert.match(css, /\.customizer-section\s*\{[^}]*padding-block:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)/);
+  assert.match(mobileCss, /\.customizer-section, \.work-section, \.work-section-warm\s*\{\s*padding-block:\s*1\.2rem/);
+  assert.match(css, /\.romantic-keepsakes\s*\{[^}]*margin-block:\s*1rem/);
+  assert.match(mobileCss, /\.romantic-keepsakes\s*\{[^}]*margin-block:\s*0\.75rem/);
+  assert.match(css, /\.premium-collection-section\s*\{[\s\S]*padding-inline:\s*clamp\(1rem, 4vw, 3\.5rem\)/);
+});
+
 test("catalogue sections use four-card responsive grids with independent disclosures", () => {
   [
     ["diwali", "diwali-grid"],
@@ -149,32 +172,31 @@ test("mobile catalogue cards keep full copy in source while reserving aligned ti
   assert.match(section("romantic-keepsakes"), /id="romantic-initial"/);
 });
 
-test("mobile copy compaction keeps the full specification visible", () => {
-  const mobileStart = css.indexOf("@media (max-width: 620px)");
-  const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
-  const mobileCss = css.slice(mobileStart, reducedMotionStart);
-  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > :is\(strong, h3\)/);
-  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:first-of-type/);
-  const specificationRule = mobileCss.match(/html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(specificationRule, /display:\s*block/);
-  assert.match(specificationRule, /line-height:\s*1\.4/);
-  assert.match(specificationRule, /overflow-wrap:\s*anywhere/);
-  assert.doesNotMatch(specificationRule, /display:\s*none|overflow:\s*hidden|-webkit-line-clamp/);
+test("catalogue cards keep only essentials while popups retain full details", () => {
+  assert.match(css, /html\.js \.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) > figure > figcaption > :is\(span, p\)\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\)\s*\{[^}]*grid-row:\s*span 5/);
+  const subgrid = css.slice(css.indexOf("@supports (grid-template-rows: subgrid)"));
+  assert.match(subgrid, /html\.js \.catalogue-grid/);
+  assert.doesNotMatch(subgrid, /\n\s+\.catalogue-grid\s*(?:\{|>)/);
+  assert.match(css, /figcaption > :is\(strong, h3\)[^{]*\{[^}]*grid-row:\s*1/);
+  assert.match(css, /figcaption > \.product-pricing[^{]*\{[^}]*grid-row:\s*2 \/ 4/);
+  assert.match(css, /figcaption > \.catalogue-order-button[^{]*\{[^}]*grid-row:\s*4/);
+  assert.match(script, /querySelectorAll\("figcaption p"\)/);
+  assert.match(script, /lightboxDescription\) lightboxDescription\.textContent = item\.description/);
+  const card = section("diwali").match(/<article\b[^>]*class="[^"]*work-card[^"]*"[\s\S]*?<\/article>/)?.[0] || "";
+  assert.match(card, /<figcaption[\s\S]*<p>/);
 });
 
 test("catalogue cards expose shared semantic row tracks through native subgrid", () => {
   assert.match(css, /@supports\s*\(grid-template-rows:\s*subgrid\)/);
-  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\)[^{]*\{[^}]*grid-row:\s*span 8;[^}]*grid-template-rows:\s*subgrid/);
+  assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\)[^{]*\{[^}]*grid-row:\s*span 5;[^}]*grid-template-rows:\s*subgrid/);
   assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) > figure[^{]*\{[^}]*grid-row:\s*1 \/ -1;[^}]*grid-template-rows:\s*subgrid/);
   assert.match(css, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) > figure > figcaption[^{]*\{[^}]*grid-row:\s*2 \/ -1;[^}]*grid-template-rows:\s*subgrid/);
-  assert.match(css, /figcaption > span[^{]*\{[^}]*grid-row:\s*1/);
-  assert.match(css, /figcaption > :is\(strong, h3\)[^{]*\{[^}]*grid-row:\s*2/);
-  assert.match(css, /figcaption > p:first-of-type[^{]*\{[^}]*grid-row:\s*3/);
-  assert.match(css, /figcaption > p:nth-of-type\(2\)[^{]*\{[^}]*grid-row:\s*4/);
-  assert.match(css, /figcaption > \.product-pricing[^{]*\{[^}]*grid-row:\s*5 \/ 7;[^}]*grid-template-rows:\s*subgrid/);
+  assert.match(css, /figcaption > :is\(strong, h3\)[^{]*\{[^}]*grid-row:\s*1/);
+  assert.match(css, /figcaption > \.product-pricing[^{]*\{[^}]*grid-row:\s*2 \/ 4;[^}]*grid-template-rows:\s*subgrid/);
   assert.match(css, /product-pricing > div:first-child[^{]*\{[^}]*grid-row:\s*1/);
   assert.match(css, /product-pricing > div:nth-child\(2\)[^{]*\{[^}]*grid-row:\s*2/);
-  assert.match(css, /figcaption > \.catalogue-order-button[^{]*\{[^}]*grid-row:\s*7/);
+  assert.match(css, /figcaption > \.catalogue-order-button[^{]*\{[^}]*grid-row:\s*4/);
   assert.match(css, /product-pricing[^{]*\{[^}]*margin-top:\s*0/);
 });
 
@@ -207,6 +229,37 @@ test("category shortcuts use three columns at tablet widths and two on mobile", 
   assert.ok(mobile > tablet);
 });
 
+test("category shortcuts use accessible local icons while action arrows stay text", () => {
+  const shortcuts = html.match(/<nav class="category-shortcuts[^\"]*"[\s\S]*?<\/nav>/)?.[0] || "";
+  [
+    ["couple", "heart"],
+    ["diwali", "diya"],
+    ["frames", "frame"],
+    ["premium", "gem"],
+    ["corporate", "gift"],
+  ].forEach(([category, icon]) => {
+    const link = shortcuts.match(new RegExp(`<a[^>]+data-category-shortcut="${category}"[\\s\\S]*?<\\/a>`))?.[0] || "";
+    assert.match(link, new RegExp(`assets/category-icons\\.svg#${icon}`));
+    assert.match(link, /<svg class="category-icon" aria-hidden="true" focusable="false">/);
+  });
+  assert.doesNotMatch(shortcuts, /↘/);
+  const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
+  assert.match(nav, /data-browse-all>Gifts <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift/);
+  assert.match(nav, /data-category-shortcut="couple">Couple keepsakes <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#heart/);
+  assert.match(nav, /data-category-shortcut="frames">Resin frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(nav, /data-customizer-open>Design a frame <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(nav, /Corporate orders <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift[\s\S]*<\/svg> <span aria-hidden="true">↗<\/span>/);
+  const footer = html.match(/<div class="footer-links">[\s\S]*?<\/div>/)?.[0] || "";
+  assert.match(footer, /data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(footer, /href="resin-photo-frames\/">Photo frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(footer, /href="namokar-mantra-frames\/">Namokar frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
+  assert.match(footer, /href="corporate-gifting\/">Corporate gifting <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift/);
+  assert.match(css, /\.category-icon\s*\{[^}]*width:\s*1\.25rem[^}]*height:\s*1\.25rem[^}]*color:\s*var\(--cocoa\)/);
+  assert.match(css, /\.site-nav \.category-icon, \.footer-links \.category-icon\s*\{[^}]*width:\s*1rem[^}]*height:\s*1rem/);
+  assert.match(icons, /ISC License[\s\S]*Copyright \(c\) 2026 Lucide Icons and Contributors[\s\S]*Permission to use, copy, modify, and\/or distribute[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
+  assert.match(icons, /The MIT License \(MIT\)[\s\S]*Copyright \(c\) 2013-present Cole Bemis[\s\S]*Permission is hereby granted, free of charge[\s\S]*THE SOFTWARE IS PROVIDED "AS IS"/);
+});
+
 test("small-screen layout keeps long labels inside the viewport without masking overflow", () => {
   const firstMobileStart = css.indexOf("@media (max-width: 620px)");
   const catalogueMobileStart = css.indexOf("@media (max-width: 620px)", firstMobileStart + 1);
@@ -236,6 +289,9 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   assert.match(orderStatusMarkup, /href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\//);
   assert.match(filterRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   assert.match(selectRule, /min-width:\s*0/);
+  assert.match(selectRule, /min-height:\s*3rem/);
+  assert.match(selectRule, /padding:\s*\.72rem\s+\.75rem/);
+  assert.match(selectRule, /font-size:\s*1rem/);
   assert.match(mobilePreviewRule, /align-self:\s*stretch/);
   assert.match(railRule, /flex-direction:\s*column/);
   assert.match(railRule, /align-items:\s*flex-start/);
@@ -270,6 +326,12 @@ test("pricing keeps current quotes without unsupported discount claims", () => {
   assert.doesNotMatch(html, /<dt>Estimated from<\/dt>/);
   assert.match(html, /<dt>Price<\/dt><dd>₹2,499<\/dd>/);
   assert.match(section("diwali"), /Diwali prices ₹249–₹1,799/);
+});
+
+test("catalogue prices use lining tabular numerals", () => {
+  const priceRule = css.match(/^:is\(\.work-card, \.romantic-keepsake-card\) figcaption \.product-pricing\s*>\s*div:first-child dd\s*\{([^}]*)\}/m)?.[1] || "";
+  assert.match(priceRule, /font-family:\s*var\(--sans\)/);
+  assert.match(priceRule, /font-variant-numeric:\s*lining-nums tabular-nums/);
 });
 
 test("festive banner is absent while Diwali remains in the collection", () => {
@@ -374,7 +436,9 @@ test("customizer starts compact and opens from the frame-design nav or hash", ()
 });
 
 test("request CTA vocabulary is consistent and supports general enquiries", () => {
-  assert.match(html, /Request a custom gift/);
+  assert.doesNotMatch(section("hero"), /Request a custom gift/);
+  assert.doesNotMatch(html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "", /nav-cta/);
+  assert.match(html, /<a href="#order" data-order-prefill="general">Contact Saloni<\/a>/);
   assert.match(script, /button\.textContent = "Request this item"/);
   assert.match(script, /data-order-prefill="general"/);
   assert.match(script, /illustrative preview\|reference image/);
@@ -382,15 +446,16 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("shopper confidence strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders", "Order"].forEach((label) => {
+  ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
-  assert.equal((nav.match(/<a\b/g) || []).length, 6);
+  assert.doesNotMatch(nav, />Order\s*<\/a>/);
+  assert.equal((nav.match(/<a\b/g) || []).length, 5);
   assert.match(html, /class="hero-trust-strip"/);
   ["Ajmer studio", "Shipping across India", "Handmade to order", "Contact Saloni"].forEach((fact) => assert.match(html, new RegExp(fact)));
   assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
   assert.doesNotMatch(html, /<a href="#diwali" data-category-shortcut="diwali">Browse Diwali designs/);
-  assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art<\/a>/);
+  assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame[\s\S]*<\/a>/);
   assert.doesNotMatch(html, /data-category-shortcut="hampers"|href="#hamper-rail"/);
   assert.match(html, /href="partners\/">Partner Circle<\/a>/);
 });
@@ -511,6 +576,7 @@ test("catalogue card body opens its existing preview while native link focus sta
   }, extra);
   const title = { textContent: "Sample gift" };
   const paragraph = { textContent: "A sample gift description." };
+  const included = { textContent: "one keepsake · display props not included" };
   const image = { alt: "Sample gift photo" };
   const orderButton = makeElement({ closest(selector) { return selector.indexOf("button") !== -1 ? this : null; } });
   const priceRow = makeElement({ querySelector(selector) {
@@ -524,7 +590,7 @@ test("catalogue card body opens its existing preview while native link focus sta
     return null;
   }, querySelectorAll(selector) {
     if (selector === ".product-pricing > div") return [priceRow];
-    if (selector === "figcaption p") return [paragraph];
+    if (selector === "figcaption p") return [paragraph, included];
     return [];
   } });
   const grid = makeElement({ querySelectorAll() { return [trigger]; } });
@@ -560,6 +626,7 @@ test("catalogue card body opens its existing preview while native link focus sta
   card.listeners.click({ target: bodyTarget, defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
   assert.equal(lightbox.open, true);
   assert.equal(docElements["lightbox-product-name"].textContent, "Sample gift");
+  assert.match(docElements["lightbox-image-description"].textContent, /one keepsake · display props not included/);
   lightbox.close();
   assert.equal(trigger.focused, true);
   const orderEvent = { target: orderButton, defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() { this.defaultPrevented = true; } };
@@ -656,12 +723,12 @@ test("order section keeps compact row and bottom spacing without changing its co
   const orderRule = css.match(/(?:^|\n)\.order-section\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(orderRule, /column-gap:\s*clamp\(2rem,\s*8vw,\s*8rem\)/);
   assert.match(orderRule, /row-gap:\s*2rem/);
-  assert.match(orderRule, /padding-block:\s*clamp\(5rem,\s*11vw,\s*10rem\)\s+clamp\(2rem,\s*5vw,\s*4rem\)/);
+  assert.match(orderRule, /padding-block:\s*clamp\(1\.25rem,\s*3\.5vw,\s*3rem\)\s+clamp\(2rem,\s*5vw,\s*4rem\)/);
   assert.doesNotMatch(orderRule, /(?:^|[; ])gap:\s*clamp/);
   const pricingNoteRule = css.match(/\.order-size-pricing-note\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(pricingNoteRule, /margin:\s*0/);
   const mobileOrderRule = css.match(/@media \(max-width: 620px\) \{[\s\S]*?\.order-section\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(mobileOrderRule, /padding-block:\s*4\.5rem 3rem/);
+  assert.match(mobileOrderRule, /padding-block:\s*1\.2rem 3rem/);
 });
 
 test("sticky header offset and contained lightbox controls remain reachable", () => {
@@ -792,12 +859,10 @@ test("all 89 catalogue cards keep price first and show only known size rows", ()
   assert.match(css, /product-pricing[^}]*div:not\(:first-child\) dd/);
 });
 
-test("order note explains how listed and unlisted sizes affect pricing", () => {
+test("order section omits the removed size-pricing note", () => {
   const order = section("order");
-  const note = "Where a size is listed, the displayed current or estimated price is for that size. If no size is listed, ask Saloni for the available size and final quote. Prices may change with size.";
-  assert.match(order, new RegExp(`<p class="order-size-pricing-note">${note.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}<\/p>`));
-  const noteTail = order.slice(order.indexOf(note));
-  assert.match(noteTail, /<\/p>\s*<\/section>$/, "size note is the last item in the order section");
+  assert.doesNotMatch(order, /order-size-pricing-note/);
+  assert.doesNotMatch(order, /Where a size is listed|Prices may change with size/);
 });
 
 test("uses known size wording and omits unknown catalogue sizes", () => {

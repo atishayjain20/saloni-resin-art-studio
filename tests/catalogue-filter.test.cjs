@@ -242,7 +242,7 @@ test("initial state shows four-card previews per section", () => {
   assert.equal(harness.pagePrevious.disabled, true);
   assert.equal(harness.pageNext.disabled, true);
   assert.equal(harness.pagination.hidden, true);
-  assert.match(harness.status.textContent, /section previews/);
+  assert.equal(harness.status.textContent, "");
 });
 
 test("each section disclosure expands only its own cards and collapses on reset", () => {
@@ -411,6 +411,7 @@ test("back to featured picks hides pagination again", () => {
   assert.equal(harness.pagination.hidden, false);
   harness.resetButton.dispatch("click");
   assert.equal(harness.pagination.hidden, true);
+  assert.equal(harness.status.textContent, "");
 });
 
 test("empty results recover to unfiltered page one", () => {

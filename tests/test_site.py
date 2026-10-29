@@ -419,7 +419,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(section_rule)
         self.assertRegex(
             section_rule.group(1),
-            r"padding:\s*clamp\(4rem,\s*9vw,\s*8rem\)\s+clamp\(1rem,\s*4vw,\s*3\.5rem\)",
+            r"padding:\s*clamp\(1\.25rem,\s*3\.5vw,\s*3rem\)\s+clamp\(1rem,\s*4vw,\s*3\.5rem\)",
         )
 
     def test_primary_navigation_has_partner_circle_link_and_clickable_pills(self):
@@ -432,15 +432,14 @@ class StaticSiteContractTests(unittest.TestCase):
             r'<a href="#romantic-keepsakes" data-category-shortcut="couple">Couple keepsakes[\s\S]*?'
             r'<a href="#studio-art" data-category-shortcut="frames">Resin frames[\s\S]*?'
             r'<a href="#customizer" data-customizer-open>Design a frame[\s\S]*?'
-            r'<a href="corporate-gifting/">Corporate orders[\s\S]*?'
-            r'<a class="nav-cta" href="#order" data-order-prefill="general">Order',
+            r'<a href="corporate-gifting/">Corporate orders',
         )
-        self.assertIn('class="nav-cta" href="#order" data-order-prefill="general"', nav)
+        self.assertNotIn('nav-cta', nav)
         self.assertNotIn('href="#process"', nav)
         self.assertNotIn(">The process<", nav)
         footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', self.html)
         self.assertIsNotNone(footer)
-        self.assertIn('<a href="#studio-art" data-category-shortcut="frames">Resin art</a>', footer.group(0))
+        self.assertRegex(footer.group(0), r'<a href="#studio-art" data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame[\s\S]*</a>')
         self.assertIn('<a href="#order">Order</a>', footer.group(0))
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -804,7 +803,13 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("romantic-keepsake-notes", section_html)
         self.assertNotRegex(section_html, re.compile(r"<blockquote|<cite|Gaurav Jain|Aarti Suthar|★★★★★", re.I))
 
-        self.assertRegex(self.html, r'<a\b[^>]*class=["\']button button-dark["\'][^>]*href=["\']#catalogue-filters["\']')
+        hero = re.search(r'<section\b[^>]*class=["\']hero\b[\s\S]*?</section>', self.html)
+        self.assertIsNotNone(hero)
+        hero_html = hero.group(0)
+        self.assertNotIn('class="hero-actions"', hero_html)
+        self.assertNotIn('Browse gifts by type or budget', hero_html)
+        self.assertNotIn('Request a custom gift', hero_html)
+        self.assertNotIn('data-browse-filters', hero_html)
         self.assertEqual(self.html.count('class="catalogue-grid"'), 5)
         self.assertEqual(self.html.count('data-lightbox-trigger'), 91)
         self.assertEqual(self.html.count('class="product-pricing"'), 89)
@@ -937,7 +942,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotRegex(self.html[romantic_end:corporate_start], r'<section\b')
 
         self.assertIn('<a href="corporate-gifting/">Corporate orders', self.html)
-        self.assertIn('<a href="corporate-gifting/">Corporate gifting</a>', self.html)
+        self.assertRegex(self.html, r'<a href="corporate-gifting/">Corporate gifting <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift[\s\S]*</a>')
         self.assertIn('id="corporate-resin-gifts-grid"', corporate)
         self.assertIn('aria-labelledby="corporate-resin-gifts-title"', corporate)
         self.assertIn('<h2 id="corporate-resin-gifts-title">Corporate Resin Gifts</h2>', corporate)
