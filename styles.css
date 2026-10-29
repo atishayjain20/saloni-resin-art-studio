@@ -210,12 +210,15 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .lightbox-nav-button:disabled { cursor: not-allowed; opacity: .42; }
 #lightbox-position { color: var(--muted); font-size: .72rem; font-weight: 800; text-align: center; }
 .lightbox-figure { margin: 0; }
+.lightbox-figure:focus-visible { outline: 3px solid var(--rose); outline-offset: 4px; }
 .lightbox-image { width: 100%; max-height: calc(65dvh - 7rem); object-fit: contain; object-position: center; background: var(--ivory); }
 .lightbox-caption { display: grid; gap: .3rem; max-width: 60ch; margin: 0.9rem auto 0; color: var(--muted); font-size: 0.82rem; text-align: center; }
-.lightbox-caption strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
-.lightbox-caption span { display: block; }
-.lightbox-caption span:not(:last-child) { color: var(--cocoa); font-weight: 800; }
-.lightbox-request { justify-self: center; margin-top: 1rem; }
+.lightbox-caption #lightbox-product-size, .lightbox-caption #lightbox-image-description { display: block; }
+.lightbox-caption #lightbox-product-size { color: var(--cocoa); font-weight: 800; }
+.lightbox-order-summary { display: grid; justify-items: center; gap: .3rem; margin-top: .9rem; text-align: center; }
+.lightbox-order-summary strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
+.lightbox-order-summary #lightbox-product-price { color: var(--cocoa); font-weight: 800; }
+.lightbox-request { justify-self: center; margin-top: .55rem; }
 .lightbox-close-form { position: absolute; z-index: 1; top: 0.5rem; right: 0.5rem; margin: 0; }
 .lightbox-close { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--ivory); color: var(--ink); font-size: 1.4rem; line-height: 1; }
 .lightbox-close:hover, .lightbox-close:focus-visible { background: var(--ink); color: var(--ivory); }
@@ -455,6 +458,18 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .customizer-form { display: contents; }
   .customizer-form > * { grid-column: 1; }
   .customizer-preview-panel { position: static; grid-column: 1; grid-row: auto; align-self: stretch; }
+}
+
+@media (max-width: 620px), (max-height: 620px) and (max-width: 900px) {
+  dialog.lightbox-dialog { max-height: calc(100dvh - 1rem); overflow: hidden; }
+  .lightbox-panel { height: calc(100dvh - 1rem); max-height: calc(100dvh - 1rem); grid-template-rows: auto minmax(0, 1fr) auto; align-items: stretch; overflow: hidden; }
+  .lightbox-nav { grid-row: 1; }
+  .lightbox-figure { grid-row: 2; min-height: 0; overflow: auto; }
+  .lightbox-caption { margin-top: .7rem; }
+  .lightbox-order-summary { grid-row: 3; min-width: 0; padding-top: .65rem; border-top: 1px solid var(--line); background: var(--paper); }
+  .lightbox-order-summary strong, .lightbox-order-summary #lightbox-product-price { max-width: 100%; overflow-wrap: anywhere; }
+  .lightbox-order-summary strong { font-size: 1.2rem; }
+  .lightbox-request { width: 100%; min-height: 2.75rem; margin-top: .45rem; }
 }
 
 /* Align the same product fields across each catalogue row when subgrid is available. */

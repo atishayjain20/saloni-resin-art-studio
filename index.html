@@ -900,16 +900,18 @@
         <span id="lightbox-position" role="status" aria-live="polite"></span>
         <button class="lightbox-nav-button" id="lightbox-next" type="button" aria-label="Next product">Next</button>
       </div>
-      <figure class="lightbox-figure">
+      <figure class="lightbox-figure" tabindex="0" aria-label="Artwork details">
         <img class="lightbox-image" id="lightbox-image" alt="Artwork preview" width="1200" height="900">
         <figcaption class="lightbox-caption" id="lightbox-caption">
-          <strong id="lightbox-product-name"></strong>
-          <span id="lightbox-product-price" hidden></span>
           <span id="lightbox-product-size" hidden></span>
           <span id="lightbox-image-description"></span>
         </figcaption>
       </figure>
-      <button class="button button-dark lightbox-request" id="lightbox-request" type="button" hidden>Request this item</button>
+      <div class="lightbox-order-summary">
+        <strong id="lightbox-product-name"></strong>
+        <span id="lightbox-product-price" hidden></span>
+        <button class="button button-dark lightbox-request" id="lightbox-request" type="button" hidden>Request this item</button>
+      </div>
     </div>
   </dialog>
 
