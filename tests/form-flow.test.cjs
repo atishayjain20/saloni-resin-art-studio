@@ -14,6 +14,13 @@ test("targets the top-level studio page rather than the immediate parent frame",
   assert.doesNotMatch(formSource, /window\.parent\.postMessage/);
 });
 
+test("customizer handoff copy does not ask customers to download or reattach a preview", () => {
+  const status = html.match(/<p id="reference-image-status"[^>]*>[\s\S]*?<\/p>/)?.[0] || "";
+  assert.match(status, /Optional: attach a separate reference image if it helps/);
+  assert.match(status, /Customizer designs transfer directly with your request/);
+  assert.doesNotMatch(status, /download it first|reattach/i);
+});
+
 test("catalogue order form shows product context without internal metadata or mandatory dimensions", () => {
   const selectedDesign = html.match(/<fieldset>[\s\S]*?<legend>Selected design<\/legend>[\s\S]*?<\/fieldset>/)?.[0] || "";
   const dimensions = html.match(/<fieldset>[\s\S]*?<legend>What should Saloni make\?<\/legend>[\s\S]*?<\/fieldset>/)?.[0] || "";
