@@ -118,6 +118,15 @@ test("premium catalogue results keep readable text on the dark section", () => {
   assert.match(resultsRule, /color:\s*#fbf5e9/);
 });
 
+test("Diwali collection uses the compact vertical spacing of Couple gifts", () => {
+  const diwaliRule = css.match(/\.diwali-section\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(diwaliRule, /padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)\s+clamp\(1rem, 4vw, 3\.5rem\)/);
+  assert.match(css, /\.romantic-keepsakes\s*\{[^}]*padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)/);
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"));
+  assert.match(mobileCss, /\.diwali-section\s*\{[^}]*padding-block:\s*1\.2rem/);
+  assert.ok(mobileCss.lastIndexOf(".diwali-section") > mobileCss.indexOf(".work-section, .work-section-warm"), "Diwali mobile padding must follow the shared work-section rule");
+});
+
 test("catalogue sections use four-card responsive grids with independent disclosures", () => {
   [
     ["diwali", "diwali-grid"],

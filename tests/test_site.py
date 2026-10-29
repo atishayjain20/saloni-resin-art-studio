@@ -419,7 +419,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(section_rule)
         self.assertRegex(
             section_rule.group(1),
-            r"padding:\s*clamp\(4rem,\s*9vw,\s*8rem\)\s+clamp\(1rem,\s*4vw,\s*3\.5rem\)",
+            r"padding:\s*clamp\(1\.25rem,\s*3\.5vw,\s*3rem\)\s+clamp\(1rem,\s*4vw,\s*3\.5rem\)",
         )
 
     def test_primary_navigation_has_partner_circle_link_and_clickable_pills(self):
