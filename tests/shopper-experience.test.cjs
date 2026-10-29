@@ -400,6 +400,16 @@ test("lightbox exposes product-aware controls without changing the catalogue sou
   assert.match(script, /data-lightbox-trigger/);
 });
 
+test("lightbox keeps the request action fixed below an independently scrolling figure", () => {
+  const dialog = html.match(/<dialog class="lightbox-dialog"[\s\S]*?<\/dialog>/)?.[0] || "";
+  const mobileCss = css.match(/@media \(max-width: 620px\) \{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(css, /\.lightbox-panel\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*overflow:\s*hidden/);
+  assert.match(css, /\.lightbox-figure\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*auto/);
+  assert.match(css, /\.lightbox-request\s*\{[^}]*width:\s*100%[^}]*align-self:\s*stretch[^}]*justify-content:\s*center/);
+  assert.match(mobileCss, /\.lightbox-request\s*\{[^}]*justify-content:\s*center/);
+  assert.match(dialog, /<figure class="lightbox-figure" tabindex="0" aria-label="Scrollable artwork details">/);
+});
+
 test("lightbox request focuses the order location after native close", () => {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
