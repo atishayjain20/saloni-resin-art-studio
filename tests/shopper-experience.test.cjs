@@ -27,7 +27,9 @@ test("homepage leads with finished artwork and a browse-gifts CTA", () => {
   assert.match(hero, /data-lightbox-target="romantic-trinket"/);
   assert.match(hero, /data-lightbox-target="romantic-initial"/);
   assert.match(hero, /Browse gifts by type or budget/);
+  assert.match(hero, /data-browse-filters/);
   assert.doesNotMatch(hero, /hero-floral-bouquet\.jpg/);
+  assert.doesNotMatch(html, /Some catalogue images are illustrative or reference ideas\. Saloni confirms availability, materials, final design, quote, and delivery\./);
 });
 
 test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable", () => {
@@ -72,6 +74,11 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   assert.doesNotMatch(css, /body\s*\{[^}]*overflow-x:\s*hidden/);
   assert.doesNotMatch(css.slice(0, mobileStart), /#hero/);
   assert.doesNotMatch(css.slice(reducedMotionStart), /#hero/);
+});
+
+test("browse gifts keeps the first product row clear of the sticky header", () => {
+  assert.match(css, /\.catalogue-tools, \.catalogue-grid, \.festive-banner/);
+  assert.match(css, /\.catalogue-grid, \.festive-banner[^}]*scroll-margin-top:\s*var\(--sticky-offset\)/);
 });
 
 test("catalogue enhancement has accessible filters, preview mode, and a no-result reset", () => {
@@ -142,13 +149,17 @@ test("mobile catalogue cards keep full copy in source while reserving aligned ti
   assert.match(section("romantic-keepsakes"), /id="romantic-initial"/);
 });
 
-test("mobile copy compaction stays behind the JavaScript enhancement class", () => {
+test("mobile copy compaction keeps the full specification visible", () => {
   const mobileStart = css.indexOf("@media (max-width: 620px)");
   const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
   const mobileCss = css.slice(mobileStart, reducedMotionStart);
   assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > :is\(strong, h3\)/);
   assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:first-of-type/);
-  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)/);
+  const specificationRule = mobileCss.match(/html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(specificationRule, /display:\s*block/);
+  assert.match(specificationRule, /line-height:\s*1\.4/);
+  assert.match(specificationRule, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(specificationRule, /display:\s*none|overflow:\s*hidden|-webkit-line-clamp/);
 });
 
 test("catalogue cards expose shared semantic row tracks through native subgrid", () => {
@@ -283,8 +294,8 @@ test("resin-only catalogue removes hamper products and keeps both ₹2,000 budge
 test("customizer presents a keyboard-matched basics, preview, advanced, and save/share flow", () => {
   const customizerSection = section("customizer");
   const order = [
-    "frame-template", "colour-theme", "reference-image", "personal-text", "frame-preset",
-    "preview-stage", "order-from-customizer", "customizer-design-help", "customizer-advanced",
+    "preview-stage", "frame-template", "colour-theme", "reference-image", "personal-text", "frame-preset",
+    "order-from-customizer", "customizer-advanced",
     "customizer-save-share"
   ];
   const positions = order.map((id) => customizerSection.indexOf(`id="${id}"`));
@@ -308,7 +319,16 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   const shareStatusPosition = customizerSection.indexOf('id="share-status"');
   const saveSharePosition = customizerSection.indexOf('id="customizer-save-share"');
   assert.ok(shareStatusPosition >= 0 && shareStatusPosition < saveSharePosition, "request status stays visible before the closed save/share disclosure");
-  assert.match(customizerSection, /Sends your design summary and size\. Attach a downloaded preview separately\./);
+  assert.match(customizerSection, /Sends this preview, your choices and size with your request\./);
+  assert.match(customizerSection, /Request this design sends the preview, choices and size with your request\./);
+  assert.match(customizerSection, /Preview your frame here; Saloni confirms final size, materials, and quote\./);
+  const previewPosition = customizerSection.indexOf('class="customizer-preview-panel"');
+  const basicsPosition = customizerSection.indexOf('class="customizer-basics-flow"');
+  assert.ok(previewPosition >= 0 && previewPosition < basicsPosition, "preview precedes the basic controls in the form");
+  const disclosureEnd = customizerSection.lastIndexOf("</details>");
+  const designHelpPosition = customizerSection.indexOf('id="customizer-design-help"');
+  assert.equal((customizerSection.match(/id="customizer-design-help"/g) || []).length, 1);
+  assert.ok(designHelpPosition > disclosureEnd, "design help stays outside the closed designer disclosure");
   assert.doesNotMatch(customizerSection.match(/<details[^>]*id="customizer-advanced"[^>]*>/)?.[0] || "", /\bopen\b/);
   assert.doesNotMatch(customizerSection.match(/<details[^>]*id="customizer-save-share"[^>]*>/)?.[0] || "", /\bopen\b/);
   assert.match(customizerSection, /Let Saloni design it for me/);
@@ -321,11 +341,36 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   assert.match(css, /\.customizer-preview-panel\s*\{[^}]*grid-row:\s*1\s*\/\s*span\s*5/);
   assert.match(css, /@media \(min-width: 841px\) and \(min-height: 720px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*sticky/);
   assert.match(css, /@media \(min-width: 841px\) and \(max-height: 719px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*static/);
-  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*static/);
-  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*grid-row:\s*auto/);
+  assert.match(css, /\.customizer-disclosure-row\s*\{[^}]*display:\s*block/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-layout\s*\{[^}]*display:\s*block/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-form\s*\{[^}]*display:\s*block/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*sticky/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview \.preview-stage\s*\{[^}]*width:\s*min\(100%, 20dvh, 13rem\)/);
+  assert.match(css, /\.customizer-form :is\(input, select, textarea, button, a, summary\)\s*\{[^}]*scroll-margin-block-start/);
+  assert.match(css, /\.customizer-form:has\(input\[type="text"\]:focus, input\[type="number"\]:focus, textarea:focus, button:focus, a:focus, summary:focus\)/);
+  assert.match(css, /@media \(max-width: 840px\) and \(max-height: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*static/);
   assert.match(css, /@media \(max-width: 840px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*grid-row:\s*auto/);
   const customizerCss = css.slice(css.indexOf(".customizer-layout"), css.indexOf(".order-section"));
   assert.doesNotMatch(customizerCss, /(?:^|[;}])\s*order\s*:/);
+});
+
+test("customizer starts compact and opens from the frame-design nav or hash", () => {
+  const customizerSection = section("customizer");
+  const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
+  const disclosureStart = customizerSection.indexOf('<details class="customizer-disclosure" id="customizer-disclosure">');
+  const disclosureEnd = customizerSection.indexOf("</details>\n    </section>", disclosureStart);
+  const disclosure = customizerSection.slice(disclosureStart, disclosureEnd === -1 ? undefined : disclosureEnd);
+
+  assert.match(nav, /<a href="#customizer"[^>]*>Design a frame/);
+  assert.match(disclosure, /<summary>Design a frame<\/summary>/);
+  assert.doesNotMatch(disclosure.match(/<details[^>]+id="customizer-disclosure"[^>]*>/)?.[0] || "", /\bopen\b/);
+  assert.ok(disclosure.indexOf('class="customizer-layout"') >= 0, "existing editor stays in the disclosure");
+  assert.ok(disclosure.indexOf('class="customizer-handoff"') >= 0, "existing handoff stays in the disclosure");
+  assert.match(customizerSection, /Choose colours, add a photo or message, and preview your custom frame\./);
+  assert.match(css, /\.customizer-disclosure\s*>\s*summary/);
+  assert.match(css, /\.customizer-heading h2\s*\{[^}]*max-width:\s*18ch[^}]*font-size:\s*clamp\(2rem, 4\.5vw, 3\.5rem\)/);
+  assert.match(script, /customizerDisclosure\.open\s*=\s*true/);
+  assert.match(script, /hashchange/);
 });
 
 test("request CTA vocabulary is consistent and supports general enquiries", () => {
@@ -337,7 +382,7 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("shopper confidence strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Couple keepsakes", "Resin frames", "Custom design", "Corporate orders", "Order"].forEach((label) => {
+  ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders", "Order"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
   assert.equal((nav.match(/<a\b/g) || []).length, 6);
@@ -361,7 +406,7 @@ test("lightbox exposes product-aware controls without changing the catalogue sou
   assert.match(summary, /id="lightbox-request"/);
   assert.doesNotMatch(figure, /id="lightbox-product-name"|id="lightbox-product-price"/);
   assert.match(figure, /tabindex="0"/);
-  assert.match(figure, /aria-label="Artwork details"/);
+  assert.match(figure, /aria-label="Scrollable artwork details"/);
   assert.match(figure, /id="lightbox-product-size"/);
   assert.match(figure, /id="lightbox-image-description"/);
   assert.match(dialog, /id="lightbox-position"/);
@@ -370,6 +415,18 @@ test("lightbox exposes product-aware controls without changing the catalogue sou
   assert.match(script, /pendingLightboxRequest[\s\S]*requestButton\.click\(\)[\s\S]*focusOrderLocation/);
   assert.match(html, /id="order"[^>]*tabindex="-1"/);
   assert.match(script, /data-lightbox-trigger/);
+});
+
+test("lightbox keeps the request action fixed below an independently scrolling figure", () => {
+  const dialog = html.match(/<dialog class="lightbox-dialog"[\s\S]*?<\/dialog>/)?.[0] || "";
+  const mobileCss = css.match(/@media \(max-width: 620px\) \{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(css, /\.lightbox-panel\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*overflow:\s*hidden/);
+  assert.match(css, /\.lightbox-figure\s*\{[^}]*flex:\s*1 1 auto[^}]*min-height:\s*0[^}]*overflow:\s*auto/);
+  assert.match(css, /\.lightbox-request\s*\{[^}]*width:\s*100%[^}]*align-self:\s*stretch[^}]*justify-content:\s*center/);
+  assert.match(mobileCss, /\.lightbox-request\s*\{[^}]*justify-content:\s*center/);
+  assert.match(css, /@media \(max-width: 620px\),\s*\(max-height: 620px\) and \(max-width: 900px\)/);
+  assert.match(css, /@media \(max-width: 620px\),\s*\(max-height: 620px\) and \(max-width: 900px\) \{[\s\S]*?\.lightbox-panel\s*\{[^}]*height:\s*calc\(100dvh - 1rem\)[^}]*max-height:\s*calc\(100dvh - 1rem\)/);
+  assert.match(dialog, /<figure class="lightbox-figure" tabindex="0" aria-label="Scrollable artwork details">/);
 });
 
 test("lightbox request focuses the order location after native close", () => {
@@ -610,29 +667,14 @@ test("order section keeps compact row and bottom spacing without changing its co
 test("sticky header offset and contained lightbox controls remain reachable", () => {
   assert.match(css, /scroll-padding-top:\s*var\(--sticky-offset\)/);
   assert.match(css, /scroll-margin-top:\s*var\(--sticky-offset\)/);
-  const desktopPanelRule = css.match(/(?:^|\n)\.lightbox-panel\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(desktopPanelRule, /overflow:\s*auto/);
-  assert.match(css, /\.lightbox-panel\s*\{[^}]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+auto/);
-  assert.match(css, /@media \(max-width: 620px\),\s*\(max-height: 620px\) and \(max-width: 900px\) \{[\s\S]*?\.lightbox-panel\s*\{[^}]*max-height:\s*calc\(100dvh - 1rem\)/);
-  assert.match(css, /\.lightbox-panel\s*\{[^}]*overflow:\s*hidden/);
-  assert.match(css, /\.lightbox-figure\s*\{[^}]*min-height:\s*0[^}]*overflow:\s*auto/);
-  assert.match(css, /\.lightbox-figure:focus-visible\s*\{[^}]*outline:/);
-  assert.match(css, /@media \(max-width: 620px\),\s*\(max-height: 620px\) and \(max-width: 900px\)/);
-  assert.match(css, /\.lightbox-order-summary\s*\{[^}]*background:\s*var\(--paper\)/);
+  assert.match(css, /\.lightbox-panel[\s\S]*overflow:\s*auto/);
   assert.match(css, /\.lightbox-image\s*\{[^}]*background:\s*var\(--ivory\)/);
   assert.match(css, /\.lightbox-nav-button\s*\{[^}]*min-height:\s*44px/);
 });
 
-test("buying-help block replaces unsupported testimonial claims without a carousel", () => {
-  const buyingHelp = html.match(/<section[^>]+id="testimonials"[\s\S]*?<\/section>/)?.[0] || "";
-  assert.match(buyingHelp, /<p class="eyebrow">Before you order<\/p>/);
-  assert.match(buyingHelp, /<h2 id="testimonials-title">Know what your gift will include\.<\/h2>/);
-  assert.match(buyingHelp, /Ask Saloni about your chosen product, personalisation, finish, packaging and delivery before confirming your order\./);
-  assert.match(buyingHelp, /<a[^>]+href="#order"[^>]+data-order-prefill="general"[^>]*>Ask Saloni about a gift/);
-  assert.doesNotMatch(buyingHelp, /data-carousel|data-testimonial-card|Rating:|★★★★★|<blockquote|<cite|Gaurav Jain|Atishay Jain|Aarti Suthar|Bharat Sharma|Puchki/);
-  assert.match(css, /\.testimonials-section\s*\{[^}]*padding-block:\s*clamp\(2\.5rem,\s*5vw,\s*4rem\)/);
-  assert.match(css, /\.testimonials-section \.buying-help\s*\{/);
-  assert.doesNotMatch(css, /\.testimonial-card\s*\{|\.sample-rating\s*\{/);
+test("before-you-order buying-help section is removed from the homepage", () => {
+  assert.doesNotMatch(html, /<section[^>]+id="testimonials"[\s\S]*?<\/section>/);
+  assert.doesNotMatch(html, /Before you order|Know what your gift will include\.|Ask Saloni about a gift/);
 });
 
 test("all 89 catalogue cards keep price first and show only known size rows", () => {
@@ -775,12 +817,8 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
   assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "4–5 in"]]);
 });
 
-test("studio edit leads directly into the order conversation", () => {
-  const studioStart = html.indexOf('<section class="intro-band shell reveal" id="offerings"');
-  const orderStart = html.indexOf('<section class="order-section shell" id="order"');
-  assert.ok(studioStart >= 0, "expected #offerings section");
-  assert.ok(orderStart >= 0, "expected #order section");
-  const studioEnd = html.indexOf("</section>", studioStart) + "</section>".length;
-  assert.ok(studioEnd < orderStart, "#offerings must come before #order");
-  assert.equal(html.slice(studioEnd, orderStart).trim(), "", "#offerings must be immediately before #order");
+test("studio edit section is removed before the order conversation", () => {
+  assert.doesNotMatch(html, /<section[^>]+id="offerings"[\s\S]*?<\/section>/);
+  assert.doesNotMatch(html, /The studio edit|A little more personal than a gift|Custom resin frames &amp; art|Explore resin photo frames|Join the Partner Circle/);
+  assert.match(html, /<section class="order-section shell" id="order"/);
 });

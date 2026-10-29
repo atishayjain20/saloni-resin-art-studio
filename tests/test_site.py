@@ -77,38 +77,38 @@ ROMANTIC_CONCEPTS = (
 )
 
 DIWALI_NEW_CONCEPTS = (
-    ("diwali-marigold-petal-holder", "diwali-marigold-petal-holder-concept.webp", "Marigold Petal Holder", "349", "249", 29, "one LED tealight holder · LED not included", "A warm marigold-inspired cup for a soft festive glow."),
-    ("diwali-ivory-mandala-holder", "diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Holder", "399", "299", 25, "one LED tealight holder · LED not included", "An ivory mandala cup with a calm, hand-finished festive feel."),
-    ("diwali-ruby-leaf-dish", "diwali-ruby-leaf-dish-concept.webp", "Ruby Leaf Dish", "999", "799", 20, "one decorative dish", "A ruby-red leaf dish for a small festive offering or accent."),
-    ("diwali-saffron-tilak-duo", "diwali-saffron-tilak-duo-concept.webp", "Saffron Tilak Duo", "449", "349", 22, "two mini dishes", "Two saffron-toned mini dishes for tilak and rice."),
-    ("diwali-pearl-rangoli-accent", "diwali-pearl-rangoli-accent-concept.webp", "Pearl Rangoli Accent", "499", "399", 20, "one decorative accent", "A pearly rangoli-inspired accent for an entryway or prayer corner."),
-    ("diwali-emerald-led-holder-pair", "diwali-emerald-led-holder-pair-concept.webp", "Emerald Glow Pair", "999", "799", 20, "pair of LED tealight holders · LEDs not included", "A pair of emerald cups for a jewel-toned LED-lit arrangement."),
-    ("diwali-rose-petal-offering-plate", "diwali-rose-petal-offering-plate-concept.webp", "Rose Petal Offering Plate", "599", "449", 25, "one decorative ritual plate", "A rosy ritual plate with a gentle petal-inspired edge."),
-    ("diwali-golden-toran-charms", "diwali-golden-toran-charms-concept.webp", "Golden Toran Charms", "599", "449", 25, "set of three hanging charms with cords", "Three golden hanging charms to style a festive doorway or wall."),
-    ("diwali-lotus-rangoli-duo", "diwali-lotus-rangoli-duo-concept.webp", "Lotus Rangoli Duo", "499", "399", 20, "set of two decorative lotus pieces", "Two lotus pieces for a small layered rangoli arrangement."),
-    ("diwali-festive-keepsake-box", "diwali-festive-keepsake-box-concept.webp", "Festive Keepsake Box", "849", "649", 24, "one small lidded box · contents not included", "A small lidded box for a keepsake, note, or festive token."),
+    ("diwali-marigold-petal-holder", "diwali-marigold-petal-holder-concept.webp", "Marigold Petal Holder", "349", "249", 29, 'one LED tealight holder · LED not included · shown palette or custom colours', "A warm marigold-inspired cup for a soft festive glow."),
+    ("diwali-ivory-mandala-holder", "diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Holder", "399", "299", 25, 'one LED tealight holder · LED not included · shown palette or custom colours', "An ivory mandala cup with a calm, hand-finished festive feel."),
+    ("diwali-ruby-leaf-dish", "diwali-ruby-leaf-dish-concept.webp", "Ruby Leaf Dish", "999", "799", 20, 'one decorative dish · ritual items not included · shown palette or custom colours', "A ruby-red leaf dish for a small festive offering or accent."),
+    ("diwali-saffron-tilak-duo", "diwali-saffron-tilak-duo-concept.webp", "Saffron Tilak Duo", "449", "349", 22, 'two mini dishes · tilak and rice not included · shown palette or custom colours', "Two saffron-toned mini dishes for tilak and rice."),
+    ("diwali-pearl-rangoli-accent", "diwali-pearl-rangoli-accent-concept.webp", "Pearl Rangoli Accent", "499", "399", 20, 'one decorative accent · flowers and ritual items not included · shown palette or custom colours', "A pearly rangoli-inspired accent for an entryway or prayer corner."),
+    ("diwali-emerald-led-holder-pair", "diwali-emerald-led-holder-pair-concept.webp", "Emerald Glow Pair", "999", "799", 20, 'pair of LED tealight holders · LEDs not included · shown palette or custom colours', "A pair of emerald cups for a jewel-toned LED-lit arrangement."),
+    ("diwali-rose-petal-offering-plate", "diwali-rose-petal-offering-plate-concept.webp", "Rose Petal Offering Plate", "599", "449", 25, 'one decorative ritual plate · offerings not included · shown palette or custom colours', "A rosy ritual plate with a gentle petal-inspired edge."),
+    ("diwali-golden-toran-charms", "diwali-golden-toran-charms-concept.webp", "Golden Toran Charms", "599", "449", 25, 'set of three hanging charms with cords · display props not included · shown palette or custom colours', "Three golden hanging charms to style a festive doorway or wall."),
+    ("diwali-lotus-rangoli-duo", "diwali-lotus-rangoli-duo-concept.webp", "Lotus Rangoli Duo", "499", "399", 20, 'set of two decorative lotus pieces · flowers and ritual items not included · shown palette or custom colours', "Two lotus pieces for a small layered rangoli arrangement."),
+    ("diwali-festive-keepsake-box", "diwali-festive-keepsake-box-concept.webp", "Festive Keepsake Box", "849", "649", 24, 'one small lidded box · contents not included · shown palette or custom colours', "A small lidded box for a keepsake, note, or festive token."),
 )
 
 CORPORATE_RESIN_GIFTS = (
-    ("corporate-logo-keychain", "corporate-logo-keychain-concept.webp", "Logo resin keychain", "299", "199", 33, "Price for one piece.", "Clear resin with a name/initial and subtle brand-colour accents."),
-    ("corporate-floral-bookmark", "corporate-floral-bookmark-concept.webp", "Pressed-flower bookmark", "249", "149", 40, "Price for one piece.", "A slim resin bookmark for welcome kits or thoughtful team gifts."),
-    ("corporate-logo-paperweight", "corporate-logo-paperweight-concept.webp", "Logo paperweight", "499", "399", 20, "Price for one piece.", "A polished desk keepsake with a logo or short message sealed inside."),
-    ("corporate-desk-nameplate", "corporate-desk-nameplate-concept.webp", "Resin desk nameplate", "999", "799", 20, "Price for one piece.", "Personalised with a name, designation and brand colours."),
-    ("corporate-logo-coaster-set", "corporate-logo-coaster-set-concept.webp", "Branded coaster set", "999", "749", 25, "Price for a set of four.", "Four coordinated coasters for desks, meeting rooms or client kits."),
-    ("corporate-fridge-magnet", "corporate-fridge-magnet-concept.webp", "Resin fridge magnet", "249", "179", 28, "Price for one piece.", "A compact branded keepsake for events and team celebrations."),
-    ("corporate-desk-logo-stand", "corporate-desk-logo-stand-concept.webp", "Mini resin desk stand", "249", "179", 28, "Price for one piece.", "A small decorative resin stand for desks, reception counters or car dashboards."),
-    ("corporate-recognition-award", "corporate-recognition-award-concept.webp", "Recognition resin award", "1,299", "899", 31, "Price for one piece.", "A modern personalised memento for milestones and appreciation."),
-    ("corporate-desk-organizer", "corporate-desk-organizer-concept.webp", "Resin desk organiser", "1,299", "999", 23, "Price for one piece.", "A compact pen and visiting-card holder with custom colours."),
-    ("corporate-business-card-holder", "corporate-business-card-holder-concept.webp", "Resin Business Card Holder", "599", "449", 25, "Price for one card holder; cards not included.", "A compact resin holder for a tidy stack of visiting cards."),
-    ("corporate-phone-rest", "corporate-phone-rest-concept.webp", "Resin Phone Rest", "699", "499", 29, "Price for one phone rest; phone not included.", "A steady resin rest for a phone on a desk or bedside table."),
-    ("corporate-pen-cup", "corporate-pen-cup-concept.webp", "Resin Pen Cup", "899", "699", 22, "Price for one pen cup; stationery not included.", "A polished pen cup with a clean, colourful resin finish."),
-    ("corporate-desk-trinket-tray", "corporate-desk-trinket-tray-concept.webp", "Desk Trinket Tray", "599", "449", 25, "Price for one tray; contents not included.", "A small catch-all tray for a desk, console, or bedside table."),
-    ("corporate-lanyard-charm", "corporate-lanyard-charm-concept.webp", "Personalised Lanyard Charm", "299", "199", 33, "Price for one charm with clasp; lanyard not included.", "A personalised charm that clips onto a lanyard or bag."),
-    ("corporate-mini-photo-stand", "corporate-mini-photo-stand-concept.webp", "Mini Photo Stand", "399", "299", 25, "Price for one base with metal clip; print not included.", "A compact photo stand for a desk memory or team note."),
-    ("corporate-bag-tag", "corporate-bag-tag-concept.webp", "Personalised Bag Tag", "399", "299", 25, "Price for one tag with strap.", "A personalised resin tag with a simple strap for a bag or case."),
-    ("corporate-desk-clock", "corporate-desk-clock-concept.webp", "Mini Resin Desk Clock", "1,299", "999", 23, "Price for one clock with stand; battery not included.", "A small resin clock to add a considered accent to a work desk."),
-    ("corporate-bookmark-keychain-duo", "corporate-bookmark-keychain-duo-concept.webp", "Welcome Keepsake Duo", "599", "449", 25, "Price for a two-piece set.", "A bookmark and keychain duo for a useful welcome keepsake."),
-    ("corporate-desk-essentials-set", "corporate-desk-essentials-set-concept.webp", "Desk Essentials Set", "1,499", "1,199", 20, "Price for one pen cup and one trinket tray.", "A coordinated pen cup and trinket tray for a complete desk set."),
+    ("corporate-logo-keychain", "corporate-logo-keychain-concept.webp", "Logo resin keychain", "299", "199", 33, 'one keychain · keys and display props not included · shown palette or custom colours', "Clear resin with a name/initial and subtle brand-colour accents."),
+    ("corporate-floral-bookmark", "corporate-floral-bookmark-concept.webp", "Pressed-flower bookmark", "249", "149", 40, 'one bookmark · books and display props not included · shown palette or custom colours', "A slim resin bookmark for welcome kits or thoughtful team gifts."),
+    ("corporate-logo-paperweight", "corporate-logo-paperweight-concept.webp", "Logo paperweight", "499", "399", 20, 'one paperweight · desk contents and display props not included · shown palette or custom colours', "A polished desk keepsake with a logo or short message sealed inside."),
+    ("corporate-desk-nameplate", "corporate-desk-nameplate-concept.webp", "Resin desk nameplate", "999", "799", 20, 'one nameplate · display props not included · shown palette or custom colours', "Personalised with a name, designation and brand colours."),
+    ("corporate-logo-coaster-set", "corporate-logo-coaster-set-concept.webp", "Branded coaster set", "999", "749", 25, 'four-piece coaster set · food and drinks not included · shown palette or custom colours', "Four coordinated coasters for desks, meeting rooms or client kits."),
+    ("corporate-fridge-magnet", "corporate-fridge-magnet-concept.webp", "Resin fridge magnet", "249", "179", 28, 'one piece · display props not included · shown palette or custom colours', "A compact branded keepsake for events and team celebrations."),
+    ("corporate-desk-logo-stand", "corporate-desk-logo-stand-concept.webp", "Mini resin desk stand", "249", "179", 28, 'one piece · display props not included · shown palette or custom colours', "A small decorative resin stand for desks, reception counters or car dashboards."),
+    ("corporate-recognition-award", "corporate-recognition-award-concept.webp", "Recognition resin award", "1,299", "899", 31, 'one piece · display props not included · shown palette or custom colours', "A modern personalised memento for milestones and appreciation."),
+    ("corporate-desk-organizer", "corporate-desk-organizer-concept.webp", "Resin desk organiser", "1,299", "999", 23, 'one piece · pens and cards not included · shown palette or custom colours', "A compact pen and visiting-card holder with custom colours."),
+    ("corporate-business-card-holder", "corporate-business-card-holder-concept.webp", "Resin Business Card Holder", "599", "449", 25, 'one card holder · cards not included · shown palette or custom colours', "A compact resin holder for a tidy stack of visiting cards."),
+    ("corporate-phone-rest", "corporate-phone-rest-concept.webp", "Resin Phone Rest", "699", "499", 29, 'one phone rest · phone not included · shown palette or custom colours', "A steady resin rest for a phone on a desk or bedside table."),
+    ("corporate-pen-cup", "corporate-pen-cup-concept.webp", "Resin Pen Cup", "899", "699", 22, 'one pen cup · stationery not included · shown palette or custom colours', "A polished pen cup with a clean, colourful resin finish."),
+    ("corporate-desk-trinket-tray", "corporate-desk-trinket-tray-concept.webp", "Desk Trinket Tray", "599", "449", 25, 'one tray · contents not included · shown palette or custom colours', "A small catch-all tray for a desk, console, or bedside table."),
+    ("corporate-lanyard-charm", "corporate-lanyard-charm-concept.webp", "Personalised Lanyard Charm", "299", "199", 33, 'one charm with clasp · lanyard not included · shown palette or custom colours', "A personalised charm that clips onto a lanyard or bag."),
+    ("corporate-mini-photo-stand", "corporate-mini-photo-stand-concept.webp", "Mini Photo Stand", "399", "299", 25, 'one base with metal clip · print not included · shown palette or custom colours', "A compact photo stand for a desk memory or team note."),
+    ("corporate-bag-tag", "corporate-bag-tag-concept.webp", "Personalised Bag Tag", "399", "299", 25, 'one tag with strap · bag not included · shown palette or custom colours', "A personalised resin tag with a simple strap for a bag or case."),
+    ("corporate-desk-clock", "corporate-desk-clock-concept.webp", "Mini Resin Desk Clock", "1,299", "999", 23, 'one clock with stand · battery not included · shown palette or custom colours', "A small resin clock to add a considered accent to a work desk."),
+    ("corporate-bookmark-keychain-duo", "corporate-bookmark-keychain-duo-concept.webp", "Welcome Keepsake Duo", "599", "449", 25, 'two-piece bookmark and keychain set · books and keys not included · shown palette or custom colours', "A bookmark and keychain duo for a useful welcome keepsake."),
+    ("corporate-desk-essentials-set", "corporate-desk-essentials-set-concept.webp", "Desk Essentials Set", "1,499", "1,199", 20, 'one pen cup + one trinket tray · stationery and desk contents not included · shown palette or custom colours', "A coordinated pen cup and trinket tray for a complete desk set."),
 )
 
 
@@ -120,8 +120,8 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_page_has_required_sections_and_accessibility_hooks(self):
         required_ids = [
-            "main-content", "hero", "diwali", "offerings", "studio-art",
-            "testimonials", "order", "footer",
+            "main-content", "hero", "diwali", "studio-art",
+            "order", "footer",
         ]
         for section_id in required_ids:
             with self.subTest(section_id=section_id):
@@ -130,6 +130,89 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-label="Previous', self.html)
         self.assertIn('aria-label="Next', self.html)
         self.assertIn('class="site-script"', self.html)
+
+    def test_catalogue_offers_are_concrete_and_preserve_verified_values(self):
+        cards = re.findall(
+            r'<article\b[^>]*class=["\'][^"\']*(?:work-card|romantic-keepsake-card)[^"\']*["\'][\s\S]*?</article>',
+            self.html,
+        )
+        self.assertEqual(len(cards), 89)
+        expected_prices = [
+            "₹249", "₹250–₹400", "₹399", "₹849", "₹899", "₹299", "₹249", "₹1,799", "₹349", "₹249", "₹349", "₹449", "₹399", "₹249", "₹299", "₹799", "₹349", "₹399", "₹799", "₹449", "₹449", "₹399", "₹649",
+            "₹399", "₹699", "₹899", "₹599", "₹349", "₹699", "₹399", "₹1,299", "₹699", "₹1,999", "₹2,499", "₹3,000", "₹599",
+            "₹199", "₹149", "₹399", "₹799", "₹749", "₹179", "₹179", "₹899", "₹999", "₹449", "₹499", "₹699", "₹449", "₹199", "₹299", "₹299", "₹999", "₹449", "₹1,199",
+            "₹4,099", "₹349", "₹399", "₹4,599", "₹399", "₹1,999", "₹1,999", "₹2,299", "₹3,999", "₹2,199", "₹999", "₹2,199", "₹1,299", "₹3,499", "₹599", "₹599", "₹599", "₹599", "₹599", "₹599",
+            "₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000",
+        ]
+        actual_prices = []
+        for index, card in enumerate(cards, 1):
+            pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
+            self.assertIsNotNone(pricing, f"card {index} has catalogue pricing")
+            rows = re.findall(r'<div><dt>([^<]+)</dt><dd>([^<]+)</dd></div>', pricing.group(0))
+            self.assertTrue(rows, f"card {index} has a price row")
+            self.assertEqual(rows[0][0], "Price", f"card {index} uses a concrete price label")
+            self.assertNotIn("From", pricing.group(0))
+            self.assertNotIn("Starting at", pricing.group(0))
+            actual_prices.append(rows[0][1])
+        self.assertEqual(actual_prices, expected_prices)
+        self.assertEqual(actual_prices.count("Price on request"), 8)
+
+        jewel = re.search(r'<article\b[^>]*id=["\']diwali-jewel-glow["\'][\s\S]*?</article>', self.html).group(0)
+        self.assertIn("one holder", jewel)
+        self.assertIn("₹249", jewel)
+        self.assertIn("4 in", jewel)
+        self.assertNotRegex(jewel, re.compile(r"candle|available colou?r", re.I))
+
+        floral = re.search(r'<article\b[^>]*id=["\']diwali-floral-swastik-tealight-set["\'][\s\S]*?</article>', self.html).group(0)
+        self.assertIn("two holders and one flower", floral)
+        self.assertIn("three-piece set", floral)
+        emerald = re.search(r'<article\b[^>]*id=["\']diwali-emerald-led-holder-pair["\'][\s\S]*?</article>', self.html).group(0)
+        self.assertIn("LEDs not included", emerald)
+        business_card = re.search(r'<article\b[^>]*id=["\']corporate-business-card-holder["\'][\s\S]*?</article>', self.html).group(0)
+        self.assertIn("one card holder", business_card)
+        self.assertIn("cards not included", business_card)
+
+        festive_set = "1 main platter (6 in) + 3 tealight holders + 2 Shubh/Labh plaques + 1 flower diya (7 pieces) · tealights and display props not included · shown palette or custom colours"
+        for card_id in ("diwali-rose-gold", "diwali-lotus-blue"):
+            card = re.search(rf'<article\b[^>]*id=["\']{card_id}["\'][\s\S]*?</article>', self.html).group(0)
+            self.assertIn(festive_set, card)
+
+    def test_catalogue_cards_have_concrete_inclusion_and_colour_copy(self):
+        cards = re.findall(
+            r'<article\b[^>]*class=["\'][^"\']*(?:work-card|romantic-keepsake-card)[^"\']*["\'][\s\S]*?</article>',
+            self.html,
+        )
+        self.assertEqual(len(cards), 89)
+        for index, card in enumerate(cards, 1):
+            paragraphs = re.findall(r'<p\b[^>]*>([\s\S]*?)</p>', card)
+            self.assertEqual(len(paragraphs), 2, f"card {index} has one description and one specification paragraph")
+            specification = re.sub(r'<[^>]+>', '', paragraphs[1]).strip()
+            self.assertRegex(specification, r"not included", f"card {index} states an exclusion")
+            self.assertIn("shown palette or custom colours", specification, f"card {index} states colour guidance")
+
+        def card_by_id(card_id):
+            return re.search(rf'<article\b[^>]*id=["\']{card_id}["\'][\s\S]*?</article>', self.html).group(0)
+
+        self.assertIn(
+            "one holder · tealight not included · shown palette or custom colours",
+            card_by_id("diwali-jewel-glow"),
+        )
+        festive_set = "1 main platter (6 in) + 3 tealight holders + 2 Shubh/Labh plaques + 1 flower diya (7 pieces) · tealights and display props not included · shown palette or custom colours"
+        for card_id in ("diwali-rose-gold", "diwali-lotus-blue"):
+            with self.subTest(card_id=card_id):
+                self.assertIn(festive_set, card_by_id(card_id))
+        self.assertIn(
+            "pair of LED tealight holders · LEDs not included · shown palette or custom colours",
+            card_by_id("diwali-emerald-led-holder-pair"),
+        )
+        self.assertIn(
+            "one phone rest · phone not included · shown palette or custom colours",
+            card_by_id("corporate-phone-rest"),
+        )
+        self.assertIn(
+            "one tray + four coasters · food and display props not included · shown palette or custom colours",
+            card_by_id("premium-turquoise-tray"),
+        )
 
     def test_diwali_collection_contract(self):
         assets = [
@@ -154,13 +237,12 @@ class StaticSiteContractTests(unittest.TestCase):
         hero_end = self.html.index('</section>', hero_start) + len('</section>')
         diwali_start = self.html.index(section_html)
         self.assertLess(hero_end, diwali_start)
-        self.assertNotIn('id="offerings"', self.html[hero_end:diwali_start])
-        self.assertLess(diwali_start, self.html.index('<section class="intro-band shell reveal"'))
+        self.assertNotIn('id="offerings"', self.html)
         self.assertNotRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
         self.assertRegex(self.html, r'<a href="#diwali" data-category-shortcut="diwali">Diwali')
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
         self.assertIn("Diwali prices ₹249–₹1,799", section_html)
-        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
+        self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
         self.assertIn('id="diwali-grid"', section_html)
         self.assertIn('class="catalogue-grid"', section_html)
         self.assertIn('role="list"', section_html)
@@ -186,19 +268,19 @@ class StaticSiteContractTests(unittest.TestCase):
         )
         self.assertNotIn('data-order-prefill="catalogue"', section_html)
         reference_notes = {
-            "diwali-jewel-glow-tealight.jpg": "Price is shown per holder.",
-            "diwali-happy-diwali-glow.webp": "Price varies by size.",
-            "diwali-shubh-labh-welcome-pair.jpg": "Price is shown for the pair.",
-            "diwali-rose-gold-festive-set.jpeg": "Contents are confirmed before ordering.",
-            "diwali-lotus-blue-festive-set.jpeg": "Contents are confirmed before ordering.",
-            "diwali-gold-fleck-lotus-light.jpeg": "Price is shown per holder.",
-            "diwali-pastel-lotus-tealight.jpeg": "Price is shown per holder.",
-            "diwali-ocean-bloom-pooja-platter.jpg": "Price is shown per platter.",
-            "diwali-golden-ganesha-pooja-plate.jpg": "Price is shown per plate.",
-            "diwali-om-mini-tilak-plate.webp": "Price is shown per plate.",
-            "diwali-lotus-diya-pair.webp": "Price is shown for the pair.",
-            "diwali-peacock-mini-pooja-thali.webp": "Price is shown per thali.",
-            "diwali-floral-swastik-tealight-set.webp": "Price is shown for the three-piece set.",
+            "diwali-jewel-glow-tealight.jpg": 'one holder · tealight not included · shown palette or custom colours',
+            "diwali-happy-diwali-glow.webp": 'one holder · tealight not included · shown palette or custom colours. Price varies by size.',
+            "diwali-shubh-labh-welcome-pair.jpg": 'pair shown · ritual items not included · shown palette or custom colours',
+            "diwali-rose-gold-festive-set.jpeg": '1 main platter (6 in) + 3 tealight holders + 2 Shubh/Labh plaques + 1 flower diya (7 pieces) · tealights and display props not included · shown palette or custom colours',
+            "diwali-lotus-blue-festive-set.jpeg": '1 main platter (6 in) + 3 tealight holders + 2 Shubh/Labh plaques + 1 flower diya (7 pieces) · tealights and display props not included · shown palette or custom colours',
+            "diwali-gold-fleck-lotus-light.jpeg": 'one holder · tealight not included · shown palette or custom colours',
+            "diwali-pastel-lotus-tealight.jpeg": 'one holder · tealight not included · shown palette or custom colours',
+            "diwali-ocean-bloom-pooja-platter.jpg": 'one platter · ritual items not included · shown palette or custom colours',
+            "diwali-golden-ganesha-pooja-plate.jpg": 'one plate · ritual items not included · shown palette or custom colours',
+            "diwali-om-mini-tilak-plate.webp": 'one plate · tilak and rice not included · shown palette or custom colours',
+            "diwali-lotus-diya-pair.webp": 'pair of diyas · tealights not included · shown palette or custom colours',
+            "diwali-peacock-mini-pooja-thali.webp": 'one thali · ritual items not included · shown palette or custom colours',
+            "diwali-floral-swastik-tealight-set.webp": 'two holders and one flower (three-piece set) · tealights not included · shown palette or custom colours',
         }
         price_matrix = {
             "Jewel Glow Tealight": ("349", "249", "29"),
@@ -349,7 +431,7 @@ class StaticSiteContractTests(unittest.TestCase):
             r'<a href="#catalogue-filters" data-browse-all>Gifts[\s\S]*?'
             r'<a href="#romantic-keepsakes" data-category-shortcut="couple">Couple keepsakes[\s\S]*?'
             r'<a href="#studio-art" data-category-shortcut="frames">Resin frames[\s\S]*?'
-            r'<a href="#customizer">Custom design[\s\S]*?'
+            r'<a href="#customizer" data-customizer-open>Design a frame[\s\S]*?'
             r'<a href="corporate-gifting/">Corporate orders[\s\S]*?'
             r'<a class="nav-cta" href="#order" data-order-prefill="general">Order',
         )
@@ -759,7 +841,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-expanded="false"', section_html)
         self.assertIn("A preview of 13 keepsake ideas", section_html)
         self.assertNotIn("Concept previews are illustrative.", section_html)
-        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
+        self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*romantic-keepsake-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 13)
@@ -865,7 +947,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('data-catalogue-disclosure', corporate)
         self.assertIn('aria-expanded="false"', corporate)
         self.assertNotIn(FINAL_QUOTE_NOTE, corporate)
-        self.assertIn("Some catalogue images are illustrative or reference ideas.", self.html)
+        self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', corporate)
         self.assertEqual(len(cards), len(CORPORATE_RESIN_GIFTS))
@@ -1110,27 +1192,11 @@ class StaticSiteContractTests(unittest.TestCase):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertNotRegex(css, r"\.studio-art-section \.work-card img\s*\{")
 
-    def test_testimonial_section_is_compact_buying_help(self):
-        parser = MarkupTreeParser()
-        parser.feed(self.html)
-        owners = []
-        for root in parser.roots:
-            owners.extend(find_nodes(root, "data-carousel"))
-        testimonials = [owner for owner in owners if owner["attrs"].get("data-carousel") == "testimonials"]
-        self.assertEqual(len(testimonials), 0)
-
-        section = re.search(r'<section\b[^>]*id=["\']testimonials["\'][\s\S]*?</section>', self.html)
-        self.assertIsNotNone(section)
-        section_html = section.group(0)
-        self.assertIn('<p class="eyebrow">Before you order</p>', section_html)
-        self.assertIn('<h2 id="testimonials-title">Know what your gift will include.</h2>', section_html)
-        self.assertIn('Ask Saloni about your chosen product, personalisation, finish, packaging and delivery before confirming your order.', section_html)
-        self.assertRegex(section_html, r'<a\b[^>]*href=["\']#order["\'][^>]*data-order-prefill=["\']general["\'][^>]*>Ask Saloni about a gift')
-        self.assertNotIn('data-testimonial-card', section_html)
-        self.assertNotIn('data-carousel', section_html)
-        self.assertNotRegex(section_html, re.compile(r'Gaurav Jain|Atishay Jain|Aarti Suthar|Bharat Sharma|Puchki|Rating:|★★★★★|★★★★', re.I))
-        self.assertNotRegex(section_html, re.compile(r'<(?:blockquote|cite)\b', re.I))
-        self.assertNotRegex(self.html, re.compile(r'"@type"\s*:\s*"(?:Review|AggregateRating)"', re.I))
+    def test_testimonial_section_is_removed_from_homepage(self):
+        self.assertIsNone(re.search(r'<section\b[^>]*id=["\']testimonials["\'][\s\S]*?</section>', self.html))
+        self.assertNotIn('Before you order', self.html)
+        self.assertNotIn('Know what your gift will include.', self.html)
+        self.assertNotIn('Ask Saloni about a gift', self.html)
 
     def test_festive_offers_area_stays_inline_without_unsupported_claims(self):
         self.assertNotRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
@@ -1197,7 +1263,7 @@ class StaticSiteContractTests(unittest.TestCase):
             with self.subTest(sunflower_asset=asset):
                 card = next((card for card in re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', studio) if f'assets/{asset}' in card), None)
                 self.assertIsNotNone(card)
-                self.assertIn("Starting at ₹599", card)
+                self.assertIn("₹599", card)
                 self.assertEqual(studio.count(f'src="assets/{asset}"'), 1)
 
         self.assertEqual(studio.count('class="product-pricing"'), 20)
@@ -1381,7 +1447,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('id="scene-canvas"', section)
         self.assertIn('id="customizer-summary"', section)
         self.assertIn("Images and paint stay on this device until you choose to share", section)
-        self.assertIn("attach your image or a screenshot separately", section)
+        self.assertIn("Request this design sends the preview, choices and size with your request", section)
+        self.assertNotIn("attach your image or a screenshot separately", section)
         self.assertIn('href="tel:8209238541"', section)
         self.assertIn('href="https://www.instagram.com/saloniresin_art_studio/"', section)
 
