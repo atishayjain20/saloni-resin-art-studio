@@ -16,7 +16,7 @@ function section(id) {
   return match[0];
 }
 
-test("homepage leads with finished artwork and a browse-gifts CTA", () => {
+test("homepage leads with finished artwork without duplicate hero CTAs", () => {
   const hero = section("hero");
   assert.match(hero, /assets\/romantic-heart-trinket-tray\.webp/);
   assert.match(hero, /Tiny tray, big feelings/);
@@ -26,8 +26,10 @@ test("homepage leads with finished artwork and a browse-gifts CTA", () => {
   assert.match(hero, /Two letters, one small corner that belongs to both of you\./);
   assert.match(hero, /data-lightbox-target="romantic-trinket"/);
   assert.match(hero, /data-lightbox-target="romantic-initial"/);
-  assert.match(hero, /Browse gifts by type or budget/);
-  assert.match(hero, /data-browse-filters/);
+  assert.doesNotMatch(hero, /class="hero-actions"/);
+  assert.doesNotMatch(hero, /Browse gifts by type or budget/);
+  assert.doesNotMatch(hero, /Request a custom gift/);
+  assert.doesNotMatch(hero, /data-browse-filters/);
   assert.doesNotMatch(hero, /hero-floral-bouquet\.jpg/);
   assert.doesNotMatch(html, /Some catalogue images are illustrative or reference ideas\. Saloni confirms availability, materials, final design, quote, and delivery\./);
 });
@@ -374,7 +376,8 @@ test("customizer starts compact and opens from the frame-design nav or hash", ()
 });
 
 test("request CTA vocabulary is consistent and supports general enquiries", () => {
-  assert.match(html, /Request a custom gift/);
+  assert.doesNotMatch(section("hero"), /Request a custom gift/);
+  assert.match(html, /class="nav-cta" href="#order" data-order-prefill="general"/);
   assert.match(script, /button\.textContent = "Request this item"/);
   assert.match(script, /data-order-prefill="general"/);
   assert.match(script, /illustrative preview\|reference image/);
