@@ -118,6 +118,17 @@ test("premium catalogue results keep readable text on the dark section", () => {
   assert.match(resultsRule, /color:\s*#fbf5e9/);
 });
 
+test("studio and corporate catalogue sections use distinct soft panels", () => {
+  const corporateRule = css.match(/\.corporate-resin-gifts-section\s*\{([^}]*)\}/)?.[1] || "";
+  const studioRule = css.match(/\.studio-art-section\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(corporateRule, /border-block:\s*1px solid rgba\(85, 113, 95, 0\.24\)/);
+  assert.match(corporateRule, /background:\s*#edf2ec/);
+  assert.match(corporateRule, /padding-inline:\s*clamp\(1rem, 4vw, 3\.5rem\)/);
+  assert.match(studioRule, /border-block:\s*1px solid rgba\(201, 101, 114, 0\.18\)/);
+  assert.match(studioRule, /background:\s*#f6e9e5/);
+  assert.match(studioRule, /padding-inline:\s*clamp\(1rem, 4vw, 3\.5rem\)/);
+});
+
 test("Diwali collection uses the compact vertical spacing of Couple gifts", () => {
   const diwaliRule = css.match(/\.diwali-section\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(diwaliRule, /padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)\s+clamp\(1rem, 4vw, 3\.5rem\)/);

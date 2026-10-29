@@ -141,13 +141,14 @@ h1 em { color: var(--rose); font-style: italic; }
 .romantic-keepsake-card figcaption > p:first-of-type, .studio-art-section .work-card figcaption > p:first-of-type { font-size: 0.75rem; }
 
 .work-section { padding-block: clamp(1.25rem, 3.5vw, 3rem); }
-.corporate-resin-gifts-section { scroll-margin-top: 3rem; }
+.corporate-resin-gifts-section { scroll-margin-top: 3rem; padding-inline: clamp(1rem, 4vw, 3.5rem); border-block: 1px solid rgba(85, 113, 95, 0.24); background: #edf2ec; }
 .corporate-resin-gifts-section .corporate-card-note { margin-top: 0.45rem; color: var(--cocoa); font-size: 0.76rem; }
 .work-section-warm { width: 100%; max-width: none; padding-inline: max(var(--gutter), calc((100vw - var(--max)) / 2)); background: #f1e0d8; }
 .diwali-section { scroll-margin-top: 1rem; padding: clamp(1.25rem, 3.5vw, 3rem) clamp(1rem, 4vw, 3.5rem); background: #fff8e6; border-block: 1px solid rgba(201, 139, 58, 0.28); }
 .diwali-section .eyebrow, .diwali-section .work-card figcaption span { color: var(--cocoa); }
 .diwali-section .rail-heading h2 { max-width: 13ch; }
 .diwali-section .diwali-card-note { max-width: 30ch; margin-top: 0.45rem; color: var(--cocoa); font-size: 0.76rem; }
+.studio-art-section { padding-inline: clamp(1rem, 4vw, 3.5rem); border-block: 1px solid rgba(201, 101, 114, 0.18); background: #f6e9e5; }
 .premium-collection-section {
   --premium-gold: #e7c883;
   scroll-margin-top: 3rem;
