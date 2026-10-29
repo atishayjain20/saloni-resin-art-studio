@@ -456,3 +456,67 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .customizer-form > * { grid-column: 1; }
   .customizer-preview-panel { position: static; grid-column: 1; grid-row: auto; align-self: stretch; }
 }
+
+/* Align the same product fields across each catalogue row when subgrid is available. */
+@supports (grid-template-rows: subgrid) {
+  .catalogue-grid { row-gap: 0; }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) {
+    display: grid;
+    grid-row: span 8;
+    grid-template-rows: subgrid;
+    min-height: 0;
+    margin-block-end: clamp(1rem, 2vw, 1.5rem);
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure {
+    display: grid;
+    grid-row: 1 / -1;
+    grid-template-rows: subgrid;
+    min-width: 0;
+    width: 100%;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > .lightbox-trigger {
+    grid-row: 1;
+    align-self: start;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption {
+    display: grid;
+    grid-row: 2 / -1;
+    grid-template-rows: subgrid;
+    row-gap: .3rem;
+    min-width: 0;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > span {
+    grid-row: 1;
+    margin-bottom: 0;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > :is(strong, h3) {
+    grid-row: 2;
+    margin-bottom: 0;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > p:first-of-type {
+    grid-row: 3;
+    margin-top: 0;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > p:nth-of-type(2) {
+    grid-row: 4;
+    margin-top: 0;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing {
+    display: grid;
+    grid-row: 5 / 7;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+    margin-top: 0;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing > div:first-child {
+    grid-row: 1;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .product-pricing > div:nth-child(2) {
+    grid-row: 2;
+  }
+  .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > figcaption > .catalogue-order-button {
+    grid-row: 7;
+    align-self: start;
+    margin-top: 0;
+  }
+}
