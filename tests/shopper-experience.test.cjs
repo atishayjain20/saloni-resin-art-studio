@@ -115,6 +115,24 @@ test("catalogue sections use four-card responsive grids with independent disclos
   assert.doesNotMatch(script, /track\.addEventListener\("keydown"/);
 });
 
+test("catalogue section disclosures sit below their grids", () => {
+  [
+    ["diwali", "diwali-grid"],
+    ["romantic-keepsakes", "romantic-keepsakes-grid"],
+    ["corporate-resin-gifts", "corporate-resin-gifts-grid"],
+    ["studio-art", "studio-art-grid"],
+    ["premium-collection", "premium-collection-grid"],
+  ].forEach(([sectionId, gridId]) => {
+    const sectionMarkup = section(sectionId);
+    assert.equal((sectionMarkup.match(/data-catalogue-disclosure/g) || []).length, 1);
+    assert.match(
+      sectionMarkup,
+      new RegExp(`<div class="catalogue-grid"[^>]*id="${gridId}"[\\s\\S]*?</div>\\s*<button[^>]*data-catalogue-disclosure[^>]*aria-controls="${gridId}"`),
+      `${sectionId} disclosure should follow its grid`,
+    );
+  });
+});
+
 test("category shortcuts use three columns at tablet widths and two on mobile", () => {
   const base = css.indexOf(".category-shortcuts {");
   const baseColumns = css.indexOf("repeat(6", base);

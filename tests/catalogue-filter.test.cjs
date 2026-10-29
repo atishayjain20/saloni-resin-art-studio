@@ -21,6 +21,7 @@ class FakeControl {
   getAttribute(name) { return this.attributes[name] || ""; }
   removeAttribute(name) { delete this.attributes[name]; }
   focus() { this.focused = true; }
+  scrollIntoView(options) { this.scrolledIntoView = options; }
 }
 
 class FakeContainer {
@@ -256,6 +257,16 @@ test("each section disclosure expands only its own cards and collapses on reset"
   harness.resetButton.dispatch("click");
   assert.equal(target.disclosure.getAttribute("aria-expanded"), "false");
   assert.equal(target.cards.filter((card) => !card.hidden).length, 4);
+});
+
+test("collapsing a section keeps its bottom disclosure reachable", () => {
+  const harness = createHarness();
+  const target = harness.sections[0];
+  target.disclosure.dispatch("click");
+  assert.equal(target.disclosure.scrolledIntoView, undefined);
+  target.disclosure.dispatch("click");
+  assert.equal(target.disclosure.scrolledIntoView.behavior, "instant");
+  assert.equal(target.disclosure.scrolledIntoView.block, "nearest");
 });
 
 test("explicit full catalogue pages contain at most eight and traverse every item once", () => {

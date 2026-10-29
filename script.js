@@ -612,9 +612,13 @@
       disclosure.addEventListener("click", function () {
         if (allVisible) return;
         var expandedIndex = expandedSections.indexOf(section);
+        var collapsing = expandedIndex !== -1;
         if (expandedIndex === -1) expandedSections.push(section);
         else expandedSections.splice(expandedIndex, 1);
         applyFilters();
+        if (collapsing && typeof disclosure.scrollIntoView === "function") {
+          disclosure.scrollIntoView({ behavior: "instant", block: "nearest" });
+        }
       });
     });
     function commitFilterChange() {
