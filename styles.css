@@ -447,7 +447,7 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .catalogue-tools h2 { margin-bottom: .9rem; }
   .catalogue-enhancement { margin-top: 1.5rem; }
   .catalogue-filter-fields { grid-template-columns: minmax(0, 1fr); }
-  .catalogue-filter-fields select { min-width: 0; }
+  .catalogue-filter-fields select { min-width: 0; min-height: 3rem; padding: .72rem .75rem; font-size: 1rem; }
   .catalogue-filter-fields .button { width: 100%; justify-content: center; }
   .catalogue-browse-all { display: flex; width: 100%; margin-top: 1rem; justify-content: space-between; }
   .catalogue-pagination { gap: .45rem; }
