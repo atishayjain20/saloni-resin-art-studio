@@ -510,7 +510,7 @@
         var canExpand = !allVisible && sectionCards.length > previewLimit;
         disclosure.hidden = !canExpand;
         disclosure.setAttribute("aria-expanded", String(canExpand && isExpanded(section)));
-        disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : section.id === "premium-collection" ? "View all" : "See all";
+        disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : "View all";
       });
       updateCataloguePresentation();
       var resultsSection = allVisible && pageCards.length ? sectionFor(pageCards[pageCards.length - 1]) : null;

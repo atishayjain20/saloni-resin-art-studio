@@ -91,6 +91,8 @@ h1 em { color: var(--rose); font-style: italic; }
 .button-dark:hover, .button-dark:focus-visible { background: var(--cocoa); }
 .button-line { border-color: var(--ink); color: var(--ink); }
 .button-line:hover, .button-line:focus-visible { background: var(--ink); color: var(--ivory); }
+.hero-secondary-action { align-self: center; color: var(--ink); font-size: 0.75rem; font-weight: 800; text-decoration: underline; text-underline-offset: 0.22em; }
+.hero-secondary-action:hover, .hero-secondary-action:focus-visible { color: var(--rose-ink); }
 .instagram-mark { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; color: var(--muted); font-size: 0.74rem; text-decoration: none; }
 .instagram-mark strong { color: var(--ink); font-weight: 800; }
 .instagram-mark:hover strong, .instagram-mark:focus-visible strong { color: var(--rose-ink); }
@@ -361,6 +363,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   #hero .instagram-mark { max-width: 100%; overflow-wrap: anywhere; }
   #hero .hero-actions { flex-direction: row; flex-wrap: wrap; gap: 0.55rem; max-width: none; margin-bottom: 0.6rem; }
   #hero .hero-actions .button { flex: 1 1 9.5rem; min-width: 0; gap: 0.45rem; padding: 0.62rem 0.8rem; font-size: 0.75rem; }
+  #hero .hero-actions .hero-secondary-action { flex: 0 1 auto; font-size: 0.7rem; }
   #hero .hero-collage { display: grid; gap: 0.8rem; min-height: auto; max-height: none; min-width: 0; }
   #hero .hero-image { position: relative; inset: auto; width: 100%; transform: none; }
   #hero .hero-image .lightbox-trigger { height: auto; }
