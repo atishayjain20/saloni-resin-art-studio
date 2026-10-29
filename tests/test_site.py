@@ -120,7 +120,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_page_has_required_sections_and_accessibility_hooks(self):
         required_ids = [
-            "main-content", "hero", "diwali", "offerings", "studio-art",
+            "main-content", "hero", "diwali", "studio-art",
             "order", "footer",
         ]
         for section_id in required_ids:
@@ -154,8 +154,7 @@ class StaticSiteContractTests(unittest.TestCase):
         hero_end = self.html.index('</section>', hero_start) + len('</section>')
         diwali_start = self.html.index(section_html)
         self.assertLess(hero_end, diwali_start)
-        self.assertNotIn('id="offerings"', self.html[hero_end:diwali_start])
-        self.assertLess(diwali_start, self.html.index('<section class="intro-band shell reveal"'))
+        self.assertNotIn('id="offerings"', self.html)
         self.assertNotRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
         self.assertRegex(self.html, r'<a href="#diwali" data-category-shortcut="diwali">Diwali')
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
