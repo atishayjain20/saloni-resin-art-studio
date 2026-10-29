@@ -127,6 +127,17 @@ test("Diwali collection uses the compact vertical spacing of Couple gifts", () =
   assert.ok(mobileCss.lastIndexOf(".diwali-section") > mobileCss.indexOf(".work-section, .work-section-warm"), "Diwali mobile padding must follow the shared work-section rule");
 });
 
+test("catalogue work sections use compact shared vertical spacing", () => {
+  const workRule = css.match(/\.work-section\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(workRule, /padding-block:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)/);
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"));
+  assert.match(css, /\.customizer-section\s*\{[^}]*padding-block:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)/);
+  assert.match(mobileCss, /\.customizer-section, \.work-section, \.work-section-warm\s*\{\s*padding-block:\s*1\.2rem/);
+  assert.match(css, /\.romantic-keepsakes\s*\{[^}]*margin-block:\s*1rem/);
+  assert.match(mobileCss, /\.romantic-keepsakes\s*\{[^}]*margin-block:\s*0\.75rem/);
+  assert.match(css, /\.premium-collection-section\s*\{[\s\S]*padding-inline:\s*clamp\(1rem, 4vw, 3\.5rem\)/);
+});
+
 test("catalogue sections use four-card responsive grids with independent disclosures", () => {
   [
     ["diwali", "diwali-grid"],
@@ -712,12 +723,12 @@ test("order section keeps compact row and bottom spacing without changing its co
   const orderRule = css.match(/(?:^|\n)\.order-section\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(orderRule, /column-gap:\s*clamp\(2rem,\s*8vw,\s*8rem\)/);
   assert.match(orderRule, /row-gap:\s*2rem/);
-  assert.match(orderRule, /padding-block:\s*clamp\(5rem,\s*11vw,\s*10rem\)\s+clamp\(2rem,\s*5vw,\s*4rem\)/);
+  assert.match(orderRule, /padding-block:\s*clamp\(1\.25rem,\s*3\.5vw,\s*3rem\)\s+clamp\(2rem,\s*5vw,\s*4rem\)/);
   assert.doesNotMatch(orderRule, /(?:^|[; ])gap:\s*clamp/);
   const pricingNoteRule = css.match(/\.order-size-pricing-note\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(pricingNoteRule, /margin:\s*0/);
   const mobileOrderRule = css.match(/@media \(max-width: 620px\) \{[\s\S]*?\.order-section\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(mobileOrderRule, /padding-block:\s*4\.5rem 3rem/);
+  assert.match(mobileOrderRule, /padding-block:\s*1\.2rem 3rem/);
 });
 
 test("sticky header offset and contained lightbox controls remain reachable", () => {
