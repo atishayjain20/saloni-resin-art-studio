@@ -1365,6 +1365,7 @@ class StaticSiteContractTests(unittest.TestCase):
         section = section_match.group(0)
         self.assertIn("Premium resin designs", section)
         self.assertIn("A preview of 14 premium design photos", section)
+        self.assertNotIn("Reference photos for made-to-order conversations. Saloni confirms the final design, quote and delivery.", section)
         self.assertIn('id="premium-collection-grid"', section)
         self.assertIn('aria-label="Premium resin designs"', section)
         self.assertIn('>View all</button>', section)
