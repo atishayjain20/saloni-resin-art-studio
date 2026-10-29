@@ -344,7 +344,6 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   const railRule = baseMobileCss.match(/\.rail-heading\s*\{([^}]*)\}/)?.[1] || "";
   const railHeadingRule = baseMobileCss.match(/\.rail-heading h2\s*\{([^}]*)\}/)?.[1] || "";
   const mainHeadingRule = baseMobileCss.match(/main h2\s*\{([^}]*)\}/)?.[1] || "";
-  const contactButtonRule = baseMobileCss.match(/\.customizer-contact-links \.button\s*\{([^}]*)\}/)?.[1] || "";
   const orderStatusRule = css.match(/\.order-form-status\s*\{([^}]*)\}/)?.[1] || "";
   const orderStatusMarkup = html.match(/<div class="order-form-status"[\s\S]*?<\/div>/)?.[0] || "";
   const mainMarkup = html.match(/<main[\s\S]*?<\/main>/)?.[0] || "";
@@ -370,11 +369,6 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   assert.match(mainMarkup, /id="customizer-title"/);
   assert.match(html, /<section[^>]*id="romantic-keepsakes"[^>]*aria-labelledby="romantic-keepsakes-title"/);
   assert.match(html, /<section[^>]*class="[^"]*\bwork-section\b[^"]*"[^>]*aria-labelledby="[^"]+"/);
-  assert.match(contactButtonRule, /flex:\s*1 1 9rem/);
-  assert.match(contactButtonRule, /min-width:\s*0/);
-  assert.match(contactButtonRule, /flex-wrap:\s*wrap/);
-  assert.match(contactButtonRule, /overflow-wrap:\s*anywhere/);
-  assert.match(contactButtonRule, /justify-content:\s*center/);
   assert.match(shortcutsRule, /min-width:\s*0/);
   assert.match(shortcutsRule, /flex-wrap:\s*wrap/);
   assert.match(shortcutsRule, /overflow-wrap:\s*anywhere/);
@@ -448,7 +442,6 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   const saveSharePosition = customizerSection.indexOf('id="customizer-save-share"');
   assert.ok(shareStatusPosition >= 0 && shareStatusPosition < saveSharePosition, "request status stays visible before the closed save/share disclosure");
   assert.match(customizerSection, /Sends this preview, your choices and size with your request\./);
-  assert.match(customizerSection, /Request this design sends the preview, choices and size with your request\./);
   assert.match(customizerSection, /Preview your frame here; Saloni confirms final size, materials, and quote\./);
   const previewPosition = customizerSection.indexOf('class="customizer-preview-panel"');
   const basicsPosition = customizerSection.indexOf('class="customizer-basics-flow"');
@@ -493,12 +486,20 @@ test("customizer starts compact and opens from the frame-design nav or hash", ()
   assert.match(disclosure, /<summary>Design a frame<\/summary>/);
   assert.doesNotMatch(disclosure.match(/<details[^>]+id="customizer-disclosure"[^>]*>/)?.[0] || "", /\bopen\b/);
   assert.ok(disclosure.indexOf('class="customizer-layout"') >= 0, "existing editor stays in the disclosure");
-  assert.ok(disclosure.indexOf('class="customizer-handoff"') >= 0, "existing handoff stays in the disclosure");
+  assert.doesNotMatch(disclosure, /customizer-handoff|Take the summary to the studio|Call Saloni/);
   assert.match(customizerSection, /Choose colours, add a photo or message, and preview your custom frame\./);
   assert.match(css, /\.customizer-disclosure\s*>\s*summary/);
   assert.match(css, /\.customizer-heading h2\s*\{[^}]*max-width:\s*18ch[^}]*font-size:\s*clamp\(2rem, 4\.5vw, 3\.5rem\)/);
   assert.match(script, /customizerDisclosure\.open\s*=\s*true/);
   assert.match(script, /hashchange/);
+});
+
+test("customizer removes the redundant handoff while preserving direct request and save/share controls", () => {
+  const customizerSection = section("customizer");
+  assert.match(customizerSection, /id="order-from-customizer"[^>]*data-order-prefill="customizer"[^>]*>Request this design/);
+  assert.match(customizerSection, /<summary>Save or share this preview<\/summary>[\s\S]*id="download-preview"[\s\S]*id="copy-summary"[\s\S]*id="share-design"/);
+  assert.doesNotMatch(customizerSection, /customizer-handoff|Take the summary to the studio|Call Saloni/);
+  assert.doesNotMatch(customizerSection, /href="tel:8209238541"|href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\//);
 });
 
 test("request CTA vocabulary is consistent and supports general enquiries", () => {
