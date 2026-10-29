@@ -367,7 +367,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption { display: flex; flex: 1; flex-direction: column; min-width: 0; }
   html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > :is(strong, h3) { display: -webkit-box; min-height: 2.2em; overflow: hidden; font-size: 1.05rem; line-height: 1.1; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > p:first-of-type { display: -webkit-box; min-height: 2.8em; overflow: hidden; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > p:not(:first-of-type) { display: none; }
+  html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption > p:not(:first-of-type) { display: block; line-height: 1.4; overflow-wrap: anywhere; }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing { grid-template-rows: repeat(2, minmax(2.35rem, auto)); margin-top: auto; }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); min-height: 2.35rem; align-items: start; }
   .catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dd { min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: right; }

@@ -149,13 +149,17 @@ test("mobile catalogue cards keep full copy in source while reserving aligned ti
   assert.match(section("romantic-keepsakes"), /id="romantic-initial"/);
 });
 
-test("mobile copy compaction stays behind the JavaScript enhancement class", () => {
+test("mobile copy compaction keeps the full specification visible", () => {
   const mobileStart = css.indexOf("@media (max-width: 620px)");
   const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
   const mobileCss = css.slice(mobileStart, reducedMotionStart);
   assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > :is\(strong, h3\)/);
   assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:first-of-type/);
-  assert.match(mobileCss, /html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)/);
+  const specificationRule = mobileCss.match(/html\.js \.catalogue-grid[^\{]*figcaption > p:not\(:first-of-type\)\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(specificationRule, /display:\s*block/);
+  assert.match(specificationRule, /line-height:\s*1\.4/);
+  assert.match(specificationRule, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(specificationRule, /display:\s*none|overflow:\s*hidden|-webkit-line-clamp/);
 });
 
 test("catalogue cards expose shared semantic row tracks through native subgrid", () => {
