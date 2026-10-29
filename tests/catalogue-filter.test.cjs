@@ -261,6 +261,20 @@ test("initial state shows four-card previews per section", () => {
   assert.equal(harness.status.textContent, "");
 });
 
+test("all catalogue section disclosures use View all until expanded", () => {
+  const labels = Array.from(html.matchAll(/<button\b[^>]*data-catalogue-disclosure[^>]*>([^<]*)<\/button>/g), (match) => match[1].trim());
+  assert.ok(labels.length > 0);
+  assert.ok(labels.every((label) => label === "View all"));
+
+  const harness = createHarness({ includePremium: true });
+  const target = harness.sections[0];
+  assert.equal(target.disclosure.textContent, "View all");
+  target.disclosure.dispatch("click");
+  assert.equal(target.disclosure.textContent, "Show less");
+  target.disclosure.dispatch("click");
+  assert.equal(target.disclosure.textContent, "View all");
+});
+
 test("catalogue search is labelled, bounded, and placed before type and budget filters", () => {
   const fields = html.match(/<div class="catalogue-filter-fields">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(fields, /<label[^>]+for="catalogue-search"[\s\S]*<input id="catalogue-search" type="search"[^>]+maxlength="100"/);
