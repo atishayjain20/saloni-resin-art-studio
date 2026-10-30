@@ -781,6 +781,207 @@ test("hero lightbox targets the hidden canonical card and restores focus to the 
   assert.equal(heroTrigger.focused, true);
 });
 
+test("lightbox owns one history entry and consumes it on browser back or native close", () => {
+  const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
+  const end = script.indexOf("\n\n    initCatalogueExperience();", start);
+  assert.ok(start >= 0 && end > start);
+  let activeElement;
+  const makeElement = (extra = {}) => Object.assign({
+    hidden: false,
+    attributes: {},
+    listeners: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    closest() { return null; },
+    getAttribute(name) { return this.attributes[name] || ""; },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
+    focus(options) { this.focused = true; this.focusOptions = options; activeElement = this; },
+  }, extra);
+  const history = {
+    state: { catalogue: true },
+    pushes: [],
+    backs: 0,
+    forwards: 0,
+    pendingBack: [],
+    pendingForward: null,
+    pushState(state, _title, url) { this.state = state; this.pushes.push({ state, url }); },
+    back() {
+      this.backs += 1;
+      this.pendingBack.push({ state: { catalogue: true } });
+    },
+    flushBack() {
+      assert.ok(this.pendingBack.length > 0);
+      this.state = this.pendingBack.shift().state;
+      if (windowObject.listeners.popstate) windowObject.listeners.popstate({ state: this.state, stopImmediatePropagation() {} });
+      activeElement = documentObject.body;
+    },
+    forward() {
+      this.forwards += 1;
+      this.pendingForward = { state: { saloniLightbox: true } };
+    },
+    flushForward() {
+      this.state = this.pendingForward.state;
+      this.pendingForward = null;
+      if (windowObject.listeners.popstate) windowObject.listeners.popstate({ state: this.state, stopImmediatePropagation() {} });
+    },
+  };
+  const image = makeElement({ alt: "Sample gift photo" });
+  const title = { textContent: "Sample gift" };
+  const order = makeElement({ scrolls: 0, scrollIntoView(options) { this.scrolls += 1; this.scrollOptions = options; } });
+  const requestButton = makeElement({ clicked: 0, click() { this.clicked += 1; } });
+  const card = makeElement({ querySelector(selector) {
+    if (selector === "figcaption strong") return title;
+    if (selector === "[data-order-prefill]") return requestButton;
+    return null;
+  } });
+  const grid = makeElement();
+  const trigger = makeElement({
+    href: "assets/sample-gift.jpg",
+    querySelector(selector) { return selector === "img" ? image : null; },
+    closest(selector) {
+      if (selector === "article") return card;
+      if (selector === ".catalogue-grid") return grid;
+      return null;
+    },
+  });
+  grid.querySelectorAll = () => [trigger];
+  const lightbox = makeElement({
+    showModal() { this.open = true; },
+    close() { this.open = false; this.listeners.close(); },
+  });
+  const docElements = {
+    "art-lightbox": lightbox,
+    "lightbox-image": makeElement(),
+    "lightbox-caption": makeElement(),
+    "lightbox-product-name": makeElement(),
+    "lightbox-product-price": makeElement(),
+    "lightbox-product-size": makeElement(),
+    "lightbox-image-description": makeElement(),
+    "lightbox-previous": makeElement(),
+    "lightbox-next": makeElement(),
+    "lightbox-position": makeElement(),
+    "lightbox-request": makeElement(),
+    order,
+  };
+  const windowObject = {
+    history,
+    location: { href: "https://example.test/?type=couple#catalogue-filters" },
+    listeners: {},
+    timers: [],
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    setTimeout(callback) { this.timers.push(callback); },
+    flushTimers() { while (this.timers.length) this.timers.shift()(); },
+  };
+  const documentObject = {
+    body: makeElement(),
+    get activeElement() { return activeElement; },
+    getElementById(id) { return docElements[id] || null; },
+    querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [trigger] : []; },
+  };
+  activeElement = documentObject.body;
+  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
+
+  const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
+  trigger.listeners.click(click);
+  assert.equal(lightbox.open, true);
+  assert.equal(history.pushes.length, 1);
+  assert.equal(history.pushes[0].state.saloniLightbox, true);
+  trigger.listeners.click(click);
+  assert.equal(history.pushes.length, 1);
+
+  history.state = { catalogue: true };
+  windowObject.listeners.popstate({ state: history.state, stopImmediatePropagation() {} });
+  assert.equal(lightbox.open, false);
+  assert.equal(trigger.focused, true);
+  assert.equal(history.backs, 0);
+
+  trigger.listeners.click(click);
+  assert.equal(history.pushes.length, 2);
+  lightbox.close();
+  assert.equal(history.backs, 1);
+  assert.equal(history.pendingBack.length, 1);
+  trigger.listeners.click(click);
+  assert.equal(history.pushes.length, 2);
+  history.flushBack();
+  assert.equal(lightbox.open, true);
+  assert.equal(history.pushes.length, 3);
+  assert.equal(history.state.saloniLightbox, true);
+  lightbox.close();
+  assert.equal(history.backs, 2);
+  history.flushBack();
+  assert.equal(lightbox.open, false);
+  assert.equal(history.state.saloniLightbox, undefined);
+  trigger.focused = false;
+  trigger.listeners.click(click);
+  lightbox.close();
+  assert.equal(history.backs, 3);
+  history.flushBack();
+  assert.equal(documentObject.activeElement, documentObject.body);
+  assert.equal(trigger.focused, false);
+  windowObject.flushTimers();
+  assert.equal(documentObject.activeElement, trigger);
+  assert.equal(trigger.focusOptions.preventScroll, true);
+
+  trigger.focused = false;
+  trigger.listeners.click(click);
+  lightbox.close();
+  trigger.listeners.click(click);
+  assert.equal(lightbox.open, true);
+  activeElement = documentObject.body;
+  windowObject.flushTimers();
+  assert.equal(documentObject.activeElement, documentObject.body);
+  assert.equal(trigger.focused, false);
+  lightbox.close();
+  history.flushBack();
+  windowObject.flushTimers();
+  assert.equal(documentObject.activeElement, trigger);
+
+  trigger.focused = false;
+  trigger.listeners.click(click);
+  lightbox.close();
+  trigger.listeners.click(click);
+  docElements["lightbox-request"].listeners.click();
+  assert.equal(requestButton.clicked, 1);
+  history.flushBack();
+  trigger.listeners.click(click);
+  activeElement = documentObject.body;
+  windowObject.flushTimers();
+  assert.equal(lightbox.open, true);
+  assert.equal(order.scrolls, 0);
+  assert.equal(documentObject.activeElement, documentObject.body);
+  lightbox.close();
+  history.flushBack();
+  windowObject.flushTimers();
+  assert.equal(documentObject.activeElement, trigger);
+
+  trigger.focused = false;
+  trigger.listeners.click(click);
+  lightbox.close();
+  trigger.listeners.click(click);
+  docElements["lightbox-request"].listeners.click();
+  assert.equal(requestButton.clicked, 2);
+  assert.equal(history.backs, 7);
+  history.flushBack();
+  windowObject.flushTimers();
+  assert.equal(order.scrolls, 1);
+  assert.equal(order.scrollOptions.behavior, "auto");
+  assert.equal(order.scrollOptions.block, "start");
+  assert.equal(documentObject.activeElement, order);
+  history.forward();
+  history.flushForward();
+  assert.equal(history.pendingBack.length, 1);
+  history.flushBack();
+  windowObject.flushTimers();
+  assert.equal(trigger.focused, false);
+  assert.equal(history.forwards, 1);
+  assert.equal(history.state.saloniLightbox, undefined);
+  let normalBackStopped = false;
+  windowObject.listeners.popstate({ state: history.state, stopImmediatePropagation() { normalBackStopped = true; } });
+  assert.equal(normalBackStopped, false);
+});
+
 test("privacy details keep the full retention and correction wording below both forms", () => {
   const order = html.match(/<section[^>]+class="order-section shell"[\s\S]*?<\/section>/)?.[0] || "";
   assert.match(order, /class="order-privacy-note"[^>]*>Your information is used only to handle your request\./);
