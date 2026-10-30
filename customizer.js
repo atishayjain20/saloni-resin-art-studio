@@ -484,6 +484,9 @@
     var previewStage = document.getElementById("preview-stage");
     var brushCursor = document.getElementById("brush-cursor");
     var summaryOutput = document.getElementById("customizer-summary");
+    var mobileActions = document.getElementById("customizer-mobile-actions");
+    var mobileRequest = document.getElementById("customizer-mobile-request");
+    var hasCustomerChange = false;
     var colours = {
       filling: colourControl("filling-colour"),
       brush: colourControl("brush-colour"),
@@ -512,6 +515,18 @@
       currentStroke: null,
       drawing: false
     };
+
+    function markCustomerChange() {
+      if (hasCustomerChange) return;
+      hasCustomerChange = true;
+      if (mobileActions) mobileActions.hidden = false;
+    }
+
+    if (mobileRequest) mobileRequest.addEventListener("click", function (event) {
+      if (event && event.preventDefault) event.preventDefault();
+      var requestButton = document.getElementById("order-from-customizer");
+      if (requestButton && requestButton !== mobileRequest) requestButton.click();
+    });
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
@@ -689,6 +704,7 @@
         return;
       }
       var normalized = value.toUpperCase();
+      if (state.colors[name] !== normalized) markCustomerChange();
       state.colors[name] = normalized;
       control.color.value = normalized;
       control.hex.value = normalized;
@@ -1396,6 +1412,7 @@
         }
         var previous = state.image;
         state.image = { element: image, url: url, name: file.name };
+        markCustomerChange();
         state.imageLoading = false;
         resetPhotoLayout();
         releaseImage(previous);
@@ -1419,6 +1436,7 @@
     }
 
     function removeCurrentImage() {
+      markCustomerChange();
       state.imageRequest += 1;
       endPhotoDrag();
       releaseImage(state.image);
@@ -1485,6 +1503,7 @@
       state.photoLayout.y = state.photoDrag.layout.y + (point.y - state.photoDrag.start.y) / inner.height;
       state.photoLayout.position = "custom";
       state.photoLayout.custom = true;
+      markCustomerChange();
       clampPhotoLayout(inner);
       renderPreview();
     }
@@ -1500,6 +1519,7 @@
     function beginPaint(event) {
       if (!paintToggle.checked) return;
       event.preventDefault();
+      markCustomerChange();
       state.drawing = true;
       state.cursor = pointFor(event);
       state.currentStroke = { color: state.colors.paint, width: PAINT_WIDTH, points: [normalisePoint(state.cursor, currentInner())] };
@@ -1540,6 +1560,7 @@
         updateBrushCursor();
       }
       state.drawing = true;
+      markCustomerChange();
       state.currentStroke = { color: state.colors.paint, width: PAINT_WIDTH, points: [normalisePoint(state.cursor, currentInner())] };
       state.strokes.push(state.currentStroke);
       renderPreview();
@@ -1593,6 +1614,7 @@
       event.preventDefault();
       state.photoLayout = nudgePhotoLayout(state.photoLayout, key, event.shiftKey);
       clampPhotoLayout(currentInner());
+      markCustomerChange();
       setImageStatus("Custom position.");
       renderPreview();
       return true;
@@ -1746,6 +1768,7 @@
       renderPreview();
     });
     paintClear.addEventListener("click", function () {
+      if (state.strokes.length) markCustomerChange();
       state.strokes = [];
       state.currentStroke = null;
       state.drawing = false;
@@ -1772,11 +1795,13 @@
     });
     sceneCanvas.addEventListener("keydown", keyboardInteraction);
     form.addEventListener("input", function (event) {
-      if (event.target.classList.contains("hex-input") || event.target.type === "color") return;
+      if (event.target.classList.contains("hex-input") || event.target.type === "file" || event.target.type === "color") return;
+      markCustomerChange();
       renderPreview();
     });
     form.addEventListener("change", function (event) {
       if (event.target.classList.contains("hex-input") || event.target.type === "file" || event.target.type === "color") return;
+      markCustomerChange();
       renderPreview();
     });
     copySummary.addEventListener("click", copySummaryText);
