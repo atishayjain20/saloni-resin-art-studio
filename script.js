@@ -141,10 +141,60 @@
     var lightboxItems = [];
     var lightboxIndex = 0;
     var pendingLightboxRequest = null;
+    var lightboxHistoryActive = false;
+    var lightboxCloseFromHistory = false;
+    var suppressNextLightboxPopstate = false;
+    var pendingLightboxFocus = null;
+    var lightboxFocusToken = 0;
     if (lightbox && lightboxImage && lightboxCaption && typeof lightbox.showModal === "function") {
       function focusOrderLocation() {
         var target = document.getElementById("order") || document.getElementById("order-form-embed");
-        if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
+        if (!target) return;
+        if (typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
+        if (typeof target.focus === "function") target.focus({ preventScroll: true });
+      }
+
+      function isLightboxHistoryState(state) {
+        return Boolean(state && state.saloniLightbox);
+      }
+
+      function focusLightboxTrigger(trigger) {
+        if (trigger && typeof trigger.focus === "function") trigger.focus({ preventScroll: true });
+      }
+
+      function invalidateLightboxFocus() {
+        lightboxFocusToken += 1;
+        pendingLightboxFocus = null;
+      }
+
+      function pushLightboxHistory() {
+        var history = window.history;
+        if (!history || typeof history.pushState !== "function") return;
+        if (suppressNextLightboxPopstate || lightboxHistoryActive || isLightboxHistoryState(history.state)) {
+          lightboxHistoryActive = true;
+          return;
+        }
+        try {
+          var state = Object.assign({}, history.state || {}, { saloniLightbox: true });
+          history.pushState(state, "", window.location && window.location.href ? window.location.href : "");
+          lightboxHistoryActive = true;
+        } catch (error) {}
+      }
+
+      function stepBackFromLightboxHistory() {
+        var history = window.history;
+        if (!history || typeof history.back !== "function") return false;
+        suppressNextLightboxPopstate = true;
+        try { history.back(); return true; } catch (error) { suppressNextLightboxPopstate = false; return false; }
+      }
+
+      function consumeLightboxHistory() {
+        if (!lightboxHistoryActive) return false;
+        lightboxHistoryActive = false;
+        if (suppressNextLightboxPopstate) return true;
+        var history = window.history;
+        if (!history || typeof history.back !== "function" || !isLightboxHistoryState(history.state)) return false;
+        return stepBackFromLightboxHistory();
       }
 
       function productDetails(trigger) {
@@ -211,6 +261,9 @@
         if (event.target === lightbox) lightbox.close();
       });
       lightbox.addEventListener("close", function () {
+        var restoreTrigger = lastTrigger;
+        var closeFromHistory = lightboxCloseFromHistory;
+        lightboxCloseFromHistory = false;
         lightboxImage.removeAttribute("src");
         lightboxImage.alt = "";
         if (lightboxName) lightboxName.textContent = "";
@@ -219,15 +272,71 @@
         if (lightboxDescription) lightboxDescription.textContent = "";
         if (lightboxRequest) { lightboxRequest.hidden = true; lightboxRequest.disabled = true; }
         if (pendingLightboxRequest) {
+          invalidateLightboxFocus();
           var requestButton = pendingLightboxRequest;
           pendingLightboxRequest = null;
           if (typeof requestButton.click === "function") requestButton.click();
-          if (typeof window.setTimeout === "function") window.setTimeout(focusOrderLocation, 0);
-          else focusOrderLocation();
-        } else if (lastTrigger) lastTrigger.focus();
+          var requestFocusToken = ++lightboxFocusToken;
+          pendingLightboxFocus = { focus: focusOrderLocation, token: requestFocusToken };
+          var requestHistoryConsumed = closeFromHistory ? false : consumeLightboxHistory();
+          if (!requestHistoryConsumed) {
+            pendingLightboxFocus = null;
+            if (requestFocusToken === lightboxFocusToken) {
+              if (typeof window.setTimeout === "function") window.setTimeout(function () {
+                if (requestFocusToken === lightboxFocusToken && !lightbox.open) focusOrderLocation();
+              }, 0);
+              else focusOrderLocation();
+            }
+          }
+        } else if (closeFromHistory) {
+          invalidateLightboxFocus();
+          focusLightboxTrigger(restoreTrigger);
+        } else {
+          var focusToken = ++lightboxFocusToken;
+          pendingLightboxFocus = { trigger: restoreTrigger, token: focusToken };
+          if (!consumeLightboxHistory()) {
+            pendingLightboxFocus = null;
+            if (focusToken === lightboxFocusToken) focusLightboxTrigger(restoreTrigger);
+          }
+        }
         lastTrigger = null;
         lightboxItems = [];
         lightboxIndex = 0;
+      });
+      if (window.addEventListener) window.addEventListener("popstate", function (event) {
+        if (suppressNextLightboxPopstate) {
+          suppressNextLightboxPopstate = false;
+          if (event && typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+          var pendingFocus = pendingLightboxFocus;
+          pendingLightboxFocus = null;
+          if (pendingFocus && pendingFocus.token === lightboxFocusToken && !lightbox.open) {
+            var pendingFocusToken = pendingFocus.token;
+            var restorePendingFocus = function () {
+              if (pendingFocusToken !== lightboxFocusToken || lightbox.open) return;
+              if (pendingFocus.trigger) focusLightboxTrigger(pendingFocus.trigger);
+              else if (pendingFocus.focus) pendingFocus.focus();
+            };
+            if (typeof window.setTimeout === "function") window.setTimeout(restorePendingFocus, 0);
+            else restorePendingFocus();
+          }
+          if (lightbox.open && !isLightboxHistoryState(event && event.state)) {
+            lightboxHistoryActive = false;
+            pushLightboxHistory();
+          }
+          return;
+        }
+        if (!lightboxHistoryActive && !lightbox.open && isLightboxHistoryState(event && event.state)) {
+          invalidateLightboxFocus();
+          if (event && typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+          stepBackFromLightboxHistory();
+          return;
+        }
+        if (!lightboxHistoryActive || isLightboxHistoryState(event && event.state)) return;
+        lightboxHistoryActive = false;
+        if (!lightbox.open) return;
+        lightboxCloseFromHistory = true;
+        if (event && typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+        lightbox.close();
       });
       lightbox.addEventListener("keydown", function (event) {
         if (event.key === "ArrowLeft") { event.preventDefault(); moveLightboxItem(-1); }
@@ -239,10 +348,12 @@
         var item = lightboxItems[lightboxIndex];
         var requestButton = item && item.card && item.card.querySelector("[data-order-prefill]");
         if (!requestButton) return;
+        invalidateLightboxFocus();
         pendingLightboxRequest = requestButton;
         lightbox.close();
       });
       function openLightbox(trigger, restoreTarget) {
+        invalidateLightboxFocus();
         lastTrigger = restoreTarget || trigger;
         var targetId = typeof trigger.getAttribute === "function" ? trigger.getAttribute("data-lightbox-target") : "";
         var targetCard = targetId && document.getElementById ? document.getElementById(targetId) : null;
@@ -250,7 +361,8 @@
         lightboxItems = targetTrigger ? [productDetails(targetTrigger)] : visibleCollection(trigger);
         lightboxIndex = Math.max(0, lightboxItems.findIndex(function (item) { return item.trigger === trigger; }));
         renderLightboxItem();
-        lightbox.showModal();
+        pushLightboxHistory();
+        if (!lightbox.open) lightbox.showModal();
       }
       lightboxTriggers.forEach(function (trigger) {
         var card = trigger.closest ? trigger.closest("article") : null;
