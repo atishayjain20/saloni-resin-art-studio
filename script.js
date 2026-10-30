@@ -420,8 +420,6 @@
     var empty = document.getElementById("catalogue-filter-empty");
     var results = document.getElementById("catalogue-results");
     if (!tools || !searchFilter || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty || !results) return;
-    var resultsHome = results.parentNode;
-
     var pagePrevious = document.getElementById("catalogue-page-previous");
     var pageNext = document.getElementById("catalogue-page-next");
     var pageStatus = document.getElementById("catalogue-page-status");
@@ -502,7 +500,7 @@
       var query = normalizeSearch(searchFilter.value).toLowerCase();
       if (!query) return true;
       var type = typeFor(card);
-      var searchable = [titleFor(card), type, typeLabels[type] || "", card.getAttribute("data-product-kind") || ""].join(" ").toLowerCase();
+      var searchable = [titleFor(card), type, typeLabels[type] || "", card.getAttribute("data-product-kind") || "", card.getAttribute("data-search-keywords") || ""].join(" ").toLowerCase();
       return searchable.indexOf(query) !== -1;
     }
 
@@ -527,23 +525,9 @@
 
     function cataloguePages(filteredCards) {
       var pages = [];
-      var currentPage = [];
-      var currentSection = null;
-      filteredCards.forEach(function (card) {
-        var section = sectionFor(card);
-        if (currentPage.length && (currentPage.length >= pageSize || section !== currentSection)) {
-          pages.push(currentPage);
-          currentPage = [];
-        }
-        if (!currentPage.length) currentSection = section;
-        currentPage.push(card);
-        if (currentPage.length === pageSize) {
-          pages.push(currentPage);
-          currentPage = [];
-          currentSection = null;
-        }
-      });
-      if (currentPage.length) pages.push(currentPage);
+      for (var start = 0; start < filteredCards.length; start += pageSize) {
+        pages.push(filteredCards.slice(start, start + pageSize));
+      }
       return pages;
     }
 
@@ -625,9 +609,6 @@
         disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : "View all";
       });
       updateCataloguePresentation();
-      var resultsSection = allVisible && pageCards.length ? sectionFor(pageCards[pageCards.length - 1]) : null;
-      if (resultsSection && resultsSection.appendChild) resultsSection.appendChild(results);
-      else if (resultsHome && resultsHome.appendChild) resultsHome.appendChild(results);
       var browseAllCta = document.getElementById("browse-all-gifts");
       if (browseAllCta) browseAllCta.hidden = allVisible;
       empty.hidden = matchingCards.length !== 0;

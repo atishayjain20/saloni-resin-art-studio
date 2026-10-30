@@ -37,18 +37,27 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
   assert.doesNotMatch(html, /Some catalogue images are illustrative or reference ideas\. Saloni confirms availability, materials, final design, quote, and delivery\./);
 });
 
+test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261031">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261031" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
+});
+
 test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable", () => {
   const mobileStart = css.indexOf("@media (max-width: 620px)");
   const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
   const mobileCss = css.slice(mobileStart, reducedMotionStart);
+  const desktopCopyRule = css.match(/^h1\s*\{([^}]*)\}/m)?.[1] || "";
   const heroRule = mobileCss.match(/#hero\s*\{([^}]*)\}/)?.[1] || "";
   const copyContainerRule = mobileCss.match(/#hero \.hero-copy\s*\{([^}]*)\}/)?.[1] || "";
   const copyRule = mobileCss.match(/#hero h1\s*\{([^}]*)\}/)?.[1] || "";
   const actionsRule = mobileCss.match(/#hero \.hero-actions\s*\{([^}]*)\}/)?.[1] || "";
+  const mobileNavRule = mobileCss.match(/\.nav-toggle\s*\{([^}]*)\}/)?.[1] || "";
   const secondaryActionRule = css.match(/\.hero-secondary-action\s*\{([^}]*)\}/)?.[1] || "";
   const mobileSecondaryActionRule = mobileCss.match(/#hero \.hero-actions \.hero-secondary-action\s*\{([^}]*)\}/)?.[1] || "";
   const collageRule = mobileCss.match(/#hero \.hero-collage\s*\{([^}]*)\}/)?.[1] || "";
   const imageRule = mobileCss.match(/#hero \.hero-image\s*\{([^}]*)\}/)?.[1] || "";
+  const mainMediaRule = mobileCss.match(/#hero \.hero-image-main \.lightbox-trigger\s*\{([^}]*)\}/)?.[1] || "";
   const mainImageRule = mobileCss.match(/#hero \.hero-image-main img\s*\{([^}]*)\}/)?.[1] || "";
   const clockFigureRule = mobileCss.match(/#hero \.hero-image-clock\s*\{([^}]*)\}/)?.[1] || "";
   const clockImageRule = mobileCss.match(/#hero \.hero-image-clock img\s*\{([^}]*)\}/)?.[1] || "";
@@ -56,23 +65,38 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   const socialRule = mobileCss.match(/#hero \.instagram-mark\s*\{([^}]*)\}/)?.[1] || "";
   const noteRule = mobileCss.match(/#hero \.hero-note\s*\{([^}]*)\}/)?.[1] || "";
 
-  assert.match(heroRule, /padding-block:\s*1rem 2\.5rem/);
+  assert.match(heroRule, /padding-block:\s*1rem 1rem/);
+  assert.match(desktopCopyRule, /font-size:\s*clamp\(3\.4rem, 7\.1vw, 6\.6rem\)/);
+  assert.match(desktopCopyRule, /line-height:\s*0\.97/);
   assert.match(copyContainerRule, /min-width:\s*0/);
   assert.match(copyRule, /max-width:\s*none/);
-  assert.match(copyRule, /font-size:\s*clamp\(2\.5rem, 12vw, 3\.8rem\)/);
+  assert.match(copyRule, /font-size:\s*clamp\(2\.15rem, 9\.8vw, 2\.9rem\)/);
+  assert.match(copyRule, /line-height:\s*1\.02/);
+  assert.match(copyRule, /letter-spacing:\s*-0\.035em/);
   assert.match(copyRule, /overflow-wrap:\s*anywhere/);
   assert.match(actionsRule, /flex-direction:\s*row/);
   assert.match(actionsRule, /flex-wrap:\s*wrap/);
+  assert.match(mobileNavRule, /width:\s*44px/);
+  assert.match(mobileNavRule, /height:\s*44px/);
+  assert.match(mobileNavRule, /min-height:\s*44px/);
   assert.match(secondaryActionRule, /font-size:\s*0\.75rem/);
   assert.match(secondaryActionRule, /text-decoration:\s*underline/);
   assert.match(mobileSecondaryActionRule, /font-size:\s*0\.7rem/);
+  assert.match(mobileSecondaryActionRule, /display:\s*flex/);
+  assert.match(mobileSecondaryActionRule, /align-items:\s*center/);
+  assert.match(mobileSecondaryActionRule, /height:\s*44px/);
+  assert.match(mobileSecondaryActionRule, /min-height:\s*44px/);
   assert.match(collageRule, /display:\s*grid/);
+  assert.match(collageRule, /gap:\s*0\.5rem/);
   assert.match(collageRule, /min-height:\s*auto/);
   assert.match(collageRule, /min-width:\s*0/);
   assert.match(imageRule, /position:\s*relative/);
   assert.match(imageRule, /width:\s*100%/);
-  assert.match(mainImageRule, /height:\s*auto/);
-  assert.match(clockFigureRule, /width:\s*55%/);
+  assert.match(mainMediaRule, /aspect-ratio:\s*1\.65\s*\/\s*1/);
+  assert.match(mainMediaRule, /overflow:\s*hidden/);
+  assert.match(mainImageRule, /height:\s*100%/);
+  assert.match(mainImageRule, /object-fit:\s*cover/);
+  assert.match(clockFigureRule, /width:\s*45%/);
   assert.match(clockImageRule, /height:\s*auto/);
   assert.match(captionRule, /position:\s*static/);
   assert.match(captionRule, /margin-top:\s*0\.4rem/);
@@ -149,11 +173,28 @@ test("catalogue enhancement has accessible filters, preview mode, and a no-resul
   assert.match(script, /initCatalogueExperience/);
 });
 
-test("full browse keeps one global status and a clear all-gifts heading while pagination stays section-bound", () => {
-  const enhancement = html.match(/<div class="catalogue-enhancement"[\s\S]*?<\/div>\s*<a class="button button-dark catalogue-browse-all"/)?.[0] || "";
-  assert.ok(enhancement.indexOf('id="catalogue-filter-status"') < enhancement.indexOf('id="catalogue-results"'));
-  assert.match(enhancement, /id="catalogue-results"[\s\S]*id="catalogue-pagination"/);
-  assert.doesNotMatch(enhancement.match(/<div class="catalogue-results"[\s\S]*?<\/div>/)?.[0] || "", /catalogue-filter-status/);
+test("catalogue results header keeps heading, count, and pager together before filters", () => {
+  const headerStart = html.indexOf('<div class="catalogue-results-header">');
+  const filtersStart = html.indexOf('<div class="catalogue-enhancement"', headerStart);
+  const fieldsStart = html.indexOf('class="catalogue-filter-fields"', filtersStart);
+  const header = headerStart >= 0 && filtersStart > headerStart ? html.slice(headerStart, filtersStart) : "";
+  assert.ok(header, "expected a stable results header before the filter controls");
+  assert.ok(header.indexOf('id="catalogue-filters-title"') < header.indexOf('id="catalogue-filter-status"'));
+  assert.ok(header.indexOf('id="catalogue-filter-status"') < header.indexOf('id="catalogue-page-status"'));
+  assert.ok(filtersStart < fieldsStart, "filter controls should remain after the results header");
+  assert.match(css, /\.catalogue-results-header\s*\{[^}]*display:\s*grid/);
+  assert.match(css, /\.catalogue-results\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.catalogue-ready \.catalogue-results\s*\{[^}]*display:\s*grid/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.catalogue-results-header\s*\{[^}]*display:\s*block/);
+});
+
+test("full browse keeps one global status and a clear all-gifts heading while pagination stays beside it", () => {
+  const headerStart = html.indexOf('<div class="catalogue-results-header">');
+  const filtersStart = html.indexOf('<div class="catalogue-enhancement"', headerStart);
+  const header = headerStart >= 0 && filtersStart > headerStart ? html.slice(headerStart, filtersStart) : "";
+  assert.ok(header.indexOf('id="catalogue-filters-title"') < header.indexOf('id="catalogue-filter-status"'));
+  assert.match(header, /id="catalogue-results"[\s\S]*id="catalogue-pagination"/);
+  assert.match(header, /id="catalogue-filter-status"[\s\S]*id="catalogue-page-status"/);
   assert.match(script, /All gifts/);
   assert.match(script, /focusCatalogueHeading\(state && state\.pageCards\)/);
   assert.match(script, /catalogue-filters/);
@@ -454,6 +495,15 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   assert.doesNotMatch(customizerSection.match(/<details[^>]*id="customizer-save-share"[^>]*>/)?.[0] || "", /\bopen\b/);
   assert.match(customizerSection, /Let Saloni design it for me/);
   assert.match(customizerSection, /Request this design/);
+  const mobileActions = html.match(/<div class="customizer-mobile-actions"[\s\S]*?<\/div>/)?.[0] || "";
+  const customizerStart = html.indexOf('<section class="customizer-section');
+  const customizerEnd = html.indexOf("</section>", customizerStart);
+  const mobileActionsPosition = html.indexOf('id="customizer-mobile-actions"');
+  assert.ok(mobileActionsPosition > customizerEnd, "mobile actions sit outside the transformed customizer section");
+  assert.ok(mobileActionsPosition < html.indexOf('<section class="order-section shell"', customizerEnd), "mobile actions stay before the order section");
+  assert.match(mobileActions, /id="customizer-mobile-actions"[^>]*hidden[^>]*role="group"[^>]*aria-label="Custom design actions"/);
+  assert.match(mobileActions, /<button[^>]+id="customizer-mobile-request"[^>]+data-customizer-request="true"[^>]*>Request this design<\/button>/);
+  assert.match(mobileActions, /<button[^>]+id="customizer-mobile-help"[^>]+data-order-prefill="general"[^>]+data-design-help="true"[^>]*>Let Saloni finish it<\/button>/);
   assert.match(customizerSection, /<button[^>]+id="customizer-continue-without-preview"[^>]+hidden/);
   assert.doesNotMatch(customizerSection, /Start an order from this design/);
   assert.match(customizer, /data-template|template/);
@@ -467,12 +517,22 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-form\s*\{[^}]*display:\s*block/);
   assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*sticky/);
   assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-preview \.preview-stage\s*\{[^}]*width:\s*min\(100%, 20dvh, 13rem\)/);
+  assert.match(css, /\.customizer-mobile-actions\s*\{[^}]*display:\s*none/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customizer-mobile-actions\s*\{[^}]*position:\s*fixed[^}]*bottom:\s*0/);
+  assert.match(css, /\.customizer-mobile-actions[^}]*padding:[^}]*env\(safe-area-inset-bottom\)/);
+  assert.match(css, /\.customizer-section:has\(\+ \.customizer-mobile-actions:not\(\[hidden\]\)\)[^}]*padding-bottom:[^}]*env\(safe-area-inset-bottom\)/);
+  assert.match(css, /body:has\(#customizer-mobile-actions:not\(\[hidden\]\)\)[^}]*padding-bottom:[^}]*env\(safe-area-inset-bottom\)/);
+  assert.match(css, /html:has\(#customizer-mobile-actions:not\(\[hidden\]\)\)[^}]*scroll-padding-bottom:[^}]*env\(safe-area-inset-bottom\)/);
+  assert.match(css, /\.customizer-form :is\(input, select, textarea, button, a, summary\)\s*\{[^}]*scroll-margin-block-end:/);
   assert.match(css, /\.customizer-form :is\(input, select, textarea, button, a, summary\)\s*\{[^}]*scroll-margin-block-start/);
   assert.match(css, /\.customizer-form:has\(input\[type="text"\]:focus, input\[type="number"\]:focus, textarea:focus, button:focus, a:focus, summary:focus\)/);
   assert.match(css, /@media \(max-width: 840px\) and \(max-height: 620px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*position:\s*static/);
   assert.match(css, /@media \(max-width: 840px\)[\s\S]*?\.customizer-preview-panel\s*\{[^}]*grid-row:\s*auto/);
   const customizerCss = css.slice(css.indexOf(".customizer-layout"), css.indexOf(".order-section"));
   assert.doesNotMatch(customizerCss, /(?:^|[;}])\s*order\s*:/);
+  assert.match(customizer, /function markCustomerChange\(\)/);
+  assert.match(customizer, /mobileActions\.hidden = false/);
+  assert.match(customizer, /customizer-mobile-request/);
 });
 
 test("customizer starts compact and opens from the frame-design nav or hash", () => {
