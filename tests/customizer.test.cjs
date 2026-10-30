@@ -92,7 +92,7 @@ function shareFixture(overrides = {}) {
   return Object.assign(fixture, overrides);
 }
 
-function imageFailureBrowserFixture() {
+function imageFailureBrowserFixture(file = { name: "reference.png", type: "image/png", size: 1024 }) {
   const elements = new Map();
   let createdImage;
   class Element {
@@ -100,7 +100,7 @@ function imageFailureBrowserFixture() {
       this.id = id;
       this.value = id === "frame-type" ? "square" : id === "border-style" ? "scalloped" : id === "frame-preset" ? "8" : id === "frame-unit" ? "in" : "0.5";
       this.checked = false;
-      this.hidden = false;
+      this.hidden = id === "customizer-mobile-actions";
       this.disabled = false;
       this.files = [];
       this.textContent = "";
@@ -140,7 +140,7 @@ function imageFailureBrowserFixture() {
   const referenceImage = elements.get("reference-image");
   const shareDesign = elements.get("share-design");
   const shareStatus = elements.get("share-status");
-  referenceImage.files = [{ name: "reference.png", type: "image/png", size: 1024 }];
+  referenceImage.files = [file];
   referenceImage.dispatch("change");
   return { elements, createdImage, shareDesign, shareStatus };
 }
@@ -343,13 +343,29 @@ test("rechecks the final preview state before exporting", () => {
 
 test("re-enables Share after a reference image load error", () => {
   const fixture = imageFailureBrowserFixture();
+  const mobileActions = fixture.elements.get("customizer-mobile-actions");
   assert.equal(fixture.shareDesign.disabled, true);
+  assert.equal(mobileActions.hidden, true);
   assert.match(fixture.shareStatus.textContent, /reference image loads/i);
 
   fixture.createdImage.onerror();
 
   assert.equal(fixture.shareDesign.disabled, false);
+  assert.equal(mobileActions.hidden, true);
   assert.doesNotMatch(fixture.shareStatus.textContent, /reference image loads/i);
+});
+
+test("rejected reference image input keeps the mobile action bar hidden", () => {
+  const fixture = imageFailureBrowserFixture({ name: "reference.gif", type: "image/gif", size: 1024 });
+  const mobileActions = fixture.elements.get("customizer-mobile-actions");
+  const form = fixture.elements.get("customizer-form");
+  const referenceImage = fixture.elements.get("reference-image");
+  referenceImage.type = "file";
+
+  form.dispatch("input", { target: referenceImage });
+  referenceImage.dispatch("change");
+
+  assert.equal(mobileActions.hidden, true);
 });
 
 test("announces an honest manual fallback when native sharing is unsupported", () => {
