@@ -68,13 +68,14 @@ class FakeSection {
 }
 
 class FakeCard {
-  constructor(section, price, id, featured = false, eventLog = [], title = id, kind = "", description = "") {
+  constructor(section, price, id, featured = false, eventLog = [], title = id, kind = "", description = "", keywords = "") {
     this.section = section;
     this.price = price;
     this.id = id;
     this.title = title;
     this.kind = kind;
     this.description = description;
+    this.keywords = keywords;
     this.textContent = `${title} ${description}`;
     this.hidden = false;
     this.attributes = featured ? { "data-featured": "true" } : {};
@@ -88,7 +89,11 @@ class FakeCard {
     if (selector === "figcaption strong" || selector === "figcaption h3") return { textContent: this.title };
     return null;
   }
-  getAttribute(name) { return name === "data-product-kind" ? this.kind : this.attributes[name] || ""; }
+  getAttribute(name) {
+    if (name === "data-product-kind") return this.kind;
+    if (name === "data-search-keywords") return this.keywords;
+    return this.attributes[name] || "";
+  }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   removeAttribute(name) { delete this.attributes[name]; }
   matches(selector) { return selector === "article"; }
@@ -160,8 +165,9 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   const pageStatus = { textContent: "" };
   const pagination = { hidden: false };
   const enhancement = new FakeContainer("catalogue-enhancement");
+  const resultsHeader = new FakeContainer("catalogue-results-header");
   const results = new FakeContainer("catalogue-results");
-  enhancement.appendChild(results);
+  resultsHeader.appendChild(results);
   results.appendChild(status);
   results.appendChild(pagination);
   const heading = new FakeControl("");
@@ -242,7 +248,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   const context = { document: documentObject, window: windowObject, URL, URLSearchParams };
   vm.createContext(context);
   vm.runInContext(`${catalogueFunction}\ninitCatalogueExperience();`, context, { filename: "script.js" });
-  return { cards, sections, tools, searchFilter, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, results, enhancement, sectionHeadings, heading, browseFilters, navBrowseAll, browseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, eventLog };
+  return { cards, sections, tools, searchFilter, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, results, enhancement, resultsHeader, sectionHeadings, heading, browseFilters, navBrowseAll, browseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, eventLog };
 }
 
 function visibleCards(harness) { return harness.cards.filter((card) => !card.hidden); }
@@ -332,6 +338,41 @@ test("search uses literal title, type, and kind fields while ignoring descriptio
   assert.ok(visibleCards(harness).every((card) => card.section.id === "diwali"));
 });
 
+test("search matches hidden semantic keywords for romantic and festive intent", () => {
+  const harness = createHarness({ count: 12 });
+  const romantic = harness.cards[0];
+  romantic.keywords = "heart rose anniversary boyfriend girlfriend couple";
+  const festive = harness.cards[1];
+  festive.keywords = "mantra diya tealight rakhi";
+
+  ["heart", "rose", "anniversary", "boyfriend", "girlfriend", "couple"].forEach((term) => {
+    harness.searchFilter.value = term;
+    harness.searchFilter.dispatch("input");
+    assert.deepEqual(visibleCards(harness).map((card) => card.id), [romantic.id], `expected ${term} to find the romantic product`);
+  });
+  ["mantra", "diya", "tealight", "rakhi"].forEach((term) => {
+    harness.searchFilter.value = term;
+    harness.searchFilter.dispatch("input");
+    assert.deepEqual(visibleCards(harness).map((card) => card.id), [festive.id], `expected ${term} to find the festive product`);
+  });
+});
+
+test("catalogue cards declare hidden intent keywords without changing visible copy", () => {
+  const articleBlocks = Array.from(html.matchAll(/<article\b[\s\S]*?<\/article>/g), (match) => match[0]);
+  const assertKeywords = (marker, keywords) => {
+    const article = articleBlocks.find((block) => block.includes(marker)) || "";
+    assert.match(article, /data-search-keywords="[^"]+"/);
+    keywords.forEach((keyword) => assert.match(article, new RegExp(`data-search-keywords="[^"]*\\b${keyword}\\b`)));
+  };
+  assertKeywords("romantic-trinket", ["heart", "boyfriend", "girlfriend", "couple"]);
+  assertKeywords("romantic-calendar-title", ["anniversary", "couple"]);
+  assertKeywords("rose-hexagon", ["rose"]);
+  assertKeywords("blue-mantra-frame", ["mantra"]);
+  assertKeywords('data-product-kind="rakhi"', ["rakhi"]);
+  assertKeywords("diwali-lotus-diya-pair", ["diya"]);
+  assertKeywords("diwali-jewel-glow", ["tealight"]);
+});
+
 test("search normalizes the URL boundary and waits for IME composition", () => {
   const harness = createHarness({ count: 12 });
   harness.searchFilter.value = "x".repeat(101);
@@ -390,7 +431,7 @@ test("search clear, category navigation, previews, and no-result reset clear q b
   assert.equal(harness.typeFilter.value, "diwali");
   assert.equal(harness.priceFilter.value, "999");
   assert.equal(harness.pagination.hidden, true);
-  assert.equal(harness.results.parentNode, harness.enhancement);
+  assert.equal(harness.results.parentNode, harness.resultsHeader);
   assert.equal(visibleCards(harness).length, 3);
   assert.equal(harness.windowObject.history.pushes.length, 2);
 
@@ -502,28 +543,31 @@ test("explicit full catalogue pages contain at most eight and traverse every ite
   }
   assert.equal(seen.length, 77);
   assert.equal(new Set(seen).size, 77);
-  assert.equal(visibleCards(harness).length, 3);
-  assert.match(harness.status.textContent, /Showing 75–77 of 77 gifts · Page 11 of 11\./);
+  assert.equal(visibleCards(harness).length, 5);
+  assert.match(harness.status.textContent, /Showing 73–77 of 77 gifts · Page 10 of 10\./);
 });
 
-test("full catalogue pages never mix product sections and cover the real 89-card catalogue in thirteen pages", () => {
+test("full catalogue pages preserve flat DOM order across section boundaries", () => {
   const harness = createHarness({ count: 89, includePremium: true, realCatalogue: true });
   harness.browseAll.dispatch("click");
+  const seen = [];
   const pageCounts = [];
   const pageSections = [];
   while (true) {
     const visible = harness.cards.filter((card) => !card.hidden);
+    seen.push(...visible.map((card) => card.id));
     pageCounts.push(visible.length);
     pageSections.push(new Set(visible.map((card) => card.section.id)));
     if (harness.pageNext.disabled) break;
     harness.pageNext.dispatch("click");
   }
-  assert.deepEqual(pageCounts, [8, 8, 7, 8, 5, 8, 8, 3, 8, 8, 4, 8, 6]);
-  assert.equal(pageSections.length, 13);
-  assert.ok(pageSections.every((sections) => sections.size === 1));
-  assert.equal(pageSections[4].has("romantic-keepsakes"), true);
-  assert.equal(pageSections[5].has("corporate-resin-gifts"), true);
-  assert.match(harness.status.textContent, /Showing 84–89 of 89 gifts · Page 13 of 13\./);
+  assert.deepEqual(pageCounts, [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 1]);
+  assert.equal(pageSections.length, 12);
+  assert.deepEqual(seen, Array.from({ length: 89 }, (_, index) => `product-${index + 1}`));
+  assert.equal(pageSections[2].size, 2, "a page may cross from Diwali into couple gifts");
+  assert.equal(pageSections[2].has("diwali"), true);
+  assert.equal(pageSections[2].has("romantic-keepsakes"), true);
+  assert.match(harness.status.textContent, /Showing 89–89 of 89 gifts · Page 12 of 12\./);
 });
 
 test("filters use AND logic and reset pagination to page one", () => {
@@ -575,16 +619,16 @@ test("paging replaces cards and returns focus to the first visible section headi
   assert.deepEqual(harness.heading.events, ["scroll", "focus", "scroll", "focus"]);
 });
 
-test("full catalogue moves pagination below the visible section and focuses the global heading", () => {
+test("full catalogue keeps results beside the global heading and focuses it", () => {
   const harness = createHarness();
   harness.browseAll.dispatch("click");
-  assert.equal(harness.results.parentNode, harness.sections[0]);
+  assert.equal(harness.results.parentNode, harness.resultsHeader);
   assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
   assert.deepEqual(harness.sectionHeadings[0].events, []);
   assert.deepEqual(harness.heading.events, ["scroll", "focus"]);
   assert.equal(harness.heading.textContent, "All gifts");
   for (let index = 0; index < 4; index += 1) harness.pageNext.dispatch("click");
-  assert.equal(harness.results.parentNode, harness.sections[1]);
+  assert.equal(harness.results.parentNode, harness.resultsHeader);
   assert.deepEqual(harness.sectionHeadings[0].events, []);
   assert.deepEqual(harness.sectionHeadings[1].events, []);
   assert.deepEqual(harness.heading.events, ["scroll", "focus", "scroll", "focus", "scroll", "focus", "scroll", "focus", "scroll", "focus"]);
@@ -597,6 +641,11 @@ test("full browse keeps the global title in sync with type and budget filters", 
   harness.browseAll.dispatch("click");
   assert.equal(harness.heading.textContent, "All gifts");
   assert.match(harness.status.textContent, /Showing 1–8 of 89 gifts/);
+  harness.priceFilter.value = "2000";
+  harness.priceFilter.dispatch("change");
+  assert.equal(harness.heading.textContent, "All gifts");
+  harness.priceFilter.value = "all";
+  harness.priceFilter.dispatch("change");
   harness.typeFilter.value = "premium";
   harness.typeFilter.dispatch("change");
   assert.equal(harness.heading.textContent, "Premium designs");
@@ -607,16 +656,16 @@ test("full browse keeps the global title in sync with type and budget filters", 
   assert.match(harness.status.textContent, /of 6 gifts/);
 });
 
-test("preview and no-result states return the results block to the filter enhancement", () => {
+test("preview, full, and no-result states keep the results block in the results header", () => {
   const harness = createHarness();
-  assert.equal(harness.results.parentNode, harness.enhancement);
+  assert.equal(harness.results.parentNode, harness.resultsHeader);
   harness.browseAll.dispatch("click");
-  assert.notEqual(harness.results.parentNode, harness.enhancement);
+  assert.equal(harness.results.parentNode, harness.resultsHeader);
   harness.resetButton.dispatch("click");
-  assert.equal(harness.results.parentNode, harness.enhancement);
+  assert.equal(harness.results.parentNode, harness.resultsHeader);
   harness.typeFilter.value = "not-a-real-type";
   harness.typeFilter.dispatch("change");
-  assert.equal(harness.results.parentNode, harness.enhancement);
+  assert.equal(harness.results.parentNode, harness.resultsHeader);
 });
 
 test("back to featured picks hides pagination again", () => {
@@ -638,7 +687,7 @@ test("empty results recover to unfiltered page one", () => {
   assert.equal(harness.empty.hidden, true);
   assert.equal(harness.typeFilter.value, "all");
   assert.equal(visibleCards(harness).length, 8);
-  assert.match(harness.status.textContent, /Page 1 of 11/);
+  assert.match(harness.status.textContent, /Page 1 of 10/);
 });
 
 test("Corporate shortcut selects corporate page one", () => {
@@ -680,8 +729,8 @@ test("product and section hashes select bounded page one or the product page", (
 
   const sectionBoundaryProduct = createHarness({ hash: "#product-39" });
   assert.equal(sectionBoundaryProduct.cards[38].hidden, false);
-  assert.match(sectionBoundaryProduct.status.textContent, /Page 6 of 11/);
-  assert.ok(visibleCards(sectionBoundaryProduct).every((card) => card.section.id === "corporate-resin-gifts"));
+  assert.match(sectionBoundaryProduct.status.textContent, /Page 5 of 10/);
+  assert.ok(visibleCards(sectionBoundaryProduct).some((card) => card.id === "product-39"));
 
   const later = createHarness();
   later.windowObject.location.hash = "#corporate-resin-gifts";
@@ -769,7 +818,7 @@ test("invalid URL state falls back to a safe full catalogue tuple without discar
   const harness = createHarness({ url: "https://example.test/?type=wat&budget=1.5&page=Infinity&ref=keep&x=1#catalogue-filters" });
   assert.equal(harness.typeFilter.value, "all");
   assert.equal(harness.priceFilter.value, "all");
-  assert.match(harness.pageStatus.textContent, /Page 1 of 11/);
+  assert.match(harness.pageStatus.textContent, /Page 1 of 10/);
   assert.equal(harness.windowObject.history.pushes.length, 0);
   assert.equal(harness.windowObject.history.replacements.length, 1);
   assert.match(harness.windowObject.location.search, /(?:^|&)type=all(?:&|$)/);
@@ -783,7 +832,7 @@ test("explicit catalogue filter hash remains a filter anchor on full URL restore
   const harness = createHarness({ url: "https://example.test/?type=all&budget=all&page=1#catalogue-filters" });
   assert.deepEqual(harness.sectionHeadings[0].events, []);
   assert.deepEqual(harness.heading.events, ["scroll", "focus"]);
-  assert.equal(harness.results.parentNode, harness.sections[0]);
+  assert.equal(harness.results.parentNode, harness.resultsHeader);
 });
 
 test("reset removes only catalogue URL keys, writes a neutral hash, and popstate restores without pushing", () => {
