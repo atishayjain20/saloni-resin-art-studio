@@ -42,9 +42,9 @@
     }
   </script>
   <title>Custom Resin Art &amp; Gifts | Saloni Resin Art Studio</title>
-  <link rel="stylesheet" href="styles.css?v=20261027">
-  <script class="site-script" src="script.js?v=20261027" defer></script>
-  <script class="customizer-script" src="customizer.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261031">
+  <script class="site-script" src="script.js?v=20261031" defer></script>
+  <script class="customizer-script" src="customizer.js?v=20261031" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -106,9 +106,19 @@
     </nav>
 
     <section class="catalogue-tools shell" id="catalogue-filters" aria-labelledby="catalogue-filters-title">
-      <div>
-        <p class="eyebrow">The collection</p>
-        <h2 id="catalogue-filters-title" tabindex="-1">Find a gift that fits the moment.</h2>
+      <div class="catalogue-results-header">
+        <div>
+          <p class="eyebrow">The collection</p>
+          <h2 id="catalogue-filters-title" tabindex="-1">Find a gift that fits the moment.</h2>
+        </div>
+        <div class="catalogue-results" id="catalogue-results">
+          <p class="catalogue-filter-status" id="catalogue-filter-status" role="status" aria-live="polite"></p>
+          <div class="catalogue-pagination" id="catalogue-pagination" aria-label="Catalogue pagination">
+            <button class="button button-line" id="catalogue-page-previous" type="button" aria-label="Previous catalogue page">Previous</button>
+            <span id="catalogue-page-status" role="status" aria-live="polite">Page 1</span>
+            <button class="button button-line" id="catalogue-page-next" type="button" aria-label="Next catalogue page">Next</button>
+          </div>
+        </div>
       </div>
       <div class="catalogue-enhancement" data-catalogue-enhancement>
         <div class="catalogue-filter-fields">
@@ -137,14 +147,6 @@
           <button class="button button-line" id="catalogue-filter-reset" type="button">Back to section previews</button>
         </div>
         <p class="catalogue-filter-empty" id="catalogue-filter-empty" role="status" hidden>No gifts match those choices. <button class="text-button" id="catalogue-empty-reset" type="button">Clear filters and browse all gifts</button></p>
-        <p class="catalogue-filter-status" id="catalogue-filter-status" role="status" aria-live="polite"></p>
-        <div class="catalogue-results" id="catalogue-results">
-          <div class="catalogue-pagination" id="catalogue-pagination" aria-label="Catalogue pagination">
-            <button class="button button-line" id="catalogue-page-previous" type="button" aria-label="Previous catalogue page">Previous</button>
-            <span id="catalogue-page-status" role="status" aria-live="polite">Page 1</span>
-            <button class="button button-line" id="catalogue-page-next" type="button" aria-label="Next catalogue page">Next</button>
-          </div>
-        </div>
       </div>
       <a class="button button-dark catalogue-browse-all" href="#catalogue-filters" id="browse-all-gifts" data-browse-all>See all 89 gifts <span aria-hidden="true">↘</span></a>
     </section>
@@ -160,7 +162,7 @@
 
         </div>
       <div class="catalogue-grid" id="diwali-grid" role="list" aria-label="Diwali designs">
-          <article class="work-card reveal" id="diwali-jewel-glow" role="listitem">
+          <article class="work-card reveal" id="diwali-jewel-glow" data-search-keywords="tealight" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-jewel-glow-tealight.jpg" aria-label="Open larger view: Jewel-toned resin tealight holder with golden flecks"><img src="assets/diwali-jewel-glow-tealight.jpg" alt="Jewel-toned resin tealight holder with golden flecks" width="236" height="419" loading="lazy" decoding="async"></a>
               <figcaption><strong>Jewel Glow Tealight</strong><p>Rich colour and golden flecks for a festive corner</p><p class="diwali-card-note">one holder · tealight not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹249</dd></div><div><dt>Size</dt><dd>4 in</dd></div></dl></figcaption>
@@ -220,7 +222,7 @@
               <figcaption><strong>Om Mini Tilak Plate</strong><p>A rosy Om plate for tilak, rice and a small festive welcome</p><p class="diwali-card-note">one plate · tilak and rice not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹249</dd></div><div><dt>Size</dt><dd>4–5 in</dd></div></dl></figcaption>
             </figure>
           </article>
-          <article class="work-card reveal reveal-delay-1" id="diwali-lotus-diya-pair" role="listitem">
+          <article class="work-card reveal reveal-delay-1" id="diwali-lotus-diya-pair" data-search-keywords="diya" role="listitem">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/diwali-lotus-diya-pair.webp" aria-label="Open larger view: Jewel-toned lotus diya pair with gold accents"><img src="assets/diwali-lotus-diya-pair.webp" alt="Illustrative preview: Jewel-toned lotus diya pair with gold accents" width="1122" height="1402" loading="lazy" decoding="async"></a>
               <figcaption><strong>Lotus Diya Pair</strong><p>A pair of jewel-toned lotus diyas for a glowing festive corner</p><p class="diwali-card-note">pair of diyas · tealights not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹349</dd></div><div><dt>Size</dt><dd>4 in each</dd></div></dl></figcaption>
@@ -313,7 +315,7 @@
         </div>
       </div>
       <div class="catalogue-grid" id="romantic-keepsakes-grid" role="list" aria-label="Romantic keepsakes">
-          <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-keychain-title">
+          <article class="romantic-keepsake-card" data-search-keywords="heart boyfriend girlfriend couple" role="listitem" aria-labelledby="romantic-keychain-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-us-keychain-pair.webp" aria-label="Open larger view: Illustrative preview of matching resin keychains with a shared heart detail"><img src="assets/romantic-us-keychain-pair.webp" alt="Illustrative preview: Matching resin keychains with a shared heart detail" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-keychain-title">Two keys, one little us</h3><p>Made to travel together, even when you cannot.</p><p>pair of keychains · keys not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹399</dd></div><div><dt>Size</dt><dd>1.5–2 in each</dd></div></dl></figcaption>
@@ -325,25 +327,25 @@
               <figcaption><h3 id="romantic-bookmark-title">Save our page</h3><p>Three little places to keep the chapters that feel like yours.</p><p>set of three bookmarks · books and display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹699</dd></div><div><dt>Size</dt><dd>5–6 in each</dd></div></dl></figcaption>
             </figure>
           </article>
-          <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-calendar-title">
+          <article class="romantic-keepsake-card" data-search-keywords="anniversary boyfriend girlfriend couple" role="listitem" aria-labelledby="romantic-calendar-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-calendar-coaster.webp" aria-label="Open larger view: Illustrative preview of an anniversary calendar coaster with a circled date"><img src="assets/romantic-calendar-coaster.webp" alt="Illustrative preview: Anniversary calendar coaster with a circled date" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-calendar-title">Our date, every day</h3><p>The day everything changed, circled for every ordinary morning after.</p><p>one calendar coaster · food and display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹899</dd></div><div><dt>Size</dt><dd>3 in</dd></div></dl></figcaption>
             </figure>
           </article>
-          <article class="romantic-keepsake-card" role="listitem" aria-labelledby="romantic-bracelet-title">
+          <article class="romantic-keepsake-card" data-search-keywords="rose anniversary boyfriend girlfriend couple" role="listitem" aria-labelledby="romantic-bracelet-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-first-rose-bracelet.webp" aria-label="Open larger view: Illustrative preview of a preserved-petal resin bracelet"><img src="assets/romantic-first-rose-bracelet.webp" alt="Illustrative preview: Preserved-petal resin bracelet for a first rose" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-bracelet-title">The first rose, still with me</h3><p>One petal from the beginning, made wearable.</p><p>one bracelet with one preserved petal · jewellery props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹599</dd></div></dl></figcaption>
             </figure>
           </article>
-          <article class="romantic-keepsake-card" id="romantic-trinket" role="listitem" aria-labelledby="romantic-trinket-title">
+          <article class="romantic-keepsake-card" id="romantic-trinket" data-search-keywords="heart anniversary boyfriend girlfriend couple" role="listitem" aria-labelledby="romantic-trinket-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-heart-trinket-tray.webp" aria-label="Open larger view: Illustrative preview of a coquette heart trinket tray"><img src="assets/romantic-heart-trinket-tray.webp" alt="Illustrative preview: Coquette heart trinket tray in soft resin" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-trinket-title">Tiny tray, big feelings</h3><p>A soft place for rings, earbuds, and the little things you share.</p><p>one trinket tray · rings and earbuds not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹349</dd></div><div><dt>Size</dt><dd>4 in</dd></div></dl></figcaption>
             </figure>
           </article>
-          <article class="romantic-keepsake-card" id="romantic-initial" role="listitem" aria-labelledby="romantic-initial-title">
+          <article class="romantic-keepsake-card" id="romantic-initial" data-search-keywords="boyfriend girlfriend couple" role="listitem" aria-labelledby="romantic-initial-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/romantic-initial-desk-stand.webp" aria-label="Open larger view: Illustrative preview of a couple initial resin desk stand"><img src="assets/romantic-initial-desk-stand.webp" alt="Illustrative preview: Couple initial resin desk stand" width="1024" height="1024" loading="lazy" decoding="async"></a>
               <figcaption><h3 id="romantic-initial-title">Your initial. Mine. Ours.</h3><p>Two letters, one small corner that belongs to both of you.</p><p>one personalised desk stand · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹699</dd></div></dl></figcaption>
@@ -373,7 +375,7 @@
               <figcaption><h3 id="romantic-miniature-title">Your story, in 3D</h3><p>Two people, one meaningful detail, made into a shelf-sized memory.</p><p>one miniature · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹1,999</dd></div></dl></figcaption>
             </figure>
           </article>
-          <article class="romantic-keepsake-card" id="rose-hexagon" data-product-kind="rose preservation" role="listitem" aria-labelledby="romantic-rose-title">
+          <article class="romantic-keepsake-card" id="rose-hexagon" data-product-kind="rose preservation" data-search-keywords="rose boyfriend girlfriend anniversary" role="listitem" aria-labelledby="romantic-rose-title">
             <figure>
               <a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-rose-hexagon-keepsake.jpeg" aria-label="Open larger view: Clear hexagonal resin keepsake with preserved roses and a camera icon"><img src="assets/studio-rose-hexagon-keepsake.jpeg" alt="Clear hexagonal resin keepsake with preserved roses and a camera icon" width="1080" height="1012" loading="lazy" decoding="async"></a>
               <figcaption><span>Floral keepsake</span><h3 id="romantic-rose-title">Rose hexagon</h3><p>First rose from a boyfriend, held in love.</p><p>one floral keepsake · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹2,499</dd></div><div><dt>Size</dt><dd>8–10 in</dd></div></dl></figcaption>
@@ -502,9 +504,9 @@
 
         </div>
       <div class="catalogue-grid" id="studio-art-grid" role="list" aria-label="Art from the studio">
-          <article role="listitem" class="work-card reveal" id="blue-mantra-frame"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-blue-mantra-frame.jpeg" aria-label="Open larger view: Blue and white resin frame with a gold Namokar mantra design and textured stone border"><img src="assets/studio-blue-mantra-frame.jpeg" alt="Blue and white resin frame with a gold Namokar mantra design and textured stone border" width="960" height="1280" loading="lazy" decoding="async"></a><figcaption><span>Studio piece</span><strong>Namokar mantra frame</strong><p>Cool blue resin and a softly textured border.</p><p>one resin frame · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹4,099</dd></div><div><dt>Size</dt><dd>20×22 in</dd></div></dl></figcaption></figure></article>
-          <article role="listitem" class="work-card reveal reveal-delay-1" data-product-kind="rakhi"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-lilac-symbol-rakhi.jpeg" aria-label="Open larger view: Lilac resin rakhi medallion with a traditional swastika motif, pearls, and floral styling"><img src="assets/studio-lilac-symbol-rakhi.jpeg" alt="Lilac resin rakhi medallion with a traditional swastika motif, pearls, and floral styling" width="1254" height="1254" loading="lazy" decoding="async"></a><figcaption><span>Rakhi detail</span><strong>Lilac symbol medallion</strong><p>A pearled rakhi with a traditional motif at its centre.</p><p>one resin medallion · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹349</dd></div></dl></figcaption></figure></article>
-          <article role="listitem" class="work-card reveal reveal-delay-2" data-product-kind="rakhi"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-little-brother-rakhi.jpeg" aria-label="Open larger view: Lilac resin rakhi medallion reading LITTLE BROTHER, styled with pearls and flowers"><img src="assets/studio-little-brother-rakhi.jpeg" alt="Lilac resin rakhi medallion reading LITTLE BROTHER, styled with pearls and flowers" width="1254" height="1254" loading="lazy" decoding="async"></a><figcaption><span>Rakhi detail</span><strong>Little brother keepsake</strong><p>Gold lettering set into a floral, pearl-finished rakhi.</p><p>one keepsake · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹399</dd></div></dl></figcaption></figure></article>
+          <article role="listitem" class="work-card reveal" id="blue-mantra-frame" data-search-keywords="mantra"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-blue-mantra-frame.jpeg" aria-label="Open larger view: Blue and white resin frame with a gold Namokar mantra design and textured stone border"><img src="assets/studio-blue-mantra-frame.jpeg" alt="Blue and white resin frame with a gold Namokar mantra design and textured stone border" width="960" height="1280" loading="lazy" decoding="async"></a><figcaption><span>Studio piece</span><strong>Namokar mantra frame</strong><p>Cool blue resin and a softly textured border.</p><p>one resin frame · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹4,099</dd></div><div><dt>Size</dt><dd>20×22 in</dd></div></dl></figcaption></figure></article>
+          <article role="listitem" class="work-card reveal reveal-delay-1" data-product-kind="rakhi" data-search-keywords="rakhi"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-lilac-symbol-rakhi.jpeg" aria-label="Open larger view: Lilac resin rakhi medallion with a traditional swastika motif, pearls, and floral styling"><img src="assets/studio-lilac-symbol-rakhi.jpeg" alt="Lilac resin rakhi medallion with a traditional swastika motif, pearls, and floral styling" width="1254" height="1254" loading="lazy" decoding="async"></a><figcaption><span>Rakhi detail</span><strong>Lilac symbol medallion</strong><p>A pearled rakhi with a traditional motif at its centre.</p><p>one resin medallion · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹349</dd></div></dl></figcaption></figure></article>
+          <article role="listitem" class="work-card reveal reveal-delay-2" data-product-kind="rakhi" data-search-keywords="rakhi"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-little-brother-rakhi.jpeg" aria-label="Open larger view: Lilac resin rakhi medallion reading LITTLE BROTHER, styled with pearls and flowers"><img src="assets/studio-little-brother-rakhi.jpeg" alt="Lilac resin rakhi medallion reading LITTLE BROTHER, styled with pearls and flowers" width="1254" height="1254" loading="lazy" decoding="async"></a><figcaption><span>Rakhi detail</span><strong>Little brother keepsake</strong><p>Gold lettering set into a floral, pearl-finished rakhi.</p><p>one keepsake · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹399</dd></div></dl></figcaption></figure></article>
           <article role="listitem" class="work-card reveal reveal-delay-3" id="white-mantra-frame"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-white-mantra-frame.jpeg" aria-label="Open larger view: White and gold resin frame with a Jain mantra design, figures, and textured border"><img src="assets/studio-white-mantra-frame.jpeg" alt="White and gold resin frame with a Jain mantra design, figures, and textured border" width="899" height="1599" loading="lazy" decoding="async"></a><figcaption><span>Studio piece</span><strong>Namokar mantra frame</strong><p>White texture, gold edging, and a detailed centre.</p><p>one resin frame · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹4,599</dd></div><div><dt>Size</dt><dd>20×22 in</dd></div></dl></figcaption></figure></article>
           <article role="listitem" class="work-card reveal"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-lilac-scalloped-tray.jpeg" aria-label="Open larger view: Lilac scalloped resin tray with two round red and cream accents"><img src="assets/studio-lilac-scalloped-tray.jpeg" alt="Lilac scalloped resin tray with two round red and cream accents" width="1152" height="648" loading="lazy" decoding="async"></a><figcaption><span>Resin decor</span><strong>Lilac scalloped tray</strong><p>A soft lilac tray with a playful pair of round details.</p><p>one tray · contents and display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹399</dd></div></dl></figcaption></figure></article>
           <article role="listitem" class="work-card reveal reveal-delay-2"><figure><a class="lightbox-trigger" data-lightbox-trigger href="assets/studio-floral-square-keepsake.jpeg" aria-label="Open larger view: Square resin keepsake filled with cream, peach, and green dried flowers"><img src="assets/studio-floral-square-keepsake.jpeg" alt="Square resin keepsake filled with cream, peach, and green dried flowers" width="1080" height="1188" loading="lazy" decoding="async"></a><figcaption><span>Floral keepsake</span><strong>Pressed flower square</strong><p class="keepsake-story"><span class="keepsake-story-label">Keepsake idea</span> First bouquet, forever close.</p><p>one floral keepsake · display props not included · shown palette or custom colours</p><dl class="product-pricing" aria-label="Catalogue price and size"><div><dt>Price</dt><dd>₹1,999</dd></div></dl></figcaption></figure></article>
@@ -833,6 +835,11 @@
       <button class="button button-line customizer-design-help" id="customizer-design-help" type="button" data-order-prefill="general" data-design-help="true">Let Saloni design it for me</button>
       </div>
     </section>
+
+    <div class="customizer-mobile-actions" id="customizer-mobile-actions" hidden role="group" aria-label="Custom design actions">
+      <button class="button button-dark" id="customizer-mobile-request" type="button" data-customizer-request="true">Request this design</button>
+      <button class="button button-line" id="customizer-mobile-help" type="button" data-order-prefill="general" data-design-help="true">Let Saloni finish it</button>
+    </div>
 
     <section class="order-section shell" id="order" aria-labelledby="order-title" tabindex="-1">
       <div class="order-left-column">
