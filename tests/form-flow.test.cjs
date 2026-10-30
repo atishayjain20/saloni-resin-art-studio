@@ -21,6 +21,15 @@ test("customizer handoff copy does not ask customers to download or reattach a p
   assert.doesNotMatch(status, /download it first|reattach/i);
 });
 
+test("keeps optional partner referral controls behind a collapsed native disclosure", () => {
+  const disclosure = html.match(/<details class="referral-disclosure">[\s\S]*?<\/details>/)?.[0] || "";
+  assert.match(disclosure, /<summary>Have a referral code\?<\/summary>/);
+  assert.doesNotMatch(disclosure, /<details[^>]+\bopen\b/);
+  assert.match(disclosure, /<label for="referral-code">Partner referral code \(optional\)[\s\S]*?name="referralCode"/);
+  assert.match(disclosure, /<button id="check-referral"[^>]*>Check code<\/button>/);
+  assert.match(disclosure, /<p id="referral-status"[^>]*>A code is optional\./);
+});
+
 test("catalogue order form shows product context without internal metadata or mandatory dimensions", () => {
   const selectedDesign = html.match(/<fieldset>[\s\S]*?<legend>Selected design<\/legend>[\s\S]*?<\/fieldset>/)?.[0] || "";
   const dimensions = html.match(/<fieldset>[\s\S]*?<legend>What should Saloni make\?<\/legend>[\s\S]*?<\/fieldset>/)?.[0] || "";
