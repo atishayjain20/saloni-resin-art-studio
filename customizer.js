@@ -42,6 +42,25 @@
     return Boolean(blob && typeof blob.size === "number" && blob.size > 0 && blob.size <= MAX_PREVIEW_BYTES && typeof blob.type === "string" && blob.type.toLowerCase() === "image/png");
   }
 
+  function shouldShowMobileCustomizerActions(state) {
+    state = state || {};
+    var finalActionsVisible = state.finalActionsVisible === true
+      || state.nativeRequestVisible === true
+      || state.nativeDesignHelpVisible === true;
+    return state.hasCustomerChange === true
+      && state.customizerExpanded === true
+      && state.editorInView === true
+      && !finalActionsVisible
+      && state.orderHandoffActive !== true;
+  }
+
+  function applyMobileCustomizerOutcome(state, outcome) {
+    var next = Object.assign({}, state || {});
+    if (outcome === "success") next.orderHandoffActive = true;
+    if (outcome === "cancelled" || outcome === "failure") next.orderHandoffActive = false;
+    return next;
+  }
+
   function previewDimensions(dimensions) {
     if (!dimensions || typeof dimensions !== "object") throw new Error("invalid dimensions");
     var heightUnit = String(dimensions.heightUnit || "");
@@ -436,6 +455,8 @@
       createSharePayload: createSharePayload,
       shareDesignFlow: shareDesignFlow,
       validPreviewBlob: validPreviewBlob,
+      shouldShowMobileCustomizerActions: shouldShowMobileCustomizerActions,
+      applyMobileCustomizerOutcome: applyMobileCustomizerOutcome,
       previewDimensions: previewDimensions,
       capturePreviewSnapshot: capturePreviewSnapshot
     };
@@ -486,6 +507,13 @@
     var summaryOutput = document.getElementById("customizer-summary");
     var mobileActions = document.getElementById("customizer-mobile-actions");
     var mobileRequest = document.getElementById("customizer-mobile-request");
+    var customizerDisclosure = document.getElementById("customizer-disclosure");
+    var customizerRequestButton = document.getElementById("order-from-customizer");
+    var customizerDesignHelp = document.getElementById("customizer-design-help");
+    var editorInView = false;
+    var nativeRequestVisible = false;
+    var nativeDesignHelpVisible = false;
+    var orderHandoffActive = false;
     var hasCustomerChange = false;
     var colours = {
       filling: colourControl("filling-colour"),
@@ -516,17 +544,77 @@
       drawing: false
     };
 
-    function markCustomerChange() {
-      if (hasCustomerChange) return;
-      hasCustomerChange = true;
-      if (mobileActions) mobileActions.hidden = false;
+    function syncMobileActions() {
+      if (!mobileActions) return;
+      mobileActions.hidden = !shouldShowMobileCustomizerActions({
+        hasCustomerChange: hasCustomerChange,
+        customizerExpanded: !customizerDisclosure || customizerDisclosure.open,
+        editorInView: editorInView,
+        finalActionsVisible: nativeRequestVisible || nativeDesignHelpVisible,
+        orderHandoffActive: orderHandoffActive
+      });
     }
+
+    function markCustomerChange() {
+      hasCustomerChange = true;
+      syncMobileActions();
+    }
+
+    function handleCustomizerRequestOutcome(outcome) {
+      var next = applyMobileCustomizerOutcome({ orderHandoffActive: orderHandoffActive }, outcome);
+      orderHandoffActive = next.orderHandoffActive;
+      syncMobileActions();
+    }
+
+    if (typeof window !== "undefined") window.saloniCustomizerRequestOutcome = handleCustomizerRequestOutcome;
 
     if (mobileRequest) mobileRequest.addEventListener("click", function (event) {
       if (event && event.preventDefault) event.preventDefault();
-      var requestButton = document.getElementById("order-from-customizer");
-      if (requestButton && requestButton !== mobileRequest) requestButton.click();
+      var requestButton = customizerRequestButton || document.getElementById("order-from-customizer");
+      if (requestButton && requestButton !== mobileRequest) {
+        requestButton.click();
+      }
     });
+
+    function elementInViewport(element) {
+      if (!element || typeof element.getBoundingClientRect !== "function") return false;
+      var rect = element.getBoundingClientRect();
+      var height = typeof window.innerHeight === "number" ? window.innerHeight : document.documentElement && document.documentElement.clientHeight;
+      return Boolean(height && rect.bottom > 0 && rect.top < height);
+    }
+
+    function updateMobileViewportFallback() {
+      editorInView = Boolean(customizerDisclosure && customizerDisclosure.open && elementInViewport(form));
+      nativeRequestVisible = Boolean(customizerRequestButton && elementInViewport(customizerRequestButton));
+      nativeDesignHelpVisible = Boolean(customizerDesignHelp && elementInViewport(customizerDesignHelp));
+      syncMobileActions();
+    }
+
+    function handleCustomizerToggle() {
+      if (customizerDisclosure && customizerDisclosure.open) orderHandoffActive = false;
+      else editorInView = false;
+      if (typeof IntersectionObserver === "undefined") updateMobileViewportFallback();
+      else syncMobileActions();
+    }
+
+    if (customizerDisclosure) customizerDisclosure.addEventListener("toggle", handleCustomizerToggle);
+    if (typeof IntersectionObserver !== "undefined") {
+      var mobileActionObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.target === form) editorInView = entry.isIntersecting && entry.intersectionRatio > 0;
+          if (entry.target === customizerRequestButton) nativeRequestVisible = entry.isIntersecting && entry.intersectionRatio > 0;
+          if (entry.target === customizerDesignHelp) nativeDesignHelpVisible = entry.isIntersecting && entry.intersectionRatio > 0;
+        });
+        syncMobileActions();
+      }, { threshold: [0, 0.01] });
+      mobileActionObserver.observe(form);
+      if (customizerRequestButton) mobileActionObserver.observe(customizerRequestButton);
+      if (customizerDesignHelp) mobileActionObserver.observe(customizerDesignHelp);
+    } else {
+      updateMobileViewportFallback();
+      window.addEventListener("scroll", updateMobileViewportFallback, { passive: true });
+      window.addEventListener("resize", updateMobileViewportFallback, { passive: true });
+    }
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
