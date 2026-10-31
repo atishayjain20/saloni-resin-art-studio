@@ -256,6 +256,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     return diwaliCard;
   });
   const posted = [];
+  const customizerOutcomes = [];
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
     crypto: { randomUUID: (() => { let n = 0; return () => "request-" + (++n); })() },
@@ -266,6 +267,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
       const format = (value) => unit === "ft" ? (value / 12).toFixed(2) : String(value);
       return { blob: { type: "image/png", size: 42 }, summary: summary.textContent, dimensions: { height: format(height), width: format(preset), heightUnit: unit, widthUnit: unit }, requestId: identity.requestId, nonce: identity.nonce, mode: identity.mode };
     },
+    saloniCustomizerRequestOutcome(outcome) { customizerOutcomes.push(outcome); },
     matchMedia: () => ({ matches: true }),
     confirm: () => confirms.length ? confirms.shift() : true,
     addEventListener(type, listener) { if (type === "message") this.messageListener = listener; },
@@ -307,7 +309,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, posted, windowObject };
+  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, posted, customizerOutcomes, windowObject };
 }
 
 function submittedSeed(posted) {
@@ -478,6 +480,37 @@ test("reads square, round, and arch dimensions from customizer controls, includi
   seed = submittedSeed(arch.posted);
   assert.deepEqual([seed.height, seed.heightUnit, seed.width, seed.widthUnit], ["0.67", "ft", "0.50", "ft"]);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["0", "8.04", "0", "6"]);
+});
+
+test("reports real customizer handoff outcomes so cancellation keeps retry available", async () => {
+  const cancelled = runFlow({ confirms: [false] });
+  cancelled.catalogueButton.dispatch("click");
+  cancelled.customizer.dispatch("click");
+  assert.deepEqual(cancelled.customizerOutcomes, ["cancelled"]);
+
+  const success = runFlow();
+  success.customizer.dispatch("click");
+  assert.deepEqual(success.customizerOutcomes, ["success"]);
+
+  const failed = runFlow();
+  failed.windowObject.saloniCustomizerCapture = () => Promise.reject(new Error("preview-export-failed"));
+  failed.customizer.dispatch("click");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(failed.customizerOutcomes, ["failure"]);
+
+  const unconfigured = runFlow({ configured: false });
+  unconfigured.customizer.dispatch("click");
+  assert.deepEqual(unconfigured.customizerOutcomes, ["failure"]);
+
+  const insecure = runFlow();
+  insecure.windowObject.crypto.randomUUID = () => "";
+  insecure.customizer.dispatch("click");
+  assert.deepEqual(insecure.customizerOutcomes, ["failure"]);
+
+  const helpCancelled = runFlow({ confirms: [false] });
+  helpCancelled.catalogueButton.dispatch("click");
+  helpCancelled.designHelp.dispatch("click", { preventDefault() {} });
+  assert.deepEqual(helpCancelled.customizerOutcomes, ["cancelled"]);
 });
 
 test("preview rejection keeps the draft until explicit continuation and retry reruns capture", async () => {

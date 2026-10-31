@@ -531,7 +531,13 @@ test("customizer presents a keyboard-matched basics, preview, advanced, and save
   const customizerCss = css.slice(css.indexOf(".customizer-layout"), css.indexOf(".order-section"));
   assert.doesNotMatch(customizerCss, /(?:^|[;}])\s*order\s*:/);
   assert.match(customizer, /function markCustomerChange\(\)/);
-  assert.match(customizer, /mobileActions\.hidden = false/);
+  assert.match(customizer, /function syncMobileActions\(\)/);
+  assert.match(customizer, /shouldShowMobileCustomizerActions\(/);
+  assert.match(customizer, /new IntersectionObserver\(/);
+  assert.match(customizer, /mobileActionObserver\.observe\(customizerRequestButton\)/);
+  assert.match(customizer, /mobileActionObserver\.observe\(customizerDesignHelp\)/);
+  assert.match(customizer, /customizerDisclosure\.addEventListener\("toggle"/);
+  assert.doesNotMatch(customizer, /MutationObserver/);
   assert.match(customizer, /customizer-mobile-request/);
 });
 

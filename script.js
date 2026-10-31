@@ -1077,7 +1077,7 @@
           : "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
         status.hidden = false;
         if (shouldScroll !== false) scrollToForm();
-        return;
+        return false;
       }
       invalidateChannel();
       var requestIdentity = identity || { requestId: seed.requestId || requestId(), nonce: channelNonce() };
@@ -1086,12 +1086,12 @@
       if (!frameState.nonce) {
         status.textContent = "This browser cannot start a secure request. Please use the latest browser or contact Saloni directly.";
         status.hidden = false;
-        return;
+        return false;
       }
       if (!previewIdentityPart(frameState.requestId)) {
         status.textContent = "This browser could not start a secure request. Please try again or contact Saloni directly.";
         status.hidden = false;
-        return;
+        return false;
       }
       if (previewExpected !== false && previewSnapshot && usablePreviewSnapshot(previewSnapshot) && previewSnapshot.requestId === frameState.requestId && previewSnapshot.nonce === frameState.nonce && previewSnapshot.mode === frameState.mode) frameState.previewSnapshot = previewSnapshot;
       seed.channelNonce = frameState.nonce;
@@ -1120,6 +1120,7 @@
       document.body.appendChild(postForm); postForm.submit(); postForm.remove();
       frameState.loaded = true;
       if (shouldScroll !== false) scrollToForm();
+      return true;
     }
 
     function previewResponse(request, ok, reason, blob) {
@@ -1166,8 +1167,7 @@
       seed.requestId = options.requestId || source.requestId || requestId();
       if (options.card) showSelectedProductSummary(options.card);
       else clearSelectedProductSummary();
-      submitSeed(seed, true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected);
-      return true;
+      return submitSeed(seed, true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected);
     }
 
     window.addEventListener("message", function (event) {
@@ -1241,6 +1241,10 @@
       if (customizerRequestStatus && /Preview could not be prepared|Automatic preview/.test(customizerRequestStatus.textContent || "")) customizerRequestStatus.textContent = "";
     }
 
+    function notifyCustomizerRequestOutcome(outcome) {
+      if (window && typeof window.saloniCustomizerRequestOutcome === "function") window.saloniCustomizerRequestOutcome(outcome);
+    }
+
     function reportCustomizerFailure(error, identity) {
       var fallback = error && error.previewFallback;
       frameState.customizerFallback = fallback && identity && fallback.requestId === identity.requestId && fallback.nonce === identity.nonce && fallback.mode === frameState.mode && usablePreviewDetails(fallback.summary, fallback.dimensions) ? fallback : null;
@@ -1263,11 +1267,12 @@
       if (!fallback || !usablePreviewDetails(fallback.summary, fallback.dimensions)) return;
       var identity = { requestId: fallback.requestId, nonce: fallback.nonce };
       clearCustomizerFallback();
-      chooseSource({
+      var handedOff = chooseSource({
         sourceKind: "customizer", sourceId: "customizer:resin-frame", productName: "Custom resin frame",
         height: fallback.dimensions.height, width: fallback.dimensions.width, heightUnit: fallback.dimensions.heightUnit, widthUnit: fallback.dimensions.widthUnit,
         designDetails: fallback.summary, requestId: identity.requestId
       }, { identity: identity, requestId: identity.requestId, confirmed: true, previewExpected: false });
+      notifyCustomizerRequestOutcome(handedOff ? "success" : "failure");
     }
 
     if (continueCustomizerButton) continueCustomizerButton.addEventListener("click", continueCustomizerWithoutPreview);
@@ -1278,12 +1283,16 @@
         event.__saloniCustomizerRequestStarted = true;
         if (event.preventDefault) event.preventDefault();
       }
-      if (frameState.loaded && !window.confirm("This order form is already loaded. Replace it with the selected item?")) return;
+      if (frameState.loaded && !window.confirm("This order form is already loaded. Replace it with the selected item?")) {
+        notifyCustomizerRequestOutcome("cancelled");
+        return;
+      }
       clearSelectedProductSummary();
       clearCustomizerFallback();
       var identity = { requestId: requestId(), nonce: channelNonce() };
       if (!identity.requestId || !identity.nonce || typeof window.saloniCustomizerCapture !== "function") {
         reportCustomizerFailure(null, identity);
+        notifyCustomizerRequestOutcome("failure");
         return;
       }
       frameState.pendingCustomizerRequestId = identity.requestId;
@@ -1298,19 +1307,22 @@
         frameState.pendingCustomizerRequestId = "";
         if (!snapshot || snapshot.requestId !== identity.requestId || snapshot.nonce !== identity.nonce || snapshot.mode !== frameState.mode || !usablePreviewSnapshot(snapshot)) {
           reportCustomizerFailure(null);
+          notifyCustomizerRequestOutcome("failure");
           return;
         }
         clearCustomizerFallback();
-        chooseSource({
+        var handedOff = chooseSource({
           sourceKind: "customizer", sourceId: "customizer:resin-frame", productName: "Custom resin frame",
           height: snapshot.dimensions.height, width: snapshot.dimensions.width, heightUnit: snapshot.dimensions.heightUnit, widthUnit: snapshot.dimensions.widthUnit,
           designDetails: snapshot.summary, previewSnapshot: snapshot, requestId: identity.requestId
         }, { identity: identity, requestId: identity.requestId, previewSnapshot: snapshot, confirmed: true, previewExpected: true });
+        notifyCustomizerRequestOutcome(handedOff ? "success" : "failure");
       };
       var reject = function (error) {
         if (frameState.pendingCustomizerRequestId !== identity.requestId) return;
         frameState.pendingCustomizerRequestId = "";
         reportCustomizerFailure(error, identity);
+        notifyCustomizerRequestOutcome("failure");
       };
       if (capture && typeof capture.then === "function") Promise.resolve(capture).then(accept, reject);
       else accept(capture);
@@ -1333,7 +1345,7 @@
       button.addEventListener("click", function (event) {
         if (event && event.preventDefault) event.preventDefault();
         var isDesignHelp = button.getAttribute("data-design-help") === "true";
-        chooseSource({
+        var handedOff = chooseSource({
           sourceKind: "catalogue",
           sourceId: isDesignHelp ? "catalogue:customizer-design-help" : "catalogue:general-custom-gift",
           productName: isDesignHelp ? "Custom resin frame design help" : "Custom gift enquiry",
@@ -1341,6 +1353,7 @@
             ? "Design help request from the customizer. Saloni will choose a starting design with you, then confirm the occasion, size, materials, quote, and delivery."
             : "General custom gift enquiry. Saloni will confirm the occasion, size, materials, quote, and delivery."
         });
+        if (isDesignHelp) notifyCustomizerRequestOutcome(handedOff ? "success" : "cancelled");
       });
     });
   }

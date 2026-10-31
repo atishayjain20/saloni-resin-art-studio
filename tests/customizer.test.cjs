@@ -17,6 +17,8 @@ const {
   shareDesignFlow,
   capturePreviewSnapshot,
   validPreviewBlob,
+  shouldShowMobileCustomizerActions,
+  applyMobileCustomizerOutcome,
 } = require("../customizer.js");
 
 const rendererSource = fs.readFileSync(path.join(__dirname, "..", "customizer.js"), "utf8");
@@ -107,9 +109,12 @@ function imageFailureBrowserFixture(file = { name: "reference.png", type: "image
       this.style = {};
       this.classList = { contains: () => false, toggle() {} };
       this.listeners = {};
+      this.open = id === "customizer-disclosure" ? false : undefined;
+      this.rect = { top: 100, bottom: 200 };
     }
     addEventListener(type, listener) { this.listeners[type] = listener; }
     dispatch(type, event = { target: this }) { this.listeners[type]?.(event); }
+    getBoundingClientRect() { return this.rect; }
     querySelectorAll() { return []; }
     setAttribute() {}
     getContext() { return null; }
@@ -127,7 +132,7 @@ function imageFailureBrowserFixture(file = { name: "reference.png", type: "image
   };
   const context = {
     document: documentObject,
-    window: { addEventListener() {} },
+    window: { innerHeight: 844, addEventListener() {} },
     URL: { createObjectURL: () => "blob:reference", revokeObjectURL() {} },
     Image: class {
       constructor() { createdImage = this; this.complete = false; }
@@ -366,6 +371,64 @@ test("rejected reference image input keeps the mobile action bar hidden", () => 
   referenceImage.dispatch("change");
 
   assert.equal(mobileActions.hidden, true);
+});
+
+test("fallback recomputes sticky actions across collapse and reopen", () => {
+  const fixture = imageFailureBrowserFixture();
+  const mobileActions = fixture.elements.get("customizer-mobile-actions");
+  const disclosure = fixture.elements.get("customizer-disclosure");
+  const form = fixture.elements.get("customizer-form");
+  fixture.elements.get("order-from-customizer").rect = { top: 900, bottom: 960 };
+  fixture.elements.get("customizer-design-help").rect = { top: 900, bottom: 960 };
+
+  disclosure.open = true;
+  disclosure.dispatch("toggle");
+  form.dispatch("change", { target: { classList: { contains: () => false }, type: "select-one" } });
+  assert.equal(mobileActions.hidden, false);
+
+  disclosure.open = false;
+  disclosure.dispatch("toggle");
+  assert.equal(mobileActions.hidden, true);
+
+  disclosure.open = true;
+  disclosure.dispatch("toggle");
+  assert.equal(mobileActions.hidden, false);
+});
+
+test("shows sticky customizer actions only while the changed editor needs them", () => {
+  const visible = {
+    hasCustomerChange: true,
+    customizerExpanded: true,
+    editorInView: true,
+    finalActionsVisible: false,
+    orderHandoffActive: false,
+  };
+
+  assert.equal(shouldShowMobileCustomizerActions(visible), true);
+  for (const key of ["hasCustomerChange", "customizerExpanded", "editorInView"]) {
+    assert.equal(shouldShowMobileCustomizerActions({ ...visible, [key]: false }), false, key);
+  }
+  assert.equal(shouldShowMobileCustomizerActions({ ...visible, finalActionsVisible: true }), false);
+  assert.equal(shouldShowMobileCustomizerActions({ ...visible, nativeRequestVisible: true }), false);
+  assert.equal(shouldShowMobileCustomizerActions({ ...visible, nativeDesignHelpVisible: true }), false);
+  assert.equal(shouldShowMobileCustomizerActions({ ...visible, orderHandoffActive: true }), false);
+});
+
+test("keeps the sticky action retryable on cancel or request failure", () => {
+  const ready = {
+    hasCustomerChange: true,
+    customizerExpanded: true,
+    editorInView: true,
+    finalActionsVisible: false,
+    orderHandoffActive: false,
+  };
+
+  assert.equal(shouldShowMobileCustomizerActions(applyMobileCustomizerOutcome(ready, "success")), false);
+  assert.equal(shouldShowMobileCustomizerActions(applyMobileCustomizerOutcome(ready, "cancelled")), true);
+  assert.equal(shouldShowMobileCustomizerActions(applyMobileCustomizerOutcome(ready, "failure")), true);
+  assert.equal(shouldShowMobileCustomizerActions({ ...ready, finalActionsVisible: true }), false);
+  assert.equal(shouldShowMobileCustomizerActions({ ...ready, nativeRequestVisible: true }), false);
+  assert.equal(shouldShowMobileCustomizerActions({ ...ready, nativeDesignHelpVisible: true }), false);
 });
 
 test("announces an honest manual fallback when native sharing is unsupported", () => {
