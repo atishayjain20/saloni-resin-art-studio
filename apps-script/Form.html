@@ -57,7 +57,8 @@
     <fieldset>
       <legend>Selected design</legend>
       <div id="product-context" class="product-context" hidden>
-        <img id="product-image" alt="" loading="lazy" decoding="async">
+        <img id="product-image" alt="" loading="lazy" decoding="async" hidden>
+        <p id="bundle-product-copy" class="hint" hidden>These catalogue items will be reviewed together in one request. Saloni will confirm the final combination, price, and delivery with you.</p>
       </div>
       <div class="grid">
         <label for="product-name">Product name <input id="product-name" name="productName" maxlength="160" required></label>
@@ -157,6 +158,7 @@
   var pinField = document.getElementById("pin-field");
   var productContext = document.getElementById("product-context");
   var productImage = document.getElementById("product-image");
+  var bundleProductCopy = document.getElementById("bundle-product-copy");
   var dimensionFields = document.getElementById("dimension-fields");
   var referenceImage = document.getElementById("reference-image");
   var referenceImagePreviewWrap = document.getElementById("reference-image-preview-wrap");
@@ -277,6 +279,17 @@
     return match && PRODUCT_IMAGE_ALLOWLIST[match[1]] ? PARENT_ORIGIN + "/assets/" + match[1] : "";
   }
   function applyProductContext() {
+    var bundle = String(seed.sourceKind || "").toLowerCase() === "catalogue" && String(seed.sourceId || "") === "catalogue:multi-item";
+    if (bundle) {
+      productImage.hidden = true;
+      productImage.removeAttribute("src");
+      productImage.removeAttribute("alt");
+      if (bundleProductCopy) bundleProductCopy.hidden = false;
+      productContext.hidden = false;
+      return;
+    }
+    productImage.hidden = false;
+    if (bundleProductCopy) bundleProductCopy.hidden = true;
     var imagePath = productImagePath();
     if (!imagePath) {
       productContext.hidden = true;
