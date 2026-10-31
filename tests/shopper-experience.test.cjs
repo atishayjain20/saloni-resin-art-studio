@@ -605,7 +605,7 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
   const orderStatus = html.match(/<div class="order-form-status"[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(orderStatus, /<button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift<\/button>/);
   assert.match(css, /\.order-form-status \.order-general-request\s*\{[^}]*background:\s*transparent[^}]*border-color:\s*#f0ddd4[^}]*color:\s*#f0ddd4/);
-  assert.match(script, /button\.textContent = "Request this item"/);
+  assert.match(script, /button\.textContent = "Add to request"/);
   assert.match(script, /data-order-prefill="general"/);
   assert.match(script, /illustrative preview\|reference image/);
 });

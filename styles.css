@@ -452,6 +452,12 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .catalogue-pagination span { color: var(--muted); font-size: .75rem; font-weight: 800; text-align: center; }
 .catalogue-pagination button:disabled { cursor: not-allowed; opacity: .45; }
 .catalogue-pagination button:focus-visible, #catalogue-filters-title:focus-visible { outline: 3px solid var(--rose); outline-offset: 3px; }
+.catalogue-selection { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; margin-top: .2rem; padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .85rem; background: var(--ivory); }
+.catalogue-selection .panel-label { margin: 0 0 .25rem; color: var(--rose-ink); }
+.catalogue-selection-summary, .catalogue-selection-status { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.catalogue-selection-status { margin-top: .3rem; color: var(--rose-ink); }
+.catalogue-selection .button { min-height: 2.75rem; white-space: nowrap; cursor: pointer; }
+.catalogue-selection .button:disabled { cursor: not-allowed; opacity: .45; }
 .text-button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .catalogue-browse-all { grid-column: 2; justify-self: end; }
 .catalogue-section-disclosure { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; margin-top: 1rem; padding: .65rem 1rem; border: 1px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font-size: .78rem; font-weight: 800; cursor: pointer; }
@@ -496,6 +502,8 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .catalogue-filter-fields select { min-width: 0; min-height: 3rem; padding: .72rem .75rem; font-size: 1rem; }
   .catalogue-filter-fields .button { width: 100%; justify-content: center; }
   .catalogue-browse-all { display: flex; width: 100%; margin-top: 1rem; justify-content: space-between; }
+  .catalogue-selection { grid-template-columns: 1fr; gap: .7rem; }
+  .catalogue-selection .button { width: 100%; justify-content: center; }
   .catalogue-pagination { gap: .45rem; }
   .catalogue-pagination .button { min-width: 0; flex: 1 1 0; }
   .festive-banner { display: block; line-height: 1.6; }

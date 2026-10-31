@@ -343,7 +343,7 @@ class StaticSiteContractTests(unittest.TestCase):
         script = (ROOT / "script.js").read_text(encoding="utf-8")
         self.assertIn('document.querySelectorAll(".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card")', script)
         self.assertIn('card.querySelectorAll("figcaption p")', script)
-        self.assertIn('button.textContent = "Request this item"', script)
+        self.assertIn('button.textContent = "Add to request"', script)
 
     def test_diwali_expansion_appends_ten_new_concept_cards(self):
         section = re.search(r'<section\b[^>]*id=["\']diwali["\'][\s\S]*?</section>', self.html)

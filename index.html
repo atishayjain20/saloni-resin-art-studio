@@ -149,6 +149,14 @@
         <p class="catalogue-filter-empty" id="catalogue-filter-empty" role="status" hidden>No gifts match those choices. <button class="text-button" id="catalogue-empty-reset" type="button">Clear filters and browse all gifts</button></p>
       </div>
       <a class="button button-dark catalogue-browse-all" href="#catalogue-filters" id="browse-all-gifts" data-browse-all>See all 89 gifts <span aria-hidden="true">↘</span></a>
+      <div class="catalogue-selection" id="catalogue-selection" hidden aria-labelledby="catalogue-selection-title">
+        <div>
+          <p class="panel-label" id="catalogue-selection-title">One request for your selected gifts</p>
+          <p class="catalogue-selection-summary" id="catalogue-selection-summary" role="status" aria-live="polite">No gifts selected.</p>
+          <p class="catalogue-selection-status" id="catalogue-selection-status" role="status" aria-live="polite" hidden></p>
+        </div>
+        <button class="button button-line" id="catalogue-request-selected" type="button" disabled>Request selected items</button>
+      </div>
     </section>
 
     <section class="work-section diwali-section shell" id="diwali" aria-labelledby="diwali-title">
@@ -859,7 +867,7 @@
       </div>
       <div class="order-inline-fallback" id="order-inline-fallback" role="region" aria-labelledby="order-inline-fallback-title">
         <p class="panel-label" id="order-inline-fallback-title">Prefer to talk first?</p>
-        <p>Choose “Request this item” or “Request this design” to open the request form without leaving your place. If the form is unavailable, call or message Saloni directly.</p>
+        <p>Add catalogue items to one request, or choose “Request this design” in the customizer. The form stays here while you browse. If the form is unavailable, call or message Saloni directly.</p>
         <a class="contact-line" href="tel:8209238541"><span>Call Saloni</span><strong>8209238541</strong></a>
         <a class="contact-line" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer"><span>Message on Instagram</span><strong>@saloniresin_art_studio</strong></a>
         <button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button>
@@ -878,7 +886,7 @@
       <h2 class="sr-only" id="order-dialog-title">Order request</h2>
       <div class="order-panel order-form-panel" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"><div class="selected-product-summary" id="selected-product-summary" hidden aria-live="polite"><img id="selected-product-image" alt="Selected product photo" width="280" height="280" loading="lazy" decoding="async"><div class="selected-product-summary-copy"><p class="panel-label">Selected item</p><h3 id="selected-product-name"></h3><p id="selected-product-price" hidden></p><p id="selected-product-size" hidden></p></div></div><p class="order-final-quote-note">Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.</p>
         <p class="panel-label">Order request</p>
-        <p class="panel-note">Select “Request this item” on a catalogue card, “Request this design” in the customizer, or request a custom gift. Your form stays here while you browse.</p>
+        <p class="panel-note">Add catalogue items to one request, choose “Request this design” in the customizer, or request a custom gift. Your form stays here while you browse.</p>
         <div class="order-form-status" id="order-form-status" role="status" aria-live="polite"><span class="order-form-spinner" aria-hidden="true" hidden></span>Choose a product, a customizer design, or a general custom gift request to begin. You can still call Saloni at <a href="tel:8209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.<button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button></div>
         <iframe id="order-form-frame" name="saloni-order-form-frame" title="Saloni Resin Art Studio order request form" loading="lazy" hidden></iframe>
       </div>
@@ -914,7 +922,7 @@
       <div class="lightbox-order-summary">
         <strong id="lightbox-product-name"></strong>
         <span id="lightbox-product-price" hidden></span>
-        <button class="button button-dark lightbox-request" id="lightbox-request" type="button" hidden>Request this item</button>
+        <button class="button button-dark lightbox-request" id="lightbox-request" type="button" hidden>Add to request</button>
       </div>
     </div>
   </dialog>

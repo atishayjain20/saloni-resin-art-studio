@@ -85,7 +85,7 @@ class CapturingPort {
   close() { this.closed = true; }
 }
 
-function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady } = {}) {
+function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
@@ -104,6 +104,10 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const selectedProductName = new Element("selected-product-name");
   const selectedProductPrice = new Element("selected-product-price"); selectedProductPrice.hidden = true;
   const selectedProductSize = new Element("selected-product-size"); selectedProductSize.hidden = true;
+  const catalogueSelection = new Element("catalogue-selection"); catalogueSelection.hidden = true;
+  const catalogueSelectionSummary = new Element("catalogue-selection-summary");
+  const catalogueSelectionStatus = new Element("catalogue-selection-status"); catalogueSelectionStatus.hidden = true;
+  const catalogueRequestSelected = new Element("catalogue-request-selected"); catalogueRequestSelected.hidden = true;
   const customizer = new Element("order-from-customizer");
   const continueWithoutPreview = new Element("customizer-continue-without-preview"); continueWithoutPreview.hidden = true;
   const generalRequest = new Element("general-custom-gift");
@@ -115,7 +119,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -182,6 +186,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ].filter(Boolean).map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return generatedCard;
   });
+  if (longCatalogueTitle) generatedCards[1].title.textContent = "x".repeat(2050);
   const romanticCatalogue = [
     ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "599", "399", 33],
     ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "999", "699", 30],
@@ -334,13 +339,20 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
+  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
   const form = posted.at(-1);
   const seedInput = form.children.find((child) => child.name === "seed");
   return JSON.parse(seedInput.value);
+}
+
+function requestCatalogue(flow, button, clear = true) {
+  button.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
+  if (clear) button.dispatch("click");
+  return submittedSeed(flow.posted);
 }
 
 
@@ -356,9 +368,64 @@ test("opens a general custom-gift enquiry through the existing catalogue seed co
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
 });
 
-test("opens one order modal, keeps loading until the current nonce is ready, and restores the opener", () => {
+test("builds one deterministic request for multiple catalogue selections", () => {
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButton.dispatch("click");
+  assert.equal(flow.posted.length, 0);
+  assert.equal(flow.catalogueSelection.hidden, false);
+  assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
+  assert.equal(flow.catalogueButton.textContent, "Remove from request");
+  assert.equal(flow.generatedCatalogueButton.textContent, "Remove from request");
+  flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(flow.posted.length, 1);
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.sourceKind, "catalogue");
+  assert.equal(seed.sourceId, "catalogue:multi-item");
+  assert.equal(seed.productName, "2 selected catalogue items");
+  assert.equal(seed.quantity, "1");
+  assert.match(seed.designDetails, /Test frame/);
+  assert.match(seed.designDetails, /Source: catalogue:test-frame\.png/);
+  assert.match(seed.designDetails, /Your flowers, held close/);
+  assert.match(seed.designDetails, /Source: catalogue:concept-floral-memory-frame\.webp/);
+  assert.match(seed.designDetails, /Quantity: 1/);
+  assert.ok(seed.designDetails.length <= 2000);
+});
+
+test("dedupes and removes catalogue selections before requesting the remaining item", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButton.dispatch("click");
+  flow.catalogueButton.dispatch("click");
+  assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
+  flow.catalogueButton.dispatch("click");
+  assert.match(flow.catalogueSelectionSummary.textContent, /1 item selected/);
+  flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(flow.posted.length, 1);
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.productName, "1 selected catalogue items");
+  assert.doesNotMatch(seed.designDetails, /Test frame/);
+  assert.match(seed.designDetails, /Your flowers, held close/);
+});
+
+test("keeps the bundle bounded and explains when another catalogue item cannot be added", () => {
+  const flow = runFlow({ longCatalogueTitle: true });
+  flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButtons[1].dispatch("click");
+  assert.match(flow.catalogueSelectionSummary.textContent, /1 item selected: Test frame/);
+  assert.equal(flow.catalogueSelectionStatus.hidden, false);
+  assert.match(flow.catalogueSelectionStatus.textContent, /selected list is full/);
+  assert.equal(flow.generatedCatalogueButtons[1].textContent, "Add to request");
+  assert.equal(flow.catalogueRequestSelected.disabled, false);
+  flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(submittedSeed(flow.posted).productName, "1 selected catalogue items");
+  assert.ok(submittedSeed(flow.posted).designDetails.length <= 2000);
+});
+
+test("opens one order modal, keeps loading until the current nonce is ready, and restores the opener", () => {
+  const flow = runFlow();
+  requestCatalogue(flow, flow.catalogueButton);
   const status = flow.elements.get("order-form-status");
   const frame = flow.elements.get("order-form-frame");
   const seed = submittedSeed(flow.posted);
@@ -370,14 +437,13 @@ test("opens one order modal, keeps loading until the current nonce is ready, and
   assert.equal(status.getAttribute("aria-busy"), "");
   flow.orderDialog.close();
   assert.equal(flow.orderDialog.open, false);
-  assert.equal(flow.catalogueButton.focused, true);
-  assert.equal(flow.catalogueButton.focusOptions.preventScroll, true);
+  assert.equal(flow.catalogueRequestSelected.focused, true);
+  assert.equal(flow.catalogueRequestSelected.focusOptions.preventScroll, true);
 });
 
 test("resumes a closed request through the visible continue control without reseeding", () => {
   const flow = runFlow({ confirms: [false] });
-  flow.catalogueButton.dispatch("click");
-  const firstSeed = submittedSeed(flow.posted);
+  const firstSeed = requestCatalogue(flow, flow.catalogueButton);
   const postCount = flow.posted.length;
   flow.windowObject.history.deferBack = true;
   flow.orderDialog.close();
@@ -399,24 +465,24 @@ test("resumes a closed request through the visible continue control without rese
 
 test("browser Back closes the order modal and restores the exact opener without scrolling", () => {
   const flow = runFlow();
-  flow.catalogueButton.dispatch("click");
+  requestCatalogue(flow, flow.catalogueButton);
   assert.equal(flow.orderDialog.open, true);
   flow.windowObject.history.back();
   assert.equal(flow.orderDialog.open, false);
-  assert.equal(flow.catalogueButton.focused, true);
-  assert.equal(flow.catalogueButton.focusOptions.preventScroll, true);
+  assert.equal(flow.catalogueRequestSelected.focused, true);
+  assert.equal(flow.catalogueRequestSelected.focusOptions.preventScroll, true);
 });
 
 test("ignores a stale ready message while a replacement request is loading", () => {
   const flow = runFlow();
-  flow.catalogueButton.dispatch("click");
+  const first = requestCatalogue(flow, flow.catalogueButton);
   const status = flow.elements.get("order-form-status");
   const frame = flow.elements.get("order-form-frame");
-  const first = submittedSeed(flow.posted);
   flow.windowObject.messageListener({ origin: "https://n-stale-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: "stale-nonce", siteKey: "stale" }, ports: [] });
   assert.equal(status.hidden, false);
   assert.equal(status.getAttribute("aria-busy"), "true");
   flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
   const second = submittedSeed(flow.posted);
   assert.notEqual(second.channelNonce, first.channelNonce);
   flow.windowObject.messageListener({ origin: "https://n-current-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: second.channelNonce, siteKey: "site-key" }, ports: [] });
@@ -428,7 +494,7 @@ test("shows bounded contact alternatives on timeout and clears them for a late v
   let timeoutCallback;
   flow.windowObject.setTimeout = (callback) => { timeoutCallback = callback; return 42; };
   flow.windowObject.clearTimeout = () => {};
-  flow.catalogueButton.dispatch("click");
+  requestCatalogue(flow, flow.catalogueButton, false);
   const status = flow.elements.get("order-form-status");
   const frame = flow.elements.get("order-form-frame");
   const seed = submittedSeed(flow.posted);
@@ -492,44 +558,44 @@ test("does not open an empty modal when customizer capture fails", async () => {
   assert.equal(flow.orderDialog.open, false);
 });
 
-test("shows selected catalogue photo, exact price, and only known size above the form", () => {
+test("shows a compact catalogue selection summary before requesting the bundle", () => {
   const flow = runFlow();
-  const summary = flow.elements.get("selected-product-summary");
-  const image = flow.elements.get("selected-product-image");
-  const name = flow.elements.get("selected-product-name");
-  const price = flow.elements.get("selected-product-price");
-  const size = flow.elements.get("selected-product-size");
-  assert.equal(summary.hidden, true);
+  assert.equal(flow.catalogueSelection.hidden, true);
 
   flow.catalogueButton.dispatch("click");
-  assert.equal(summary.hidden, false);
-  assert.equal(image.getAttribute("src"), "assets/test-frame.png");
-  assert.equal(image.getAttribute("alt"), "Test frame product photo");
-  assert.equal(name.textContent, "Test frame");
-  assert.equal(price.hidden, false);
-  assert.equal(price.textContent, "Price: ₹249");
-  assert.equal(size.hidden, false);
-  assert.equal(size.textContent, "Size: 4 in");
+  assert.equal(flow.catalogueSelection.hidden, false);
+  assert.match(flow.catalogueSelectionSummary.textContent, /1 item selected: Test frame/);
 
   flow.generatedCatalogueButtons[1].dispatch("click");
-  assert.equal(size.hidden, true);
-  assert.equal(size.textContent, "");
-  assert.doesNotMatch(summary.textContent, /Suggested size|confirm with Saloni|Custom size in inches/i);
+  assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
 });
 
-test("clears a catalogue summary when general or customizer ordering takes over", () => {
+test("keeps selected catalogue items while pagination or filters change the visible page", () => {
   const flow = runFlow();
-  const summary = flow.elements.get("selected-product-summary");
   flow.catalogueButton.dispatch("click");
-  assert.equal(summary.hidden, false);
+  flow.catalogueButton.hidden = true;
+  flow.generatedCatalogueButton.dispatch("click");
+  flow.catalogueButton.hidden = false;
+  assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
+  flow.catalogueRequestSelected.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.productName, "2 selected catalogue items");
+  assert.match(seed.designDetails, /Test frame/);
+  assert.match(seed.designDetails, /Your flowers, held close/);
+});
+
+test("clears catalogue selections when general or customizer ordering takes over", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.catalogueSelection.hidden, false);
 
   flow.generalRequest.dispatch("click", { preventDefault() {} });
-  assert.equal(summary.hidden, true);
+  assert.equal(flow.catalogueSelection.hidden, true);
 
   flow.catalogueButton.dispatch("click");
-  assert.equal(summary.hidden, false);
+  assert.equal(flow.catalogueSelection.hidden, false);
   flow.customizer.dispatch("click");
-  assert.equal(summary.hidden, true);
+  assert.equal(flow.catalogueSelection.hidden, true);
 });
 
 test("routes Resin art to the active catalogue categories without a romantic heading link", () => {
@@ -578,7 +644,7 @@ test("keeps the corporate page pending when intake readiness is missing or unkno
 
 test("keeps the existing order and Partner Circle seed paths active", () => {
   const order = runFlow();
-  order.catalogueButton.dispatch("click");
+  requestCatalogue(order, order.catalogueButton);
   assert.equal(order.posted.length, 1);
   assert.equal(submittedSeed(order.posted).requestStage, "quote");
   const partner = runFlow({ mode: "partner", intakeReady: false });
@@ -588,11 +654,11 @@ test("keeps the existing order and Partner Circle seed paths active", () => {
 
 test("starts two orders for the same catalogue item with new IDs only after confirmed replacement", () => {
   const flow = runFlow({ confirms: [false, true] });
+  const first = requestCatalogue(flow, flow.catalogueButton);
   flow.catalogueButton.dispatch("click");
-  const first = submittedSeed(flow.posted);
-  flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
   assert.equal(flow.posted.length, 1);
-  flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
   const second = submittedSeed(flow.posted);
   assert.notEqual(second.requestId, first.requestId);
 });
@@ -600,10 +666,12 @@ test("starts two orders for the same catalogue item with new IDs only after conf
 test("adds the catalogue order control to highlighted keepsake cards", () => {
   const flow = runFlow();
   assert.ok(flow.highlightCatalogueButton);
-  flow.highlightCatalogueButton.dispatch("click");
-  const seed = submittedSeed(flow.posted);
-  assert.equal(seed.productName, "Preserved rose display");
-  assert.equal(seed.sourceId, "catalogue:studio-red-rose-resin-display.jpeg");
+  assert.equal(flow.highlightCatalogueButton.textContent, "Add to request");
+  const seed = requestCatalogue(flow, flow.highlightCatalogueButton);
+  assert.equal(seed.productName, "1 selected catalogue items");
+  assert.equal(seed.sourceId, "catalogue:multi-item");
+  assert.match(seed.designDetails, /Item 1: Preserved rose display/);
+  assert.match(seed.designDetails, /catalogue:studio-red-rose-resin-display\.jpeg/);
 });
 
 test("keeps moved studio art cards on the shared catalogue order path", () => {
@@ -615,11 +683,12 @@ test("keeps moved studio art cards on the shared catalogue order path", () => {
     ["personalized-floral-hoop.jpg", "A tiny beginning"],
   ];
   expected.forEach(([asset, title], index) => {
-    assert.equal(flow.movedStudioButtons[index].textContent, "Request this item");
-    flow.movedStudioButtons[index].dispatch("click");
-    const seed = submittedSeed(flow.posted);
-    assert.equal(seed.sourceId, `catalogue:${asset}`);
-    assert.equal(seed.productName, title);
+    assert.equal(flow.movedStudioButtons[index].textContent, "Add to request");
+    const seed = requestCatalogue(flow, flow.movedStudioButtons[index]);
+    assert.equal(seed.sourceId, "catalogue:multi-item");
+    assert.equal(seed.productName, "1 selected catalogue items");
+    assert.match(seed.designDetails, new RegExp(`Source: catalogue:${asset}`));
+    assert.match(seed.designDetails, new RegExp(`Item 1: ${title}`));
   });
 });
 
@@ -645,7 +714,7 @@ test("reads square, round, and arch dimensions from customizer controls, includi
 
 test("reports real customizer handoff outcomes so cancellation keeps retry available", async () => {
   const cancelled = runFlow({ confirms: [false] });
-  cancelled.catalogueButton.dispatch("click");
+  requestCatalogue(cancelled, cancelled.catalogueButton);
   cancelled.customizer.dispatch("click");
   assert.deepEqual(cancelled.customizerOutcomes, ["cancelled"]);
 
@@ -669,7 +738,7 @@ test("reports real customizer handoff outcomes so cancellation keeps retry avail
   assert.deepEqual(insecure.customizerOutcomes, ["failure"]);
 
   const helpCancelled = runFlow({ confirms: [false] });
-  helpCancelled.catalogueButton.dispatch("click");
+  requestCatalogue(helpCancelled, helpCancelled.catalogueButton);
   helpCancelled.designHelp.dispatch("click", { preventDefault() {} });
   assert.deepEqual(helpCancelled.customizerOutcomes, ["cancelled"]);
 });
@@ -719,8 +788,7 @@ test("preview rejection keeps the draft until explicit continuation and retry re
 
 test("leaves catalogue dimensions blank when the catalogue has no real size", () => {
   const flow = runFlow();
-  flow.catalogueButton.dispatch("click");
-  const seed = submittedSeed(flow.posted);
+  const seed = requestCatalogue(flow, flow.catalogueButton);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
 });
 
@@ -733,23 +801,24 @@ test("carries known catalogue sizes and preserves no-size selections in order de
     [flow.generatedCatalogueButtons[1], null, "A little blue hour"],
   ];
   cases.forEach(([button, sizeDetails, productName]) => {
-    button.dispatch("click");
-    const seed = submittedSeed(flow.posted);
-    assert.equal(seed.productName, productName);
+    const seed = requestCatalogue(flow, button);
+    assert.equal(seed.productName, "1 selected catalogue items");
+    assert.match(seed.designDetails, new RegExp(productName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
     if (sizeDetails) assert.match(seed.designDetails, new RegExp(sizeDetails.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
-    else assert.doesNotMatch(seed.designDetails, /Size:/);
+    else assert.match(seed.designDetails, /Size: not shown/);
     assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
   });
 });
 
 test("uses the shared catalogue CTA and preserves generated-design details in a catalogue seed", () => {
   const flow = runFlow();
-  assert.equal(flow.generatedCatalogueButton.textContent, "Request this item");
-  assert.equal(flow.catalogueButton.textContent, "Request this item");
-  flow.generatedCatalogueButton.dispatch("click");
-  const seed = submittedSeed(flow.posted);
+  assert.equal(flow.generatedCatalogueButton.textContent, "Add to request");
+  assert.equal(flow.catalogueButton.textContent, "Add to request");
+  const seed = requestCatalogue(flow, flow.generatedCatalogueButton);
   assert.equal(seed.sourceKind, "catalogue");
-  assert.equal(seed.sourceId, "catalogue:concept-floral-memory-frame.webp");
+  assert.equal(seed.sourceId, "catalogue:multi-item");
+  assert.match(seed.designDetails, /Source: catalogue:concept-floral-memory-frame\.webp/);
+  assert.match(seed.designDetails, /Item 1: Your flowers, held close/);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
   assert.doesNotMatch(seed.designDetails, /Market reference/);
   assert.doesNotMatch(seed.designDetails, new RegExp(FINAL_QUOTE_NOTE));
@@ -763,11 +832,11 @@ test("includes each generated design pricing in order seed details", () => {
     ["concept-floral-coasters.webp", "1,299", "999", 23],
   ];
   expected.forEach(([asset, regular, festive, discount], index) => {
-    flow.generatedCatalogueButtons[index].dispatch("click");
-    const seed = submittedSeed(flow.posted);
-    assert.equal(seed.sourceId, `catalogue:${asset}`);
+    const seed = requestCatalogue(flow, flow.generatedCatalogueButtons[index]);
+    assert.equal(seed.sourceId, "catalogue:multi-item");
+    assert.match(seed.designDetails, new RegExp(`Source: catalogue:${asset}`));
     assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
-    assert.ok(seed.designDetails.includes(`From: ₹${festive}`));
+    assert.ok(seed.designDetails.includes(`Price: ₹${festive}`));
     assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
     assert.doesNotMatch(seed.designDetails, new RegExp(FINAL_QUOTE_NOTE));
     assert.doesNotMatch(seed.designDetails, /Average listed price/);
@@ -781,17 +850,13 @@ test("seeds every corporate catalogue card with identity, unit, concept, and pri
   const flow = runFlow();
   CORPORATE_RESIN_GIFTS.forEach(([asset, title, copy, unit, regular, offer, discount], index) => {
     const button = flow.corporateCatalogueButtons[index];
-    assert.equal(button.textContent, "Request this item");
-    button.dispatch("click");
-    const seed = submittedSeed(flow.posted);
-    assert.equal(seed.sourceId, `catalogue:${asset}`);
-    assert.equal(seed.productName, title);
-    assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
-    assert.match(seed.designDetails, new RegExp(unit.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
-    assert.match(seed.designDetails, /Illustrative\/reference image; final design to confirm with Saloni\./);
-    assert.doesNotMatch(seed.designDetails, /Concept preview · made to order/);
-    assert.match(seed.designDetails, new RegExp(`From: ₹${offer}`));
-    assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
+    assert.equal(button.textContent, "Add to request");
+    const seed = requestCatalogue(flow, button);
+    assert.equal(seed.sourceId, "catalogue:multi-item");
+    assert.equal(seed.productName, "1 selected catalogue items");
+    assert.match(seed.designDetails, new RegExp(`Item 1: ${title}`));
+    assert.match(seed.designDetails, new RegExp(`Source: catalogue:${asset}`));
+    assert.match(seed.designDetails, /Quantity: 1/);
   });
 });
 
@@ -802,16 +867,13 @@ test("seeds every new Diwali concept with identity, unit, concept, and pricing d
   const flow = runFlow();
   DIWALI_NEW_CONCEPTS.forEach(([asset, title, copy, unit, regular, festive, discount], index) => {
     const button = flow.diwaliCatalogueButtons[index];
-    assert.equal(button.textContent, "Request this item");
-    button.dispatch("click");
-    const seed = submittedSeed(flow.posted);
-    assert.equal(seed.sourceId, `catalogue:${asset}`);
-    assert.equal(seed.productName, title);
-    assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
-    assert.match(seed.designDetails, new RegExp(unit.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")));
-    assert.doesNotMatch(seed.designDetails, /Concept preview · made to order/);
-    assert.match(seed.designDetails, new RegExp(`From: ₹${festive}`));
-    assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
+    assert.equal(button.textContent, "Add to request");
+    const seed = requestCatalogue(flow, button);
+    assert.equal(seed.sourceId, "catalogue:multi-item");
+    assert.equal(seed.productName, "1 selected catalogue items");
+    assert.match(seed.designDetails, new RegExp(`Item 1: ${title}`));
+    assert.match(seed.designDetails, new RegExp(`Source: catalogue:${asset}`));
+    assert.match(seed.designDetails, /Quantity: 1/);
   });
 });
 
@@ -831,16 +893,14 @@ test("seeds every romantic concept with its disclosure, exact price, and blank d
   ];
   expected.forEach(([asset, title, copy, regular, festive, discount], index) => {
     const button = flow.romanticConceptButtons[index];
-    assert.equal(button.textContent, "Request this item");
-    button.dispatch("click");
-    const seed = submittedSeed(flow.posted);
-    assert.equal(seed.sourceId, `catalogue:${asset}`);
-    assert.equal(seed.productName, title);
-    assert.match(seed.designDetails, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.doesNotMatch(seed.designDetails, /Concept preview · made to order/);
-    assert.match(seed.designDetails, new RegExp(`From: ₹${festive}`));
-    assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off/);
-    assert.doesNotMatch(seed.designDetails, /Average listed price/);
+    assert.equal(button.textContent, "Add to request");
+    const seed = requestCatalogue(flow, button);
+    assert.equal(seed.sourceId, "catalogue:multi-item");
+    assert.equal(seed.productName, "1 selected catalogue items");
+    assert.match(seed.designDetails, new RegExp(`Item 1: ${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(seed.designDetails, new RegExp(`Source: catalogue:${asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(seed.designDetails, new RegExp(`Price: ₹${festive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.doesNotMatch(seed.designDetails, /Regular price|Discount|% off|Average listed price/);
     assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
   });
 });
@@ -854,10 +914,11 @@ test("keeps order seeds correct at the first, tenth, eleventh, and fourteenth ro
     [flow.romanticExistingButtons[2], "catalogue:studio-red-rose-resin-display.jpeg", "Preserved rose display"],
   ];
   selected.forEach(([button, sourceId, productName]) => {
-    button.dispatch("click");
-    const seed = submittedSeed(flow.posted);
-    assert.equal(seed.sourceId, sourceId);
-    assert.equal(seed.productName, productName);
+    const seed = requestCatalogue(flow, button);
+    assert.equal(seed.sourceId, "catalogue:multi-item");
+    assert.equal(seed.productName, "1 selected catalogue items");
+    assert.match(seed.designDetails, new RegExp(`Item 1: ${productName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    assert.match(seed.designDetails, new RegExp(`Source: ${sourceId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
     assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
   });
 });
@@ -873,8 +934,7 @@ test("owns CAPTCHA token requests on the exact studio origin and pinned sender",
 
 test("pins a nested form sender and observed sandbox origin, then rejects stale or foreign messages", async () => {
   const flow = runFlow({ confirms: [true] });
-  flow.catalogueButton.dispatch("click");
-  const first = submittedSeed(flow.posted);
+  const first = requestCatalogue(flow, flow.catalogueButton);
   const nestedSource = {};
   const sandboxOrigin = "https://script.googleusercontent.com";
   flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: first.channelNonce, siteKey: "site-key" }, ports: [] });
@@ -883,6 +943,7 @@ test("pins a nested form sender and observed sandbox origin, then rejects stale 
   await Promise.resolve();
   assert.equal(firstPort.messages[0].token, "parent-token");
   flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
   const second = submittedSeed(flow.posted);
   assert.notEqual(second.channelNonce, first.channelNonce);
   const stalePort = new CapturingPort();
@@ -1028,6 +1089,7 @@ test("invalidates a prior preview snapshot when a newer source is selected", () 
   const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
   flow.windowObject.messageListener({ origin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: first.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
   flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
   const stale = new CapturingPort();
   flow.windowObject.messageListener({ origin, source: nestedSource, data: { type: "saloni-preview-request", version: 1, nonce: first.channelNonce, requestId: first.requestId, mode: "order", transferId: "stale" }, ports: [stale] });
   assert.equal(stale.messages.length, 0);

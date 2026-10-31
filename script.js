@@ -245,8 +245,14 @@
         if (lightboxPrevious) { lightboxPrevious.disabled = lightboxIndex <= 0 || lightboxItems.length < 2; lightboxPrevious.setAttribute("aria-disabled", String(lightboxPrevious.disabled)); }
         if (lightboxNext) { lightboxNext.disabled = lightboxIndex >= lightboxItems.length - 1 || lightboxItems.length < 2; lightboxNext.setAttribute("aria-disabled", String(lightboxNext.disabled)); }
         if (lightboxRequest) {
-          lightboxRequest.hidden = !item.card || !item.card.querySelector("[data-order-prefill]");
+          var itemRequestButton = item.card && item.card.querySelector ? item.card.querySelector("[data-order-prefill]") : null;
+          lightboxRequest.hidden = !itemRequestButton;
           lightboxRequest.disabled = lightboxRequest.hidden;
+          if (!lightboxRequest.hidden) {
+            var selected = typeof itemRequestButton.getAttribute === "function" && itemRequestButton.getAttribute("aria-pressed") === "true";
+            lightboxRequest.textContent = selected ? "Remove from request" : "Add to request";
+            lightboxRequest.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from request" : " to request"));
+          }
         }
       }
 
@@ -898,6 +904,10 @@
     var selectedProductName = document.getElementById("selected-product-name");
     var selectedProductPrice = document.getElementById("selected-product-price");
     var selectedProductSize = document.getElementById("selected-product-size");
+    var catalogueSelection = document.getElementById("catalogue-selection");
+    var catalogueSelectionSummary = document.getElementById("catalogue-selection-summary");
+    var catalogueSelectionStatus = document.getElementById("catalogue-selection-status");
+    var catalogueRequestSelected = document.getElementById("catalogue-request-selected");
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
     if (!embed || !frame || !status) return;
@@ -1371,6 +1381,65 @@
       return;
     }
 
+    var selectedCatalogueItems = [];
+    var catalogueButtons = [];
+
+    function setCatalogueSelectionStatus(message) {
+      if (!catalogueSelectionStatus) return;
+      catalogueSelectionStatus.textContent = message || "";
+      catalogueSelectionStatus.hidden = !message;
+    }
+
+    function updateCatalogueSelection() {
+      var count = selectedCatalogueItems.length;
+      if (catalogueSelection) catalogueSelection.hidden = count === 0;
+      if (catalogueRequestSelected) catalogueRequestSelected.disabled = count === 0;
+      if (catalogueSelectionSummary) {
+        if (!count) catalogueSelectionSummary.textContent = "No gifts selected.";
+        else {
+          var titles = selectedCatalogueItems.slice(0, 3).map(function (item) { return item.productName; });
+          var more = count > titles.length ? " + " + (count - titles.length) + " more" : "";
+          catalogueSelectionSummary.textContent = count + (count === 1 ? " item selected: " : " items selected: ") + titles.join(", ") + more;
+        }
+      }
+      catalogueButtons.forEach(function (button) {
+        var selected = selectedCatalogueItems.some(function (item) { return item.sourceId === button.__saloniCatalogueSourceId; });
+        button.textContent = selected ? "Remove from request" : "Add to request";
+        button.setAttribute("aria-pressed", String(selected));
+        button.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (button.__saloniCatalogueTitle || "item") + (selected ? " from request" : " to request"));
+      });
+    }
+
+    function resetCatalogueSelection() {
+      selectedCatalogueItems = [];
+      setCatalogueSelectionStatus("");
+      updateCatalogueSelection();
+    }
+
+    function bundleDetails(items) {
+      return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); }).map(function (item, index) {
+        return "Item " + (index + 1) + ": " + item.productName + " | Source: " + item.sourceId + " | Price: " + (item.price || "not shown") + " | Size: " + (item.size || "not shown") + " | Quantity: 1";
+      }).join("\n");
+    }
+
+    function toggleCatalogueSelection(seed) {
+      var existingIndex = selectedCatalogueItems.findIndex(function (item) { return item.sourceId === seed.sourceId; });
+      if (existingIndex !== -1) {
+        selectedCatalogueItems.splice(existingIndex, 1);
+        setCatalogueSelectionStatus("");
+        updateCatalogueSelection();
+        return;
+      }
+      var nextItems = selectedCatalogueItems.concat([seed]);
+      if (bundleDetails(nextItems).length > 2000) {
+        setCatalogueSelectionStatus("That item cannot be added because the selected list is full. Remove an item before adding another.");
+        return;
+      }
+      selectedCatalogueItems = nextItems;
+      setCatalogueSelectionStatus("");
+      updateCatalogueSelection();
+    }
+
     function catalogueSeed(card) {
       var image = card.querySelector("img[src]");
       var title = card.querySelector("figcaption strong") || card.querySelector("figcaption h3");
@@ -1385,7 +1454,9 @@
         return priceLabel && priceValue ? priceLabel.textContent.trim() + ": " + priceValue.textContent.trim() : "";
       }).filter(function (detail) { return detail; });
       if (pricingDetails.length) details += (details ? " " : "") + pricingDetails.join(" ");
-      return sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details });
+      var price = pricingDetails.map(function (detail) { return /^(?:price|from):\s*/i.test(detail) ? detail.replace(/^(?:price|from):\s*/i, "") : ""; }).filter(Boolean)[0] || "";
+      var size = pricingDetails.map(function (detail) { return /^size:\s*/i.test(detail) ? detail.replace(/^size:\s*/i, "") : ""; }).filter(Boolean)[0] || "";
+      return Object.assign(sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details }), { price: price, size: size });
     }
 
     document.querySelectorAll(".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card").forEach(function (card) {
@@ -1394,13 +1465,24 @@
       if (!seed || !caption || caption.querySelector("[data-order-prefill]")) return;
       var button = document.createElement("button");
       button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "catalogue");
-      button.textContent = "Request this item";
+      button.__saloniCatalogueSourceId = seed.sourceId;
+      button.__saloniCatalogueTitle = seed.productName;
+      catalogueButtons.push(button);
+      button.textContent = "Add to request";
+      button.setAttribute("aria-pressed", "false");
+      button.setAttribute("aria-label", "Add " + seed.productName + " to request");
       button.addEventListener("click", function () {
-        var opener = button.__saloniOrderDialogOpener || button;
-        button.__saloniOrderDialogOpener = null;
-        chooseSource(seed, { card: card, opener: opener });
+        toggleCatalogueSelection(seed);
       });
       caption.appendChild(button);
+    });
+
+    if (catalogueRequestSelected) catalogueRequestSelected.addEventListener("click", function () {
+      if (!selectedCatalogueItems.length) return;
+      var items = selectedCatalogueItems.slice();
+      chooseSource({
+        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items", designDetails: bundleDetails(items)
+      }, { opener: catalogueRequestSelected });
     });
 
     function clearCustomizerFallback() {
@@ -1465,6 +1547,7 @@
         notifyCustomizerRequestOutcome("cancelled");
         return;
       }
+      resetCatalogueSelection();
       clearSelectedProductSummary();
       clearCustomizerFallback();
       var identity = { requestId: requestId(), nonce: channelNonce() };
@@ -1530,6 +1613,7 @@
     document.querySelectorAll('[data-order-prefill="general"]').forEach(function (button) {
       button.addEventListener("click", function (event) {
         if (event && event.preventDefault) event.preventDefault();
+        resetCatalogueSelection();
         var isDesignHelp = button.getAttribute("data-design-help") === "true";
         var handedOff = chooseSource({
           sourceKind: "catalogue",
