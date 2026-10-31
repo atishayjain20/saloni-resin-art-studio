@@ -435,6 +435,14 @@ test("catalogue prices use lining tabular numerals", () => {
   assert.match(priceRule, /font-variant-numeric:\s*lining-nums tabular-nums/);
 });
 
+test("narrow catalogue cards give ranged prices room beside the PRICE label", () => {
+  const mobileStart = css.indexOf("@media (max-width: 620px)");
+  const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)", mobileStart);
+  const mobileCss = css.slice(mobileStart, reducedMotionStart);
+  assert.match(mobileCss, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) figcaption \.product-pricing > div:first-child\s*\{[^}]*grid-template-columns:\s*max-content minmax\(0, 1fr\)/);
+  assert.match(section("diwali"), /<dt>Price<\/dt><dd>₹250–₹400<\/dd>/);
+});
+
 test("festive banner is absent while Diwali remains in the collection", () => {
   assert.doesNotMatch(html, /class="[^"]*festive-banner/);
   assert.doesNotMatch(html, /<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs/);
@@ -566,6 +574,28 @@ test("customizer removes the redundant handoff while preserving direct request a
   assert.match(customizerSection, /<summary>Save or share this preview<\/summary>[\s\S]*id="download-preview"[\s\S]*id="copy-summary"[\s\S]*id="share-design"/);
   assert.doesNotMatch(customizerSection, /customizer-handoff|Take the summary to the studio|Call Saloni/);
   assert.doesNotMatch(customizerSection, /href="tel:8209238541"|href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\//);
+});
+
+test("homepage order panel lives in one accessible native modal with an inline fallback", () => {
+  const dialog = html.match(/<dialog class="order-dialog" id="order-dialog"[\s\S]*?<\/dialog>/)?.[0] || "";
+  assert.match(dialog, /aria-labelledby="order-dialog-title"/);
+  assert.match(dialog, /id="order-form-embed"/);
+  assert.match(dialog, /id="order-form-frame"/);
+  const order = html.match(/<section class="order-section shell" id="order"[\s\S]*?<\/section>/)?.[0] || "";
+  assert.match(order, /id="order-inline-fallback"/);
+  assert.match(order, /data-order-prefill="general"/);
+  assert.match(order, /id="order-continue-request"[^>]*>Continue your request<\/button>/);
+});
+
+test("order modal loading state is spinner-backed and ready-message driven", () => {
+  assert.match(html, /class="order-form-spinner"[^>]*aria-hidden="true"/);
+  assert.match(css, /\.order-form-spinner\s*\{/);
+  assert.match(script, /saloni-order-form-ready/);
+  assert.match(script, /startOrderFormLoading[\s\S]*clearOrderLoadingTimer/);
+  assert.match(script, /aria-busy/);
+  assert.doesNotMatch(script, /frame\.addEventListener\(["']load/);
+  assert.doesNotMatch(script, /loadingTimedOut/);
+  assert.match(script, /requestHistoryConsumed && orderDialog/);
 });
 
 test("request CTA vocabulary is consistent and supports general enquiries", () => {
@@ -1046,6 +1076,110 @@ test("lightbox owns one history entry and consumes it on browser back or native 
   let normalBackStopped = false;
   windowObject.listeners.popstate({ state: history.state, stopImmediatePropagation() { normalBackStopped = true; } });
   assert.equal(normalBackStopped, false);
+});
+
+test("hero lightbox request consumes history and restores the visible opener after order close", () => {
+  const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
+  const end = script.indexOf("\n\n    initCatalogueExperience();", start);
+  const makeElement = (extra = {}) => Object.assign({
+    hidden: false,
+    attributes: {},
+    listeners: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    closest() { return null; },
+    getAttribute(name) { return this.attributes[name] || ""; },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
+  }, extra);
+  const history = {
+    state: { catalogue: true },
+    backs: 0,
+    pendingBack: [],
+    pushState(state) { this.state = state; },
+    back() { this.backs += 1; this.pendingBack.push({ state: { catalogue: true } }); },
+    flushBack() {
+      this.state = this.pendingBack.shift().state;
+      windowObject.listeners.popstate({ state: this.state, stopImmediatePropagation() {} });
+    },
+  };
+  const orderDialog = makeElement({ open: false });
+  const requestButton = makeElement({ clicked: 0, opener: null, click() {
+    this.clicked += 1;
+    this.opener = this.__saloniOrderDialogOpener;
+    orderDialog.opener = this.opener;
+    orderDialog.open = true;
+    history.pushState({ saloniOrderDialog: true });
+  } });
+  const canonicalCard = makeElement({ querySelector(selector) {
+    if (selector === "figcaption strong") return { textContent: "Sample gift" };
+    if (selector === "[data-order-prefill]") return requestButton;
+    if (selector === "[data-lightbox-trigger]") return canonicalTrigger;
+    return null;
+  } });
+  const canonicalTrigger = makeElement({
+    href: "assets/sample-gift.jpg",
+    querySelector(selector) { return selector === "img" ? { alt: "Sample gift photo" } : null; },
+    closest(selector) { return selector === "article" ? canonicalCard : null; },
+  });
+  const heroTrigger = makeElement({
+    attributes: { "data-lightbox-target": "canonical-gift" },
+    focused: false,
+    focus(options) { this.focused = true; this.focusOptions = options; },
+    querySelector(selector) { return selector === "img" ? { alt: "Sample gift photo" } : null; },
+    closest() { return null; },
+  });
+  const lightbox = makeElement({ showModal() { this.open = true; }, close() { this.open = false; this.listeners.close(); } });
+  const docElements = {
+    "art-lightbox": lightbox,
+    "lightbox-image": makeElement(),
+    "lightbox-caption": makeElement(),
+    "lightbox-product-name": makeElement(),
+    "lightbox-product-price": makeElement(),
+    "lightbox-product-size": makeElement(),
+    "lightbox-image-description": makeElement(),
+    "lightbox-previous": makeElement(),
+    "lightbox-next": makeElement(),
+    "lightbox-position": makeElement(),
+    "lightbox-request": makeElement(),
+    "order-dialog": orderDialog,
+    "canonical-gift": canonicalCard,
+  };
+  const windowObject = {
+    history,
+    location: { href: "https://example.test/" },
+    listeners: {},
+    timers: [],
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    setTimeout(callback) { this.timers.push(callback); },
+    flushTimers() { while (this.timers.length) this.timers.shift()(); },
+  };
+  const documentObject = {
+    getElementById(id) { return docElements[id] || null; },
+    querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [heroTrigger] : []; },
+  };
+  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
+  const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
+  heroTrigger.listeners.click(click);
+  docElements["lightbox-request"].listeners.click();
+  assert.equal(lightbox.open, false);
+  assert.equal(orderDialog.open, false);
+  assert.equal(history.backs, 1);
+  history.flushBack();
+  windowObject.flushTimers();
+  assert.equal(requestButton.clicked, 1);
+  assert.equal(requestButton.opener, heroTrigger);
+  assert.equal(orderDialog.open, true);
+  assert.equal(history.state.saloniOrderDialog, true);
+  assert.equal(history.backs, 1);
+  orderDialog.close = function () {
+    this.open = false;
+    if (this.opener && this.opener.focus) this.opener.focus({ preventScroll: true });
+  };
+  orderDialog.close();
+  assert.equal(heroTrigger.focused, true);
+  assert.deepEqual(heroTrigger.focusOptions, { preventScroll: true });
 });
 
 test("privacy details keep the full retention and correction wording below both forms", () => {

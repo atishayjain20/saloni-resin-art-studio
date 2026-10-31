@@ -52,6 +52,7 @@ class Element {
   get innerHTML() { return this._innerHTML; }
   set innerHTML(value) { this._innerHTML = String(value); this.textContent = this._innerHTML.replace(/<[^>]*>/g, ""); }
   addEventListener(type, listener) { this.listeners[type] = listener; }
+  focus(options) { this.focused = true; this.focusOptions = options || {}; }
   dispatch(type, event = {}) { if (this.listeners[type]) this.listeners[type](Object.assign({ target: this }, event)); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] || ""; }
@@ -88,10 +89,16 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
+  const orderDialog = new Element("order-dialog");
+  orderDialog.open = false;
+  orderDialog.showModal = () => { orderDialog.open = true; };
+  orderDialog.close = () => { orderDialog.open = false; orderDialog.dispatch("close"); };
+  const orderDialogClose = new Element("order-dialog-close");
   if (mode !== "order") embed.attributes["data-form-mode"] = mode;
   if (intakeReady !== undefined) embed.attributes["data-intake-ready"] = String(intakeReady);
   const frame = new Element("order-form-frame"); frame.name = "order-frame"; frame.hidden = true;
   const status = new Element("order-form-status");
+  const continueOrder = new Element("order-continue-request"); continueOrder.hidden = true;
   const selectedProductSummary = new Element("selected-product-summary"); selectedProductSummary.hidden = true;
   const selectedProductImage = new Element("selected-product-image");
   const selectedProductName = new Element("selected-product-name");
@@ -108,7 +115,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, frame, status, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -259,6 +266,24 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const customizerOutcomes = [];
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
+    location: { href: "https://saloniresinart.com/" },
+    activeElement: null,
+    history: {
+      state: {},
+      pushState(state) { this.state = state; },
+      back() {
+        this.backCalls = (this.backCalls || 0) + 1;
+        if (this.deferBack) { this.pendingBack = true; return; }
+        this.state = {};
+        if (this._listener) this._listener({ state: this.state });
+      },
+      flushBack() {
+        if (!this.pendingBack) return;
+        this.pendingBack = false;
+        this.state = {};
+        if (this._listener) this._listener({ state: this.state });
+      },
+    },
     crypto: { randomUUID: (() => { let n = 0; return () => "request-" + (++n); })() },
     saloniCustomizerCapture(identity) {
       const preset = Number(framePresetControl.value);
@@ -270,7 +295,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     saloniCustomizerRequestOutcome(outcome) { customizerOutcomes.push(outcome); },
     matchMedia: () => ({ matches: true }),
     confirm: () => confirms.length ? confirms.shift() : true,
-    addEventListener(type, listener) { if (type === "message") this.messageListener = listener; },
+    addEventListener(type, listener) { if (type === "message") this.messageListener = listener; if (type === "popstate") { this.popstateListener = listener; this.history._listener = listener; } },
     setTimeout: () => 1,
     clearTimeout() {},
     grecaptcha: { ready(callback) { callback(); }, execute() { return Promise.resolve("parent-token"); } },
@@ -309,7 +334,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, posted, customizerOutcomes, windowObject };
+  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
@@ -329,6 +354,142 @@ test("opens a general custom-gift enquiry through the existing catalogue seed co
   assert.equal(seed.requestStage, "quote");
   assert.match(seed.designDetails, /General custom gift enquiry/);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
+});
+
+test("opens one order modal, keeps loading until the current nonce is ready, and restores the opener", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  const status = flow.elements.get("order-form-status");
+  const frame = flow.elements.get("order-form-frame");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(flow.orderDialog.open, true);
+  assert.equal(status.hidden, false);
+  assert.equal(status.getAttribute("aria-busy"), "true");
+  flow.windowObject.messageListener({ origin: "https://n-current-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key" }, ports: [] });
+  assert.equal(status.hidden, true);
+  assert.equal(status.getAttribute("aria-busy"), "");
+  flow.orderDialog.close();
+  assert.equal(flow.orderDialog.open, false);
+  assert.equal(flow.catalogueButton.focused, true);
+  assert.equal(flow.catalogueButton.focusOptions.preventScroll, true);
+});
+
+test("resumes a closed request through the visible continue control without reseeding", () => {
+  const flow = runFlow({ confirms: [false] });
+  flow.catalogueButton.dispatch("click");
+  const firstSeed = submittedSeed(flow.posted);
+  const postCount = flow.posted.length;
+  flow.windowObject.history.deferBack = true;
+  flow.orderDialog.close();
+  assert.equal(flow.continueOrder.hidden, false);
+  flow.continueOrder.dispatch("click", { preventDefault() {} });
+  assert.equal(flow.orderDialog.open, false);
+  assert.equal(flow.windowObject.history.backCalls, 1);
+  flow.windowObject.history.flushBack();
+  assert.equal(flow.orderDialog.open, true);
+  assert.equal(flow.posted.length, postCount);
+  assert.equal(submittedSeed(flow.posted).requestId, firstSeed.requestId);
+  assert.equal(submittedSeed(flow.posted).channelNonce, firstSeed.channelNonce);
+  flow.orderDialog.close();
+  assert.equal(flow.windowObject.history.backCalls, 2);
+  flow.windowObject.history.flushBack();
+  assert.equal(flow.continueOrder.focused, true);
+  assert.equal(flow.continueOrder.focusOptions.preventScroll, true);
+});
+
+test("browser Back closes the order modal and restores the exact opener without scrolling", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.orderDialog.open, true);
+  flow.windowObject.history.back();
+  assert.equal(flow.orderDialog.open, false);
+  assert.equal(flow.catalogueButton.focused, true);
+  assert.equal(flow.catalogueButton.focusOptions.preventScroll, true);
+});
+
+test("ignores a stale ready message while a replacement request is loading", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  const status = flow.elements.get("order-form-status");
+  const frame = flow.elements.get("order-form-frame");
+  const first = submittedSeed(flow.posted);
+  flow.windowObject.messageListener({ origin: "https://n-stale-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: "stale-nonce", siteKey: "stale" }, ports: [] });
+  assert.equal(status.hidden, false);
+  assert.equal(status.getAttribute("aria-busy"), "true");
+  flow.catalogueButton.dispatch("click");
+  const second = submittedSeed(flow.posted);
+  assert.notEqual(second.channelNonce, first.channelNonce);
+  flow.windowObject.messageListener({ origin: "https://n-current-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: second.channelNonce, siteKey: "site-key" }, ports: [] });
+  assert.equal(status.hidden, true);
+});
+
+test("shows bounded contact alternatives on timeout and clears them for a late valid ready", () => {
+  const flow = runFlow();
+  let timeoutCallback;
+  flow.windowObject.setTimeout = (callback) => { timeoutCallback = callback; return 42; };
+  flow.windowObject.clearTimeout = () => {};
+  flow.catalogueButton.dispatch("click");
+  const status = flow.elements.get("order-form-status");
+  const frame = flow.elements.get("order-form-frame");
+  const seed = submittedSeed(flow.posted);
+  timeoutCallback();
+  assert.equal(status.hidden, false);
+  assert.equal(status.getAttribute("aria-busy"), "");
+  assert.match(status.textContent, /taking longer than expected/);
+  flow.windowObject.messageListener({ origin: "https://n-late-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key" }, ports: [] });
+  assert.equal(status.hidden, true);
+});
+
+test("closing a customizer order releases sticky handoff suppression without clearing the draft", () => {
+  const flow = runFlow();
+  flow.customizer.dispatch("click");
+  assert.equal(flow.orderDialog.open, true);
+  assert.deepEqual(flow.customizerOutcomes, ["success"]);
+  assert.equal(flow.elements.get("customizer-summary").textContent, "Custom details");
+  flow.orderDialog.close();
+  assert.deepEqual(flow.customizerOutcomes, ["success", "cancelled"]);
+  assert.equal(flow.elements.get("customizer-summary").textContent, "Custom details");
+});
+
+test("closing a design-help order releases sticky handoff suppression without clearing the draft", () => {
+  const flow = runFlow();
+  flow.designHelp.dispatch("click", { preventDefault() {} });
+  assert.equal(flow.orderDialog.open, true);
+  assert.deepEqual(flow.customizerOutcomes, ["success"]);
+  flow.orderDialog.close();
+  assert.deepEqual(flow.customizerOutcomes, ["success", "cancelled"]);
+  assert.equal(flow.elements.get("customizer-summary").textContent, "Custom details");
+});
+
+test("continue without preview restores focus to the visible customizer request control", async () => {
+  const flow = runFlow();
+  flow.windowObject.saloniCustomizerCapture = (identity) => {
+    const error = new Error("preview-export-failed");
+    error.previewFallback = {
+      summary: "Custom details",
+      dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+      requestId: identity.requestId, nonce: identity.nonce, mode: identity.mode
+    };
+    return Promise.reject(error);
+  };
+  flow.customizer.dispatch("click");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(flow.continueWithoutPreview.hidden, false);
+  flow.continueWithoutPreview.dispatch("click", { preventDefault() {} });
+  assert.equal(flow.orderDialog.open, true);
+  flow.orderDialog.close();
+  assert.equal(flow.customizer.focused, true);
+  assert.equal(flow.customizer.focusOptions.preventScroll, true);
+  assert.equal(flow.continueWithoutPreview.focused, undefined);
+});
+
+test("does not open an empty modal when customizer capture fails", async () => {
+  const flow = runFlow();
+  flow.windowObject.saloniCustomizerCapture = () => Promise.reject(new Error("preview-export-failed"));
+  flow.customizer.dispatch("click");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(flow.posted.length, 0);
+  assert.equal(flow.orderDialog.open, false);
 });
 
 test("shows selected catalogue photo, exact price, and only known size above the form", () => {
