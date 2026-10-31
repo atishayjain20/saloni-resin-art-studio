@@ -73,6 +73,15 @@ test("catalogue quote context is safe and customizer dimensions remain selected"
   ["height-feet", "height-inches-part", "width-feet", "width-inches-part"].forEach((id) => assert.equal(customizer.elements.get(id).getAttribute("required"), "required"));
 });
 
+test("multi-item catalogue requests show bundle copy without a single product image", () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:multi-item", productName: "2 selected catalogue items" });
+  assert.equal(runtime.elements.get("product-context").hidden, false);
+  assert.equal(runtime.elements.get("product-image").hidden, true);
+  assert.equal(runtime.elements.get("product-image").getAttribute("src"), "");
+  assert.equal(runtime.elements.get("bundle-product-copy").hidden, false);
+  assert.match(html, /These catalogue items will be reviewed together in one request/);
+});
+
 test("descriptive catalogue filenames are allowlisted while lookalikes stay hidden", () => {
   const filename = "premium-midnight-blue-tiered-set.jpeg";
   const selected = makeFormRuntime({ sourceId: `catalogue:${filename}` });
@@ -233,7 +242,7 @@ class FakeMessageChannel {
 }
 
 function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
+  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
