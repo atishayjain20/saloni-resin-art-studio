@@ -149,14 +149,17 @@
         <p class="catalogue-filter-empty" id="catalogue-filter-empty" role="status" hidden>No gifts match those choices. <button class="text-button" id="catalogue-empty-reset" type="button">Clear filters and browse all gifts</button></p>
       </div>
       <a class="button button-dark catalogue-browse-all" href="#catalogue-filters" id="browse-all-gifts" data-browse-all>See all 89 gifts <span aria-hidden="true">↘</span></a>
-      <div class="catalogue-selection" id="catalogue-selection" hidden aria-labelledby="catalogue-selection-title">
+      <div class="catalogue-selection" id="catalogue-selection" hidden tabindex="-1" aria-labelledby="catalogue-selection-title">
         <div>
+          <div class="catalogue-selection-previews" id="catalogue-selection-previews" aria-hidden="true"></div>
           <p class="panel-label" id="catalogue-selection-title">One request for your selected gifts</p>
+          <div class="catalogue-selection-items" id="catalogue-selection-items" aria-label="Selected catalogue items"></div>
           <p class="catalogue-selection-summary" id="catalogue-selection-summary" role="status" aria-live="polite">No gifts selected.</p>
           <p class="catalogue-selection-status" id="catalogue-selection-status" role="status" aria-live="polite" hidden></p>
         </div>
         <button class="button button-line" id="catalogue-request-selected" type="button" disabled>Request selected items</button>
       </div>
+      <button class="button button-dark catalogue-cart-jump" id="catalogue-cart-jump" type="button" hidden aria-controls="catalogue-selection"></button>
     </section>
 
     <section class="work-section diwali-section shell" id="diwali" aria-labelledby="diwali-title">
@@ -922,7 +925,7 @@
       <div class="lightbox-order-summary">
         <strong id="lightbox-product-name"></strong>
         <span id="lightbox-product-price" hidden></span>
-        <button class="button button-dark lightbox-request" id="lightbox-request" type="button" hidden>Add to request</button>
+        <button class="button button-dark lightbox-request" id="lightbox-request" type="button" hidden>Add to cart</button>
       </div>
     </div>
   </dialog>
