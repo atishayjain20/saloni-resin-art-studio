@@ -651,6 +651,26 @@ test("cart lists every selected line and submits independent quantities with a b
   assert.match(flow.catalogueSelectionStatus.textContent, /1 to 100|100/);
 });
 
+test("cart rows expose an accessible remove action for the exact selected item", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButtons[0].dispatch("click");
+  flow.generatedCatalogueButtons[1].dispatch("click");
+  assert.equal(flow.catalogueSelectionItems.children.length, 3);
+
+  const row = flow.catalogueSelectionItems.children[1];
+  const removeButton = row.children.find((child) => child.type === "button");
+  assert.ok(removeButton);
+  assert.equal(removeButton.textContent, "×");
+  assert.equal(removeButton.getAttribute("aria-label"), "Remove Your flowers, held close from cart");
+
+  removeButton.dispatch("click");
+  assert.deepEqual(flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "A little blue hour"]);
+  assert.equal(flow.catalogueCartJump.textContent, "2 selected · View cart");
+  assert.equal(flow.generatedCatalogueButtons[0].textContent, "Add to cart");
+  assert.equal(flow.generatedCatalogueButtons[1].textContent, "Remove from cart");
+});
+
 test("keeps selected catalogue items while pagination or filters change the visible page", () => {
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
