@@ -94,6 +94,7 @@
                 <option value="2000">₹2,000 and above</option>
               </select>
             </label>
+            <button class="button button-dark" id="catalogue-filter-apply" type="button">Apply filters</button>
             <button class="button button-line" id="catalogue-filter-reset" type="button">Clear filters</button>
           </div>
         </div>
@@ -116,15 +117,9 @@
       <div class="hero-copy reveal">
         <h1 id="hero-title">Made for the moment they’ll <em>remember.</em></h1>
         <div class="hero-actions">
-          <a class="button button-dark hero-catalogue-action" href="#catalogue-filters" data-browse-all>Explore gifts <span aria-hidden="true">↘</span></a>
+          <a class="button button-dark hero-catalogue-action" href="#catalogue-filters" data-browse-all>Explore gifts</a>
           <a class="button button-line hero-catalogue-action" href="#customizer" data-customizer-open>Design a custom frame</a>
         </div>
-        <ul class="hero-trust-strip" aria-label="Studio facts">
-          <li>Ajmer studio</li>
-          <li>Shipping across India</li>
-          <li>Handmade to order</li>
-          <li><a href="#order" data-order-prefill="general">Contact Saloni</a></li>
-        </ul>
       </div>
       <div class="hero-collage reveal reveal-delay" aria-label="Finished resin artwork from the studio">
         <figure class="hero-image hero-image-main">
@@ -161,9 +156,13 @@
           <p class="catalogue-selection-summary" id="catalogue-selection-summary" role="status" aria-live="polite">No gifts selected.</p>
           <p class="catalogue-selection-status" id="catalogue-selection-status" role="status" aria-live="polite" hidden></p>
         </div>
-        <button class="button button-line" id="catalogue-request-selected" type="button" disabled>Request selected items</button>
+        <button class="button button-line" id="catalogue-request-selected" type="button" disabled>Order now</button>
     </div>
-    <button class="button button-dark catalogue-cart-jump" id="catalogue-cart-jump" type="button" hidden aria-controls="catalogue-selection"></button>
+    <div class="catalogue-cart-jump" id="catalogue-cart-jump" hidden role="group" aria-label="Selected gifts">
+      <span class="catalogue-cart-count" id="catalogue-cart-count" aria-live="polite"></span>
+      <button class="button button-line catalogue-cart-view" id="catalogue-cart-view" type="button" aria-controls="catalogue-selection">View cart</button>
+      <button class="button button-dark catalogue-cart-order" id="catalogue-cart-order" type="button" aria-controls="catalogue-selection" disabled>Order now</button>
+    </div>
 
     <section class="work-section diwali-section shell" id="diwali" aria-labelledby="diwali-title">
       <div class="rail-heading reveal">
@@ -898,6 +897,14 @@
       <div><a class="wordmark wordmark-footer" href="#hero"><span class="wordmark-name">Saloni</span><span class="wordmark-subtitle">resin art studio</span></a><p>Small details. Lasting feelings.</p><a class="instagram-mark" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Follow the studio <strong>@saloniresin_art_studio</strong></a></div>
       <div class="footer-links"><a href="#studio-art" data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#frame"></use></svg></a><a href="resin-photo-frames/">Photo frames <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#frame"></use></svg></a><a href="namokar-mantra-frames/">Namokar frames <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#frame"></use></svg></a><a href="partners/">Partner Circle</a><a href="corporate-gifting/">Corporate gifting <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#gift"></use></svg></a><a href="#order">Order</a></div>
       <p class="footer-credit">© Saloni Resin Art Studio</p>
+    </div>
+    <div class="shell">
+      <ul class="hero-trust-strip" aria-label="Studio facts">
+        <li>Ajmer studio</li>
+        <li>Shipping across India</li>
+        <li>Handmade to order</li>
+        <li><a href="#order" data-order-prefill="general">Contact Saloni</a></li>
+      </ul>
     </div>
   </footer>
 

@@ -6,6 +6,7 @@ const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
 const page = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+const css = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 const FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery.";
 
 const CORPORATE_RESIN_GIFTS = [
@@ -115,6 +116,16 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   if (mode !== "order") embed.attributes["data-form-mode"] = mode;
   if (intakeReady !== undefined) embed.attributes["data-intake-ready"] = String(intakeReady);
   const frame = new Element("order-form-frame"); frame.name = "order-frame"; frame.hidden = true;
+  frame.setAttribute("title", "Saloni Resin Art Studio order request form");
+  frame.setAttribute("loading", "lazy");
+  const frameHost = {
+    replaceChild(next, previous) {
+      elements.set(next.id, next);
+      next.parentNode = this;
+      previous.parentNode = null;
+    },
+  };
+  frame.parentNode = frameHost;
   const status = new Element("order-form-status");
   const continueOrder = new Element("order-continue-request"); continueOrder.hidden = true;
   const selectedProductSummary = new Element("selected-product-summary"); selectedProductSummary.hidden = true;
@@ -129,6 +140,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const catalogueSelectionStatus = new Element("catalogue-selection-status"); catalogueSelectionStatus.hidden = true;
   const catalogueRequestSelected = new Element("catalogue-request-selected"); catalogueRequestSelected.hidden = true;
   const catalogueCartJump = new Element("catalogue-cart-jump"); catalogueCartJump.hidden = true;
+  const catalogueCartCount = new Element("catalogue-cart-count");
+  const catalogueCartView = new Element("catalogue-cart-view");
+  const catalogueCartOrder = new Element("catalogue-cart-order"); catalogueCartOrder.disabled = true;
   const customizer = new Element("order-from-customizer");
   const continueWithoutPreview = new Element("customizer-continue-without-preview"); continueWithoutPreview.hidden = true;
   const generalRequest = new Element("general-custom-gift");
@@ -140,7 +154,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, catalogueCartJump, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -361,7 +375,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, catalogueCartJump, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
+  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
@@ -393,14 +407,15 @@ test("opens a general custom-gift enquiry through the existing catalogue seed co
 test("builds one deterministic request for multiple catalogue selections", () => {
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
+  assert.equal(flow.posted.length, 1);
   flow.generatedCatalogueButton.dispatch("click");
-  assert.equal(flow.posted.length, 0);
+  assert.equal(flow.posted.length, 2);
   assert.equal(flow.catalogueSelection.hidden, false);
   assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
   assert.equal(flow.catalogueButton.textContent, "Remove from cart");
   assert.equal(flow.generatedCatalogueButton.textContent, "Remove from cart");
   flow.catalogueRequestSelected.dispatch("click");
-  assert.equal(flow.posted.length, 1);
+  assert.equal(flow.posted.length, 2);
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.sourceKind, "catalogue");
   assert.equal(seed.sourceId, "catalogue:multi-item");
@@ -424,7 +439,7 @@ test("dedupes and removes catalogue selections before requesting the remaining i
   flow.catalogueButton.dispatch("click");
   assert.match(flow.catalogueSelectionSummary.textContent, /1 item selected/);
   flow.catalogueRequestSelected.dispatch("click");
-  assert.equal(flow.posted.length, 1);
+  assert.equal(flow.posted.length, 4);
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.productName, "1 selected catalogue items");
   assert.doesNotMatch(seed.designDetails, /Test frame/);
@@ -461,6 +476,113 @@ test("opens one order modal, keeps loading until the current nonce is ready, and
   assert.equal(flow.orderDialog.open, false);
   assert.equal(flow.catalogueRequestSelected.focused, true);
   assert.equal(flow.catalogueRequestSelected.focusOptions.preventScroll, true);
+});
+
+test("clears loading when the current iframe navigation visibly loads", () => {
+  const flow = runFlow();
+  const status = flow.elements.get("order-form-status");
+  const cleared = [];
+  flow.windowObject.setTimeout = () => 42;
+  flow.windowObject.clearTimeout = (id) => cleared.push(id);
+  requestCatalogue(flow, flow.catalogueButton, false);
+  const frame = flow.elements.get("order-form-frame");
+  assert.equal(status.hidden, false);
+  frame.dispatch("load");
+  assert.equal(status.hidden, true);
+  assert.deepEqual(cleared, [42]);
+});
+
+test("visible iframe load cancels the loading timeout before it can show the fallback copy", () => {
+  const flow = runFlow();
+  const status = flow.elements.get("order-form-status");
+  let timeoutCallback;
+  flow.windowObject.setTimeout = (callback) => { timeoutCallback = callback; return 42; };
+  flow.windowObject.clearTimeout = () => {};
+  requestCatalogue(flow, flow.catalogueButton, false);
+  const frame = flow.elements.get("order-form-frame");
+  frame.dispatch("load");
+  timeoutCallback();
+  assert.equal(status.hidden, true);
+  assert.doesNotMatch(status.textContent, /taking longer than expected/);
+});
+
+test("a detached iframe load cannot clear a replacement request", () => {
+  const flow = runFlow();
+  const status = flow.elements.get("order-form-status");
+  const timeoutCallbacks = [];
+  flow.windowObject.setTimeout = (callback) => { timeoutCallbacks.push(callback); return timeoutCallbacks.length; };
+  flow.windowObject.clearTimeout = () => {};
+  requestCatalogue(flow, flow.catalogueButton);
+  const firstFrame = flow.elements.get("order-form-frame");
+  const firstTarget = flow.posted.at(-1).target;
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
+  const secondFrame = flow.elements.get("order-form-frame");
+  const secondTarget = flow.posted.at(-1).target;
+  assert.notEqual(secondFrame, firstFrame);
+  assert.equal(firstFrame.id, "order-form-frame");
+  assert.equal(firstFrame.getAttribute("title"), "Saloni Resin Art Studio order request form");
+  assert.equal(firstFrame.getAttribute("loading"), "lazy");
+  assert.notEqual(secondFrame.name, firstFrame.name);
+  assert.notEqual(secondTarget, firstTarget);
+  assert.equal(secondTarget, secondFrame.name);
+  assert.equal(status.hidden, false);
+  assert.equal(status.getAttribute("aria-busy"), "true");
+  flow.windowObject.messageListener({
+    origin: "https://n-current-script.googleusercontent.com",
+    source: firstFrame.contentWindow,
+    data: { type: "saloni-order-form-ready", nonce: submittedSeed(flow.posted).channelNonce, siteKey: "stale-site-key" },
+    ports: [],
+  });
+  assert.equal(status.hidden, false);
+  assert.equal(status.getAttribute("aria-busy"), "true");
+  timeoutCallbacks[0]();
+  assert.equal(status.hidden, false);
+  assert.equal(status.getAttribute("aria-busy"), "true");
+  firstFrame.dispatch("load");
+  assert.equal(status.hidden, false);
+  assert.equal(status.getAttribute("aria-busy"), "true");
+  secondFrame.dispatch("load");
+  assert.equal(status.hidden, true);
+});
+
+test("a stale ready message cannot change the replacement request security or loading state", () => {
+  const flow = runFlow();
+  const status = flow.elements.get("order-form-status");
+  const first = requestCatalogue(flow, flow.catalogueButton);
+  const firstFrame = flow.elements.get("order-form-frame");
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
+  const frame = flow.elements.get("order-form-frame");
+  const second = submittedSeed(flow.posted);
+  assert.notEqual(second.channelNonce, first.channelNonce);
+  flow.windowObject.messageListener({
+    origin: "https://n-stale-script.googleusercontent.com",
+    source: firstFrame.contentWindow,
+    data: { type: "saloni-order-form-ready", nonce: first.channelNonce, siteKey: "stale-site-key" },
+    ports: [],
+  });
+  assert.equal(status.hidden, false);
+  assert.equal(status.getAttribute("aria-busy"), "true");
+  flow.windowObject.messageListener({
+    origin: "https://n-current-script.googleusercontent.com",
+    source: frame.contentWindow,
+    data: { type: "saloni-order-form-ready", nonce: second.channelNonce, siteKey: "" },
+    ports: [],
+  });
+  assert.equal(status.hidden, true);
+  const executedSiteKeys = [];
+  flow.windowObject.grecaptcha.execute = (siteKey) => {
+    executedSiteKeys.push(siteKey);
+    return Promise.resolve("parent-token");
+  };
+  flow.windowObject.messageListener({
+    origin: "https://n-current-script.googleusercontent.com",
+    source: frame.contentWindow,
+    data: { type: "saloni-order-captcha-request", nonce: second.channelNonce, attemptId: "current-attempt" },
+    ports: [new CapturingPort()],
+  });
+  assert.deepEqual(executedSiteKeys, [""]);
 });
 
 test("resumes a closed request through the visible continue control without reseeding", () => {
@@ -523,12 +645,13 @@ test("ignores a stale ready message while a replacement request is loading", () 
   const flow = runFlow();
   const first = requestCatalogue(flow, flow.catalogueButton);
   const status = flow.elements.get("order-form-status");
-  const frame = flow.elements.get("order-form-frame");
-  flow.windowObject.messageListener({ origin: "https://n-stale-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: "stale-nonce", siteKey: "stale" }, ports: [] });
+  const firstFrame = flow.elements.get("order-form-frame");
+  flow.windowObject.messageListener({ origin: "https://n-stale-script.googleusercontent.com", source: firstFrame.contentWindow, data: { type: "saloni-order-form-ready", nonce: "stale-nonce", siteKey: "stale" }, ports: [] });
   assert.equal(status.hidden, false);
   assert.equal(status.getAttribute("aria-busy"), "true");
   flow.catalogueButton.dispatch("click");
   flow.catalogueRequestSelected.dispatch("click");
+  const frame = flow.elements.get("order-form-frame");
   const second = submittedSeed(flow.posted);
   assert.notEqual(second.channelNonce, first.channelNonce);
   flow.windowObject.messageListener({ origin: "https://n-current-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: second.channelNonce, siteKey: "site-key" }, ports: [] });
@@ -626,20 +749,20 @@ test("previews selected catalogue items and provides an accessible cart jump", (
 
   flow.catalogueButton.dispatch("click");
   assert.equal(flow.catalogueCartJump.hidden, false);
-  assert.equal(flow.catalogueCartJump.textContent, "1 selected · View cart");
+  assert.equal(flow.catalogueCartCount.textContent, "1 selected");
   assert.equal(flow.catalogueSelectionPreviews.children.length, 1);
   assert.equal(flow.catalogueSelectionPreviews.children[0].getAttribute("src"), "assets/test-frame.png");
   assert.equal(flow.catalogueSelection.focused, undefined);
 
   flow.generatedCatalogueButtons[1].dispatch("click");
-  assert.equal(flow.catalogueCartJump.textContent, "2 selected · View cart");
+  assert.equal(flow.catalogueCartCount.textContent, "2 selected");
   assert.equal(flow.catalogueSelectionPreviews.children.length, 2);
   flow.generatedCatalogueButtons[0].dispatch("click");
   flow.generatedCatalogueButtons[2].dispatch("click");
-  assert.equal(flow.catalogueCartJump.textContent, "4 selected · View cart");
+  assert.equal(flow.catalogueCartCount.textContent, "4 selected");
   assert.equal(flow.catalogueSelectionPreviews.children.length, 4);
   assert.equal(flow.catalogueSelectionPreviews.children[3].textContent, "+1");
-  flow.catalogueCartJump.dispatch("click");
+  flow.catalogueCartView.dispatch("click");
   assert.equal(flow.catalogueSelection.focused, true);
   assert.equal(flow.catalogueSelection.focusOptions.preventScroll, true);
   assert.equal(flow.catalogueSelection.scrollCalls.length, 1);
@@ -652,6 +775,33 @@ test("previews selected catalogue items and provides an accessible cart jump", (
   flow.generatedCatalogueButtons[2].dispatch("click");
   assert.equal(flow.catalogueCartJump.hidden, true);
   assert.equal(flow.catalogueSelectionPreviews.children.length, 0);
+});
+
+test("the fixed selected-items cart exposes separate View cart and Order now actions", () => {
+  assert.match(page, /id="catalogue-cart-jump"[^>]*role="group"[^>]*aria-label="Selected gifts"/);
+  assert.match(page, /id="catalogue-cart-count"[^>]*aria-live="polite"/);
+  assert.match(page, /id="catalogue-cart-view"[^>]*aria-controls="catalogue-selection"[^>]*>View cart<\/button>/);
+  assert.match(page, /id="catalogue-cart-order"[^>]*aria-controls="catalogue-selection"[^>]*>Order now<\/button>/);
+  assert.match(page, /id="catalogue-request-selected"[^>]*>Order now<\/button>/);
+  assert.match(css, /\.catalogue-cart-jump \.button[^}]*min-height:\s*44px/);
+});
+
+test("fixed cart Order now opens the existing selected-items request without reseeding", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  const submittedBeforeOrder = flow.posted.length;
+  flow.catalogueCartOrder.dispatch("click");
+  assert.equal(flow.posted.length, submittedBeforeOrder);
+  assert.equal(flow.orderDialog.open, true);
+});
+
+test("fixed cart Order now restores focus to the fixed cart trigger when closed", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueCartOrder.dispatch("click");
+  flow.orderDialog.close();
+  assert.equal(flow.catalogueCartOrder.focused, true);
+  assert.equal(flow.catalogueCartOrder.focusOptions.preventScroll, true);
 });
 
 test("cart lists every selected line and submits independent quantities with a bounded total", () => {
@@ -826,7 +976,7 @@ test("cart rows expose an accessible remove action for the exact selected item",
 
   removeButton.dispatch("click");
   assert.deepEqual(flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "A little blue hour"]);
-  assert.equal(flow.catalogueCartJump.textContent, "2 selected · View cart");
+  assert.equal(flow.catalogueCartCount.textContent, "2 selected");
   assert.equal(flow.generatedCatalogueButtons[0].textContent, "Add to cart");
   assert.equal(flow.generatedCatalogueButtons[1].textContent, "Remove from cart");
 });
@@ -916,15 +1066,27 @@ test("keeps the existing order and Partner Circle seed paths active", () => {
   assert.equal(partner.posted[0].children.find((child) => child.name === "mode").value, "partner");
 });
 
-test("starts two orders for the same catalogue item with new IDs only after confirmed replacement", () => {
-  const flow = runFlow({ confirms: [false, true] });
-  const first = requestCatalogue(flow, flow.catalogueButton);
+test("prepares the cart request on add and replaces it without confirmation or duplicate submission", () => {
+  const flow = runFlow({ confirms: [false] });
   flow.catalogueButton.dispatch("click");
+  const first = submittedSeed(flow.posted);
   flow.catalogueRequestSelected.dispatch("click");
   assert.equal(flow.posted.length, 1);
-  flow.catalogueRequestSelected.dispatch("click");
+  flow.generatedCatalogueButton.dispatch("click");
   const second = submittedSeed(flow.posted);
+  assert.equal(flow.posted.length, 2);
   assert.notEqual(second.requestId, first.requestId);
+  assert.match(second.designDetails, /Test frame/);
+  flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(flow.posted.length, 2);
+});
+
+test("does not preload a catalogue request when the form is not configured", () => {
+  const flow = runFlow({ configured: false });
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.posted.length, 0);
+  flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(flow.posted.length, 0);
 });
 
 test("adds the catalogue order control to highlighted keepsake cards", () => {
@@ -976,11 +1138,11 @@ test("reads square, round, and arch dimensions from customizer controls, includi
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["0", "8.04", "0", "6"]);
 });
 
-test("reports real customizer handoff outcomes so cancellation keeps retry available", async () => {
+test("reports real customizer handoff outcomes while replacing an existing request automatically", async () => {
   const cancelled = runFlow({ confirms: [false] });
   requestCatalogue(cancelled, cancelled.catalogueButton);
   cancelled.customizer.dispatch("click");
-  assert.deepEqual(cancelled.customizerOutcomes, ["cancelled"]);
+  assert.deepEqual(cancelled.customizerOutcomes, ["success"]);
 
   const success = runFlow();
   success.customizer.dispatch("click");
@@ -1004,7 +1166,7 @@ test("reports real customizer handoff outcomes so cancellation keeps retry avail
   const helpCancelled = runFlow({ confirms: [false] });
   requestCatalogue(helpCancelled, helpCancelled.catalogueButton);
   helpCancelled.designHelp.dispatch("click", { preventDefault() {} });
-  assert.deepEqual(helpCancelled.customizerOutcomes, ["cancelled"]);
+  assert.deepEqual(helpCancelled.customizerOutcomes, ["success"]);
 });
 
 test("preview rejection keeps the draft until explicit continuation and retry reruns capture", async () => {
@@ -1217,7 +1379,7 @@ test("pins the exact form iframe sender and observed sandbox origin, then reject
   flow.windowObject.messageListener({ origin: sandboxOrigin, source: {}, data: { type: "saloni-order-captcha-request", nonce: second.channelNonce, attemptId: "foreign" }, ports: [foreignPort] });
   assert.equal(stalePort.messages.length, 0);
   assert.equal(foreignPort.messages.length, 0);
-  const replacementSource = frame.contentWindow;
+  const replacementSource = flow.elements.get("order-form-frame").contentWindow;
   const replacementOrigin = "https://n-1234567890-1lu-script.googleusercontent.com";
   flow.windowObject.messageListener({ origin: replacementOrigin, source: replacementSource, data: { type: "saloni-order-form-ready", nonce: second.channelNonce, siteKey: "site-key" }, ports: [] });
   const replacementPort = new CapturingPort();
