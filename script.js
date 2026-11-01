@@ -250,8 +250,8 @@
           lightboxRequest.disabled = lightboxRequest.hidden;
           if (!lightboxRequest.hidden) {
             var selected = typeof itemRequestButton.getAttribute === "function" && itemRequestButton.getAttribute("aria-pressed") === "true";
-            lightboxRequest.textContent = selected ? "Remove from request" : "Add to request";
-            lightboxRequest.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from request" : " to request"));
+            lightboxRequest.textContent = selected ? "Remove from cart" : "Add to cart";
+            lightboxRequest.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from cart" : " to cart"));
           }
         }
       }
@@ -905,9 +905,12 @@
     var selectedProductPrice = document.getElementById("selected-product-price");
     var selectedProductSize = document.getElementById("selected-product-size");
     var catalogueSelection = document.getElementById("catalogue-selection");
+    var catalogueSelectionPreviews = document.getElementById("catalogue-selection-previews");
+    var catalogueSelectionItems = document.getElementById("catalogue-selection-items");
     var catalogueSelectionSummary = document.getElementById("catalogue-selection-summary");
     var catalogueSelectionStatus = document.getElementById("catalogue-selection-status");
     var catalogueRequestSelected = document.getElementById("catalogue-request-selected");
+    var catalogueCartJump = document.getElementById("catalogue-cart-jump");
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
     if (!embed || !frame || !status) return;
@@ -1228,12 +1231,23 @@
       var widthParts = parts(source.width, source.widthUnit);
       var seed = {
         sourceKind: source.sourceKind || "catalogue", sourceId: source.sourceId || "",
-        productName: source.productName || "", requestStage: "quote", quantity: "1", dimensionFormat: "feet-inches",
+        productName: source.productName || "", requestStage: "quote", quantity: source.quantity || "1", dimensionFormat: "feet-inches",
         heightFeet: heightParts ? heightParts.feet : "", heightInchesPart: heightParts ? heightParts.inches : "", widthFeet: widthParts ? widthParts.feet : "", widthInchesPart: widthParts ? widthParts.inches : "",
         height: source.height || "", heightUnit: source.heightUnit || "",
         width: source.width || "", widthUnit: source.widthUnit || "", designDetails: source.designDetails || "",
         customerName: "", phone: "", email: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "", referralCode: readReferralCode()
       };
+      if (Array.isArray(source.bundleItems)) {
+        seed.bundleItems = source.bundleItems.map(function (item) {
+          return {
+            sourceId: String(item && item.sourceId || "").slice(0, 160),
+            productName: String(item && item.productName || "").slice(0, 160),
+            price: String(item && item.price || "").slice(0, 120),
+            size: String(item && item.size || "").slice(0, 120),
+            quantity: Number.isInteger(Number(item && item.quantity)) ? Number(item.quantity) : 1
+          };
+        });
+      }
       return seed;
     }
 
@@ -1390,23 +1404,112 @@
       catalogueSelectionStatus.hidden = !message;
     }
 
+    function renderCatalogueSelectionPreviews() {
+      if (!catalogueSelectionPreviews) return;
+      while (catalogueSelectionPreviews.firstChild) catalogueSelectionPreviews.removeChild(catalogueSelectionPreviews.firstChild);
+      selectedCatalogueItems.slice(0, 3).forEach(function (item) {
+        if (!item.imageSrc) return;
+        var image = document.createElement("img");
+        image.setAttribute("src", item.imageSrc);
+        image.setAttribute("alt", "");
+        image.setAttribute("loading", "lazy");
+        image.setAttribute("decoding", "async");
+        catalogueSelectionPreviews.appendChild(image);
+      });
+      if (selectedCatalogueItems.length > 3) {
+        var excess = document.createElement("span");
+        excess.textContent = "+" + (selectedCatalogueItems.length - 3);
+        excess.setAttribute("aria-hidden", "true");
+        catalogueSelectionPreviews.appendChild(excess);
+      }
+    }
+
+    function bundleQuantity(item) {
+      var quantity = Number(item && item.quantity);
+      return Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 1;
+    }
+
+    function bundleTotal(items) {
+      return items.reduce(function (total, item) { return total + bundleQuantity(item); }, 0);
+    }
+
+    function renderCatalogueSelectionItems() {
+      if (!catalogueSelectionItems) return;
+      while (catalogueSelectionItems.firstChild) catalogueSelectionItems.removeChild(catalogueSelectionItems.firstChild);
+      selectedCatalogueItems.forEach(function (item) {
+        var line = document.createElement("div");
+        line.className = "catalogue-selection-item";
+        line.setAttribute("data-product-name", item.productName);
+        var name = document.createElement("span");
+        name.className = "catalogue-selection-item-name";
+        name.textContent = item.productName;
+        var label = document.createElement("label");
+        var inputId = "catalogue-quantity-" + item.sourceId.replace(/[^A-Za-z0-9_-]/g, "-");
+        label.setAttribute("for", inputId);
+        label.textContent = "Quantity";
+        var input = document.createElement("input");
+        input.id = inputId;
+        input.type = "number";
+        input.min = "1";
+        input.max = "100";
+        input.step = "1";
+        input.inputMode = "numeric";
+        input.value = String(bundleQuantity(item));
+        input.setAttribute("aria-label", "Quantity for " + item.productName);
+        input.addEventListener("change", function () {
+          var requested = String(input.value || "").trim();
+          var nextQuantity = /^\d+$/.test(requested) ? Number(requested) : NaN;
+          var previous = bundleQuantity(item);
+          if (!Number.isInteger(nextQuantity) || nextQuantity < 1 || nextQuantity > 100) {
+            input.value = String(previous);
+            setCatalogueSelectionStatus("Each quantity must be a whole number from 1 to 100.");
+            return;
+          }
+          item.quantity = nextQuantity;
+          if (bundleTotal(selectedCatalogueItems) > 100) {
+            item.quantity = previous;
+            input.value = String(previous);
+            setCatalogueSelectionStatus("The total selected quantity must be from 1 to 100.");
+            return;
+          }
+          if (bundleDetails(selectedCatalogueItems).length > 2000) {
+            item.quantity = previous;
+            input.value = String(previous);
+            setCatalogueSelectionStatus("Those quantities make the selected list too long. Lower a quantity before continuing.");
+            return;
+          }
+          setCatalogueSelectionStatus("");
+          updateCatalogueSelection();
+        });
+        label.appendChild(input);
+        line.appendChild(name);
+        line.appendChild(label);
+        catalogueSelectionItems.appendChild(line);
+      });
+    }
+
     function updateCatalogueSelection() {
       var count = selectedCatalogueItems.length;
       if (catalogueSelection) catalogueSelection.hidden = count === 0;
       if (catalogueRequestSelected) catalogueRequestSelected.disabled = count === 0;
+      renderCatalogueSelectionPreviews();
+      renderCatalogueSelectionItems();
+      if (catalogueCartJump) {
+        catalogueCartJump.hidden = count === 0;
+        catalogueCartJump.textContent = count ? count + " selected · View cart" : "";
+      }
       if (catalogueSelectionSummary) {
         if (!count) catalogueSelectionSummary.textContent = "No gifts selected.";
         else {
-          var titles = selectedCatalogueItems.slice(0, 3).map(function (item) { return item.productName; });
-          var more = count > titles.length ? " + " + (count - titles.length) + " more" : "";
-          catalogueSelectionSummary.textContent = count + (count === 1 ? " item selected: " : " items selected: ") + titles.join(", ") + more;
+          var titles = selectedCatalogueItems.map(function (item) { return item.productName; });
+          catalogueSelectionSummary.textContent = count + (count === 1 ? " item selected: " : " items selected: ") + titles.join(", ");
         }
       }
       catalogueButtons.forEach(function (button) {
         var selected = selectedCatalogueItems.some(function (item) { return item.sourceId === button.__saloniCatalogueSourceId; });
-        button.textContent = selected ? "Remove from request" : "Add to request";
+        button.textContent = selected ? "Remove from cart" : "Add to cart";
         button.setAttribute("aria-pressed", String(selected));
-        button.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (button.__saloniCatalogueTitle || "item") + (selected ? " from request" : " to request"));
+        button.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (button.__saloniCatalogueTitle || "item") + (selected ? " from cart" : " to cart"));
       });
     }
 
@@ -1418,7 +1521,7 @@
 
     function bundleDetails(items) {
       return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); }).map(function (item, index) {
-        return "Item " + (index + 1) + ": " + item.productName + " | Source: " + item.sourceId + " | Price: " + (item.price || "not shown") + " | Size: " + (item.size || "not shown") + " | Quantity: 1";
+        return "Item " + (index + 1) + ": " + item.productName + " | Source: " + item.sourceId + " | Price: " + (item.price || "not shown") + " | Size: " + (item.size || "not shown") + " | Quantity: " + bundleQuantity(item);
       }).join("\n");
     }
 
@@ -1431,7 +1534,7 @@
         return;
       }
       var nextItems = selectedCatalogueItems.concat([seed]);
-      if (bundleDetails(nextItems).length > 2000) {
+      if (bundleTotal(nextItems) > 100 || bundleDetails(nextItems).length > 2000) {
         setCatalogueSelectionStatus("That item cannot be added because the selected list is full. Remove an item before adding another.");
         return;
       }
@@ -1456,7 +1559,7 @@
       if (pricingDetails.length) details += (details ? " " : "") + pricingDetails.join(" ");
       var price = pricingDetails.map(function (detail) { return /^(?:price|from):\s*/i.test(detail) ? detail.replace(/^(?:price|from):\s*/i, "") : ""; }).filter(Boolean)[0] || "";
       var size = pricingDetails.map(function (detail) { return /^size:\s*/i.test(detail) ? detail.replace(/^size:\s*/i, "") : ""; }).filter(Boolean)[0] || "";
-      return Object.assign(sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details }), { price: price, size: size });
+      return Object.assign(sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details }), { price: price, size: size, imageSrc: image.getAttribute("src") });
     }
 
     document.querySelectorAll(".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card").forEach(function (card) {
@@ -1468,9 +1571,9 @@
       button.__saloniCatalogueSourceId = seed.sourceId;
       button.__saloniCatalogueTitle = seed.productName;
       catalogueButtons.push(button);
-      button.textContent = "Add to request";
+      button.textContent = "Add to cart";
       button.setAttribute("aria-pressed", "false");
-      button.setAttribute("aria-label", "Add " + seed.productName + " to request");
+      button.setAttribute("aria-label", "Add " + seed.productName + " to cart");
       button.addEventListener("click", function () {
         toggleCatalogueSelection(seed);
       });
@@ -1480,9 +1583,24 @@
     if (catalogueRequestSelected) catalogueRequestSelected.addEventListener("click", function () {
       if (!selectedCatalogueItems.length) return;
       var items = selectedCatalogueItems.slice();
+      if (bundleTotal(items) > 100) {
+        setCatalogueSelectionStatus("The total selected quantity must be from 1 to 100.");
+        return;
+      }
+      if (bundleDetails(items).length > 2000) {
+        setCatalogueSelectionStatus("The selected list is too long. Lower a quantity before continuing.");
+        return;
+      }
       chooseSource({
-        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items", designDetails: bundleDetails(items)
+        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items",
+        quantity: String(bundleTotal(items)), designDetails: bundleDetails(items), bundleItems: items
       }, { opener: catalogueRequestSelected });
+    });
+
+    if (catalogueCartJump) catalogueCartJump.addEventListener("click", function () {
+      if (!catalogueSelection || catalogueSelection.hidden) return;
+      catalogueSelection.scrollIntoView({ behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+      catalogueSelection.focus({ preventScroll: true });
     });
 
     function clearCustomizerFallback() {

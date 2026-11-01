@@ -605,7 +605,7 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
   const orderStatus = html.match(/<div class="order-form-status"[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(orderStatus, /<button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift<\/button>/);
   assert.match(css, /\.order-form-status \.order-general-request\s*\{[^}]*background:\s*transparent[^}]*border-color:\s*#f0ddd4[^}]*color:\s*#f0ddd4/);
-  assert.match(script, /button\.textContent = "Add to request"/);
+  assert.match(script, /button\.textContent = "Add to cart"/);
   assert.match(script, /data-order-prefill="general"/);
   assert.match(script, /illustrative preview\|reference image/);
 });
@@ -634,7 +634,7 @@ test("lightbox exposes product-aware controls without changing the catalogue sou
   assert.match(dialog, /id="lightbox-next"/);
   assert.match(summary, /id="lightbox-product-name"/);
   assert.match(summary, /id="lightbox-product-price"/);
-  assert.match(summary, /id="lightbox-request"/);
+  assert.match(summary, /id="lightbox-request"[^>]*>Add to cart<\/button>/);
   assert.doesNotMatch(figure, /id="lightbox-product-name"|id="lightbox-product-price"/);
   assert.match(figure, /tabindex="0"/);
   assert.match(figure, /aria-label="Scrollable artwork details"/);
@@ -644,6 +644,8 @@ test("lightbox exposes product-aware controls without changing the catalogue sou
   assert.match(script, /ArrowLeft/);
   assert.match(script, /ArrowRight/);
   assert.match(script, /pendingLightboxRequest[\s\S]*requestButton\.click\(\)[\s\S]*focusOrderLocation/);
+  assert.match(script, /selected \? "Remove from cart" : "Add to cart"/);
+  assert.match(script, /selected \? " from cart" : " to cart"/);
   assert.match(html, /id="order"[^>]*tabindex="-1"/);
   assert.match(script, /data-lightbox-trigger/);
 });
