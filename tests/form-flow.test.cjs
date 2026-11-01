@@ -30,6 +30,15 @@ test("keeps optional partner referral controls behind a collapsed native disclos
   assert.match(disclosure, /<p id="referral-status"[^>]*>A code is optional\./);
 });
 
+test("offers an unchecked repeat-details choice and an accessible forget control", () => {
+  const rememberControl = html.match(/<input id="remember-repeat-profile"[^>]*>/)?.[0] || "";
+  assert.match(rememberControl, /type="checkbox"/);
+  assert.doesNotMatch(rememberControl, /\bchecked\b/);
+  assert.match(html, /Remember .*30 days/);
+  assert.match(html, /id="forget-repeat-profile"[^>]*>Forget saved details on this device<\/button>/);
+  assert.match(html, /id="repeat-profile-status"[^>]*aria-live="polite"/);
+});
+
 test("catalogue order form shows product context without internal metadata or mandatory dimensions", () => {
   const selectedDesign = html.match(/<fieldset>[\s\S]*?<legend>Selected design<\/legend>[\s\S]*?<\/fieldset>/)?.[0] || "";
   const dimensions = html.match(/<fieldset>[\s\S]*?<legend>What should Saloni make\?<\/legend>[\s\S]*?<\/fieldset>/)?.[0] || "";
@@ -332,8 +341,8 @@ class FakeMessageChannel {
   }
 }
 
-function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "bundle-items", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
+function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
+  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "bundle-items", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
@@ -354,7 +363,7 @@ function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote
   };
   form.reset = () => Object.values(fields).forEach((field) => { field.value = ""; field.files = []; });
   Object.values(fields).forEach((field) => { field.parentNode = { appendChild(child) { errors.push(child); } }; });
-  const seed = { requestId: "request-seed", requestStage, channelNonce: "nonce-seed-123456", sourceKind, sourceId, productName, quantity: "1", dimensionFormat: "feet-inches", heightFeet: "3", heightInchesPart: "0", widthFeet: "4", widthInchesPart: "0", designDetails: "Details", bundleItems, customerName: "", phone: "", email: "", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "" };
+  const seed = Object.assign({ requestId: "request-seed", requestStage, channelNonce: "nonce-seed-123456", sourceKind, sourceId, productName, quantity: "1", dimensionFormat: "feet-inches", heightFeet: "3", heightInchesPart: "0", widthFeet: "4", widthInchesPart: "0", designDetails: "Details", bundleItems, customerName: "", phone: "", email: "", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "" }, seedOverrides);
   if (!omitPreviewExpected) seed.previewExpected = previewExpected;
   elements.get("seed-data").textContent = JSON.stringify(seed);
   const status = elements.get("form-status");
@@ -599,6 +608,55 @@ test("success and reset revoke the preview URL without reusing the old preview i
   assert.match(runtime.elements.get("reference-image-status").textContent, /return to the designer/i);
   first.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: first.message.nonce, requestId: first.message.requestId, mode: "order", transferId: first.message.transferId, ok: true, blob: pngBlob() });
   assert.equal(runtime.fields.referenceImage.files.length, 0);
+});
+
+test("saves repeat details only after success when the customer checks the device-only option", async () => {
+  const unchecked = makeFormRuntime();
+  fillValid(unchecked.fields);
+  unchecked.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(unchecked, 0);
+  await Promise.resolve();
+  unchecked.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(unchecked.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile").length, 0);
+
+  const failed = makeFormRuntime();
+  failed.elements.get("remember-repeat-profile").checked = true;
+  fillValid(failed.fields);
+  failed.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(failed, 0);
+  await Promise.resolve();
+  failed.callbacks[0].failure(new Error("server failure"));
+  assert.equal(failed.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile").length, 0);
+
+  const checked = makeFormRuntime();
+  checked.elements.get("remember-repeat-profile").checked = true;
+  fillValid(checked.fields);
+  checked.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(checked, 0);
+  await Promise.resolve();
+  checked.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  const save = checked.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile");
+  assert.equal(save.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(save[0].message.profile)), {
+    customerName: "A Customer", phone: "8209238541", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "305001",
+  });
+  assert.equal(save[0].message.nonce, "nonce-seed-123456");
+});
+
+test("uses the existing seeded fields for repeat details and can request a device-only clear", () => {
+  const runtime = makeFormRuntime({ seedOverrides: { customerName: "Saved Customer", phone: "+91 8209238541", fulfillment: "shipping", shippingAddress: "61 Hathi Bhata", city: "Ajmer", state: "Rajasthan", pin: "305001" } });
+  assert.equal(runtime.fields.customerName.value, "Saved Customer");
+  assert.equal(runtime.fields.phone.value, "+91 8209238541");
+  assert.equal(runtime.fields.fulfillment.value, "shipping");
+  assert.equal(runtime.fields.shippingAddress.value, "61 Hathi Bhata");
+  runtime.elements.get("forget-repeat-profile").dispatch("click");
+  const clear = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-clear-repeat-profile");
+  assert.equal(clear.length, 1);
+  assert.equal(clear[0].message.nonce, "nonce-seed-123456");
+  assert.match(runtime.elements.get("repeat-profile-status").textContent, /removed/i);
 });
 
 test("page teardown closes a pending preview port and revokes its object URL", () => {
