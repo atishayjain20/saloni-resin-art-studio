@@ -1048,12 +1048,16 @@
       if (opener && typeof opener.focus === "function") opener.focus({ preventScroll: true });
     }
 
-    function openOrderDialog(opener) {
+    function openOrderDialog(opener, openWhileHistoryPending) {
       if (!orderDialogEnabled) return false;
       orderDialogOpener = opener || (document.activeElement && document.activeElement.focus ? document.activeElement : null);
       orderDialogCustomizerHandoff = frameState.customizerHandoff;
       if (orderDialogHistoryBackPending) {
         pendingOrderDialogOpener = orderDialogOpener;
+        if (openWhileHistoryPending) {
+          if (!orderDialog.open) orderDialog.showModal();
+          if (orderDialogClose && typeof orderDialogClose.focus === "function") orderDialogClose.focus({ preventScroll: true });
+        }
         return true;
       }
       pushOrderDialogHistory();
@@ -1143,6 +1147,7 @@
       orderDialog.addEventListener("close", function () {
         var wasCustomizerRequest = orderDialogCustomizerHandoff;
         consumeOrderDialogHistory();
+        pendingOrderDialogOpener = null;
         orderDialogCloseFromHistory = false;
         orderDialogCustomizerHandoff = false;
         if (wasCustomizerRequest) notifyCustomizerRequestOutcome("cancelled");
@@ -1158,7 +1163,12 @@
           orderDialogHistoryBackPending = false;
           var opener = pendingOrderDialogOpener;
           pendingOrderDialogOpener = null;
-          if (opener) openOrderDialog(opener);
+          if (opener) {
+            if (orderDialog.open) {
+              pushOrderDialogHistory();
+              if (orderDialogClose && typeof orderDialogClose.focus === "function") orderDialogClose.focus({ preventScroll: true });
+            } else openOrderDialog(opener);
+          }
           return;
         }
         if (orderDialogHistoryActive && !isOrderDialogHistoryState(event && event.state)) {
@@ -1305,7 +1315,7 @@
       document.body.appendChild(postForm); postForm.submit(); postForm.remove();
       frameState.loaded = true;
       if (continueOrderButton) continueOrderButton.hidden = false;
-      if (orderDialogEnabled) openOrderDialog(opener);
+      if (orderDialogEnabled) openOrderDialog(opener, true);
       else if (shouldScroll !== false) scrollToForm();
       return true;
     }
