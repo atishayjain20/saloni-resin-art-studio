@@ -66,7 +66,7 @@
       </div>
       <div id="bundle-items" class="bundle-items" role="list" aria-label="Selected catalogue items" hidden></div>
       <div class="grid">
-        <label for="product-name">Product name <input id="product-name" name="productName" maxlength="160" required></label>
+        <label for="product-name">Product name <input id="product-name" name="productName" maxlength="2000" required></label>
       </div>
       <p id="product-name-hint" class="hint">You can edit the product name before sending the request.</p>
     </fieldset>
@@ -240,6 +240,7 @@
     return Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 1;
   }
   function bundleTotal(items) { return items.reduce(function (total, item) { return total + bundleQuantity(item); }, 0); }
+  function bundleProductName(items) { return items.map(function (item) { return item.productName; }).join(", "); }
   function bundleDetails(items) {
     return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); }).map(function (item, index) {
       return "Item " + (index + 1) + ": " + item.productName + " | Source: " + item.sourceId + " | Price: " + (item.price || "not shown") + " | Size: " + (item.size || "not shown") + " | Quantity: " + bundleQuantity(item);
@@ -274,7 +275,7 @@
   }
   function updateBundleScalars(includeDetails) {
     if (!isBundle() || !bundleItems.length) return;
-    form.elements.productName.value = bundleItems.length + " selected catalogue items";
+    form.elements.productName.value = bundleProductName(bundleItems);
     form.elements.quantity.value = String(bundleTotal(bundleItems));
     if (includeDetails) {
       var notes = String(bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
