@@ -1481,9 +1481,22 @@
           setCatalogueSelectionStatus("");
           updateCatalogueSelection();
         });
+        var removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "catalogue-selection-item-remove";
+        removeButton.textContent = "×";
+        removeButton.setAttribute("aria-label", "Remove " + item.productName + " from cart");
+        removeButton.addEventListener("click", function () {
+          var index = selectedCatalogueItems.indexOf(item);
+          if (index === -1) return;
+          selectedCatalogueItems.splice(index, 1);
+          setCatalogueSelectionStatus("");
+          updateCatalogueSelection();
+        });
         label.appendChild(input);
         line.appendChild(name);
         line.appendChild(label);
+        line.appendChild(removeButton);
         catalogueSelectionItems.appendChild(line);
       });
     }

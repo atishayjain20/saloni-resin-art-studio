@@ -459,10 +459,12 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .catalogue-selection-previews img { object-fit: cover; background: var(--paper); }
 .catalogue-selection-previews span { display: inline-flex; align-items: center; justify-content: center; background: var(--ink); color: var(--ivory); font-size: .72rem; font-weight: 800; }
 .catalogue-selection-items { display: grid; gap: .45rem; margin-bottom: .55rem; }
-.catalogue-selection-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 7rem); gap: .7rem; align-items: center; color: var(--ink); font-size: .78rem; }
+.catalogue-selection-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 7rem) auto; gap: .7rem; align-items: center; color: var(--ink); font-size: .78rem; }
 .catalogue-selection-item-name { min-width: 0; overflow-wrap: anywhere; }
 .catalogue-selection-item label { display: grid; grid-template-columns: auto minmax(3.5rem, 1fr); gap: .35rem; align-items: center; color: var(--muted); font-size: .7rem; font-weight: 750; }
 .catalogue-selection-item input { width: 100%; min-height: 2.4rem; padding: .45rem .5rem; border: 1px solid var(--line); border-radius: .45rem; background: var(--paper); color: var(--ink); font: inherit; }
+.catalogue-selection-item-remove { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; min-height: 2.75rem; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--rose-ink); font-size: 1.25rem; line-height: 1; cursor: pointer; }
+.catalogue-selection-item-remove:focus-visible { outline: 3px solid var(--rose); outline-offset: 2px; }
 .catalogue-selection-summary, .catalogue-selection-status { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.45; }
 .catalogue-selection-status { margin-top: .3rem; color: var(--rose-ink); }
 .catalogue-selection .button { min-height: 2.75rem; white-space: nowrap; cursor: pointer; }
