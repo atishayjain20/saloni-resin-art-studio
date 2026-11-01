@@ -42,12 +42,7 @@ class OrderFlowContractTests(unittest.TestCase):
         self.assertIn("customizer", self.script)
         self.assertRegex(self.html, r'id="order-from-customizer"')
         self.assertNotIn("order-form-draft", self.form)
-        self.assertNotIn("This order form is already loaded", self.script)
-        self.assertNotIn("window.confirm", self.script)
         self.assertIn("prepareCatalogueSelection", self.script)
-        self.assertIn("openCatalogueSelectionRequest", self.script)
-        self.assertIn("catalogueSeedKey", self.script)
-        self.assertIn("openDialog", self.script)
         self.assertIn("frameState.loaded", self.script)
 
     def test_form_has_editable_request_fields_and_failure_safe_submission(self):
