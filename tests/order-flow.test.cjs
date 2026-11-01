@@ -784,6 +784,7 @@ test("the fixed selected-items cart exposes separate View cart and Order now act
   assert.match(page, /id="catalogue-cart-order"[^>]*aria-controls="catalogue-selection"[^>]*>Order now<\/button>/);
   assert.match(page, /id="catalogue-request-selected"[^>]*>Order now<\/button>/);
   assert.match(css, /\.catalogue-cart-jump \.button[^}]*min-height:\s*44px/);
+    assert.match(css, /\.catalogue-cart-jump \.button-line\s*\{[^}]*background:\s*transparent[^}]*color:\s*var\(--ivory\)/);
 });
 
 test("fixed cart Order now opens the existing selected-items request without reseeding", () => {
