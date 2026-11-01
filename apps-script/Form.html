@@ -866,8 +866,7 @@
     setStatus("Checking the request…", "");
     timeoutId = window.setTimeout(function () {
       if (!isCurrent(attempt)) return;
-      restoreSubmitState(attempt);
-      setStatus("Unable to confirm the request yet. Your entries are still here; please try again.", "error");
+      setStatus("This is taking longer than expected. Keep this window open; we are still confirming your request.", "");
       if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
     }, 30000);
     getCaptchaToken(attempt, function (token) {
@@ -907,8 +906,8 @@
     window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("pageshow", handlePageShow);
   }
-  if (captchaEnabled && captchaSiteKey && seed.channelNonce && window.top && window.top !== window) {
-    try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey }, PARENT_ORIGIN); } catch (error) {}
+  if (seed.channelNonce && window.top && window.top !== window) {
+    try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey || "" }, PARENT_ORIGIN); } catch (error) {}
   }
 }());
 </script>
