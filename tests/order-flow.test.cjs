@@ -46,7 +46,7 @@ const DIWALI_NEW_CONCEPTS = [
 class Element {
   constructor(id, value = "") {
     this.id = id; this.value = value; this.textContent = ""; this._innerHTML = ""; this.hidden = false; this.name = id;
-    this.listeners = {}; this.children = []; this.attributes = {}; this.files = [];
+    this.listeners = {}; this.children = []; this.attributes = {}; this.files = []; this.scrollCalls = [];
     this.contentWindow = {}; this.classList = { add() {}, remove() {} };
   }
   get innerHTML() { return this._innerHTML; }
@@ -59,6 +59,8 @@ class Element {
   removeAttribute(name) { delete this.attributes[name]; }
   hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); }
   appendChild(child) { this.children.push(child); return child; }
+  removeChild(child) { this.children = this.children.filter((item) => item !== child); return child; }
+  get firstChild() { return this.children[0] || null; }
   remove() {}
   querySelector(selector) {
     if (selector === "img[src]") return this.image;
@@ -69,6 +71,13 @@ class Element {
     if (selector === ".product-pricing dt") return this.priceLabel || null;
     if (selector === ".product-pricing dd") return this.priceValue || null;
     if (selector === "[data-order-prefill]") return null;
+    if (selector === "input") {
+      for (const child of this.children) {
+        if (child.type === "number" || child.tagName === "INPUT") return child;
+        const nested = child.querySelector && child.querySelector(selector);
+        if (nested) return nested;
+      }
+    }
     return null;
   }
   querySelectorAll(selector) {
@@ -76,7 +85,7 @@ class Element {
     if (selector === ".product-pricing > div") return this.priceRows || [];
     return [];
   }
-  scrollIntoView() {}
+  scrollIntoView(options) { this.scrollCalls.push(options); }
 }
 
 class CapturingPort {
@@ -105,9 +114,12 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const selectedProductPrice = new Element("selected-product-price"); selectedProductPrice.hidden = true;
   const selectedProductSize = new Element("selected-product-size"); selectedProductSize.hidden = true;
   const catalogueSelection = new Element("catalogue-selection"); catalogueSelection.hidden = true;
+  const catalogueSelectionPreviews = new Element("catalogue-selection-previews");
+  const catalogueSelectionItems = new Element("catalogue-selection-items");
   const catalogueSelectionSummary = new Element("catalogue-selection-summary");
   const catalogueSelectionStatus = new Element("catalogue-selection-status"); catalogueSelectionStatus.hidden = true;
   const catalogueRequestSelected = new Element("catalogue-request-selected"); catalogueRequestSelected.hidden = true;
+  const catalogueCartJump = new Element("catalogue-cart-jump"); catalogueCartJump.hidden = true;
   const customizer = new Element("order-from-customizer");
   const continueWithoutPreview = new Element("customizer-continue-without-preview"); continueWithoutPreview.hidden = true;
   const generalRequest = new Element("general-custom-gift");
@@ -119,7 +131,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, catalogueCartJump, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -339,7 +351,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
+  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueRequestSelected, catalogueCartJump, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
@@ -375,15 +387,15 @@ test("builds one deterministic request for multiple catalogue selections", () =>
   assert.equal(flow.posted.length, 0);
   assert.equal(flow.catalogueSelection.hidden, false);
   assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
-  assert.equal(flow.catalogueButton.textContent, "Remove from request");
-  assert.equal(flow.generatedCatalogueButton.textContent, "Remove from request");
+  assert.equal(flow.catalogueButton.textContent, "Remove from cart");
+  assert.equal(flow.generatedCatalogueButton.textContent, "Remove from cart");
   flow.catalogueRequestSelected.dispatch("click");
   assert.equal(flow.posted.length, 1);
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.sourceKind, "catalogue");
   assert.equal(seed.sourceId, "catalogue:multi-item");
   assert.equal(seed.productName, "2 selected catalogue items");
-  assert.equal(seed.quantity, "1");
+  assert.equal(seed.quantity, "2");
   assert.match(seed.designDetails, /Test frame/);
   assert.match(seed.designDetails, /Source: catalogue:test-frame\.png/);
   assert.match(seed.designDetails, /Your flowers, held close/);
@@ -416,7 +428,7 @@ test("keeps the bundle bounded and explains when another catalogue item cannot b
   assert.match(flow.catalogueSelectionSummary.textContent, /1 item selected: Test frame/);
   assert.equal(flow.catalogueSelectionStatus.hidden, false);
   assert.match(flow.catalogueSelectionStatus.textContent, /selected list is full/);
-  assert.equal(flow.generatedCatalogueButtons[1].textContent, "Add to request");
+  assert.equal(flow.generatedCatalogueButtons[1].textContent, "Add to cart");
   assert.equal(flow.catalogueRequestSelected.disabled, false);
   flow.catalogueRequestSelected.dispatch("click");
   assert.equal(submittedSeed(flow.posted).productName, "1 selected catalogue items");
@@ -570,6 +582,75 @@ test("shows a compact catalogue selection summary before requesting the bundle",
   assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
 });
 
+test("previews selected catalogue items and provides an accessible cart jump", () => {
+  assert.match(page, /id="catalogue-selection-previews"/);
+  assert.match(page, /id="catalogue-cart-jump"/);
+  assert.match(page, /id="catalogue-selection"[^>]+tabindex="-1"/);
+
+  const flow = runFlow();
+  assert.equal(flow.catalogueCartJump.hidden, true);
+
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.catalogueCartJump.hidden, false);
+  assert.equal(flow.catalogueCartJump.textContent, "1 selected · View cart");
+  assert.equal(flow.catalogueSelectionPreviews.children.length, 1);
+  assert.equal(flow.catalogueSelectionPreviews.children[0].getAttribute("src"), "assets/test-frame.png");
+  assert.equal(flow.catalogueSelection.focused, undefined);
+
+  flow.generatedCatalogueButtons[1].dispatch("click");
+  assert.equal(flow.catalogueCartJump.textContent, "2 selected · View cart");
+  assert.equal(flow.catalogueSelectionPreviews.children.length, 2);
+  flow.generatedCatalogueButtons[0].dispatch("click");
+  flow.generatedCatalogueButtons[2].dispatch("click");
+  assert.equal(flow.catalogueCartJump.textContent, "4 selected · View cart");
+  assert.equal(flow.catalogueSelectionPreviews.children.length, 4);
+  assert.equal(flow.catalogueSelectionPreviews.children[3].textContent, "+1");
+  flow.catalogueCartJump.dispatch("click");
+  assert.equal(flow.catalogueSelection.focused, true);
+  assert.equal(flow.catalogueSelection.focusOptions.preventScroll, true);
+  assert.equal(flow.catalogueSelection.scrollCalls.length, 1);
+  flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(Object.prototype.hasOwnProperty.call(submittedSeed(flow.posted), "imageSrc"), false);
+
+  flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButtons[1].dispatch("click");
+  flow.generatedCatalogueButtons[0].dispatch("click");
+  flow.generatedCatalogueButtons[2].dispatch("click");
+  assert.equal(flow.catalogueCartJump.hidden, true);
+  assert.equal(flow.catalogueSelectionPreviews.children.length, 0);
+});
+
+test("cart lists every selected line and submits independent quantities with a bounded total", () => {
+  const flow = runFlow();
+  [flow.catalogueButton, flow.generatedCatalogueButtons[0], flow.generatedCatalogueButtons[1], flow.generatedCatalogueButtons[2]].forEach((button) => button.dispatch("click"));
+  assert.equal(flow.catalogueSelectionItems.children.length, 4);
+  assert.deepEqual(flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "Your flowers, held close", "A little blue hour", "Little messages, shared"]);
+  flow.generatedCatalogueButtons[2].dispatch("click");
+  const quantities = flow.catalogueSelectionItems.children.map((line) => line.querySelector("input"));
+  quantities[0].value = "2"; quantities[0].dispatch("change");
+  quantities[1].value = "5"; quantities[1].dispatch("change");
+  quantities[2].value = "1"; quantities[2].dispatch("change");
+  let currentQuantities = flow.catalogueSelectionItems.children.map((line) => line.querySelector("input"));
+  currentQuantities[0].value = "0"; currentQuantities[0].dispatch("change");
+  assert.equal(currentQuantities[0].value, "2");
+  currentQuantities = flow.catalogueSelectionItems.children.map((line) => line.querySelector("input"));
+  currentQuantities[0].value = "1.5"; currentQuantities[0].dispatch("change");
+  assert.equal(currentQuantities[0].value, "2");
+  currentQuantities = flow.catalogueSelectionItems.children.map((line) => line.querySelector("input"));
+  currentQuantities[0].value = "100"; currentQuantities[0].dispatch("change");
+  assert.equal(currentQuantities[0].value, "2");
+  flow.catalogueRequestSelected.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.quantity, "8");
+  assert.deepEqual(seed.bundleItems.map((item) => [item.productName, item.quantity]), [["Test frame", 2], ["Your flowers, held close", 5], ["A little blue hour", 1]]);
+  assert.match(seed.designDetails, /Test frame.*Quantity: 2/);
+  assert.match(seed.designDetails, /Your flowers, held close.*Quantity: 5/);
+  quantities[0].value = "101";
+  quantities[0].dispatch("change");
+  assert.equal(quantities[0].value, "2");
+  assert.match(flow.catalogueSelectionStatus.textContent, /1 to 100|100/);
+});
+
 test("keeps selected catalogue items while pagination or filters change the visible page", () => {
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
@@ -666,7 +747,7 @@ test("starts two orders for the same catalogue item with new IDs only after conf
 test("adds the catalogue order control to highlighted keepsake cards", () => {
   const flow = runFlow();
   assert.ok(flow.highlightCatalogueButton);
-  assert.equal(flow.highlightCatalogueButton.textContent, "Add to request");
+  assert.equal(flow.highlightCatalogueButton.textContent, "Add to cart");
   const seed = requestCatalogue(flow, flow.highlightCatalogueButton);
   assert.equal(seed.productName, "1 selected catalogue items");
   assert.equal(seed.sourceId, "catalogue:multi-item");
@@ -683,7 +764,7 @@ test("keeps moved studio art cards on the shared catalogue order path", () => {
     ["personalized-floral-hoop.jpg", "A tiny beginning"],
   ];
   expected.forEach(([asset, title], index) => {
-    assert.equal(flow.movedStudioButtons[index].textContent, "Add to request");
+    assert.equal(flow.movedStudioButtons[index].textContent, "Add to cart");
     const seed = requestCatalogue(flow, flow.movedStudioButtons[index]);
     assert.equal(seed.sourceId, "catalogue:multi-item");
     assert.equal(seed.productName, "1 selected catalogue items");
@@ -812,8 +893,8 @@ test("carries known catalogue sizes and preserves no-size selections in order de
 
 test("uses the shared catalogue CTA and preserves generated-design details in a catalogue seed", () => {
   const flow = runFlow();
-  assert.equal(flow.generatedCatalogueButton.textContent, "Add to request");
-  assert.equal(flow.catalogueButton.textContent, "Add to request");
+  assert.equal(flow.generatedCatalogueButton.textContent, "Add to cart");
+  assert.equal(flow.catalogueButton.textContent, "Add to cart");
   const seed = requestCatalogue(flow, flow.generatedCatalogueButton);
   assert.equal(seed.sourceKind, "catalogue");
   assert.equal(seed.sourceId, "catalogue:multi-item");
@@ -850,7 +931,7 @@ test("seeds every corporate catalogue card with identity, unit, concept, and pri
   const flow = runFlow();
   CORPORATE_RESIN_GIFTS.forEach(([asset, title, copy, unit, regular, offer, discount], index) => {
     const button = flow.corporateCatalogueButtons[index];
-    assert.equal(button.textContent, "Add to request");
+    assert.equal(button.textContent, "Add to cart");
     const seed = requestCatalogue(flow, button);
     assert.equal(seed.sourceId, "catalogue:multi-item");
     assert.equal(seed.productName, "1 selected catalogue items");
@@ -867,7 +948,7 @@ test("seeds every new Diwali concept with identity, unit, concept, and pricing d
   const flow = runFlow();
   DIWALI_NEW_CONCEPTS.forEach(([asset, title, copy, unit, regular, festive, discount], index) => {
     const button = flow.diwaliCatalogueButtons[index];
-    assert.equal(button.textContent, "Add to request");
+    assert.equal(button.textContent, "Add to cart");
     const seed = requestCatalogue(flow, button);
     assert.equal(seed.sourceId, "catalogue:multi-item");
     assert.equal(seed.productName, "1 selected catalogue items");
@@ -893,7 +974,7 @@ test("seeds every romantic concept with its disclosure, exact price, and blank d
   ];
   expected.forEach(([asset, title, copy, regular, festive, discount], index) => {
     const button = flow.romanticConceptButtons[index];
-    assert.equal(button.textContent, "Add to request");
+    assert.equal(button.textContent, "Add to cart");
     const seed = requestCatalogue(flow, button);
     assert.equal(seed.sourceId, "catalogue:multi-item");
     assert.equal(seed.productName, "1 selected catalogue items");

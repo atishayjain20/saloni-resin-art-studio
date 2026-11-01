@@ -82,6 +82,72 @@ test("multi-item catalogue requests show bundle copy without a single product im
   assert.match(html, /These catalogue items will be reviewed together in one request/);
 });
 
+test("bundle form renders every selected item and rebuilds authoritative quantities", async () => {
+  const runtime = makeFormRuntime({
+    sourceId: "catalogue:multi-item", productName: "3 selected catalogue items",
+    bundleItems: [
+      { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 2 },
+      { sourceId: "catalogue:two.webp", productName: "Two", price: "399", size: "6 in", quantity: 5 },
+      { sourceId: "catalogue:three.webp", productName: "Three", price: "499", size: "8 in", quantity: 1 },
+      { sourceId: "catalogue:four.webp", productName: "Four", price: "599", size: "10 in", quantity: 1 },
+    ],
+  });
+  const list = runtime.elements.get("bundle-items");
+  assert.equal(list.children.length, 4);
+  assert.deepEqual(list.children.map((line) => line.getAttribute("data-product-name")), ["One", "Two", "Three", "Four"]);
+  const quantities = list.children.map((line) => line.querySelector("input"));
+  quantities[0].value = "2"; quantities[1].value = "5"; quantities[2].value = "1"; quantities[3].value = "0";
+  quantities[3].dispatch("change");
+  assert.equal(quantities[3].value, "1");
+  quantities[3].value = "1";
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
+  assert.equal(runtime.fields.quantity.value, "9");
+  assert.equal(runtime.fields.productName.value, "4 selected catalogue items");
+  assert.match(runtime.fields.designDetails.value, /One.*Quantity: 2/);
+  assert.match(runtime.fields.designDetails.value, /Two.*Quantity: 5/);
+  assert.match(runtime.fields.designDetails.value, /Three.*Quantity: 1/);
+  assert.match(runtime.fields.designDetails.value, /Four.*Quantity: 1/);
+});
+
+test("bundle quantity changes rebuild details without stale quantities before shared notes", () => {
+  const runtime = makeFormRuntime({
+    sourceId: "catalogue:multi-item",
+    bundleItems: [
+      { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 2 },
+      { sourceId: "catalogue:two.webp", productName: "Two", price: "399", size: "6 in", quantity: 1 },
+    ],
+  });
+  const notes = "Please use warm colours";
+  runtime.fields.designDetails.value = [
+    "Item 1: One | Source: catalogue:one.webp | Price: 249 | Size: 4 in | Quantity: 2",
+    "Item 2: Two | Source: catalogue:two.webp | Price: 399 | Size: 6 in | Quantity: 1",
+    "Order notes: " + notes,
+  ].join("\n");
+  runtime.fields.designDetails.dispatch("input");
+
+  const firstQuantity = runtime.elements.get("bundle-items").children[0].querySelector("input");
+  firstQuantity.value = "3";
+  firstQuantity.dispatch("change");
+
+  assert.equal(runtime.fields.designDetails.value, [
+    "Item 1: One | Source: catalogue:one.webp | Price: 249 | Size: 4 in | Quantity: 3",
+    "Item 2: Two | Source: catalogue:two.webp | Price: 399 | Size: 6 in | Quantity: 1",
+    "Order notes: " + notes,
+  ].join("\n"));
+});
+
+test("bundle form keeps shared contact and delivery controls singular and scopes scrolling to selected designs", () => {
+  assert.equal((html.match(/name="customerName"/g) || []).length, 1);
+  assert.equal((html.match(/name="fulfillment"/g) || []).length, 1);
+  assert.equal((html.match(/name="shippingAddress"/g) || []).length, 1);
+  assert.match(html, /id="bundle-items"[^>]*class="bundle-items"/);
+  assert.match(html, /\.bundle-items\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto/s);
+});
+
 test("descriptive catalogue filenames are allowlisted while lookalikes stay hidden", () => {
   const filename = "premium-midnight-blue-tiered-set.jpeg";
   const selected = makeFormRuntime({ sourceId: `catalogue:${filename}` });
@@ -225,6 +291,18 @@ class FakeElement {
   getAttribute(name) { return this.attributes[name] || ""; }
   removeAttribute(name) { delete this.attributes[name]; }
   appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
+  removeChild(child) { this.children = this.children.filter((item) => item !== child); return child; }
+  get firstChild() { return this.children[0] || null; }
+  querySelector(selector) {
+    if (selector === "input") {
+      for (const child of this.children) {
+        if (child.type === "number" || child.tagName === "INPUT") return child;
+        const nested = child.querySelector && child.querySelector(selector);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  }
   focus() { this.focused = true; }
 }
 
@@ -241,8 +319,8 @@ class FakeMessageChannel {
   }
 }
 
-function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
+function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false } = {}) {
+  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "bundle-items", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
@@ -263,7 +341,7 @@ function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote
   };
   form.reset = () => Object.values(fields).forEach((field) => { field.value = ""; field.files = []; });
   Object.values(fields).forEach((field) => { field.parentNode = { appendChild(child) { errors.push(child); } }; });
-  const seed = { requestId: "request-seed", requestStage, channelNonce: "nonce-seed-123456", sourceKind, sourceId, productName, quantity: "1", dimensionFormat: "feet-inches", heightFeet: "3", heightInchesPart: "0", widthFeet: "4", widthInchesPart: "0", designDetails: "Details", customerName: "", phone: "", email: "", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "" };
+  const seed = { requestId: "request-seed", requestStage, channelNonce: "nonce-seed-123456", sourceKind, sourceId, productName, quantity: "1", dimensionFormat: "feet-inches", heightFeet: "3", heightInchesPart: "0", widthFeet: "4", widthInchesPart: "0", designDetails: "Details", bundleItems, customerName: "", phone: "", email: "", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "" };
   if (!omitPreviewExpected) seed.previewExpected = previewExpected;
   elements.get("seed-data").textContent = JSON.stringify(seed);
   const status = elements.get("form-status");

@@ -265,6 +265,21 @@ test("bounds seed values and escapes seed JSON before HTMLService output", () =>
   assert.match(escaped, /\\u003c/);
 });
 
+test("retains only a bounded valid bundle seed for rendering", () => {
+  const items = [
+    { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 2 },
+    { sourceId: "catalogue:two.webp", productName: "Two", price: "399", size: "6 in", quantity: 5 },
+    { sourceId: "catalogue:three.webp", productName: "Three", price: "499", size: "8 in", quantity: 1 },
+    { sourceId: "catalogue:bad", productName: "Zero", quantity: 0 },
+  ];
+  const seed = context.parseSeed_(JSON.stringify({ sourceId: "catalogue:multi-item", bundleItems: items }));
+  assert.equal(seed.bundleItems.length, 3);
+  assert.deepEqual(Array.from(seed.bundleItems.map((item) => item.productName)), ["One", "Two", "Three"]);
+  assert.deepEqual(Array.from(seed.bundleItems.map((item) => item.quantity)), [2, 5, 1]);
+  const overLimit = context.parseSeed_(JSON.stringify({ sourceId: "catalogue:multi-item", bundleItems: [{ sourceId: "catalogue:one", productName: "One", quantity: 101 }] }));
+  assert.deepEqual(Array.from(overLimit.bundleItems), []);
+});
+
 test("round-trips only exact customizer previewExpected booleans through doPost and render", () => {
   for (const [input, expected] of [[true, true], [false, false], [undefined, false], ["true", false], [1, false], [{ value: true }, false]]) {
     const seed = { requestId: "request-preview-roundtrip", sourceKind: "customizer", productName: "Custom resin frame" };
