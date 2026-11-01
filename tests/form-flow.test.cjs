@@ -8,10 +8,19 @@ const html = fs.readFileSync(path.join(__dirname, "..", "apps-script", "Form.htm
 const formSource = html.match(/<script>\n([\s\S]*?)\n<\/script>/)[1]
   .replace(/<\?!= captchaEnabledJson \?>/g, "true")
   .replace(/<\?!= captchaSiteKeyJson \?>/g, JSON.stringify("site-key"));
+const formSourceWithoutCaptchaSiteKey = formSource.replace('var captchaSiteKey = "site-key";', 'var captchaSiteKey = "";');
 
 test("targets the top-level studio page rather than the immediate parent frame", () => {
   assert.match(formSource, /window\.top\.postMessage/);
   assert.doesNotMatch(formSource, /window\.parent\.postMessage/);
+});
+
+test("announces a seeded embedded form even when CAPTCHA has no site key", () => {
+  const runtime = makeFormRuntime({ captchaSiteKey: "" });
+  const ready = runtime.parentMessages.find((entry) => entry.message.type === "saloni-order-form-ready");
+  assert.ok(ready);
+  assert.equal(ready.message.nonce, "nonce-seed-123456");
+  assert.equal(ready.message.siteKey, "");
 });
 
 test("customizer handoff copy does not ask customers to download or reattach a preview", () => {
@@ -341,7 +350,7 @@ class FakeMessageChannel {
   }
 }
 
-function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
+function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
   const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "bundle-items", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
@@ -416,7 +425,7 @@ function makeFormRuntime({ captcha = "ready", timeout = 1, requestStage = "quote
     File: FakeFile, Blob, DataTransfer: supportsDataTransfer ? FakeDataTransfer : undefined, URL: windowObject.URL,
   };
   vm.createContext(context);
-  vm.runInContext(formSource, context, { filename: "Form.html" });
+  vm.runInContext(captchaSiteKey ? formSource : formSourceWithoutCaptchaSiteKey, context, { filename: "Form.html" });
   elements.get("submit-button").dispatch("click");
   return { elements, fields, status, timers, timerDelays, clearedTimers, submissions, callbacks, lookupCallbacks, parentMessages, windowObject, objectUrls, pageListeners };
 }
@@ -731,7 +740,7 @@ test("clears accepted referral status on edits and ignores stale lookup response
   assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /accepted for Studio A/);
 });
 
-test("late success and failure from timed-out attempt cannot control a retry", async () => {
+test("late success completes and late failure restores the original attempt after an advisory timeout", async () => {
   const runtime = makeFormRuntime();
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
@@ -739,22 +748,36 @@ test("late success and failure from timed-out attempt cannot control a retry", a
   respondToken(runtime, 0);
   await Promise.resolve();
   runtime.timers[0]();
+  assert.match(runtime.status.textContent, /taking longer than expected/i);
+  assert.equal(runtime.elements.get("submit-button").disabled, true);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 1);
+  runtime.callbacks[0].success({ ok: true, requestId: "late", receivedAt: "late" });
+  assert.match(runtime.status.textContent, /Request received/);
+  assert.equal(runtime.elements.get("another-button").hidden, false);
+
+  const failed = makeFormRuntime();
+  fillValid(failed.fields);
+  failed.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 1);
+  respondToken(failed, 0);
   await Promise.resolve();
-  runtime.callbacks[0].success({ ok: true, requestId: "old", receivedAt: "old" });
-  assert.match(runtime.status.textContent, /Checking/);
-  runtime.callbacks[1].failure(new Error("network"));
-  assert.match(runtime.status.textContent, /unable to confirm/i);
+  failed.timers[0]();
+  failed.callbacks[0].failure(new Error("network"));
+  assert.match(failed.status.textContent, /unable to confirm/i);
+  assert.equal(failed.elements.get("submit-button").disabled, false);
+  assert.equal(failed.fields.productName.value, "Test frame");
+  assert.equal(failed.fields.customerName.value, "A Customer");
+  assert.equal(failed.fields.phone.value, "8209238541");
 });
 
-test("stalled CAPTCHA is bounded and general server errors remain readable", async () => {
+test("stalled CAPTCHA shows an advisory while general server errors remain readable", async () => {
   const stalled = makeFormRuntime({ captcha: "stalled" });
   fillValid(stalled.fields);
   stalled.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   stalled.timers[0]();
-  assert.match(stalled.status.textContent, /unable to confirm/i);
+  assert.match(stalled.status.textContent, /taking longer than expected/i);
+  assert.equal(stalled.elements.get("submit-button").disabled, true);
 
   const runtime = makeFormRuntime();
   fillValid(runtime.fields);

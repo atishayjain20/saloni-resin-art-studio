@@ -153,32 +153,29 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   });
   const tools = new FakeControl("");
   const searchFilter = new FakeControl("");
-  tools.scrollIntoView = (options) => { tools.scrolledIntoView = options; };
   const typeFilter = new FakeControl("all");
   const priceFilter = new FakeControl("all");
+  const applyButton = new FakeControl("");
   const resetButton = new FakeControl("");
   const emptyReset = new FakeControl("");
   const status = { textContent: "" };
   const empty = { hidden: true };
-  const pagePrevious = new FakeControl("");
-  const pageNext = new FakeControl("");
-  const pageStatus = { textContent: "" };
-  const pagination = { hidden: false };
-  const enhancement = new FakeContainer("catalogue-enhancement");
-  const resultsHeader = new FakeContainer("catalogue-results-header");
+  const searchForm = new FakeControl("");
+  const searchToggle = new FakeControl("");
+  const filterToggle = new FakeControl("");
+  const searchPanel = new FakeControl("");
+  const filterPanel = new FakeControl("");
+  searchPanel.hidden = true;
+  filterPanel.hidden = true;
   const results = new FakeContainer("catalogue-results");
-  resultsHeader.appendChild(results);
+  results.parentNode = tools;
   results.appendChild(status);
-  results.appendChild(pagination);
-  const heading = new FakeControl("");
-  heading.events = [];
-  heading.scrollIntoView = () => heading.events.push("scroll");
-  heading.focus = () => heading.events.push("focus");
+  tools.events = [];
+  tools.scrollIntoView = (options) => { tools.scrolledIntoView = options; tools.events.push("scroll"); };
+  tools.focus = () => tools.events.push("focus");
   const browseFilters = new FakeLink("#catalogue-filters");
   const navBrowseAll = new FakeLink("#catalogue-filters");
   navBrowseAll.hidden = false;
-  const browseAll = new FakeLink("#catalogue-filters");
-  browseAll.hidden = false;
   const diwaliShortcut = new FakeLink("#diwali", "diwali");
   const corporateShortcut = new FakeLink("#corporate-resin-gifts", "corporate");
   const premiumShortcut = new FakeLink("#premium-collection", "premium");
@@ -187,17 +184,17 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
     ["catalogue-search", searchFilter],
     ["catalogue-type-filter", typeFilter],
     ["catalogue-price-filter", priceFilter],
+    ["catalogue-filter-apply", applyButton],
     ["catalogue-filter-reset", resetButton],
     ["catalogue-empty-reset", emptyReset],
     ["catalogue-filter-status", status],
     ["catalogue-filter-empty", empty],
     ["catalogue-results", results],
-    ["catalogue-page-previous", pagePrevious],
-    ["catalogue-page-next", pageNext],
-    ["catalogue-page-status", pageStatus],
-    ["catalogue-pagination", pagination],
-    ["catalogue-filters-title", heading],
-    ["browse-all-gifts", browseAll],
+    ["catalogue-search-form", searchForm],
+    ["catalogue-search-toggle", searchToggle],
+    ["catalogue-filter-toggle", filterToggle],
+    ["catalogue-search-panel", searchPanel],
+    ["catalogue-filter-panel", filterPanel],
   ]);
   cards.forEach((card) => elements.set(card.id, card));
   sections.forEach((section) => elements.set(section.id, section));
@@ -215,7 +212,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
     querySelectorAll(selector) {
       if (selector === ".work-card, .romantic-keepsake-card") return cards;
       if (selector === "[data-browse-filters]") return [browseFilters];
-      if (selector === "[data-browse-all]") return [navBrowseAll, browseAll];
+      if (selector === "[data-browse-all]") return [navBrowseAll];
       if (selector === "[data-category-shortcut]") return includePremium ? [diwaliShortcut, corporateShortcut, premiumShortcut] : [diwaliShortcut, corporateShortcut];
       return [];
     },
@@ -245,13 +242,37 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
     listeners: {},
     addEventListener(type, listener) { this.listeners[type] = listener; },
   };
+  const documentListeners = {};
+  documentObject.addEventListener = (type, listener) => { documentListeners[type] = listener; };
   const context = { document: documentObject, window: windowObject, URL, URLSearchParams };
   vm.createContext(context);
   vm.runInContext(`${catalogueFunction}\ninitCatalogueExperience();`, context, { filename: "script.js" });
-  return { cards, sections, tools, searchFilter, typeFilter, priceFilter, resetButton, emptyReset, status, empty, pagePrevious, pageNext, pageStatus, pagination, results, enhancement, resultsHeader, sectionHeadings, heading, browseFilters, navBrowseAll, browseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, eventLog };
+  return { cards, sections, tools, searchFilter, typeFilter, priceFilter, applyButton, resetButton, emptyReset, status, empty, searchForm, searchToggle, filterToggle, searchPanel, filterPanel, results, sectionHeadings, browseFilters, navBrowseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, documentListeners, eventLog };
 }
 
 function visibleCards(harness) { return harness.cards.filter((card) => !card.hidden); }
+
+test("catalogue browse uses one continuous result view with compact search and filter controls", () => {
+  assert.doesNotMatch(html, /id="catalogue-page-(?:previous|next|status)"/);
+  assert.doesNotMatch(html, /id="catalogue-filters-title"|Find a gift that fits the moment/);
+  assert.match(html, /<div class="catalogue-status-region shell" id="catalogue-filters" aria-label="Gift catalogue results" tabindex="-1">/);
+  assert.doesNotMatch(html, /catalogue-results-header|catalogue-browse-all|See all 89 gifts/);
+  assert.match(html, /id="catalogue-search-toggle"[^>]+aria-controls="catalogue-search-panel"/);
+  assert.match(html, /id="catalogue-filter-toggle"[^>]+aria-controls="catalogue-filter-panel"/);
+  assert.match(html, /id="catalogue-search-panel"/);
+  assert.match(html, /id="catalogue-filter-panel"/);
+  assert.match(html, /<button class="button button-dark" id="catalogue-filter-apply" type="button">Apply filters<\/button>/);
+  assert.match(css, /\.catalogue-control-toggle[^}]*min-height:\s*44px/);
+  assert.match(html, /hero-catalogue-action[^>]*>Explore gifts/);
+  assert.match(html, /class="button button-line hero-catalogue-action"[^>]*>Design a custom frame/);
+});
+
+test("no-JS source keeps every catalogue card in the document", () => {
+  const articleBlocks = Array.from(html.matchAll(/<article\b[\s\S]*?<\/article>/g), (match) => match[0]);
+  assert.ok(articleBlocks.length > 80);
+  assert.ok(articleBlocks.every((article) => !/\shidden(?:=|\s|>)/.test(article)));
+  assert.match(css, /html\.js \.catalogue-grid/);
+});
 
 test("initial state shows four-card previews per section", () => {
   const harness = createHarness();
@@ -261,10 +282,9 @@ test("initial state shows four-card previews per section", () => {
     assert.equal(section.disclosure.hidden, section.cards.length <= 4);
     assert.equal(section.disclosure.getAttribute("aria-expanded"), "false");
   });
-  assert.equal(harness.pagePrevious.disabled, true);
-  assert.equal(harness.pageNext.disabled, true);
-  assert.equal(harness.pagination.hidden, true);
   assert.equal(harness.status.textContent, "");
+  assert.equal(harness.searchPanel.hidden, true);
+  assert.equal(harness.filterPanel.hidden, true);
 });
 
 test("all catalogue section disclosures use View all until expanded", () => {
@@ -281,15 +301,15 @@ test("all catalogue section disclosures use View all until expanded", () => {
   assert.equal(target.disclosure.textContent, "View all");
 });
 
-test("catalogue search is labelled, bounded, and placed before type and budget filters", () => {
-  const fields = html.match(/<div class="catalogue-filter-fields">[\s\S]*?<\/div>/)?.[0] || "";
-  assert.match(fields, /<label[^>]+for="catalogue-search"[\s\S]*<input id="catalogue-search" type="search"[^>]+maxlength="100"/);
-  assert.ok(fields.indexOf("catalogue-search") < fields.indexOf("catalogue-type-filter"));
-  assert.match(css, /\.catalogue-filter-fields input\[type="search"\]/);
-  assert.match(css, /\.catalogue-filter-fields input\[type="search"\][^}]*min-height:\s*3rem/); (() => { assert.match(css, /\.catalogue-filter-fields input\[type="search"\]::\-webkit-search-decoration,\s*\.catalogue-filter-fields input\[type="search"\]::\-webkit-search-cancel-button\s*\{[^}]*width:\s*\.75rem[^}]*height:\s*\.75rem/); assert.match(css, /\.catalogue-filter-fields input\[type="search"\][^}]*min-height:\s*3rem/); assert.match(html, /<label class="catalogue-search-field" for="catalogue-search">Search gifts\s*<input id="catalogue-search" type="search"/); })();
+test("search is labelled, bounded, compactly opened, and placed before filters", () => {
+  assert.match(html, /<form class="catalogue-search-form" id="catalogue-search-form">/);
+  assert.match(html, /<label class="catalogue-search-field" for="catalogue-search">Search gifts\s*<input id="catalogue-search" type="search"[^>]+maxlength="100"/);
+  assert.ok(html.indexOf("catalogue-search-panel") < html.indexOf("catalogue-filter-panel"));
+  assert.match(css, /\.catalogue-search-form input\[type="search"\][^}]*min-height:\s*44px/);
+  assert.match(css, /\.catalogue-control-toggle[^}]*min-height:\s*44px/);
 });
 
-test("catalogue search metadata covers requested item kinds without taxonomy drift", () => {
+test("search metadata covers requested item kinds without taxonomy drift", () => {
   const articleBlocks = Array.from(html.matchAll(/<article\b[\s\S]*?<\/article>/g), (match) => match[0]);
   const kindArticles = articleBlocks.filter((article) => /data-product-kind="[^"]+"/.test(article));
   assert.equal(kindArticles.length, 4);
@@ -307,7 +327,15 @@ test("catalogue search metadata covers requested item kinds without taxonomy dri
   assert.doesNotMatch(roseFestive, /data-product-kind="rose preservation"/);
 });
 
-test("search uses literal title, type, and kind fields while ignoring descriptions", () => {
+test("Explore gifts reveals every matching item in one continuous view", () => {
+  const harness = createHarness({ count: 77 });
+  harness.navBrowseAll.dispatch("click");
+  assert.equal(visibleCards(harness).length, 77);
+  assert.equal(harness.status.textContent, "");
+  assert.ok(harness.sections.every((section) => section.disclosure.hidden));
+});
+
+test("search matches title, type, and kind while ignoring descriptions", () => {
   const harness = createHarness({ count: 12 });
   const beyondPreview = harness.cards[8];
   beyondPreview.title = "Jewel Glow Tealight";
@@ -315,27 +343,30 @@ test("search uses literal title, type, and kind fields while ignoring descriptio
   beyondPreview.description = "bookmark details stay outside search";
   beyondPreview.textContent = `${beyondPreview.title} ${beyondPreview.description}`;
 
+  harness.searchToggle.dispatch("click");
+  assert.equal(harness.searchToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(harness.searchPanel.hidden, false);
+  assert.equal(harness.searchFilter.focused, true);
   harness.searchFilter.value = "  Jewel   Glow ";
   harness.searchFilter.dispatch("input");
   assert.equal(harness.searchFilter.value, "  Jewel   Glow ");
   assert.deepEqual(visibleCards(harness).map((card) => card.id), [beyondPreview.id]);
-  assert.equal(harness.windowObject.history.replacements.length, 1);
-  assert.equal(harness.windowObject.history.pushes.length, 0);
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "Jewel Glow");
+  assert.equal(harness.status.textContent, "");
 
+  harness.searchForm.dispatch("submit");
+  assert.equal(harness.searchToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(harness.searchPanel.hidden, true);
+  harness.searchToggle.dispatch("click");
   harness.searchFilter.value = "bookmark";
   harness.searchFilter.dispatch("input");
   assert.equal(harness.empty.hidden, false);
   assert.equal(visibleCards(harness).length, 0);
 
-  harness.searchFilter.value = "jewel+glow";
-  harness.searchFilter.dispatch("input");
-  assert.equal(visibleCards(harness).length, 0);
-
-  harness.searchFilter.value = "diwali gifts";
-  harness.searchFilter.dispatch("input");
-  assert.ok(visibleCards(harness).length > 0);
-  assert.ok(visibleCards(harness).every((card) => card.section.id === "diwali"));
+  harness.emptyReset.dispatch("click");
+  assert.equal(visibleCards(harness).length, 12);
+  assert.equal(harness.searchFilter.value, "");
+  assert.equal(harness.searchToggle.getAttribute("aria-expanded"), "false");
 });
 
 test("search matches hidden semantic keywords for romantic and festive intent", () => {
@@ -344,7 +375,6 @@ test("search matches hidden semantic keywords for romantic and festive intent", 
   romantic.keywords = "heart rose anniversary boyfriend girlfriend couple";
   const festive = harness.cards[1];
   festive.keywords = "mantra diya tealight rakhi";
-
   ["heart", "rose", "anniversary", "boyfriend", "girlfriend", "couple"].forEach((term) => {
     harness.searchFilter.value = term;
     harness.searchFilter.dispatch("input");
@@ -357,29 +387,13 @@ test("search matches hidden semantic keywords for romantic and festive intent", 
   });
 });
 
-test("catalogue cards declare hidden intent keywords without changing visible copy", () => {
-  const articleBlocks = Array.from(html.matchAll(/<article\b[\s\S]*?<\/article>/g), (match) => match[0]);
-  const assertKeywords = (marker, keywords) => {
-    const article = articleBlocks.find((block) => block.includes(marker)) || "";
-    assert.match(article, /data-search-keywords="[^"]+"/);
-    keywords.forEach((keyword) => assert.match(article, new RegExp(`data-search-keywords="[^"]*\\b${keyword}\\b`)));
-  };
-  assertKeywords("romantic-trinket", ["heart", "boyfriend", "girlfriend", "couple"]);
-  assertKeywords("romantic-calendar-title", ["anniversary", "couple"]);
-  assertKeywords("rose-hexagon", ["rose"]);
-  assertKeywords("blue-mantra-frame", ["mantra"]);
-  assertKeywords('data-product-kind="rakhi"', ["rakhi"]);
-  assertKeywords("diwali-lotus-diya-pair", ["diya"]);
-  assertKeywords("diwali-jewel-glow", ["tealight"]);
-});
-
 test("search normalizes the URL boundary and waits for IME composition", () => {
   const harness = createHarness({ count: 12 });
   harness.searchFilter.value = "x".repeat(101);
   harness.searchFilter.dispatch("input");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q").length, 100);
   assert.equal(harness.windowObject.history.pushes.length, 0);
-  assert.deepEqual(harness.heading.events, []);
+  assert.deepEqual(harness.tools.events, []);
 
   harness.searchFilter.value = "diwali";
   harness.searchFilter.dispatch("input", { isComposing: true });
@@ -388,34 +402,88 @@ test("search normalizes the URL boundary and waits for IME composition", () => {
   assert.ok(visibleCards(harness).length > 0);
 });
 
-test("search restores q-only URLs, preserves q through filters and pages, and follows popstate", () => {
+test("filters stay open while choices are staged and apply together from an explicit control", () => {
+  const harness = createHarness({ count: 77 });
+  harness.filterToggle.dispatch("click");
+  assert.equal(harness.filterToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(harness.filterPanel.hidden, false);
+  assert.equal(harness.typeFilter.focused, true);
+  const beforeCards = visibleCards(harness).map((card) => card.id);
+  harness.typeFilter.value = "corporate";
+  harness.typeFilter.dispatch("change");
+  assert.equal(harness.filterToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(harness.filterPanel.hidden, false);
+  assert.deepEqual(visibleCards(harness).map((card) => card.id), beforeCards);
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), null);
+  harness.priceFilter.value = "499";
+  harness.priceFilter.dispatch("change");
+  assert.equal(harness.filterToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(harness.filterPanel.hidden, false);
+  assert.deepEqual(visibleCards(harness).map((card) => card.id), beforeCards);
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("budget"), null);
+
+  harness.applyButton.dispatch("click");
+  assert.equal(harness.filterToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(harness.filterPanel.hidden, true);
+  assert.equal(harness.filterToggle.focused, true);
+  assert.ok(visibleCards(harness).length > 0);
+  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "corporate"));
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "corporate");
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("budget"), "499");
+});
+
+test("Escape discards staged filters and returns focus to the toggle", () => {
+  const harness = createHarness({ count: 77 });
+  harness.filterToggle.dispatch("click");
+  assert.equal(harness.filterPanel.hidden, false);
+  harness.typeFilter.value = "corporate";
+  harness.priceFilter.value = "999";
+  harness.applyButton.dispatch("click");
+
+  harness.filterToggle.dispatch("click");
+  harness.typeFilter.value = "diwali";
+  harness.typeFilter.dispatch("change");
+  harness.priceFilter.value = "499";
+  harness.priceFilter.dispatch("change");
+  harness.documentListeners.keydown({ key: "Escape" });
+  assert.equal(harness.filterPanel.hidden, true);
+  assert.equal(harness.filterToggle.focused, true);
+  assert.equal(harness.typeFilter.value, "corporate");
+  assert.equal(harness.priceFilter.value, "999");
+
+  harness.filterToggle.dispatch("click");
+  harness.applyButton.dispatch("click");
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "corporate");
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("budget"), "999");
+  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "corporate"));
+});
+
+test("URL state preserves query, filters, unrelated parameters, and back/forward restoration", () => {
   const harness = createHarness({ url: "https://example.test/?q=%20product%20%20&ref=keep#catalogue-filters" });
   assert.equal(harness.searchFilter.value, "product");
-  assert.equal(harness.pagination.hidden, false);
+  assert.equal(visibleCards(harness).length, 77);
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "product");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("ref"), "keep");
   assert.equal(harness.windowObject.history.replacements.length, 1);
 
-  harness.pageNext.dispatch("click");
-  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "product");
   harness.typeFilter.value = "corporate";
   harness.typeFilter.dispatch("change");
+  harness.applyButton.dispatch("click");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "product");
-  harness.priceFilter.value = "999";
-  harness.priceFilter.dispatch("change");
-  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "product");
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "corporate");
+  assert.equal(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "corporate"), true);
 
   harness.windowObject.history.replaceState({}, "", "https://example.test/#catalogue-filters");
   harness.windowObject.listeners.popstate();
   assert.equal(harness.searchFilter.value, "");
-  assert.equal(harness.pagination.hidden, true);
+  assert.equal(visibleCards(harness).length, 19);
   harness.windowObject.history.replaceState({}, "", "https://example.test/?q=product#catalogue-filters");
   harness.windowObject.listeners.popstate();
   assert.equal(harness.searchFilter.value, "product");
-  assert.equal(harness.pagination.hidden, false);
+  assert.equal(visibleCards(harness).length, 77);
 });
 
-test("search clear, category navigation, previews, and no-result reset clear q by their existing rules", () => {
+test("search clear, category navigation, previews, and no-result reset clear q", () => {
   const harness = createHarness({ count: 12 });
   harness.searchFilter.value = "product";
   harness.searchFilter.dispatch("input");
@@ -423,6 +491,7 @@ test("search clear, category navigation, previews, and no-result reset clear q b
   harness.typeFilter.dispatch("change");
   harness.priceFilter.value = "999";
   harness.priceFilter.dispatch("change");
+  harness.applyButton.dispatch("click");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "product");
 
   harness.searchFilter.value = "";
@@ -430,74 +499,19 @@ test("search clear, category navigation, previews, and no-result reset clear q b
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), null);
   assert.equal(harness.typeFilter.value, "diwali");
   assert.equal(harness.priceFilter.value, "999");
-  assert.equal(harness.pagination.hidden, true);
-  assert.equal(harness.results.parentNode, harness.resultsHeader);
   assert.equal(visibleCards(harness).length, 3);
-  assert.equal(harness.windowObject.history.pushes.length, 2);
+  assert.equal(harness.results.parentNode, harness.tools);
 
   harness.corporateShortcut.dispatch("click");
-  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), null);
   harness.resetButton.dispatch("click");
   assert.equal(harness.searchFilter.value, "");
-  assert.equal(harness.pagination.hidden, true);
+  assert.equal(visibleCards(harness).length, 4);
 
   harness.searchFilter.value = "does-not-exist";
   harness.searchFilter.dispatch("input");
   harness.emptyReset.dispatch("click");
   assert.equal(harness.searchFilter.value, "");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), null);
-});
-
-test("cleared search keeps selected filters when Back returns from category navigation", () => {
-  const harness = createHarness({ count: 12 });
-  harness.searchFilter.value = "product";
-  harness.searchFilter.dispatch("input");
-  harness.typeFilter.value = "diwali";
-  harness.typeFilter.dispatch("change");
-  harness.priceFilter.value = "999";
-  harness.priceFilter.dispatch("change");
-
-  harness.searchFilter.value = "";
-  harness.searchFilter.dispatch("input");
-  const previewUrl = harness.windowObject.location.href;
-  assert.equal(new URL(previewUrl).searchParams.get("view"), "preview");
-  assert.equal(new URL(previewUrl).searchParams.get("type"), "diwali");
-  assert.equal(new URL(previewUrl).searchParams.get("budget"), "999");
-
-  harness.corporateShortcut.dispatch("click");
-  assert.equal(harness.typeFilter.value, "corporate");
-  harness.windowObject.history.replaceState({}, "", previewUrl);
-  harness.windowObject.listeners.popstate();
-  assert.equal(harness.typeFilter.value, "diwali");
-  assert.equal(harness.priceFilter.value, "999");
-  assert.equal(harness.pagination.hidden, true);
-});
-
-test("See all gifts stays hidden in full mode and returns for section previews", () => {
-  const harness = createHarness();
-  assert.equal(harness.browseAll.hidden, false);
-  assert.equal(harness.navBrowseAll.hidden, false);
-  harness.browseAll.dispatch("click");
-  assert.equal(harness.browseAll.hidden, true);
-  assert.equal(harness.navBrowseAll.hidden, false);
-
-  harness.typeFilter.value = "corporate";
-  harness.typeFilter.dispatch("change");
-  harness.pageNext.dispatch("click");
-  assert.equal(harness.browseAll.hidden, true);
-  assert.equal(harness.navBrowseAll.hidden, false);
-
-  harness.resetButton.dispatch("click");
-  assert.equal(harness.browseAll.hidden, false);
-  harness.corporateShortcut.dispatch("click");
-  assert.equal(harness.browseAll.hidden, true);
-
-  harness.windowObject.history.replaceState({}, "", "https://example.test/#catalogue-filters");
-  harness.windowObject.listeners.popstate();
-  assert.equal(harness.browseAll.hidden, false);
-  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=all&budget=all&page=1#catalogue-filters");
-  harness.windowObject.listeners.popstate();
-  assert.equal(harness.browseAll.hidden, true);
 });
 
 test("each section disclosure expands only its own cards and collapses on reset", () => {
@@ -511,262 +525,92 @@ test("each section disclosure expands only its own cards and collapses on reset"
   });
   target.disclosure.dispatch("click");
   assert.equal(target.disclosure.getAttribute("aria-expanded"), "false");
-  assert.equal(target.cards.filter((card) => !card.hidden).length, 4);
-  harness.browseAll.dispatch("click");
+  harness.navBrowseAll.dispatch("click");
   assert.ok(harness.sections.every((section) => section.disclosure.hidden));
   harness.resetButton.dispatch("click");
   assert.equal(target.disclosure.getAttribute("aria-expanded"), "false");
-  assert.equal(target.cards.filter((card) => !card.hidden).length, 4);
 });
 
-test("collapsing a section keeps its bottom disclosure reachable", () => {
-  const harness = createHarness();
-  const target = harness.sections[0];
-  target.disclosure.dispatch("click");
-  assert.equal(target.disclosure.scrolledIntoView, undefined);
-  target.disclosure.dispatch("click");
-  assert.equal(target.disclosure.scrolledIntoView.behavior, "instant");
-  assert.equal(target.disclosure.scrolledIntoView.block, "nearest");
-});
-
-test("explicit full catalogue pages contain at most eight and traverse every item once", () => {
-  const harness = createHarness();
-  harness.browseAll.dispatch("click");
-  assert.equal(harness.pagination.hidden, false);
-  const seen = [];
-  while (true) {
-    const current = visibleCards(harness).map((card) => card.id);
-    assert.ok(current.length <= 8);
-    seen.push(...current);
-    if (harness.pageNext.disabled) break;
-    harness.pageNext.dispatch("click");
-  }
-  assert.equal(seen.length, 77);
-  assert.equal(new Set(seen).size, 77);
-  assert.equal(visibleCards(harness).length, 5);
-  assert.match(harness.status.textContent, /Showing 73–77 of 77 gifts · Page 10 of 10\./);
-});
-
-test("full catalogue pages preserve flat DOM order across section boundaries", () => {
-  const harness = createHarness({ count: 89, includePremium: true, realCatalogue: true });
-  harness.browseAll.dispatch("click");
-  const seen = [];
-  const pageCounts = [];
-  const pageSections = [];
-  while (true) {
-    const visible = harness.cards.filter((card) => !card.hidden);
-    seen.push(...visible.map((card) => card.id));
-    pageCounts.push(visible.length);
-    pageSections.push(new Set(visible.map((card) => card.section.id)));
-    if (harness.pageNext.disabled) break;
-    harness.pageNext.dispatch("click");
-  }
-  assert.deepEqual(pageCounts, [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 1]);
-  assert.equal(pageSections.length, 12);
-  assert.deepEqual(seen, Array.from({ length: 89 }, (_, index) => `product-${index + 1}`));
-  assert.equal(pageSections[2].size, 2, "a page may cross from Diwali into couple gifts");
-  assert.equal(pageSections[2].has("diwali"), true);
-  assert.equal(pageSections[2].has("romantic-keepsakes"), true);
-  assert.match(harness.status.textContent, /Showing 89–89 of 89 gifts · Page 12 of 12\./);
-});
-
-test("filters use AND logic and reset pagination to page one", () => {
-  const harness = createHarness();
-  harness.browseAll.dispatch("click");
-  harness.pageNext.dispatch("click");
-  assert.match(harness.status.textContent, /Page 2/);
+test("filters use AND logic without pagination", () => {
+  const harness = createHarness({ count: 77 });
+  harness.navBrowseAll.dispatch("click");
   harness.typeFilter.value = "corporate";
   harness.priceFilter.value = "999";
   harness.typeFilter.dispatch("change");
-  assert.equal(harness.pagePrevious.disabled, true);
-  assert.match(harness.status.textContent, /Page 1/);
-  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "corporate"));
   harness.priceFilter.dispatch("change");
-  assert.equal(harness.pagePrevious.disabled, true);
-  assert.match(harness.status.textContent, /Page 1/);
+  harness.applyButton.dispatch("click");
+  assert.ok(visibleCards(harness).length > 0);
+  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "corporate"));
+  assert.equal(harness.status.textContent, "");
 });
 
 test("hero browse link jumps to the first visible product grid without changing catalogue state", () => {
   const harness = createHarness();
   harness.browseFilters.dispatch("click");
   assert.equal(harness.sections[0].grid.scrolledIntoView.behavior, "auto");
-  assert.equal(harness.sections[0].grid.scrolledIntoView.block, "start");
   const before = visibleCards(harness).map((card) => card.id);
-
   harness.corporateShortcut.dispatch("click");
   harness.sections.forEach((section) => { section.grid.scrolledIntoView = undefined; });
   const filtered = visibleCards(harness).map((card) => card.id);
   harness.browseFilters.dispatch("click");
   assert.deepEqual(visibleCards(harness).map((card) => card.id), filtered);
   assert.equal(harness.sections[2].grid.scrolledIntoView.behavior, "auto");
-  assert.equal(harness.sections[2].grid.scrolledIntoView.block, "start");
   assert.notDeepEqual(filtered, before);
-
   harness.typeFilter.value = "not-a-real-type";
   harness.typeFilter.dispatch("change");
+  harness.applyButton.dispatch("click");
   harness.browseFilters.dispatch("click");
   assert.equal(harness.tools.scrolledIntoView.behavior, "auto");
-  assert.equal(harness.tools.scrolledIntoView.block, "start");
 });
 
-test("paging replaces cards and returns focus to the first visible section heading", () => {
+test("full catalogue keeps results beside the accessible status region and focuses it", () => {
   const harness = createHarness();
-  harness.browseAll.dispatch("click");
-  const firstPage = visibleCards(harness).map((card) => card.id);
-  harness.pageNext.dispatch("click");
-  assert.notDeepEqual(visibleCards(harness).map((card) => card.id), firstPage);
-  assert.deepEqual(harness.sectionHeadings[0].events, []);
-  assert.deepEqual(harness.heading.events, ["scroll", "focus", "scroll", "focus"]);
-});
-
-test("full catalogue keeps results beside the global heading and focuses it", () => {
-  const harness = createHarness();
-  harness.browseAll.dispatch("click");
-  assert.equal(harness.results.parentNode, harness.resultsHeader);
+  harness.navBrowseAll.dispatch("click");
+  assert.equal(harness.results.parentNode, harness.tools);
   assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
   assert.deepEqual(harness.sectionHeadings[0].events, []);
-  assert.deepEqual(harness.heading.events, ["scroll", "focus"]);
-  assert.equal(harness.heading.textContent, "All gifts");
-  for (let index = 0; index < 4; index += 1) harness.pageNext.dispatch("click");
-  assert.equal(harness.results.parentNode, harness.resultsHeader);
-  assert.deepEqual(harness.sectionHeadings[0].events, []);
-  assert.deepEqual(harness.sectionHeadings[1].events, []);
-  assert.deepEqual(harness.heading.events, ["scroll", "focus", "scroll", "focus", "scroll", "focus", "scroll", "focus", "scroll", "focus"]);
-  assert.deepEqual(harness.sectionHeadings[2].events, []);
-  assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
+  assert.deepEqual(harness.tools.events, ["scroll", "focus"]);
+  assert.equal(harness.status.textContent, "");
+  assert.equal(visibleCards(harness).length, 77);
 });
 
-test("full browse keeps the global title in sync with type and budget filters", () => {
+test("full browse keeps the accessible status quiet for matching results", () => {
   const harness = createHarness({ count: 89, includePremium: true, realCatalogue: true });
-  harness.browseAll.dispatch("click");
-  assert.equal(harness.heading.textContent, "All gifts");
-  assert.match(harness.status.textContent, /Showing 1–8 of 89 gifts/);
-  harness.priceFilter.value = "2000";
-  harness.priceFilter.dispatch("change");
-  assert.equal(harness.heading.textContent, "All gifts");
-  harness.priceFilter.value = "all";
-  harness.priceFilter.dispatch("change");
+  harness.navBrowseAll.dispatch("click");
+  assert.equal(harness.status.textContent, "");
   harness.typeFilter.value = "premium";
   harness.typeFilter.dispatch("change");
-  assert.equal(harness.heading.textContent, "Premium designs");
-  assert.match(harness.status.textContent, /of 14 gifts/);
+  assert.equal(harness.status.textContent, "");
   harness.priceFilter.value = "2000";
   harness.priceFilter.dispatch("change");
-  assert.equal(harness.heading.textContent, "Premium designs");
-  assert.match(harness.status.textContent, /of 6 gifts/);
-});
-
-test("preview, full, and no-result states keep the results block in the results header", () => {
-  const harness = createHarness();
-  assert.equal(harness.results.parentNode, harness.resultsHeader);
-  harness.browseAll.dispatch("click");
-  assert.equal(harness.results.parentNode, harness.resultsHeader);
-  harness.resetButton.dispatch("click");
-  assert.equal(harness.results.parentNode, harness.resultsHeader);
-  harness.typeFilter.value = "not-a-real-type";
-  harness.typeFilter.dispatch("change");
-  assert.equal(harness.results.parentNode, harness.resultsHeader);
-});
-
-test("back to featured picks hides pagination again", () => {
-  const harness = createHarness();
-  harness.browseAll.dispatch("click");
-  assert.equal(harness.pagination.hidden, false);
-  harness.resetButton.dispatch("click");
-  assert.equal(harness.pagination.hidden, true);
+  harness.applyButton.dispatch("click");
   assert.equal(harness.status.textContent, "");
 });
 
-test("empty results recover to unfiltered page one", () => {
+test("empty results recover to all gifts", () => {
   const harness = createHarness();
   harness.typeFilter.value = "not-a-real-type";
   harness.typeFilter.dispatch("change");
+  harness.applyButton.dispatch("click");
   assert.equal(harness.empty.hidden, false);
+  assert.equal(harness.status.textContent, "No gifts match those choices.");
   assert.equal(visibleCards(harness).length, 0);
   harness.emptyReset.dispatch("click");
   assert.equal(harness.empty.hidden, true);
   assert.equal(harness.typeFilter.value, "all");
-  assert.equal(visibleCards(harness).length, 8);
-  assert.match(harness.status.textContent, /Page 1 of 10/);
+  assert.equal(visibleCards(harness).length, 77);
+  assert.equal(harness.status.textContent, "");
 });
 
-test("Corporate shortcut selects corporate page one", () => {
-  const harness = createHarness();
+test("Corporate and premium shortcuts select continuous category results", () => {
+  const harness = createHarness({ count: 91, includePremium: true });
   harness.corporateShortcut.dispatch("click");
   assert.equal(harness.typeFilter.value, "corporate");
-  assert.equal(harness.pagePrevious.disabled, true);
   assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "corporate"));
-});
-
-test("category shortcuts replace a conflicting explicit filter state", () => {
-  const harness = createHarness({ url: "https://example.test/?type=couple&budget=999&page=2&ref=keep#romantic-keepsakes" });
-  harness.diwaliShortcut.dispatch("click");
-  assert.equal(harness.typeFilter.value, "diwali");
-  assert.equal(harness.priceFilter.value, "all");
-  assert.equal(harness.windowObject.location.hash, "#diwali");
-  assert.match(harness.windowObject.location.search, /(?:^|&)type=diwali(?:&|$)/);
-  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "diwali"));
-});
-
-test("hero browse-by-filter CTA preserves the current catalogue state", () => {
-  const harness = createHarness();
-  harness.browseAll.dispatch("click");
-  harness.typeFilter.value = "corporate";
-  harness.typeFilter.dispatch("change");
-  harness.pageNext.dispatch("click");
-  const before = visibleCards(harness).map((card) => card.id);
-  const state = [harness.typeFilter.value, harness.priceFilter.value, harness.pageStatus.textContent, harness.status.textContent];
-  harness.browseFilters.dispatch("click");
-  assert.deepEqual(visibleCards(harness).map((card) => card.id), before);
-  assert.deepEqual([harness.typeFilter.value, harness.priceFilter.value, harness.pageStatus.textContent, harness.status.textContent], state);
-});
-
-test("product and section hashes select bounded page one or the product page", () => {
-  const initial = createHarness({ hash: "#product-25" });
-  assert.equal(initial.cards[24].hidden, false);
-  assert.match(initial.status.textContent, /Page 4/);
-  assert.ok(visibleCards(initial).length <= 8);
-
-  const sectionBoundaryProduct = createHarness({ hash: "#product-39" });
-  assert.equal(sectionBoundaryProduct.cards[38].hidden, false);
-  assert.match(sectionBoundaryProduct.status.textContent, /Page 5 of 10/);
-  assert.ok(visibleCards(sectionBoundaryProduct).some((card) => card.id === "product-39"));
-
-  const later = createHarness();
-  later.windowObject.location.hash = "#corporate-resin-gifts";
-  later.windowObject.listeners.hashchange();
-  assert.equal(later.typeFilter.value, "corporate");
-  assert.equal(later.pagePrevious.disabled, true);
-  assert.ok(visibleCards(later).every((card) => card.getAttribute("data-product-type") === "corporate"));
-});
-
-test("premium collection starts with four photos and expands only itself", () => {
-  const harness = createHarness({ count: 91, includePremium: true });
-  const premium = harness.sections.find((section) => section.id === "premium-collection");
-  assert.equal(premium.cards.length, 14);
-  assert.equal(premium.cards.filter((card) => !card.hidden).length, 4);
-  assert.equal(premium.disclosure.hidden, false);
-  assert.equal(premium.disclosure.textContent, "View all");
-  assert.equal(premium.disclosure.getAttribute("aria-expanded"), "false");
-  premium.disclosure.dispatch("click");
-  assert.equal(premium.cards.filter((card) => !card.hidden).length, 14);
-  assert.equal(premium.disclosure.textContent, "Show less");
-  harness.sections.filter((section) => section !== premium).forEach((section) => {
-    assert.equal(section.cards.filter((card) => !card.hidden).length, Math.min(4, section.cards.length));
-  });
-});
-
-test("premium filter includes priced and on-request photos, while budget excludes on-request", () => {
-  const harness = createHarness({ count: 91, includePremium: true });
-  harness.premiumShortcut.dispatch("click");
+  harness.windowObject.history.replaceState({}, "", "https://example.test/#premium-collection");
+  harness.windowObject.listeners.hashchange();
   assert.equal(harness.typeFilter.value, "premium");
-  assert.match(harness.status.textContent, /Showing 1–8 of 14 gifts/);
   assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "premium"));
-  harness.priceFilter.value = "2000";
-  harness.priceFilter.dispatch("change");
-  assert.match(harness.status.textContent, /of 6 gifts/);
-  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "premium"));
-  assert.ok(visibleCards(harness).every((card) => card.querySelector(".product-pricing dd").textContent !== "Price on request"));
 });
 
 test("budget filters overlap at ₹2,000 and keep higher-priced gifts in the upper range", () => {
@@ -774,84 +618,50 @@ test("budget filters overlap at ₹2,000 and keep higher-priced gifts in the upp
   harness.cards[0].price = "₹2,000";
   harness.cards[1].price = "₹2,001";
   harness.cards[2].price = "₹1,999";
-  harness.browseAll.dispatch("click");
+  harness.navBrowseAll.dispatch("click");
 
   harness.priceFilter.value = "1999";
   harness.priceFilter.dispatch("change");
+  harness.applyButton.dispatch("click");
   assert.ok(visibleCards(harness).some((card) => card.id === "product-1"));
   assert.ok(visibleCards(harness).some((card) => card.id === "product-3"));
   assert.ok(visibleCards(harness).every((card) => card.id !== "product-2"));
 
   harness.priceFilter.value = "2000";
   harness.priceFilter.dispatch("change");
+  harness.applyButton.dispatch("click");
   assert.ok(visibleCards(harness).some((card) => card.id === "product-1"));
   assert.ok(visibleCards(harness).some((card) => card.id === "product-2"));
   assert.ok(visibleCards(harness).every((card) => card.id !== "product-3"));
 });
 
-test("premium section hash selects the premium category", () => {
-  const harness = createHarness({ count: 91, includePremium: true });
-  harness.windowObject.location.hash = "#premium-collection";
-  harness.windowObject.listeners.hashchange();
-  assert.equal(harness.typeFilter.value, "premium");
-  assert.equal(harness.windowObject.location.hash, "#premium-collection");
-  assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "premium"));
-});
-
-test("explicit URL state restores filters, clamps pages, preserves unrelated params, and pushes once per page action", () => {
-  const harness = createHarness({ url: "https://example.test/?type=corporate&budget=999&page=999&ref=partner-7&unknown=keep#corporate-resin-gifts" });
-  assert.equal(harness.typeFilter.value, "corporate");
-  assert.equal(harness.priceFilter.value, "999");
-  assert.match(harness.pageStatus.textContent, /Page 2 of 2/);
-  assert.equal(harness.windowObject.history.pushes.length, 0);
-  harness.pagePrevious.dispatch("click");
-  assert.equal(harness.windowObject.history.pushes.length, 1);
-  assert.match(harness.windowObject.location.search, /(?:^|&)type=corporate(?:&|$)/);
-  assert.match(harness.windowObject.location.search, /(?:^|&)budget=999(?:&|$)/);
-  assert.match(harness.windowObject.location.search, /(?:\?|&)page=1(?:&|$)/);
-  assert.match(harness.windowObject.location.search, /(?:\?|&)ref=partner-7(?:&|$)/);
-  assert.match(harness.windowObject.location.search, /(?:^|&)unknown=keep(?:&|$)/);
-  assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
-});
-
-test("invalid URL state falls back to a safe full catalogue tuple without discarding unknown params", () => {
+test("invalid URL state falls back to a safe full tuple while preserving unrelated params", () => {
   const harness = createHarness({ url: "https://example.test/?type=wat&budget=1.5&page=Infinity&ref=keep&x=1#catalogue-filters" });
   assert.equal(harness.typeFilter.value, "all");
   assert.equal(harness.priceFilter.value, "all");
-  assert.match(harness.pageStatus.textContent, /Page 1 of 10/);
+  assert.equal(visibleCards(harness).length, 77);
   assert.equal(harness.windowObject.history.pushes.length, 0);
   assert.equal(harness.windowObject.history.replacements.length, 1);
   assert.match(harness.windowObject.location.search, /(?:^|&)type=all(?:&|$)/);
   assert.match(harness.windowObject.location.search, /(?:^|&)budget=all(?:&|$)/);
-  assert.match(harness.windowObject.location.search, /(?:^|&)page=1(?:&|$)/);
+  assert.doesNotMatch(harness.windowObject.location.search, /(?:^|&)page=/);
   assert.match(harness.windowObject.location.search, /(?:\?|&)ref=keep(?:&|$)/);
   assert.match(harness.windowObject.location.search, /(?:\?|&)x=1(?:&|$)/);
 });
 
-test("explicit catalogue filter hash remains a filter anchor on full URL restore", () => {
-  const harness = createHarness({ url: "https://example.test/?type=all&budget=all&page=1#catalogue-filters" });
-  assert.deepEqual(harness.sectionHeadings[0].events, []);
-  assert.deepEqual(harness.heading.events, ["scroll", "focus"]);
-  assert.equal(harness.results.parentNode, harness.resultsHeader);
-});
-
-test("reset removes only catalogue URL keys, writes a neutral hash, and popstate restores without pushing", () => {
+test("reset removes catalogue query keys, collapses controls, and popstate restores without pushing", () => {
   const harness = createHarness({ url: "https://example.test/?type=corporate&budget=999&page=2&ref=keep&x=1#corporate-resin-gifts" });
+  harness.filterToggle.dispatch("click");
   harness.resetButton.dispatch("click");
   assert.equal(harness.windowObject.history.pushes.length, 1);
-  assert.doesNotMatch(harness.windowObject.location.search, /(?:^|&)(?:type|budget|page)=/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)view=preview(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)type=all(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)budget=all(?:&|$)/);
+  assert.doesNotMatch(harness.windowObject.location.search, /(?:^|&)page=/);
   assert.match(harness.windowObject.location.search, /(?:\?|&)ref=keep(?:&|$)/);
-  assert.match(harness.windowObject.location.search, /(?:\?|&)x=1(?:&|$)/);
-  assert.equal(harness.windowObject.location.hash, "#catalogue-filters");
-  assert.equal(harness.typeFilter.value, "all");
-  assert.equal(harness.pagination.hidden, true);
+  assert.equal(harness.filterPanel.hidden, true);
   const previousPushes = harness.windowObject.history.pushes.length;
   harness.windowObject.listeners.popstate();
   assert.equal(harness.typeFilter.value, "all");
-  assert.equal(harness.pagination.hidden, true);
-  assert.equal(harness.windowObject.history.pushes.length, previousPushes);
-  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=diwali&budget=all&page=1&ref=keep#diwali");
-  harness.windowObject.listeners.popstate();
-  assert.equal(harness.typeFilter.value, "diwali");
   assert.equal(harness.windowObject.history.pushes.length, previousPushes);
 });

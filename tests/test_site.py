@@ -127,8 +127,8 @@ class StaticSiteContractTests(unittest.TestCase):
             with self.subTest(section_id=section_id):
                 self.assertRegex(self.html, rf'id=["\']{section_id}["\']')
         self.assertIn('href="#main-content"', self.html)
-        self.assertIn('aria-label="Previous', self.html)
-        self.assertIn('aria-label="Next', self.html)
+        self.assertNotIn('id="lightbox-previous"', self.html)
+        self.assertNotIn('id="lightbox-next"', self.html)
         self.assertIn('class="site-script"', self.html)
 
     def test_catalogue_offers_are_concrete_and_preserve_verified_values(self):
@@ -241,7 +241,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
         self.assertRegex(self.html, r'<a href="#diwali" data-category-shortcut="diwali">Diwali')
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
-        self.assertIn("Diwali prices ₹249–₹1,799", section_html)
+        self.assertNotIn("Diwali prices ₹249–₹1,799", section_html)
         self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
         self.assertIn('id="diwali-grid"', section_html)
         self.assertIn('class="catalogue-grid"', section_html)
@@ -349,7 +349,7 @@ class StaticSiteContractTests(unittest.TestCase):
         section = re.search(r'<section\b[^>]*id=["\']diwali["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
-        self.assertIn("A preview of 23 festive designs for your home and your people.", section_html)
+        self.assertNotIn("A preview of 23 festive designs for your home and your people. Diwali prices ₹249–₹1,799.", section_html)
         self.assertNotIn("Crossed-out regular prices", section_html)
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 23)
@@ -380,7 +380,7 @@ class StaticSiteContractTests(unittest.TestCase):
         section = re.search(r'<section\b[^>]*id=["\']corporate-resin-gifts["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
-        self.assertIn("19 branded keepsakes", section_html)
+        self.assertNotIn("A preview of 19 branded keepsakes and gift sets for welcome kits, desks, milestones and festive thank-yous.", section_html)
         self.assertNotIn("Crossed-out regular prices", section_html)
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', section_html)
         self.assertEqual(len(cards), 19)
@@ -608,7 +608,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 customer_markup = re.sub(r'\s(?:src|href)=["\'][^"\']*["\']', "", page, flags=re.IGNORECASE)
                 customer_markup = re.sub(r'\scontent=["\'][^"\']*(?:/assets/|\.(?:webp|jpe?g|png|svg))[^"\']*["\']', "", customer_markup, flags=re.IGNORECASE)
                 self.assertNotRegex(customer_markup, re.compile(r"\bconcept\b", re.IGNORECASE))
-        self.assertIn("A preview of 13 keepsake ideas", self.html)
+        self.assertNotIn("A preview of 13 keepsake ideas for the two of you.", self.html)
         self.assertIn("Corporate gifting", self.html)
         corporate = re.search(r'<section\b[^>]*id=["\']corporate-resin-gifts["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(corporate)
@@ -703,13 +703,10 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("Online orders only", self.html)
         self.assertNotIn("no customer visits", self.html)
 
-    def test_hero_copy_names_searchable_offerings(self):
-        hero = re.search(r'<p\b[^>]*class=["\']hero-intro["\'][\s\S]*?</p>', self.html)
-        self.assertIsNotNone(hero)
-        hero_copy = hero.group(0).lower()
-        for phrase in ("custom resin frames", "resin art", "personalized gifts"):
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, hero_copy)
+    def test_hero_copy_keeps_the_heading_without_the_removed_intro(self):
+        self.assertIn('<h1 id="hero-title">Made for the moment they’ll <em>remember.</em></h1>', self.html)
+        self.assertNotIn('class="hero-intro"', self.html)
+        self.assertNotIn("Thoughtful custom resin frames, resin art, and personalized gifts from Ajmer, Rajasthan", self.html)
 
     def test_romantic_keepsake_highlight_contract(self):
         section = re.search(r'<section\b[^>]*id=["\']romantic-keepsakes["\'][\s\S]*?</section>', self.html)
@@ -810,8 +807,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(hero_actions)
         action_links = re.findall(r'<a\b[\s\S]*?</a>', hero_actions.group(1))
         self.assertEqual(len(action_links), 2)
-        self.assertRegex(hero_actions.group(1), r'<a class="button button-dark" href="#catalogue-filters" data-browse-all>Explore gifts <span aria-hidden="true">↘</span></a>')
-        self.assertRegex(hero_actions.group(1), r'<a class="hero-secondary-action" href="#customizer" data-customizer-open>Design a custom frame</a>')
+        self.assertRegex(hero_actions.group(1), r'<a class="button button-dark hero-catalogue-action" href="#catalogue-filters" data-browse-all>Explore gifts</a>')
+        self.assertRegex(hero_actions.group(1), r'<a class="button button-line hero-catalogue-action" href="#customizer" data-customizer-open>Design a custom frame</a>')
         self.assertNotIn('Browse gifts by type or budget', hero_html)
         self.assertNotIn('Request a custom gift', hero_html)
         self.assertNotIn('data-browse-filters', hero_html)
@@ -849,7 +846,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('aria-controls="romantic-keepsakes-grid"', section_html)
         self.assertIn('data-catalogue-disclosure', section_html)
         self.assertIn('aria-expanded="false"', section_html)
-        self.assertIn("A preview of 13 keepsake ideas", section_html)
+        self.assertNotIn("A preview of 13 keepsake ideas for the two of you.", section_html)
         self.assertNotIn("Concept previews are illustrative.", section_html)
         self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
@@ -1126,7 +1123,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(section)
         section_html = section.group(0)
         self.assertIn("Resin keepsakes from the studio", section_html)
-        self.assertIn("A preview of 20 studio pieces", section_html)
+        self.assertNotIn("A preview of 20 studio pieces, with more to explore below.", section_html)
         grid = re.search(r'<div\b[^>]*class=["\'][^"\']*catalogue-grid[^"\']*["\'][^>]*>', section_html)
         self.assertIsNotNone(grid)
         self.assertIn('id="studio-art-grid"', grid.group(0))
@@ -1373,7 +1370,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(section_match)
         section = section_match.group(0)
         self.assertIn("Premium resin designs", section)
-        self.assertIn("A preview of 14 premium design photos", section)
+        self.assertNotIn("A preview of 14 premium design photos, with more to explore below.", section)
         self.assertNotIn("Reference photos for made-to-order conversations. Saloni confirms the final design, quote and delivery.", section)
         self.assertIn('id="premium-collection-grid"', section)
         self.assertIn('aria-label="Premium resin designs"', section)

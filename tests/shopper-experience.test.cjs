@@ -30,8 +30,14 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
   const heroActions = hero.match(/<div class="hero-actions">([\s\S]*?)<\/div>/)?.[1] || "";
   const actionLinks = Array.from(heroActions.matchAll(/<a\b[\s\S]*?<\/a>/g));
   assert.equal(actionLinks.length, 2);
-  assert.match(heroActions, /<a class="button button-dark" href="#catalogue-filters" data-browse-all>Explore gifts <span aria-hidden="true">↘<\/span><\/a>/);
-  assert.match(heroActions, /<a class="hero-secondary-action" href="#customizer" data-customizer-open>Design a custom frame<\/a>/);
+  assert.match(heroActions, /<a class="button button-dark hero-catalogue-action" href="#catalogue-filters" data-browse-all>Explore gifts<\/a>/);
+  assert.match(heroActions, /<a class="button button-line hero-catalogue-action" href="#customizer" data-customizer-open>Design a custom frame<\/a>/);
+  assert.doesNotMatch(heroActions, /aria-hidden="true">↘/);
+  assert.doesNotMatch(hero, /class="hero-intro"|Thoughtful custom resin frames, resin art, and personalized gifts from Ajmer, Rajasthan/);
+  assert.doesNotMatch(hero, /class="instagram-mark"/);
+  const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
+  assert.match(footer, /<a class="instagram-mark" href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\/" target="_blank" rel="noreferrer">Follow the studio <strong>@saloniresin_art_studio<\/strong><\/a>/);
+  assert.doesNotMatch(footer, />Instagram<\/a>/);
   assert.doesNotMatch(hero, /Request a custom gift/);
   assert.doesNotMatch(hero, /hero-floral-bouquet\.jpg/);
   assert.doesNotMatch(html, /Some catalogue images are illustrative or reference ideas\. Saloni confirms availability, materials, final design, quote, and delivery\./);
@@ -53,8 +59,8 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   const copyRule = mobileCss.match(/#hero h1\s*\{([^}]*)\}/)?.[1] || "";
   const actionsRule = mobileCss.match(/#hero \.hero-actions\s*\{([^}]*)\}/)?.[1] || "";
   const mobileNavRule = mobileCss.match(/\.nav-toggle\s*\{([^}]*)\}/)?.[1] || "";
-  const secondaryActionRule = css.match(/\.hero-secondary-action\s*\{([^}]*)\}/)?.[1] || "";
-  const mobileSecondaryActionRule = mobileCss.match(/#hero \.hero-actions \.hero-secondary-action\s*\{([^}]*)\}/)?.[1] || "";
+  const catalogueActionRule = css.match(/\.hero-catalogue-action\s*\{([^}]*)\}/)?.[1] || "";
+  const mobileCatalogueActionRule = mobileCss.match(/#hero \.hero-actions \.button\s*\{([^}]*)\}/)?.[1] || "";
   const collageRule = mobileCss.match(/#hero \.hero-collage\s*\{([^}]*)\}/)?.[1] || "";
   const imageRule = mobileCss.match(/#hero \.hero-image\s*\{([^}]*)\}/)?.[1] || "";
   const mainMediaRule = mobileCss.match(/#hero \.hero-image-main \.lightbox-trigger\s*\{([^}]*)\}/)?.[1] || "";
@@ -62,7 +68,6 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   const clockFigureRule = mobileCss.match(/#hero \.hero-image-clock\s*\{([^}]*)\}/)?.[1] || "";
   const clockImageRule = mobileCss.match(/#hero \.hero-image-clock img\s*\{([^}]*)\}/)?.[1] || "";
   const captionRule = mobileCss.match(/#hero \.hero-image figcaption\s*\{([^}]*)\}/)?.[1] || "";
-  const socialRule = mobileCss.match(/#hero \.instagram-mark\s*\{([^}]*)\}/)?.[1] || "";
   const noteRule = mobileCss.match(/#hero \.hero-note\s*\{([^}]*)\}/)?.[1] || "";
 
   assert.match(heroRule, /padding-block:\s*1rem 1rem/);
@@ -74,18 +79,15 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   assert.match(copyRule, /line-height:\s*1\.02/);
   assert.match(copyRule, /letter-spacing:\s*-0\.035em/);
   assert.match(copyRule, /overflow-wrap:\s*anywhere/);
-  assert.match(actionsRule, /flex-direction:\s*row/);
-  assert.match(actionsRule, /flex-wrap:\s*wrap/);
+  assert.match(actionsRule, /display:\s*grid/);
+  assert.match(actionsRule, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(mobileNavRule, /width:\s*44px/);
   assert.match(mobileNavRule, /height:\s*44px/);
   assert.match(mobileNavRule, /min-height:\s*44px/);
-  assert.match(secondaryActionRule, /font-size:\s*0\.75rem/);
-  assert.match(secondaryActionRule, /text-decoration:\s*underline/);
-  assert.match(mobileSecondaryActionRule, /font-size:\s*0\.7rem/);
-  assert.match(mobileSecondaryActionRule, /display:\s*flex/);
-  assert.match(mobileSecondaryActionRule, /align-items:\s*center/);
-  assert.match(mobileSecondaryActionRule, /height:\s*44px/);
-  assert.match(mobileSecondaryActionRule, /min-height:\s*44px/);
+  assert.match(catalogueActionRule, /font-size:\s*\.75rem/);
+  assert.match(catalogueActionRule, /min-height:\s*2\.75rem/);
+  assert.match(mobileCatalogueActionRule, /font-size:\s*(?:0\.)?75rem/);
+  assert.match(mobileCatalogueActionRule, /min-height:\s*44px/);
   assert.match(collageRule, /display:\s*grid/);
   assert.match(collageRule, /gap:\s*0\.5rem/);
   assert.match(collageRule, /min-height:\s*auto/);
@@ -100,8 +102,6 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
   assert.match(clockImageRule, /height:\s*auto/);
   assert.match(captionRule, /position:\s*static/);
   assert.match(captionRule, /margin-top:\s*0\.4rem/);
-  assert.match(socialRule, /max-width:\s*100%/);
-  assert.match(socialRule, /overflow-wrap:\s*anywhere/);
   assert.match(noteRule, /max-width:\s*100%/);
   assert.match(noteRule, /overflow-wrap:\s*anywhere/);
   assert.match(noteRule, /right:\s*0\.5rem/);
@@ -111,7 +111,7 @@ test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable
 });
 
 test("browse gifts keeps the first product row clear of the sticky header", () => {
-  assert.match(css, /\.catalogue-tools, \.catalogue-grid, \.festive-banner/);
+  assert.match(css, /\.catalogue-status-region, \.catalogue-grid, \.festive-banner/);
   assert.match(css, /\.catalogue-grid, \.festive-banner[^}]*scroll-margin-top:\s*var\(--sticky-offset\)/);
 });
 
@@ -155,53 +155,52 @@ test("order layout keeps the confidence copy left and the form right, then stack
 });
 
 test("catalogue enhancement has accessible filters, preview mode, and a no-result reset", () => {
+  const siteHeader = html.match(/<header class="site-header">[\s\S]*?<\/header>/)?.[0] || "";
   assert.match(html, /id="catalogue-filters"/);
   assert.match(html, /id="catalogue-type-filter"/);
   assert.match(html, /id="catalogue-price-filter"/);
   assert.match(html, /id="catalogue-filter-reset"/);
   assert.match(html, /id="catalogue-filter-empty"/);
   assert.match(html, /data-catalogue-disclosure/);
-  assert.match(html, /See all 89 gifts/);
   assert.match(html, /Clear filters and browse all gifts/);
-  assert.match(html, /Back to section previews/);
+  assert.match(html, /Clear filters/);
+  assert.match(siteHeader, /id="catalogue-header-controls"/);
+  assert.match(siteHeader, /id="catalogue-search-toggle"/);
+  assert.match(siteHeader, /id="catalogue-filter-toggle"/);
+  assert.match(siteHeader, /aria-controls="catalogue-search-panel"/);
+  assert.match(siteHeader, /aria-controls="catalogue-filter-panel"/);
   assert.match(html, /data-category-shortcut="corporate"/);
-  assert.match(html, /id="catalogue-page-previous"/);
-  assert.match(html, /id="catalogue-page-next"/);
-  assert.match(html, /id="catalogue-page-status"/);
-  assert.match(html, /id="catalogue-pagination"/);
+  assert.doesNotMatch(html, /catalogue-pagination|catalogue-page-(?:previous|next|status)/);
   assert.match(css, /\.category-shortcuts\s*\{[^}]*repeat\(6/);
   assert.match(script, /initCatalogueExperience/);
 });
 
-test("catalogue results header keeps heading, count, and pager together before filters", () => {
-  const headerStart = html.indexOf('<div class="catalogue-results-header">');
-  const filtersStart = html.indexOf('<div class="catalogue-enhancement"', headerStart);
-  const fieldsStart = html.indexOf('class="catalogue-filter-fields"', filtersStart);
-  const header = headerStart >= 0 && filtersStart > headerStart ? html.slice(headerStart, filtersStart) : "";
-  assert.ok(header, "expected a stable results header before the filter controls");
-  assert.ok(header.indexOf('id="catalogue-filters-title"') < header.indexOf('id="catalogue-filter-status"'));
-  assert.ok(header.indexOf('id="catalogue-filter-status"') < header.indexOf('id="catalogue-page-status"'));
-  assert.ok(filtersStart < fieldsStart, "filter controls should remain after the results header");
-  assert.match(css, /\.catalogue-results-header\s*\{[^}]*display:\s*grid/);
-  assert.match(css, /\.catalogue-results\s*\{[^}]*display:\s*none/);
+test("catalogue result status stays minimal while controls live in the site header", () => {
+  const headerEnd = html.indexOf('</header>');
+  const fieldsStart = html.indexOf('class="catalogue-filter-fields"');
+  const statusRegion = html.match(/<div class="catalogue-status-region shell"[\s\S]*?<\/div>/)?.[0] || "";
+  assert.match(statusRegion, /id="catalogue-filter-status"/);
+  assert.doesNotMatch(statusRegion, /Find a gift that fits the moment|catalogue-search|catalogue-type-filter|catalogue-price-filter|catalogue-browse-all|See all 89 gifts/);
+  assert.match(html, /id="catalogue-filters" aria-label="Gift catalogue results" tabindex="-1"/);
+  assert.ok(fieldsStart > 0 && fieldsStart < headerEnd, "filter controls should remain inside the site header");
   assert.match(css, /\.catalogue-ready \.catalogue-results\s*\{[^}]*display:\s*grid/);
-  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.catalogue-results-header\s*\{[^}]*display:\s*block/);
+  assert.doesNotMatch(css, /\.catalogue-results-header|\.catalogue-browse-all/);
 });
 
-test("full browse keeps one global status and a clear all-gifts heading while pagination stays beside it", () => {
-  const headerStart = html.indexOf('<div class="catalogue-results-header">');
-  const filtersStart = html.indexOf('<div class="catalogue-enhancement"', headerStart);
-  const header = headerStart >= 0 && filtersStart > headerStart ? html.slice(headerStart, filtersStart) : "";
-  assert.ok(header.indexOf('id="catalogue-filters-title"') < header.indexOf('id="catalogue-filter-status"'));
-  assert.match(header, /id="catalogue-results"[\s\S]*id="catalogue-pagination"/);
-  assert.match(header, /id="catalogue-filter-status"[\s\S]*id="catalogue-page-status"/);
-  assert.match(script, /All gifts/);
-  assert.match(script, /focusCatalogueHeading\(state && state\.pageCards\)/);
+test("full browse keeps one global status beside compact controls", () => {
+  const statusRegion = html.match(/<div class="catalogue-status-region shell"[\s\S]*?<\/div>/)?.[0] || "";
+  assert.match(statusRegion, /id="catalogue-filter-status"/);
+  assert.doesNotMatch(html, /Find a gift that fits the moment|id="catalogue-filters-title"|catalogue-browse-all|See all 89 gifts/);
+  const siteHeader = html.match(/<header class="site-header">[\s\S]*?<\/header>/)?.[0] || "";
+  assert.match(siteHeader, /id="catalogue-search-toggle"[\s\S]*id="catalogue-filter-toggle"/);
+  assert.doesNotMatch(statusRegion, /catalogue-pagination|catalogue-page-(?:previous|next|status)/);
+  assert.match(script, /focusCatalogueRegion\(\)/);
   assert.match(script, /catalogue-filters/);
+  assert.doesNotMatch(css, /\.catalogue-full \.rail-heading > div > p:not\(\.eyebrow\):not\(\.catalogue-note\)/);
 });
 
 test("premium catalogue results keep readable text on the dark section", () => {
-  const resultsRule = css.match(/\.premium-collection-section \.catalogue-results \.catalogue-filter-status,\s*\.premium-collection-section \.catalogue-results \.catalogue-pagination span\s*\{([^}]*)\}/)?.[1] || "";
+  const resultsRule = css.match(/\.premium-collection-section \.catalogue-results \.catalogue-filter-status\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(resultsRule, /color:\s*#fbf5e9/);
 });
 
@@ -426,7 +425,7 @@ test("pricing keeps current quotes without unsupported discount claims", () => {
   });
   assert.doesNotMatch(html, /<dt>Estimated from<\/dt>/);
   assert.match(html, /<dt>Price<\/dt><dd>₹2,499<\/dd>/);
-  assert.match(section("diwali"), /Diwali prices ₹249–₹1,799/);
+  assert.doesNotMatch(section("diwali"), /Diwali prices ₹249–₹1,799/);
 });
 
 test("catalogue prices use lining tabular numerals", () => {
@@ -446,7 +445,7 @@ test("narrow catalogue cards give ranged prices room beside the PRICE label", ()
 test("festive banner is absent while Diwali remains in the collection", () => {
   assert.doesNotMatch(html, /class="[^"]*festive-banner/);
   assert.doesNotMatch(html, /<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs/);
-  assert.match(html, /<section[^>]+id="diwali"[\s\S]*Diwali prices/);
+  assert.doesNotMatch(html, /<section[^>]+id="diwali"[\s\S]*Diwali prices/);
   assert.doesNotMatch(html, /<dialog[^>]+festive-offers|special discounts/);
   assert.doesNotMatch(script, /initFestiveOffers|aria-controls="festive-offers"/);
 });
@@ -457,7 +456,6 @@ test("resin-only catalogue removes hamper products and keeps both ₹2,000 budge
   });
   assert.doesNotMatch(html, /concept-tray-hamper\.webp|festive-welcome-hamper|customised-hampers\//);
   assert.doesNotMatch(html, /data-category-shortcut="hampers"|value="hampers"/);
-  assert.match(html, /See all 89 gifts/);
   assert.match(html, /<option value="1999">Up to ₹2,000<\/option>/);
   assert.match(html, /<option value="2000">₹2,000 and above<\/option>/);
 });
@@ -593,7 +591,9 @@ test("order modal loading state is spinner-backed and ready-message driven", () 
   assert.match(script, /saloni-order-form-ready/);
   assert.match(script, /startOrderFormLoading[\s\S]*clearOrderLoadingTimer/);
   assert.match(script, /aria-busy/);
-  assert.doesNotMatch(script, /frame\.addEventListener\(["']load/);
+  assert.match(script, /nextFrame\.addEventListener\(["']load["'][\s\S]*?finishOrderFormLoading/);
+  assert.match(script, /frameState\.nonce !== identity\.nonce/);
+  assert.match(script, /frameState\.requestId !== identity\.requestId/);
   assert.doesNotMatch(script, /loadingTimedOut/);
   assert.match(script, /requestHistoryConsumed && orderDialog/);
 });
@@ -610,15 +610,22 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
   assert.match(script, /illustrative preview\|reference image/);
 });
 
-test("shopper confidence strip and primary navigation use the approved customer vocabulary", () => {
+test("footer trust strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
   ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
   assert.doesNotMatch(nav, />Order\s*<\/a>/);
   assert.equal((nav.match(/<a\b/g) || []).length, 5);
-  assert.match(html, /class="hero-trust-strip"/);
-  ["Ajmer studio", "Shipping across India", "Handmade to order", "Contact Saloni"].forEach((fact) => assert.match(html, new RegExp(fact)));
+  const hero = section("hero");
+  const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
+  const trustStrip = footer.match(/<ul class="hero-trust-strip"[\s\S]*?<\/ul>/)?.[0] || "";
+  assert.doesNotMatch(hero, /class="hero-trust-strip"/);
+  assert.ok(trustStrip, "expected the studio facts at the end of the page footer");
+  assert.ok(footer.indexOf('class="hero-trust-strip"') > footer.indexOf('class="footer-inner"'), "expected the studio facts after the footer links");
+  assert.match(trustStrip, /aria-label="Studio facts"/);
+  assert.match(trustStrip, /<a href="#order" data-order-prefill="general">Contact Saloni<\/a>/);
+  ["Ajmer studio", "Shipping across India", "Handmade to order"].forEach((fact) => assert.match(trustStrip, new RegExp(fact)));
   assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
   assert.doesNotMatch(html, /<a href="#diwali" data-category-shortcut="diwali">Browse Diwali designs/);
   assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame[\s\S]*<\/a>/);
@@ -626,12 +633,11 @@ test("shopper confidence strip and primary navigation use the approved customer 
   assert.match(html, /href="partners\/">Partner Circle<\/a>/);
 });
 
-test("lightbox exposes product-aware controls without changing the catalogue source cards", () => {
+test("lightbox keeps product details and request action without catalogue navigation", () => {
   const dialog = html.match(/<dialog class="lightbox-dialog"[\s\S]*?<\/dialog>/)?.[0] || "";
   const figure = dialog.match(/<figure class="lightbox-figure"[^>]*>[\s\S]*?<\/figure>/)?.[0] || "";
   const summary = dialog.match(/<div class="lightbox-order-summary">[\s\S]*?<\/div>/)?.[0] || "";
-  assert.match(dialog, /id="lightbox-previous"/);
-  assert.match(dialog, /id="lightbox-next"/);
+  assert.doesNotMatch(dialog, /lightbox-(?:previous|next|position)/);
   assert.match(summary, /id="lightbox-product-name"/);
   assert.match(summary, /id="lightbox-product-price"/);
   assert.match(summary, /id="lightbox-request"[^>]*>Add to cart<\/button>/);
@@ -640,9 +646,7 @@ test("lightbox exposes product-aware controls without changing the catalogue sou
   assert.match(figure, /aria-label="Scrollable artwork details"/);
   assert.match(figure, /id="lightbox-product-size"/);
   assert.match(figure, /id="lightbox-image-description"/);
-  assert.match(dialog, /id="lightbox-position"/);
-  assert.match(script, /ArrowLeft/);
-  assert.match(script, /ArrowRight/);
+  assert.doesNotMatch(script, /lightbox-(?:previous|next|position)/);
   assert.match(script, /pendingLightboxRequest[\s\S]*requestButton\.click\(\)[\s\S]*focusOrderLocation/);
   assert.match(script, /selected \? "Remove from cart" : "Add to cart"/);
   assert.match(script, /selected \? " from cart" : " to cart"/);
@@ -707,9 +711,6 @@ test("lightbox request focuses the order location after native close", () => {
     "lightbox-product-price": makeElement(),
     "lightbox-product-size": makeElement(),
     "lightbox-image-description": makeElement(),
-    "lightbox-previous": makeElement(),
-    "lightbox-next": makeElement(),
-    "lightbox-position": makeElement(),
     "lightbox-request": makeElement(),
     order,
   };
@@ -777,9 +778,6 @@ test("catalogue card body opens its existing preview while native link focus sta
     "lightbox-product-price": makeElement(),
     "lightbox-product-size": makeElement(),
     "lightbox-image-description": makeElement(),
-    "lightbox-previous": makeElement(),
-    "lightbox-next": makeElement(),
-    "lightbox-position": makeElement(),
     "lightbox-request": makeElement(),
   };
   const documentObject = {
@@ -858,9 +856,6 @@ test("hero lightbox targets the hidden canonical card and restores focus to the 
     "lightbox-product-price": makeElement(),
     "lightbox-product-size": makeElement(),
     "lightbox-image-description": makeElement(),
-    "lightbox-previous": makeElement(),
-    "lightbox-next": makeElement(),
-    "lightbox-position": makeElement(),
     "lightbox-request": makeElement(),
     "romantic-trinket": canonicalCard,
   };
@@ -957,9 +952,6 @@ test("lightbox owns one history entry and consumes it on browser back or native 
     "lightbox-product-price": makeElement(),
     "lightbox-product-size": makeElement(),
     "lightbox-image-description": makeElement(),
-    "lightbox-previous": makeElement(),
-    "lightbox-next": makeElement(),
-    "lightbox-position": makeElement(),
     "lightbox-request": makeElement(),
     order,
   };
@@ -1141,9 +1133,6 @@ test("hero lightbox request consumes history and restores the visible opener aft
     "lightbox-product-price": makeElement(),
     "lightbox-product-size": makeElement(),
     "lightbox-image-description": makeElement(),
-    "lightbox-previous": makeElement(),
-    "lightbox-next": makeElement(),
-    "lightbox-position": makeElement(),
     "lightbox-request": makeElement(),
     "order-dialog": orderDialog,
     "canonical-gift": canonicalCard,
@@ -1204,12 +1193,12 @@ test("order section keeps compact row and bottom spacing without changing its co
   assert.match(mobileOrderRule, /padding-block:\s*1\.2rem 3rem/);
 });
 
-test("sticky header offset and contained lightbox controls remain reachable", () => {
+test("sticky header offset and contained lightbox request remain reachable", () => {
   assert.match(css, /scroll-padding-top:\s*var\(--sticky-offset\)/);
   assert.match(css, /scroll-margin-top:\s*var\(--sticky-offset\)/);
   assert.match(css, /\.lightbox-panel[\s\S]*overflow:\s*auto/);
   assert.match(css, /\.lightbox-image\s*\{[^}]*background:\s*var\(--ivory\)/);
-  assert.match(css, /\.lightbox-nav-button\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.lightbox-request\s*\{[^}]*width:\s*100%/);
 });
 
 test("before-you-order buying-help section is removed from the homepage", () => {
