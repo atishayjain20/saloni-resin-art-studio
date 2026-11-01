@@ -286,7 +286,7 @@ test("catalogue search is labelled, bounded, and placed before type and budget f
   assert.match(fields, /<label[^>]+for="catalogue-search"[\s\S]*<input id="catalogue-search" type="search"[^>]+maxlength="100"/);
   assert.ok(fields.indexOf("catalogue-search") < fields.indexOf("catalogue-type-filter"));
   assert.match(css, /\.catalogue-filter-fields input\[type="search"\]/);
-  assert.match(css, /\.catalogue-filter-fields input\[type="search"\][^}]*min-height:\s*3rem/);
+  assert.match(css, /\.catalogue-filter-fields input\[type="search"\][^}]*min-height:\s*3rem/); (() => { assert.match(css, /\.catalogue-filter-fields input\[type="search"\]::\-webkit-search-decoration,\s*\.catalogue-filter-fields input\[type="search"\]::\-webkit-search-cancel-button\s*\{[^}]*width:\s*\.75rem[^}]*height:\s*\.75rem/); assert.match(css, /\.catalogue-filter-fields input\[type="search"\][^}]*min-height:\s*3rem/); assert.match(html, /<label class="catalogue-search-field" for="catalogue-search">Search gifts\s*<input id="catalogue-search" type="search"/); })();
 });
 
 test("catalogue search metadata covers requested item kinds without taxonomy drift", () => {
