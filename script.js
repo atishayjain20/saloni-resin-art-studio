@@ -1239,13 +1239,14 @@
       }
       var heightParts = parts(source.height, source.heightUnit);
       var widthParts = parts(source.width, source.widthUnit);
+      var repeatProfile = frameState.mode === "order" ? readRepeatProfile() : null;
       var seed = {
         sourceKind: source.sourceKind || "catalogue", sourceId: source.sourceId || "",
         productName: source.productName || "", requestStage: "quote", quantity: source.quantity || "1", dimensionFormat: "feet-inches",
         heightFeet: heightParts ? heightParts.feet : "", heightInchesPart: heightParts ? heightParts.inches : "", widthFeet: widthParts ? widthParts.feet : "", widthInchesPart: widthParts ? widthParts.inches : "",
         height: source.height || "", heightUnit: source.heightUnit || "",
         width: source.width || "", widthUnit: source.widthUnit || "", designDetails: source.designDetails || "",
-        customerName: "", phone: "", email: "", fulfillment: "shipping", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "", referralCode: readReferralCode()
+        customerName: repeatProfile ? repeatProfile.customerName : "", phone: repeatProfile ? repeatProfile.phone : "", email: "", fulfillment: repeatProfile ? repeatProfile.fulfillment : "shipping", shippingAddress: repeatProfile ? repeatProfile.shippingAddress : "", city: repeatProfile ? repeatProfile.city : "", state: repeatProfile ? repeatProfile.state : "", pin: repeatProfile ? repeatProfile.pin : "", requestedDate: "", referralCode: readReferralCode()
       };
       if (Array.isArray(source.bundleItems)) {
         seed.bundleItems = source.bundleItems.map(function (item) {
@@ -1333,7 +1334,7 @@
 
     function handlePreviewRequest(event, data) {
       if (!data || data.type !== "saloni-preview-request") return;
-      if (!frameState.loaded || !frameState.nonce || !frameState.requestId || data.version !== 1 || data.mode !== frameState.mode || data.nonce !== frameState.nonce || data.requestId !== frameState.requestId || !previewIdentityPart(data.nonce) || !previewIdentityPart(data.requestId) || !previewTransferId(data.transferId) || !event || !event.source || !event.ports || event.ports.length !== 1 || !event.origin) return;
+      if (!frameState.loaded || !frameState.nonce || !frameState.requestId || data.version !== 1 || data.mode !== frameState.mode || data.nonce !== frameState.nonce || data.requestId !== frameState.requestId || !previewIdentityPart(data.nonce) || !previewIdentityPart(data.requestId) || !previewTransferId(data.transferId) || !event || !event.source || event.source !== frame.contentWindow || !event.ports || event.ports.length !== 1 || !event.origin) return;
       var origin = previewOrigin(event.origin);
       if (!origin || (frameState.pinnedOrigin && origin !== frameState.pinnedOrigin) || (frameState.pinnedSender && event.source !== frameState.pinnedSender)) return;
       var port = event.ports[0];
@@ -1374,17 +1375,26 @@
         return;
       }
       if (!frameState.loaded || !frameState.nonce || data.nonce !== frameState.nonce || !event.source || !event.origin || event.origin === "null") return;
+      var messageOrigin = previewOrigin(event.origin);
+      if (!messageOrigin) return;
+      if (data.type === "saloni-order-save-repeat-profile" || data.type === "saloni-order-clear-repeat-profile") {
+        if (data.version !== REPEAT_PROFILE_VERSION || event.source !== frame.contentWindow || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin) return;
+        if (data.type === "saloni-order-save-repeat-profile") saveRepeatProfile(data.profile);
+        else clearRepeatProfile();
+        return;
+      }
       if (data.type === "saloni-order-form-ready") {
+        if (event.source !== frame.contentWindow) return;
         if (!frameState.pinnedSender) {
           frameState.pinnedSender = event.source;
-          frameState.pinnedOrigin = event.origin;
+          frameState.pinnedOrigin = messageOrigin;
         }
-        if (event.source !== frameState.pinnedSender || event.origin !== frameState.pinnedOrigin) return;
+        if (event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin) return;
         if (typeof data.siteKey === "string" && data.siteKey.length > 0 && data.siteKey.length <= 200) frameState.siteKey = data.siteKey;
         finishOrderFormLoading();
         return;
       }
-      if (event.source !== frameState.pinnedSender || event.origin !== frameState.pinnedOrigin || data.type !== "saloni-order-captcha-request" || typeof data.attemptId !== "string" || !event.ports || !event.ports[0] || frameState.activeCaptcha) return;
+      if (event.source !== frame.contentWindow || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin || data.type !== "saloni-order-captcha-request" || typeof data.attemptId !== "string" || !event.ports || !event.ports[0] || frameState.activeCaptcha) return;
       var request = { attemptId: data.attemptId, port: event.ports[0], timer: null };
       frameState.activeCaptcha = request;
       request.timer = window.setTimeout(function () { postCaptchaResult(request, false, ""); }, 30000);
@@ -1407,6 +1417,124 @@
 
     var selectedCatalogueItems = [];
     var catalogueButtons = [];
+    var CATALOGUE_CART_STORAGE_KEY = "saloniCatalogueCart";
+    var REPEAT_PROFILE_STORAGE_KEY = "saloniRepeatProfile";
+    var REPEAT_PROFILE_VERSION = 1;
+    var REPEAT_PROFILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+    var catalogueCartExpiresAt = 0;
+
+    function catalogueCartStorage() {
+      try { return window.localStorage || null; } catch (error) { return null; }
+    }
+
+    function repeatProfileText(value, maxLength, required) {
+      if (value === undefined && !required) return "";
+      if (typeof value !== "string") return null;
+      var text = value.trim();
+      if (text.length > maxLength || (required && !text)) return null;
+      return text;
+    }
+
+    function normalizeRepeatProfile(profile) {
+      if (!profile || typeof profile !== "object" || Array.isArray(profile)) return null;
+      var customerName = repeatProfileText(profile.customerName, 120, true);
+      var phone = repeatProfileText(profile.phone, 40, true);
+      var fulfillment = repeatProfileText(profile.fulfillment, 20, true);
+      var shippingAddress = repeatProfileText(profile.shippingAddress, 300, false);
+      var city = repeatProfileText(profile.city, 100, false);
+      var state = repeatProfileText(profile.state, 100, false);
+      var pin = repeatProfileText(profile.pin, 6, true);
+      if (!customerName || !phone || !/\d/.test(phone) || (phone.match(/\d/g) || []).length < 7 || ["shipping", "pickup"].indexOf(fulfillment) === -1 || shippingAddress === null || city === null || state === null || !pin || !/^\d{6}$/.test(pin)) return null;
+      return {
+        customerName: customerName, phone: phone, fulfillment: fulfillment,
+        shippingAddress: fulfillment === "shipping" ? shippingAddress : "",
+        city: fulfillment === "shipping" ? city : "", state: fulfillment === "shipping" ? state : "", pin: pin
+      };
+    }
+
+    function readRepeatProfile() {
+      var storage = catalogueCartStorage();
+      if (!storage) return null;
+      var raw;
+      try { raw = storage.getItem(REPEAT_PROFILE_STORAGE_KEY); } catch (error) { return null; }
+      if (!raw || raw.length > 5000) {
+        try { storage.removeItem(REPEAT_PROFILE_STORAGE_KEY); } catch (error) {}
+        return null;
+      }
+      var record;
+      try { record = JSON.parse(raw); } catch (error) { record = null; }
+      var expiresAt = Number(record && record.expiresAt);
+      var now = Date.now();
+      var profile = record && record.version === REPEAT_PROFILE_VERSION ? normalizeRepeatProfile(record.profile) : null;
+      if (!profile || !Number.isInteger(expiresAt) || expiresAt <= now || expiresAt > now + REPEAT_PROFILE_TTL_MS) {
+        try { storage.removeItem(REPEAT_PROFILE_STORAGE_KEY); } catch (error) {}
+        return null;
+      }
+      return profile;
+    }
+
+    function saveRepeatProfile(profile) {
+      var normalized = normalizeRepeatProfile(profile);
+      if (!normalized) return false;
+      var storage = catalogueCartStorage();
+      if (!storage) return false;
+      try {
+        storage.setItem(REPEAT_PROFILE_STORAGE_KEY, JSON.stringify({ version: REPEAT_PROFILE_VERSION, expiresAt: Date.now() + REPEAT_PROFILE_TTL_MS, profile: normalized }));
+        return true;
+      } catch (error) { return false; }
+    }
+
+    function clearRepeatProfile() {
+      var storage = catalogueCartStorage();
+      if (!storage) return;
+      try { storage.removeItem(REPEAT_PROFILE_STORAGE_KEY); } catch (error) {}
+    }
+
+    function persistCatalogueSelection() {
+      var storage = catalogueCartStorage();
+      if (!storage) return;
+      try {
+        if (!selectedCatalogueItems.length) {
+          catalogueCartExpiresAt = 0;
+          storage.removeItem(CATALOGUE_CART_STORAGE_KEY);
+          return;
+        }
+        if (!Number.isInteger(catalogueCartExpiresAt) || catalogueCartExpiresAt <= Date.now()) catalogueCartExpiresAt = Date.now() + REPEAT_PROFILE_TTL_MS;
+        storage.setItem(CATALOGUE_CART_STORAGE_KEY, JSON.stringify({
+          version: 1,
+          expiresAt: catalogueCartExpiresAt,
+          items: selectedCatalogueItems.map(function (item) {
+            return { sourceId: item.sourceId, quantity: bundleQuantity(item) };
+          })
+        }));
+      } catch (error) {}
+    }
+
+    function readPersistedCatalogueSelection() {
+      var storage = catalogueCartStorage();
+      if (!storage) return [];
+      var raw;
+      try { raw = storage.getItem(CATALOGUE_CART_STORAGE_KEY); } catch (error) { return []; }
+      if (!raw || raw.length > 10000) {
+        try { storage.removeItem(CATALOGUE_CART_STORAGE_KEY); } catch (error) {}
+        return [];
+      }
+      var parsed;
+      try { parsed = JSON.parse(raw); } catch (error) {
+        try { storage.removeItem(CATALOGUE_CART_STORAGE_KEY); } catch (removeError) {}
+        return [];
+      }
+      var expiresAt = Number(parsed && parsed.expiresAt);
+      var now = Date.now();
+      if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.items) || !Number.isInteger(expiresAt) || expiresAt <= now || expiresAt > now + REPEAT_PROFILE_TTL_MS) {
+        try { storage.removeItem(CATALOGUE_CART_STORAGE_KEY); } catch (error) {}
+        return [];
+      }
+      catalogueCartExpiresAt = expiresAt;
+      return parsed.items;
+    }
+
+    function markCatalogueSelectionChanged() { catalogueCartExpiresAt = Date.now() + REPEAT_PROFILE_TTL_MS; }
 
     function setCatalogueSelectionStatus(message) {
       if (!catalogueSelectionStatus) return;
@@ -1489,6 +1617,7 @@
             return;
           }
           setCatalogueSelectionStatus("");
+          markCatalogueSelectionChanged();
           updateCatalogueSelection();
         });
         var removeButton = document.createElement("button");
@@ -1501,6 +1630,7 @@
           if (index === -1) return;
           selectedCatalogueItems.splice(index, 1);
           setCatalogueSelectionStatus("");
+          markCatalogueSelectionChanged();
           updateCatalogueSelection();
         });
         label.appendChild(input);
@@ -1513,6 +1643,7 @@
 
     function updateCatalogueSelection() {
       var count = selectedCatalogueItems.length;
+      persistCatalogueSelection();
       if (catalogueSelection) catalogueSelection.hidden = count === 0;
       if (catalogueRequestSelected) catalogueRequestSelected.disabled = count === 0;
       renderCatalogueSelectionPreviews();
@@ -1553,6 +1684,7 @@
       if (existingIndex !== -1) {
         selectedCatalogueItems.splice(existingIndex, 1);
         setCatalogueSelectionStatus("");
+        markCatalogueSelectionChanged();
         updateCatalogueSelection();
         return;
       }
@@ -1563,6 +1695,7 @@
       }
       selectedCatalogueItems = nextItems;
       setCatalogueSelectionStatus("");
+      markCatalogueSelectionChanged();
       updateCatalogueSelection();
     }
 
@@ -1593,6 +1726,7 @@
       button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "catalogue");
       button.__saloniCatalogueSourceId = seed.sourceId;
       button.__saloniCatalogueTitle = seed.productName;
+      button.__saloniCatalogueSeed = seed;
       catalogueButtons.push(button);
       button.textContent = "Add to cart";
       button.setAttribute("aria-pressed", "false");
@@ -1602,6 +1736,27 @@
       });
       caption.appendChild(button);
     });
+
+    function restoreCatalogueSelection() {
+      var seedsBySourceId = Object.create(null);
+      catalogueButtons.forEach(function (button) { seedsBySourceId[button.__saloniCatalogueSourceId] = button.__saloniCatalogueSeed; });
+      var restored = [];
+      var seen = Object.create(null);
+      readPersistedCatalogueSelection().forEach(function (entry) {
+        if (!entry || typeof entry.sourceId !== "string" || seen[entry.sourceId] || !seedsBySourceId[entry.sourceId]) return;
+        var quantity = Number(entry.quantity);
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) return;
+        var item = Object.assign({}, seedsBySourceId[entry.sourceId], { quantity: quantity });
+        var candidate = restored.concat([item]);
+        if (bundleTotal(candidate) > 100 || bundleDetails(candidate).length > 2000) return;
+        seen[entry.sourceId] = true;
+        restored.push(item);
+      });
+      selectedCatalogueItems = restored;
+      updateCatalogueSelection();
+    }
+
+    restoreCatalogueSelection();
 
     if (catalogueRequestSelected) catalogueRequestSelected.addEventListener("click", function () {
       if (!selectedCatalogueItems.length) return;
