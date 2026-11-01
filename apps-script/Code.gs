@@ -1699,6 +1699,7 @@ function parseSeed_(json) {
     shippingAddress: boundedSeed_(seed.shippingAddress, 300), city: boundedSeed_(seed.city, 100), state: boundedSeed_(seed.state, 100),
     pin: boundedSeed_(seed.pin, 20), requestedDate: boundedSeed_(seed.requestedDate, 20),
     referralCode: normalizeReferralCode_(seed.referralCode),
+    bundleItems: boundedBundleItems_(seed.bundleItems),
     applicationId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.applicationId || "")) ? String(seed.applicationId) : "",
     enquiryId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.enquiryId || "")) ? String(seed.enquiryId) : Utilities.getUuid(),
     formMode: boundedMode_(seed.formMode),
@@ -1711,6 +1712,27 @@ function legacyParts_(value, unit) {
   if (inches === null || inches <= 0 || inches > MAX_DIMENSION_INCHES) return null;
   var expression = canonicalDimension_(inches).match(/^(\d+) ft ([0-9.]+) in$/);
   return expression ? { feet: expression[1], inches: expression[2] } : null;
+}
+
+function boundedBundleItems_(items) {
+  if (!Array.isArray(items) || !items.length || items.length > 100) return [];
+  var seen = {};
+  var total = 0;
+  var valid = [];
+  items.forEach(function (item) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return;
+    var sourceId = boundedSeed_(item.sourceId, 160).trim();
+    var productName = boundedSeed_(item.productName, 160).trim();
+    var price = boundedSeed_(item.price, 120).trim();
+    var size = boundedSeed_(item.size, 120).trim();
+    var quantityText = String(item.quantity == null ? "" : item.quantity).trim();
+    var quantity = Number(quantityText);
+    if (!sourceId || !/^[A-Za-z0-9_.:\/-]+$/.test(sourceId) || !productName || !/^\d+$/.test(quantityText) || !isFinite(quantity) || quantity < 1 || quantity > 100 || seen[sourceId]) return;
+    seen[sourceId] = true;
+    total += quantity;
+    valid.push({ sourceId: sourceId, productName: productName, price: price, size: size, quantity: quantity });
+  });
+  return total >= 1 && total <= 100 ? valid : [];
 }
 
 function blankSeed_() { return parseSeed_({}); }

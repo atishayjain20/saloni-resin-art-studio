@@ -19,6 +19,10 @@
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
     .product-context { margin: 0 0 1rem; }
     .product-context img { display: block; width: min(100%, 22rem); max-height: 16rem; object-fit: cover; border-radius: .7rem; }
+    .bundle-items { display: grid; gap: .65rem; max-height: 15rem; margin: 0 0 1rem; padding: .7rem; overflow-y: auto; border: 1px solid #dccbc1; border-radius: .65rem; background: #fffaf4; }
+    .bundle-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(6rem, 8rem); gap: .7rem; align-items: center; }
+    .bundle-item-name { min-width: 0; overflow-wrap: anywhere; font-size: .86rem; font-weight: 700; }
+    .bundle-item label { font-size: .76rem; }
     .reference-preview { display: block; width: min(100%, 18rem); max-height: 14rem; margin-top: .65rem; object-fit: contain; border: 1px solid #dccbc1; border-radius: .7rem; background: #fffaf4; }
     label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; }
     input, select, textarea, button { font: inherit; }
@@ -60,10 +64,11 @@
         <img id="product-image" alt="" loading="lazy" decoding="async" hidden>
         <p id="bundle-product-copy" class="hint" hidden>These catalogue items will be reviewed together in one request. Saloni will confirm the final combination, price, and delivery with you.</p>
       </div>
+      <div id="bundle-items" class="bundle-items" role="list" aria-label="Selected catalogue items" hidden></div>
       <div class="grid">
         <label for="product-name">Product name <input id="product-name" name="productName" maxlength="160" required></label>
       </div>
-      <p class="hint">You can edit the product name before sending the request.</p>
+      <p id="product-name-hint" class="hint">You can edit the product name before sending the request.</p>
     </fieldset>
 
     <fieldset>
@@ -80,7 +85,7 @@
         </div>
         <p class="hint">Enter each dimension as feet plus an inch remainder. Each total must be greater than 0 and no more than 60 inches. For example, 3 ft × 4 ft is valid.</p>
       </div>
-      <label for="design-details">Design details <textarea id="design-details" name="designDetails" maxlength="2000" required placeholder="Colours, words, occasion, reference notes, or anything Saloni should know."></textarea></label>
+      <label for="design-details">Order notes <textarea id="design-details" name="designDetails" maxlength="2000" required placeholder="Colours, words, occasion, reference notes, or anything Saloni should know."></textarea></label>
     </fieldset>
 
     <fieldset>
@@ -159,6 +164,7 @@
   var productContext = document.getElementById("product-context");
   var productImage = document.getElementById("product-image");
   var bundleProductCopy = document.getElementById("bundle-product-copy");
+  var bundleItemsElement = document.getElementById("bundle-items");
   var dimensionFields = document.getElementById("dimension-fields");
   var referenceImage = document.getElementById("reference-image");
   var referenceImagePreviewWrap = document.getElementById("reference-image-preview-wrap");
@@ -228,6 +234,107 @@
   };
 
   function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
+  function isBundle() { return String(seed.sourceKind || "").toLowerCase() === "catalogue" && String(seed.sourceId || "") === "catalogue:multi-item"; }
+  function bundleQuantity(item) {
+    var quantity = Number(item && item.quantity);
+    return Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 1;
+  }
+  function bundleTotal(items) { return items.reduce(function (total, item) { return total + bundleQuantity(item); }, 0); }
+  function bundleDetails(items) {
+    return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); }).map(function (item, index) {
+      return "Item " + (index + 1) + ": " + item.productName + " | Source: " + item.sourceId + " | Price: " + (item.price || "not shown") + " | Size: " + (item.size || "not shown") + " | Quantity: " + bundleQuantity(item);
+    }).join("\n");
+  }
+  function normalizeBundleItems(items) {
+    if (!Array.isArray(items) || !items.length || items.length > 100) return [];
+    var seen = {};
+    var normalized = [];
+    for (var index = 0; index < items.length; index += 1) {
+      var item = items[index] || {};
+      var sourceId = String(item.sourceId || "").trim().slice(0, 160);
+      var productName = String(item.productName || "").trim().slice(0, 160);
+      var price = String(item.price || "").trim().slice(0, 120);
+      var size = String(item.size || "").trim().slice(0, 120);
+      var quantity = Number(item.quantity);
+      if (!sourceId || !/^[A-Za-z0-9_.:/-]+$/.test(sourceId) || !productName || !Number.isInteger(quantity) || quantity < 1 || quantity > 100 || seen[sourceId]) return [];
+      seen[sourceId] = true;
+      normalized.push({ sourceId: sourceId, productName: productName, price: price, size: size, quantity: quantity });
+    }
+    return bundleTotal(normalized) <= 100 && bundleDetails(normalized).length <= 2000 ? normalized : [];
+  }
+  var bundleItems = normalizeBundleItems(seed.bundleItems);
+  var bundleNotes = "";
+  var syncingBundleFields = false;
+  function bundleNotesFromField(fieldValue) {
+    var current = String(fieldValue || "");
+    var canonical = bundleDetails(bundleItems);
+    var prefix = canonical + "\nOrder notes: ";
+    if (current === canonical) return "";
+    return current.indexOf(prefix) === 0 ? current.slice(prefix.length) : current;
+  }
+  function updateBundleScalars(includeDetails) {
+    if (!isBundle() || !bundleItems.length) return;
+    form.elements.productName.value = bundleItems.length + " selected catalogue items";
+    form.elements.quantity.value = String(bundleTotal(bundleItems));
+    if (includeDetails) {
+      var notes = String(bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
+      syncingBundleFields = true;
+      form.elements.designDetails.value = bundleDetails(bundleItems) + (notes ? "\nOrder notes: " + notes : "");
+      syncingBundleFields = false;
+      bundleNotes = notes;
+    }
+  }
+  function renderBundleItems() {
+    if (!bundleItemsElement) return;
+    var visible = isBundle() && bundleItems.length > 0;
+    bundleItemsElement.hidden = !visible;
+    while (bundleItemsElement.firstChild) bundleItemsElement.removeChild(bundleItemsElement.firstChild);
+    if (!visible) return;
+    bundleItems.forEach(function (item) {
+      var line = document.createElement("div");
+      line.className = "bundle-item";
+      line.setAttribute("role", "listitem");
+      line.setAttribute("data-product-name", item.productName);
+      var name = document.createElement("span");
+      name.className = "bundle-item-name";
+      name.textContent = item.productName;
+      var label = document.createElement("label");
+      var inputId = "bundle-quantity-" + item.sourceId.replace(/[^A-Za-z0-9_-]/g, "-");
+      label.setAttribute("for", inputId);
+      label.textContent = "Quantity";
+      var input = document.createElement("input");
+      input.id = inputId;
+      input.type = "number";
+      input.min = "1"; input.max = "100"; input.step = "1"; input.inputMode = "numeric";
+      input.value = String(bundleQuantity(item));
+      input.setAttribute("aria-label", "Quantity for " + item.productName);
+      input.addEventListener("change", function () {
+        var requested = String(input.value || "").trim();
+        var nextQuantity = /^\d+$/.test(requested) ? Number(requested) : NaN;
+        var previous = bundleQuantity(item);
+        var notesBeforeChange = String(bundleNotesFromField(value("designDetails")) || bundleNotes || "").trim();
+        if (!Number.isInteger(nextQuantity) || nextQuantity < 1 || nextQuantity > 100) {
+          input.value = String(previous);
+          setStatus("Each selected item quantity must be a whole number from 1 to 100.", "error");
+          return;
+        }
+        item.quantity = nextQuantity;
+        if (bundleTotal(bundleItems) > 100 || bundleDetails(bundleItems).length > 2000) {
+          item.quantity = previous;
+          input.value = String(previous);
+          setStatus(bundleTotal(bundleItems) > 100 ? "The total selected quantity must be from 1 to 100." : "Those quantities make the selected list too long. Lower a quantity before continuing.", "error");
+          return;
+        }
+        bundleNotes = notesBeforeChange;
+        setStatus("", "");
+        updateBundleScalars(true);
+      });
+      label.appendChild(input);
+      line.appendChild(name);
+      line.appendChild(label);
+      bundleItemsElement.appendChild(line);
+    });
+  }
   function setError(field, message) {
     var input = form.elements[field];
     if (!input) return;
@@ -279,15 +386,26 @@
     return match && PRODUCT_IMAGE_ALLOWLIST[match[1]] ? PARENT_ORIGIN + "/assets/" + match[1] : "";
   }
   function applyProductContext() {
-    var bundle = String(seed.sourceKind || "").toLowerCase() === "catalogue" && String(seed.sourceId || "") === "catalogue:multi-item";
+    var bundle = isBundle();
     if (bundle) {
+      form.elements.productName.setAttribute("readonly", "readonly");
+      form.elements.quantity.setAttribute("readonly", "readonly");
+      var bundleHint = document.getElementById("product-name-hint");
+      if (bundleHint) bundleHint.textContent = "The bundle name and total quantity follow your selected items.";
       productImage.hidden = true;
       productImage.removeAttribute("src");
       productImage.removeAttribute("alt");
       if (bundleProductCopy) bundleProductCopy.hidden = false;
       productContext.hidden = false;
+      renderBundleItems();
+      updateBundleScalars(false);
       return;
     }
+    form.elements.productName.removeAttribute("readonly");
+    form.elements.quantity.removeAttribute("readonly");
+    var productNameHint = document.getElementById("product-name-hint");
+    if (productNameHint) productNameHint.textContent = "You can edit the product name before sending the request.";
+    if (bundleItemsElement) bundleItemsElement.hidden = true;
     productImage.hidden = false;
     if (bundleProductCopy) bundleProductCopy.hidden = true;
     var imagePath = productImagePath();
@@ -304,6 +422,9 @@
   function applySeed(next) {
     var fields = ["requestId", "requestStage", "sourceKind", "sourceId", "productName", "quantity", "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate", "referralCode"];
     fields.forEach(function (field) { if (form.elements[field]) form.elements[field].value = next[field] == null ? "" : next[field]; });
+    bundleItems = normalizeBundleItems(next.bundleItems);
+    bundleNotes = "";
+    if (isBundle() && bundleItems.length) form.elements.designDetails.value = "";
     toggleShipping();
     updateDimensionMaxes();
     setDimensionsRequired(dimensionsRequired());
@@ -671,6 +792,9 @@
     return errors;
   }
   form.addEventListener("change", function () { toggleShipping(); updateDimensionMaxes(); });
+  if (form.elements.designDetails) form.elements.designDetails.addEventListener("input", function () {
+    if (isBundle() && !syncingBundleFields) bundleNotes = bundleNotesFromField(value("designDetails"));
+  });
   if (referenceImage) referenceImage.addEventListener("change", handleReferenceImageChange);
   if (retryPreviewButton) retryPreviewButton.addEventListener("click", function () {
     if (!previewExpected) return;
@@ -690,6 +814,7 @@
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;
+    if (isBundle()) updateBundleScalars(true);
     clearErrors();
     if (previewExpected && !previewResolved) {
       setStatus(previewPending ? "The customizer preview is still loading. Please wait, retry, or continue without a preview." : "Attach the customizer preview, retry it, or continue without a preview.", "error");
