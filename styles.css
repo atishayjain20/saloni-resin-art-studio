@@ -368,8 +368,8 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
   #hero { padding-block: 1rem 1rem; }
   #hero .hero-copy { min-width: 0; }
   #hero h1 { max-width: none; margin-bottom: 0.5rem; font-size: clamp(2.15rem, 9.8vw, 2.9rem); line-height: 1.02; letter-spacing: -0.035em; overflow-wrap: anywhere; }
-  #hero .hero-actions { flex-direction: row; flex-wrap: wrap; gap: 0.55rem; max-width: none; margin-bottom: 0.6rem; }
-  #hero .hero-actions .button { flex: 1 1 9.5rem; min-width: 0; gap: 0.45rem; padding: 0.62rem 0.8rem; font-size: 0.75rem; }
+  #hero .hero-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; max-width: none; margin-bottom: 0.6rem; }
+  #hero .hero-actions .button { min-width: 0; min-height: 44px; justify-content: center; gap: 0.45rem; padding: 0.62rem 0.8rem; font-size: 0.75rem; text-align: center; }
   #hero .hero-collage { display: grid; gap: 0.5rem; min-height: auto; max-height: none; min-width: 0; }
   #hero .hero-image { position: relative; inset: auto; width: 100%; transform: none; }
   #hero .hero-image .lightbox-trigger { height: auto; }
@@ -431,7 +431,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .catalogue-header-tools .catalogue-control-panel { position: absolute; top: calc(100% + .75rem); right: 0; z-index: 2; width: min(40rem, calc(100vw - (var(--gutter) * 2))); padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .85rem; background: var(--ivory); box-shadow: var(--shadow); }
 .catalogue-search-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .7rem; align-items: end; }
 .catalogue-search-form .button { min-height: 44px; white-space: nowrap; cursor: pointer; }
-.catalogue-filter-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: .7rem; align-items: end; }
+.catalogue-filter-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto; gap: .7rem; align-items: end; }
 .catalogue-filter-fields label { display: grid; gap: .35rem; min-width: 0; color: var(--cocoa); font-size: .72rem; font-weight: 800; }
 .catalogue-filter-fields input[type="search"] { width: 100%; min-width: 0; min-height: 2.85rem; padding: .65rem .7rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--paper); color: var(--ink); font: inherit; font-size: .78rem; } .catalogue-filter-fields input[type="search"]::-webkit-search-decoration, .catalogue-filter-fields input[type="search"]::-webkit-search-cancel-button { width: .75rem; height: .75rem; }
 .catalogue-search-form input[type="search"] { width: 100%; min-width: 0; min-height: 44px; padding: .65rem .7rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--paper); color: var(--ink); font: inherit; font-size: .85rem; }
@@ -458,8 +458,13 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .catalogue-selection-status { margin-top: .3rem; color: var(--rose-ink); }
 .catalogue-selection .button { min-height: 2.75rem; white-space: nowrap; cursor: pointer; }
 .catalogue-selection .button:disabled { cursor: not-allowed; opacity: .45; }
-.catalogue-cart-jump { position: fixed; right: max(1rem, env(safe-area-inset-right)); bottom: calc(1rem + env(safe-area-inset-bottom)); z-index: 15; min-height: 3rem; padding-inline: 1rem; box-shadow: 0 .45rem 1.1rem rgba(86, 57, 45, .18); cursor: pointer; }
+.catalogue-cart-jump { display: flex; align-items: center; gap: .55rem; position: fixed; right: max(1rem, env(safe-area-inset-right)); bottom: calc(1rem + env(safe-area-inset-bottom)); z-index: 15; min-height: 3rem; padding: .45rem .55rem .45rem .8rem; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--ivory); box-shadow: 0 .45rem 1.1rem rgba(86, 57, 45, .18); }
 .catalogue-cart-jump[hidden] { display: none; }
+.catalogue-cart-count { flex: 0 0 auto; font-size: .78rem; font-weight: 800; white-space: nowrap; }
+.catalogue-cart-jump .button { min-height: 44px; padding: .55rem .8rem; white-space: nowrap; cursor: pointer; }
+.catalogue-cart-jump .button-line { border-color: var(--ivory); color: var(--ivory); }
+.catalogue-cart-jump .button-dark { background: var(--rose); color: var(--ink); }
+.catalogue-cart-jump .button:disabled { cursor: not-allowed; opacity: .55; }
 .text-button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .catalogue-section-disclosure { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; margin-top: 1rem; padding: .65rem 1rem; border: 1px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font-size: .78rem; font-weight: 800; cursor: pointer; }
 .catalogue-section-disclosure:hover, .catalogue-section-disclosure:focus-visible { background: var(--ink); color: var(--ivory); }

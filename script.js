@@ -399,12 +399,13 @@
     var searchFilter = document.getElementById("catalogue-search");
     var typeFilter = document.getElementById("catalogue-type-filter");
     var priceFilter = document.getElementById("catalogue-price-filter");
+    var applyButton = document.getElementById("catalogue-filter-apply");
     var resetButton = document.getElementById("catalogue-filter-reset");
     var emptyReset = document.getElementById("catalogue-empty-reset");
     var status = document.getElementById("catalogue-filter-status");
     var empty = document.getElementById("catalogue-filter-empty");
     var results = document.getElementById("catalogue-results");
-    if (!tools || !searchFilter || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty || !results) return;
+    if (!tools || !searchFilter || !typeFilter || !priceFilter || !applyButton || !resetButton || !emptyReset || !status || !empty || !results) return;
     var searchForm = document.getElementById("catalogue-search-form");
     var searchToggle = document.getElementById("catalogue-search-toggle");
     var filterToggle = document.getElementById("catalogue-filter-toggle");
@@ -415,6 +416,8 @@
     var validBudgets = ["all", "499", "999", "1999", "2000"];
     var typeLabels = { all: "All gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
     var searchMaxLength = 100;
+    var appliedType = "all";
+    var appliedBudget = "all";
 
     var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
       return !card.closest || !card.closest("#testimonials");
@@ -500,8 +503,8 @@
         var isInOverview = allVisible || isExpanded(section) || sectionCards.indexOf(card) < previewLimit;
         var type = typeFor(card);
         return isInOverview &&
-          ((typeFilter.value || "all") === "all" || (typeFilter.value || "all") === type) &&
-          matchesPrice(card, priceFilter.value || "all") &&
+          (appliedType === "all" || appliedType === type) &&
+          matchesPrice(card, appliedBudget) &&
           matchesSearch(card);
       });
     }
@@ -562,7 +565,7 @@
       });
       updateCataloguePresentation();
       empty.hidden = matchingCards.length !== 0;
-      status.textContent = !matchingCards.length ? "No gifts match those choices." : allVisible ? "Showing " + matchingCards.length + " gifts." : "";
+      status.textContent = !matchingCards.length ? "No gifts match those choices." : "";
       document.documentElement.classList.add("catalogue-ready");
       return { total: matchingCards.length, cards: matchingCards };
     }
@@ -627,8 +630,10 @@
     function setFullState(type, budget, query) {
       allVisible = true;
       expandedSections = [];
-      typeFilter.value = validTypes.indexOf(type) !== -1 ? type : "all";
-      priceFilter.value = validBudgets.indexOf(budget) !== -1 ? budget : "all";
+      appliedType = validTypes.indexOf(type) !== -1 ? type : "all";
+      appliedBudget = validBudgets.indexOf(budget) !== -1 ? budget : "all";
+      typeFilter.value = appliedType;
+      priceFilter.value = appliedBudget;
       searchFilter.value = normalizeSearch(query);
       return applyFilters();
     }
@@ -643,12 +648,14 @@
     function showFeatured(commit, type, budget) {
       allVisible = false;
       expandedSections = [];
-      typeFilter.value = validTypes.indexOf(type) !== -1 ? type : "all";
-      priceFilter.value = validBudgets.indexOf(budget) !== -1 ? budget : "all";
+      appliedType = validTypes.indexOf(type) !== -1 ? type : "all";
+      appliedBudget = validBudgets.indexOf(budget) !== -1 ? budget : "all";
+      typeFilter.value = appliedType;
+      priceFilter.value = appliedBudget;
       searchFilter.value = "";
       applyFilters();
       closeControls();
-      if (commit) writeUrl(urlWithState({ preview: true, type: typeFilter.value, budget: priceFilter.value }, "#catalogue-filters"));
+      if (commit) writeUrl(urlWithState({ preview: true, type: appliedType, budget: appliedBudget }, "#catalogue-filters"));
     }
 
     function scrollToHash(href) {
@@ -667,7 +674,7 @@
     function selectCategory(category, href, commit) {
       setFullState(category || "all", "all", "");
       closeControls();
-      if (commit) writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value }, href || "#catalogue-filters"));
+      if (commit) writeUrl(urlWithState({ full: true, type: appliedType, budget: appliedBudget }, href || "#catalogue-filters"));
       scrollToHash(href || "#catalogue-filters");
     }
 
@@ -693,7 +700,7 @@
       var state = readLocationState();
       if (state.full) {
         setFullState(state.type, state.budget, state.q);
-        var normalized = urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, q: searchFilter.value }, window.location && window.location.hash);
+        var normalized = urlWithState({ full: true, type: appliedType, budget: appliedBudget, q: searchFilter.value }, window.location && window.location.hash);
         if (!sameUrl(normalized)) writeUrl(normalized, true);
         closeControls();
         scrollToHash(window.location && window.location.hash);
@@ -702,7 +709,7 @@
       }
       if (state.preview) {
         showFeatured(false, state.type, state.budget);
-        var previewUrl = urlWithState({ preview: true, type: typeFilter.value, budget: priceFilter.value }, window.location && window.location.hash);
+        var previewUrl = urlWithState({ preview: true, type: appliedType, budget: appliedBudget }, window.location && window.location.hash);
         if (!sameUrl(previewUrl)) writeUrl(previewUrl, true);
         scrollToHash(window.location && window.location.hash);
         return;
@@ -739,9 +746,11 @@
     function commitFilterChange() {
       allVisible = true;
       expandedSections = [];
+      appliedType = typeFilter.value || "all";
+      appliedBudget = priceFilter.value || "all";
       applyFilters();
-      closeControls();
-      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, q: searchFilter.value }, "#catalogue-filters"));
+      closeControls(filterToggle);
+      writeUrl(urlWithState({ full: true, type: appliedType, budget: appliedBudget, q: searchFilter.value }, "#catalogue-filters"));
     }
 
     function commitSearchInput(event) {
@@ -750,8 +759,8 @@
       allVisible = Boolean(query);
       expandedSections = [];
       applyFilters();
-      var state = { full: allVisible, type: typeFilter.value, budget: priceFilter.value, q: query };
-      if (!allVisible && (typeFilter.value !== "all" || priceFilter.value !== "all")) state = { preview: true, type: typeFilter.value, budget: priceFilter.value };
+      var state = { full: allVisible, type: appliedType, budget: appliedBudget, q: query };
+      if (!allVisible && (appliedType !== "all" || appliedBudget !== "all")) state = { preview: true, type: appliedType, budget: appliedBudget };
       writeUrl(urlWithState(state, "#catalogue-filters"), true);
       if (!query) closeControls();
     }
@@ -806,8 +815,7 @@
       closeControls();
       focusCatalogueRegion();
     });
-    typeFilter.addEventListener("change", commitFilterChange);
-    priceFilter.addEventListener("change", commitFilterChange);
+    applyButton.addEventListener("click", commitFilterChange);
     searchFilter.addEventListener("input", commitSearchInput);
     searchFilter.addEventListener("compositionend", commitSearchInput);
     resetButton.addEventListener("click", function () { showFeatured(true); });
@@ -818,7 +826,11 @@
     if (typeof document.addEventListener === "function") document.addEventListener("keydown", function (event) {
       if (event.key !== "Escape") return;
       if (searchToggle && searchToggle.getAttribute("aria-expanded") === "true") closeControls(searchToggle);
-      else if (filterToggle && filterToggle.getAttribute("aria-expanded") === "true") closeControls(filterToggle);
+      else if (filterToggle && filterToggle.getAttribute("aria-expanded") === "true") {
+        typeFilter.value = appliedType;
+        priceFilter.value = appliedBudget;
+        closeControls(filterToggle);
+      }
     });
     window.addEventListener("hashchange", restoreFromLocation);
     window.addEventListener("popstate", restoreFromLocation);
@@ -844,6 +856,9 @@
     var catalogueSelectionStatus = document.getElementById("catalogue-selection-status");
     var catalogueRequestSelected = document.getElementById("catalogue-request-selected");
     var catalogueCartJump = document.getElementById("catalogue-cart-jump");
+    var catalogueCartCount = document.getElementById("catalogue-cart-count");
+    var catalogueCartView = document.getElementById("catalogue-cart-view");
+    var catalogueCartOrder = document.getElementById("catalogue-cart-order");
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
     if (!embed || !frame || !status) return;
@@ -851,7 +866,7 @@
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
     var requestedMode = embed.getAttribute("data-form-mode");
-    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
+    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
     var corporateIntakeReady = embed.getAttribute("data-intake-ready") === "true";
     var orderDialogEnabled = Boolean(orderDialog && typeof orderDialog.showModal === "function");
     var orderDialogHistoryActive = false;
@@ -929,8 +944,10 @@
       status.innerHTML = loadingStatusMarkup("Preparing the request form…");
       status.hidden = false;
       status.setAttribute("aria-busy", "true");
+      var loadingNonce = identity.nonce;
+      var loadingRequestId = identity.requestId;
       frameState.loadingTimer = window.setTimeout(function () {
-        if (!frameState.loading || frameState.loadingNonce !== frameState.nonce || frameState.loadingRequestId !== frameState.requestId) return;
+        if (!frameState.loading || frameState.loadingNonce !== loadingNonce || frameState.loadingRequestId !== loadingRequestId || frameState.nonce !== loadingNonce || frameState.requestId !== loadingRequestId) return;
         frameState.loading = false;
         frameState.loadingTimer = null;
         status.innerHTML = "The request form is taking longer than expected. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
@@ -946,6 +963,30 @@
       frameState.loadingRequestId = "";
       status.hidden = true;
       status.removeAttribute("aria-busy");
+    }
+
+    function replaceOrderFormFrame(identity) {
+      var previousFrame = frame;
+      var nextFrame = previousFrame.cloneNode ? previousFrame.cloneNode(false) : document.createElement("iframe");
+      nextFrame.id = previousFrame.id || "order-form-frame";
+      if (previousFrame.getAttribute && nextFrame.setAttribute) {
+        ["title", "loading"].forEach(function (attribute) {
+          var value = previousFrame.getAttribute(attribute);
+          if (value) nextFrame.setAttribute(attribute, value);
+        });
+      }
+      nextFrame.name = "saloni-order-form-frame-" + (++frameState.frameSequence);
+      nextFrame.hidden = true;
+      if (previousFrame.parentNode && previousFrame.parentNode.replaceChild) previousFrame.parentNode.replaceChild(nextFrame, previousFrame);
+      frame = nextFrame;
+      // A visible load only ends presentation loading; it does not establish a trusted message sender.
+      nextFrame.addEventListener("load", function () {
+        if (frame !== nextFrame || !frameState.loaded || frameState.nonce !== identity.nonce || frameState.requestId !== identity.requestId) return;
+        nextFrame.hidden = false;
+        if (!frameState.loading || frameState.loadingNonce !== identity.nonce || frameState.loadingRequestId !== identity.requestId) return;
+        finishOrderFormLoading();
+      });
+      return nextFrame;
     }
 
     function isOrderDialogHistoryState(state) {
@@ -1228,14 +1269,15 @@
       seed.channelNonce = frameState.nonce;
       seed.formMode = frameState.mode;
       if (String(seed.sourceKind || "").toLowerCase() === "customizer") seed.previewExpected = previewExpected !== false;
-      frame.hidden = false;
-      if (orderDialogEnabled) startOrderFormLoading(requestIdentity);
+      var frameIdentity = { nonce: frameState.nonce, requestId: frameState.requestId };
+      var requestFrame = replaceOrderFormFrame(frameIdentity);
+      if (orderDialogEnabled) startOrderFormLoading(frameIdentity);
       else status.hidden = true;
-      // Normal POST action=seed keeps the existing iframe alive while replacing its document.
+      // POST action=seed targets the fresh iframe for this request.
       var postForm = document.createElement("form");
       postForm.method = "POST";
       postForm.action = orderUrl;
-      postForm.target = frame.name;
+      postForm.target = requestFrame.name;
       postForm.setAttribute("aria-hidden", "true");
       var action = document.createElement("input");
       action.type = "hidden"; action.name = "action"; action.value = "seed";
@@ -1605,8 +1647,9 @@
       renderCatalogueSelectionItems();
       if (catalogueCartJump) {
         catalogueCartJump.hidden = count === 0;
-        catalogueCartJump.textContent = count ? count + " selected · View cart" : "";
       }
+      if (catalogueCartCount) catalogueCartCount.textContent = count ? count + " selected" : "";
+      if (catalogueCartOrder) catalogueCartOrder.disabled = count === 0;
       if (catalogueSelectionSummary) {
         if (!count) catalogueSelectionSummary.textContent = "No gifts selected.";
         else {
@@ -1652,18 +1695,19 @@
       return prepared;
     }
 
-    function openCatalogueSelectionRequest(items) {
+    function openCatalogueSelectionRequest(items, opener) {
+      var requestOpener = opener || catalogueRequestSelected;
       var key = catalogueSelectionKey(items);
       if (frameState.loaded && frameState.sourceKind === "catalogue" && frameState.catalogueSeedKey === key) {
         if (continueOrderButton) continueOrderButton.hidden = false;
-        if (orderDialogEnabled) openOrderDialog(catalogueRequestSelected, true);
+        if (orderDialogEnabled) openOrderDialog(requestOpener, true);
         else scrollToForm();
         return true;
       }
       return chooseSource({
         sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items",
         quantity: String(bundleTotal(items)), designDetails: key, bundleItems: items
-      }, { opener: catalogueRequestSelected });
+      }, { opener: requestOpener });
     }
 
     function toggleCatalogueSelection(seed) {
@@ -1748,7 +1792,7 @@
 
     restoreCatalogueSelection();
 
-    if (catalogueRequestSelected) catalogueRequestSelected.addEventListener("click", function () {
+    function requestSelectedCatalogueItems(opener) {
       if (!selectedCatalogueItems.length) return;
       var items = selectedCatalogueItems.slice();
       if (bundleTotal(items) > 100) {
@@ -1759,10 +1803,17 @@
         setCatalogueSelectionStatus("The selected list is too long. Lower a quantity before continuing.");
         return;
       }
-      openCatalogueSelectionRequest(items);
+      openCatalogueSelectionRequest(items, opener || catalogueRequestSelected);
+    }
+
+    if (catalogueRequestSelected) catalogueRequestSelected.addEventListener("click", function () {
+      requestSelectedCatalogueItems(catalogueRequestSelected);
+    });
+    if (catalogueCartOrder) catalogueCartOrder.addEventListener("click", function () {
+      requestSelectedCatalogueItems(catalogueCartOrder);
     });
 
-    if (catalogueCartJump) catalogueCartJump.addEventListener("click", function () {
+    if (catalogueCartView) catalogueCartView.addEventListener("click", function () {
       if (!catalogueSelection || catalogueSelection.hidden) return;
       catalogueSelection.scrollIntoView({ behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
       catalogueSelection.focus({ preventScroll: true });
