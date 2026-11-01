@@ -35,6 +35,9 @@
     .referral-disclosure { margin-top: .85rem; }
     .referral-disclosure summary { padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
     .referral-box { display: grid; gap: .65rem; margin-top: .65rem; }
+    .repeat-profile-box { display: grid; gap: .65rem; margin-top: .85rem; }
+    .repeat-profile-box label { display: flex; align-items: flex-start; gap: .55rem; }
+    .repeat-profile-box input[type="checkbox"] { width: auto; min-height: auto; margin-top: .2rem; }
     .field-error { margin: 0; color: #a41f33; }
     [hidden] { display: none !important; }
     .actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
@@ -119,6 +122,13 @@
       </div>
     </fieldset>
 
+    <div class="repeat-profile-box" id="repeat-profile-box">
+      <label for="remember-repeat-profile"><input id="remember-repeat-profile" type="checkbox"> Remember my name, phone, and delivery details on this device for 30 days.</label>
+      <p class="hint">Saved only in this browser. These details are not sent to the studio again until you send a new request.</p>
+      <button id="forget-repeat-profile" class="secondary" type="button">Forget saved details on this device</button>
+      <p id="repeat-profile-status" class="hint" role="status" aria-live="polite"></p>
+    </div>
+
     <fieldset>
       <legend>Optional reference image</legend>
       <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
@@ -143,7 +153,7 @@
     <p class="privacy-summary">Your information is used only to handle your request. <a href="#privacy-details">Privacy details</a></p>
     <details class="privacy-details" id="privacy-details">
       <summary>Privacy details</summary>
-      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p>
+      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. If you choose to remember them, your name, phone, and delivery details stay only in this browser for up to 30 days and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p>
     </details>
   </form>
 </main>
@@ -177,6 +187,9 @@
   var referralInput = form.elements.referralCode || document.getElementById("referral-code");
   var referralStatus = document.getElementById("referral-status");
   var checkReferral = document.getElementById("check-referral");
+  var rememberRepeatProfile = document.getElementById("remember-repeat-profile");
+  var forgetRepeatProfileButton = document.getElementById("forget-repeat-profile");
+  var repeatProfileStatus = document.getElementById("repeat-profile-status");
   var active = false;
   var currentAttempt = null;
   var timeoutId = null;
@@ -439,6 +452,21 @@
     if (checkReferral) checkReferral.disabled = false;
     var code = referralInput ? normalizeReferralCode(referralInput.value) : "";
     showReferralStatus(code ? "Code changed. Check it again before submitting." : "No code entered. The order can continue without partner credit.", "");
+  }
+  function setRepeatProfileStatus(message) {
+    if (repeatProfileStatus) repeatProfileStatus.textContent = message || "";
+  }
+  function repeatProfileFromForm() {
+    return {
+      customerName: value("customerName"), phone: value("phone"), fulfillment: value("fulfillment"),
+      shippingAddress: value("shippingAddress"), city: value("city"), state: value("state"), pin: value("pin")
+    };
+  }
+  function requestForgetRepeatProfile() {
+    if (window.top && window.top !== window && seed.channelNonce) {
+      try { window.top.postMessage({ type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, PARENT_ORIGIN); } catch (error) {}
+    }
+    setRepeatProfileStatus("Saved details were removed from this device.");
   }
   function checkReferralCode() {
     if (!referralInput || !checkReferral || !window.google || !google.script || !google.script.run) return;
@@ -735,6 +763,9 @@
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
     anotherButton.hidden = false;
     var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
+    if (rememberRepeatProfile && rememberRepeatProfile.checked && window.top && window.top !== window && seed.channelNonce) {
+      try { window.top.postMessage({ type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile: repeatProfileFromForm() }, PARENT_ORIGIN); } catch (error) {}
+    }
     setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed." + referralMessage + " Request ID: " + result.requestId, "success");
     if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
   }
@@ -812,6 +843,7 @@
   });
   if (referralInput) { referralInput.addEventListener("input", clearReferralStatus); referralInput.addEventListener("change", clearReferralStatus); }
   if (checkReferral) checkReferral.addEventListener("click", checkReferralCode);
+  if (forgetRepeatProfileButton) forgetRepeatProfileButton.addEventListener("click", requestForgetRepeatProfile);
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;

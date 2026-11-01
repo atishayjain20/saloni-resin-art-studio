@@ -94,7 +94,16 @@ class CapturingPort {
   close() { this.closed = true; }
 }
 
-function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false } = {}) {
+function createStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { values.set(String(key), String(value)); },
+    removeItem(key) { values.delete(String(key)); },
+  };
+}
+
+function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage() } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
@@ -284,6 +293,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
     location: { href: "https://saloniresinart.com/" },
+    localStorage: storage,
     activeElement: null,
     history: {
       state: {},
@@ -675,6 +685,132 @@ test("cart lists every selected line and submits independent quantities with a b
   assert.match(flow.catalogueSelectionStatus.textContent, /1 to 100|100/);
 });
 
+test("restores selected catalogue items and quantities after a browser reload", () => {
+  const storage = createStorage();
+  const firstLoad = runFlow({ storage });
+  firstLoad.catalogueButton.dispatch("click");
+  firstLoad.generatedCatalogueButtons[0].dispatch("click");
+  const quantity = firstLoad.catalogueSelectionItems.children[0].querySelector("input");
+  quantity.value = "3";
+  quantity.dispatch("change");
+  const persisted = JSON.parse(storage.getItem("saloniCatalogueCart"));
+  assert.equal(persisted.version, 1);
+  assert.ok(persisted.expiresAt > Date.now());
+  assert.ok(persisted.expiresAt <= Date.now() + 30 * 24 * 60 * 60 * 1000);
+  assert.deepEqual(persisted.items, [
+    { sourceId: "catalogue:test-frame.png", quantity: 3 },
+    { sourceId: "catalogue:concept-floral-memory-frame.webp", quantity: 1 },
+  ]);
+
+  const reloaded = runFlow({ storage });
+  assert.equal(reloaded.catalogueSelection.hidden, false);
+  assert.deepEqual(reloaded.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "Your flowers, held close"]);
+  assert.deepEqual(reloaded.catalogueSelectionItems.children.map((line) => line.querySelector("input").value), ["3", "1"]);
+  assert.equal(reloaded.catalogueButton.textContent, "Remove from cart");
+  assert.equal(reloaded.generatedCatalogueButtons[0].textContent, "Remove from cart");
+});
+
+test("ignores stale or invalid catalogue cart entries during reload", () => {
+  const storage = createStorage({
+    saloniCatalogueCart: JSON.stringify({
+      version: 1,
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      items: [
+        { sourceId: "catalogue:test-frame.png", quantity: 2 },
+        { sourceId: "catalogue:removed-item.png", quantity: 4 },
+        { sourceId: "catalogue:concept-floral-memory-frame.webp", quantity: 0 },
+        { sourceId: "catalogue:test-frame.png", quantity: 99 },
+      ],
+    }),
+  });
+  const flow = runFlow({ storage });
+  assert.deepEqual(flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame"]);
+  assert.equal(flow.catalogueSelectionItems.children[0].querySelector("input").value, "2");
+});
+
+test("expires and removes malformed catalogue cart records", () => {
+  for (const record of [
+    JSON.stringify({ version: 1, expiresAt: Date.now() - 1, items: [{ sourceId: "catalogue:test-frame.png", quantity: 2 }] }),
+    "not-json",
+  ]) {
+    const storage = createStorage({ saloniCatalogueCart: record });
+    const flow = runFlow({ storage });
+    assert.equal(flow.catalogueSelection.hidden, true);
+    assert.equal(storage.getItem("saloniCatalogueCart"), null);
+  }
+});
+
+test("prefills repeat customer details from a valid 30-day parent profile and rejects expired or malformed records", () => {
+  const profile = { customerName: "Saved Customer", phone: "+91 8209238541", fulfillment: "shipping", shippingAddress: "61 Hathi Bhata", city: "Ajmer", state: "Rajasthan", pin: "305001" };
+  const validStorage = createStorage({ saloniRepeatProfile: JSON.stringify({ version: 1, expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, profile }) });
+  const valid = runFlow({ storage: validStorage });
+  const seeded = requestCatalogue(valid, valid.catalogueButton, false);
+  assert.deepEqual(Object.fromEntries(Object.entries(profile).map(([key, value]) => [key, seeded[key]])), profile);
+
+  for (const payload of [
+    { version: 1, expiresAt: Date.now() - 1, profile },
+    { version: 2, expiresAt: Date.now() + 1000, profile },
+    { version: 1, expiresAt: Date.now() + 1000, profile: { ...profile, shippingAddress: { invalid: true } } },
+    "not-json",
+  ]) {
+    const storage = createStorage({ saloniRepeatProfile: typeof payload === "string" ? payload : JSON.stringify(payload) });
+    const flow = runFlow({ storage });
+    const seeded = requestCatalogue(flow, flow.catalogueButton, false);
+    assert.equal(seeded.customerName, "");
+    assert.equal(storage.getItem("saloniRepeatProfile"), null);
+  }
+
+  const denied = { getItem() { throw new Error("storage denied"); }, setItem() { throw new Error("storage denied"); }, removeItem() { throw new Error("storage denied"); } };
+  const flow = runFlow({ storage: denied });
+  const deniedSeed = requestCatalogue(flow, flow.catalogueButton, false);
+  assert.equal(deniedSeed.customerName, "");
+  const deniedFrame = flow.elements.get("order-form-frame");
+  assert.doesNotThrow(() => flow.windowObject.messageListener({
+    origin: "https://n-current-script.googleusercontent.com", source: deniedFrame.contentWindow,
+    data: { type: "saloni-order-form-ready", nonce: deniedSeed.channelNonce, siteKey: "site-key" }, ports: [],
+  }));
+  assert.doesNotThrow(() => flow.windowObject.messageListener({
+    origin: "https://n-current-script.googleusercontent.com", source: deniedFrame.contentWindow,
+    data: { type: "saloni-order-save-repeat-profile", version: 1, nonce: deniedSeed.channelNonce, profile }, ports: [],
+  }));
+});
+
+test("accepts only a pinned successful iframe repeat-profile message and clears only that record", () => {
+  const storage = createStorage();
+  const flow = runFlow({ storage });
+  const seed = requestCatalogue(flow, flow.catalogueButton, false);
+  const frame = flow.elements.get("order-form-frame");
+  const source = frame.contentWindow;
+  const origin = "https://n-current-script.googleusercontent.com";
+  const profile = { customerName: "Saved Customer", phone: "+91 8209238541", fulfillment: "shipping", shippingAddress: "61 Hathi Bhata", city: "Ajmer", state: "Rajasthan", pin: "305001", email: "not allowed", requestId: "not allowed", referralCode: "not allowed" };
+  const foreignSource = {};
+  flow.windowObject.messageListener({ origin: "https://other.example", source, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "foreign" }, ports: [] });
+  flow.windowObject.messageListener({ origin: "https://other.example", source, data: { type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile }, ports: [] });
+  flow.windowObject.messageListener({ origin: "https://other.example", source, data: { type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, ports: [] });
+  flow.windowObject.messageListener({ origin, source: foreignSource, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "foreign" }, ports: [] });
+  assert.equal(flow.elements.get("order-form-status").getAttribute("aria-busy"), "true");
+  flow.windowObject.messageListener({ origin, source: foreignSource, data: { type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile }, ports: [] });
+  flow.windowObject.messageListener({ origin, source: foreignSource, data: { type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, ports: [] });
+  assert.equal(storage.getItem("saloniRepeatProfile"), null);
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key" }, ports: [] });
+  for (const mismatch of [
+    { origin: "https://other.example", source, nonce: seed.channelNonce },
+    { origin, source, nonce: "stale-nonce" },
+    { origin, source: {}, nonce: seed.channelNonce },
+  ]) {
+    flow.windowObject.messageListener({ origin: mismatch.origin, source: mismatch.source, data: { type: "saloni-order-save-repeat-profile", version: 1, nonce: mismatch.nonce, profile }, ports: [] });
+    assert.equal(storage.getItem("saloniRepeatProfile"), null);
+  }
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile }, ports: [] });
+  const saved = JSON.parse(storage.getItem("saloniRepeatProfile"));
+  assert.deepEqual(saved.profile, { customerName: profile.customerName, phone: profile.phone, fulfillment: profile.fulfillment, shippingAddress: profile.shippingAddress, city: profile.city, state: profile.state, pin: profile.pin });
+  assert.ok(saved.expiresAt > Date.now());
+  const cartBefore = storage.getItem("saloniCatalogueCart");
+  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, ports: [] });
+  assert.equal(storage.getItem("saloniRepeatProfile"), null);
+  assert.equal(storage.getItem("saloniCatalogueCart"), cartBefore);
+});
+
 test("cart rows expose an accessible remove action for the exact selected item", () => {
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
@@ -710,17 +846,20 @@ test("keeps selected catalogue items while pagination or filters change the visi
 });
 
 test("clears catalogue selections when general or customizer ordering takes over", () => {
-  const flow = runFlow();
+  const storage = createStorage();
+  const flow = runFlow({ storage });
   flow.catalogueButton.dispatch("click");
   assert.equal(flow.catalogueSelection.hidden, false);
 
   flow.generalRequest.dispatch("click", { preventDefault() {} });
   assert.equal(flow.catalogueSelection.hidden, true);
+  assert.equal(storage.getItem("saloniCatalogueCart"), null);
 
   flow.catalogueButton.dispatch("click");
   assert.equal(flow.catalogueSelection.hidden, false);
   flow.customizer.dispatch("click");
   assert.equal(flow.catalogueSelection.hidden, true);
+  assert.equal(storage.getItem("saloniCatalogueCart"), null);
 });
 
 test("routes Resin art to the active catalogue categories without a romantic heading link", () => {
@@ -905,7 +1044,7 @@ test("preview rejection keeps the draft until explicit continuation and retry re
   assert.equal(seed.previewExpected, false);
   assert.equal(form.children.find((child) => child.name === "mode").value, "order");
   const latePreview = new CapturingPort();
-  flow.windowObject.messageListener({ origin: "https://n-1234567890-1lu-script.googleusercontent.com", source: {}, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "no-preview" }, ports: [latePreview] });
+  flow.windowObject.messageListener({ origin: "https://n-1234567890-1lu-script.googleusercontent.com", source: flow.elements.get("order-form-frame").contentWindow, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "no-preview" }, ports: [latePreview] });
   assert.equal(latePreview.messages[0].ok, false);
   assert.equal(latePreview.messages[0].error, "unavailable");
   assert.equal(Object.hasOwn(latePreview.messages[0], "blob"), false);
@@ -1057,11 +1196,12 @@ test("owns CAPTCHA token requests on the exact studio origin and pinned sender",
   assert.doesNotMatch(source, /CHILD_ORIGIN/);
 });
 
-test("pins a nested form sender and observed sandbox origin, then rejects stale or foreign messages", async () => {
+test("pins the exact form iframe sender and observed sandbox origin, then rejects stale or foreign messages", async () => {
   const flow = runFlow({ confirms: [true] });
   const first = requestCatalogue(flow, flow.catalogueButton);
-  const nestedSource = {};
-  const sandboxOrigin = "https://script.googleusercontent.com";
+  const frame = flow.elements.get("order-form-frame");
+  const nestedSource = frame.contentWindow;
+  const sandboxOrigin = "https://n-nested-script.googleusercontent.com";
   flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: first.channelNonce, siteKey: "site-key" }, ports: [] });
   const firstPort = new CapturingPort();
   flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-captcha-request", nonce: first.channelNonce, attemptId: "attempt-1" }, ports: [firstPort] });
@@ -1077,8 +1217,8 @@ test("pins a nested form sender and observed sandbox origin, then rejects stale 
   flow.windowObject.messageListener({ origin: sandboxOrigin, source: {}, data: { type: "saloni-order-captcha-request", nonce: second.channelNonce, attemptId: "foreign" }, ports: [foreignPort] });
   assert.equal(stalePort.messages.length, 0);
   assert.equal(foreignPort.messages.length, 0);
-  const replacementSource = {};
-  const replacementOrigin = "https://1234567890-1lu-script.googleusercontent.com";
+  const replacementSource = frame.contentWindow;
+  const replacementOrigin = "https://n-1234567890-1lu-script.googleusercontent.com";
   flow.windowObject.messageListener({ origin: replacementOrigin, source: replacementSource, data: { type: "saloni-order-form-ready", nonce: second.channelNonce, siteKey: "site-key" }, ports: [] });
   const replacementPort = new CapturingPort();
   flow.windowObject.messageListener({ origin: replacementOrigin, source: replacementSource, data: { type: "saloni-order-captcha-request", nonce: second.channelNonce, attemptId: "attempt-2" }, ports: [replacementPort] });
@@ -1090,7 +1230,7 @@ test("direct preview bootstrap pins only after the complete identity and origin 
   const flow = runFlow();
   flow.customizer.dispatch("click");
   const seed = submittedSeed(flow.posted);
-  const source = {};
+  const source = flow.elements.get("order-form-frame").contentWindow;
   const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
   const port = new CapturingPort();
   flow.windowObject.messageListener({ origin, source, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "bootstrap-1" }, ports: [port] });
@@ -1103,7 +1243,7 @@ test("preview rejects two ports without pinning, and the separate CAPTCHA channe
   const flow = runFlow();
   flow.customizer.dispatch("click");
   const seed = submittedSeed(flow.posted);
-  const source = {};
+  const source = flow.elements.get("order-form-frame").contentWindow;
   const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
   const firstPort = new CapturingPort();
   const secondPort = new CapturingPort();
@@ -1129,7 +1269,7 @@ test("serves exactly one immutable preview snapshot per validated request and al
   const flow = runFlow();
   flow.customizer.dispatch("click");
   const seed = submittedSeed(flow.posted);
-  const nestedSource = {};
+  const nestedSource = flow.elements.get("order-form-frame").contentWindow;
   const sandboxOrigin = "https://n-1234567890-1lu-script.googleusercontent.com";
   flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
 
@@ -1166,7 +1306,7 @@ test("reports preview failures through the bounded error field without a Blob", 
   flow.customizer.dispatch("click");
   captured.blob = { type: "image/png", size: 0 };
   const seed = submittedSeed(flow.posted);
-  const source = {};
+  const source = flow.elements.get("order-form-frame").contentWindow;
   const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
   flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
   const port = new CapturingPort();
@@ -1182,7 +1322,7 @@ test("rejects wrong preview origin, source, identity, mode, version, and port sh
   const flow = runFlow();
   flow.customizer.dispatch("click");
   const seed = submittedSeed(flow.posted);
-  const nestedSource = {};
+  const nestedSource = flow.elements.get("order-form-frame").contentWindow;
   const sandboxOrigin = "https://n-1234567890-1lu-script.googleusercontent.com";
   flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
   const cases = [
@@ -1210,7 +1350,7 @@ test("invalidates a prior preview snapshot when a newer source is selected", () 
   const flow = runFlow();
   flow.customizer.dispatch("click");
   const first = submittedSeed(flow.posted);
-  const nestedSource = {};
+  const nestedSource = flow.elements.get("order-form-frame").contentWindow;
   const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
   flow.windowObject.messageListener({ origin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: first.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
   flow.catalogueButton.dispatch("click");
