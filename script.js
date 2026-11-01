@@ -132,9 +132,6 @@
     var lightboxPrice = document.getElementById("lightbox-product-price");
     var lightboxSize = document.getElementById("lightbox-product-size");
     var lightboxDescription = document.getElementById("lightbox-image-description");
-    var lightboxPrevious = document.getElementById("lightbox-previous");
-    var lightboxNext = document.getElementById("lightbox-next");
-    var lightboxPosition = document.getElementById("lightbox-position");
     var lightboxRequest = document.getElementById("lightbox-request");
     var lightboxTriggers = document.querySelectorAll("[data-lightbox-trigger]");
     var lastTrigger = null;
@@ -221,17 +218,6 @@
         return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description };
       }
 
-      function visibleCollection(trigger) {
-        var grid = trigger.closest ? trigger.closest(".catalogue-grid") : null;
-        var scope = grid || (trigger.closest ? trigger.closest("section") : null);
-        var candidates = scope && scope.querySelectorAll ? scope.querySelectorAll("[data-lightbox-trigger]") : [];
-        var items = Array.prototype.filter.call(candidates, function (candidate) {
-          var card = candidate.closest ? candidate.closest("article") : null;
-          return !card || (!card.hidden && !(card.closest && card.closest("[hidden]")));
-        }).map(productDetails);
-        return items.length ? items : [productDetails(trigger)];
-      }
-
       function renderLightboxItem() {
         var item = lightboxItems[lightboxIndex] || productDetails(lastTrigger);
         if (!item) return;
@@ -241,9 +227,6 @@
         if (lightboxPrice) { lightboxPrice.textContent = item.price || ""; lightboxPrice.hidden = !item.price; }
         if (lightboxSize) { lightboxSize.textContent = item.size || ""; lightboxSize.hidden = !item.size; }
         if (lightboxDescription) lightboxDescription.textContent = item.description || "";
-        if (lightboxPosition) lightboxPosition.textContent = item.card ? (lightboxIndex + 1) + " of " + lightboxItems.length + (item.title ? " · " + item.title : "") : "";
-        if (lightboxPrevious) { lightboxPrevious.disabled = lightboxIndex <= 0 || lightboxItems.length < 2; lightboxPrevious.setAttribute("aria-disabled", String(lightboxPrevious.disabled)); }
-        if (lightboxNext) { lightboxNext.disabled = lightboxIndex >= lightboxItems.length - 1 || lightboxItems.length < 2; lightboxNext.setAttribute("aria-disabled", String(lightboxNext.disabled)); }
         if (lightboxRequest) {
           var itemRequestButton = item.card && item.card.querySelector ? item.card.querySelector("[data-order-prefill]") : null;
           lightboxRequest.hidden = !itemRequestButton;
@@ -254,13 +237,6 @@
             lightboxRequest.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from cart" : " to cart"));
           }
         }
-      }
-
-      function moveLightboxItem(direction) {
-        var nextIndex = Math.min(lightboxItems.length - 1, Math.max(0, lightboxIndex + direction));
-        if (nextIndex === lightboxIndex || !lightboxItems.length) return;
-        lightboxIndex = nextIndex;
-        renderLightboxItem();
       }
 
       lightbox.addEventListener("click", function (event) {
@@ -353,12 +329,6 @@
         if (event && typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
         lightbox.close();
       });
-      lightbox.addEventListener("keydown", function (event) {
-        if (event.key === "ArrowLeft") { event.preventDefault(); moveLightboxItem(-1); }
-        if (event.key === "ArrowRight") { event.preventDefault(); moveLightboxItem(1); }
-      });
-      if (lightboxPrevious) lightboxPrevious.addEventListener("click", function () { moveLightboxItem(-1); });
-      if (lightboxNext) lightboxNext.addEventListener("click", function () { moveLightboxItem(1); });
       if (lightboxRequest) lightboxRequest.addEventListener("click", function () {
         var item = lightboxItems[lightboxIndex];
         var requestButton = item && item.card && item.card.querySelector("[data-order-prefill]");
@@ -373,8 +343,8 @@
         var targetId = typeof trigger.getAttribute === "function" ? trigger.getAttribute("data-lightbox-target") : "";
         var targetCard = targetId && document.getElementById ? document.getElementById(targetId) : null;
         var targetTrigger = targetCard && targetCard.querySelector ? targetCard.querySelector("[data-lightbox-trigger]") : null;
-        lightboxItems = targetTrigger ? [productDetails(targetTrigger)] : visibleCollection(trigger);
-        lightboxIndex = Math.max(0, lightboxItems.findIndex(function (item) { return item.trigger === trigger; }));
+        lightboxItems = [productDetails(targetTrigger || trigger)];
+        lightboxIndex = 0;
         renderLightboxItem();
         pushLightboxHistory();
         if (!lightbox.open) lightbox.showModal();
@@ -435,13 +405,12 @@
     var empty = document.getElementById("catalogue-filter-empty");
     var results = document.getElementById("catalogue-results");
     if (!tools || !searchFilter || !typeFilter || !priceFilter || !resetButton || !emptyReset || !status || !empty || !results) return;
-    var pagePrevious = document.getElementById("catalogue-page-previous");
-    var pageNext = document.getElementById("catalogue-page-next");
-    var pageStatus = document.getElementById("catalogue-page-status");
-    var pagination = document.getElementById("catalogue-pagination");
-    var catalogueHeading = document.getElementById("catalogue-filters-title");
-    var originalCatalogueHeading = catalogueHeading ? catalogueHeading.textContent : "";
-    var pageSize = 8;
+    var searchForm = document.getElementById("catalogue-search-form");
+    var searchToggle = document.getElementById("catalogue-search-toggle");
+    var filterToggle = document.getElementById("catalogue-filter-toggle");
+    var searchPanel = document.getElementById("catalogue-search-panel");
+    var filterPanel = document.getElementById("catalogue-filter-panel");
+    var catalogueRegion = tools;
     var validTypes = ["all", "couple", "diwali", "frames", "premium", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
     var typeLabels = { all: "All gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
@@ -452,7 +421,6 @@
     });
     var sections = [];
     var allVisible = false;
-    var page = 1;
     var previewLimit = 4;
     var expandedSections = [];
 
@@ -538,30 +506,6 @@
       });
     }
 
-    function cataloguePages(filteredCards) {
-      var pages = [];
-      for (var start = 0; start < filteredCards.length; start += pageSize) {
-        pages.push(filteredCards.slice(start, start + pageSize));
-      }
-      return pages;
-    }
-
-    function setPageStatus(total, pageCount) {
-      if (!pageStatus) return;
-      pageStatus.textContent = total ? "Page " + page + " of " + pageCount : "No pages";
-    }
-
-    function updatePageControls(total, pageCount) {
-      if (pagePrevious) {
-        pagePrevious.disabled = !allVisible || page <= 1 || total === 0;
-        pagePrevious.setAttribute("aria-disabled", String(pagePrevious.disabled));
-      }
-      if (pageNext) {
-        pageNext.disabled = !allVisible || page >= pageCount || total === 0;
-        pageNext.setAttribute("aria-disabled", String(pageNext.disabled));
-      }
-    }
-
     function toggleClass(element, name, enabled) {
       if (element && element.classList && typeof element.classList.toggle === "function") element.classList.toggle(name, enabled);
     }
@@ -572,8 +516,6 @@
     }
 
     function updateCataloguePresentation() {
-      var selectedType = validTypes.indexOf(typeFilter.value) !== -1 ? typeFilter.value : "all";
-      if (catalogueHeading) catalogueHeading.textContent = allVisible ? (typeLabels[selectedType] || typeLabels.all) : originalCatalogueHeading;
       toggleClass(tools, "catalogue-full", allVisible);
       sections.forEach(function (section) {
         var fullSection = allVisible && !section.hidden;
@@ -594,11 +536,6 @@
 
     function applyFilters() {
       var matchingCards = catalogueCards();
-      var pages = cataloguePages(matchingCards);
-      var pageCount = Math.max(1, pages.length);
-      if (page > pageCount) page = pageCount;
-      var pageCards = allVisible ? (pages[page - 1] || []) : matchingCards;
-      var pageStart = pageCards.length ? matchingCards.indexOf(pageCards[0]) : 0;
       cards.forEach(function (card) {
         var type = typeFor(card);
         var price = priceFor(card);
@@ -610,7 +547,7 @@
           card.removeAttribute("data-price-min");
           card.removeAttribute("data-price-max");
         }
-        setVisibility(card, pageCards.indexOf(card) !== -1);
+        setVisibility(card, matchingCards.indexOf(card) !== -1);
       });
       sections.forEach(function (section) {
         var sectionCards = cardsForSection(section);
@@ -624,18 +561,10 @@
         disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : "View all";
       });
       updateCataloguePresentation();
-      var browseAllCta = document.getElementById("browse-all-gifts");
-      if (browseAllCta) browseAllCta.hidden = allVisible;
       empty.hidden = matchingCards.length !== 0;
-      if (pagination) pagination.hidden = !allVisible;
-      var pageEnd = pageStart + pageCards.length;
-      if (!matchingCards.length) status.textContent = "No gifts match those choices.";
-      else if (!allVisible) status.textContent = "";
-      else status.textContent = "Showing " + (pageStart + 1) + "–" + pageEnd + " of " + matchingCards.length + " gifts · Page " + page + " of " + pageCount + ".";
-      setPageStatus(matchingCards.length, pageCount);
-      updatePageControls(matchingCards.length, pageCount);
+      status.textContent = !matchingCards.length ? "No gifts match those choices." : allVisible ? "Showing " + matchingCards.length + " gifts." : "";
       document.documentElement.classList.add("catalogue-ready");
-      return { total: matchingCards.length, pageCount: pageCount, pageCards: pageCards };
+      return { total: matchingCards.length, cards: matchingCards };
     }
 
     function currentUrl() {
@@ -652,11 +581,9 @@
         params.set("view", "preview");
         params.set("type", state.type || "all");
         params.set("budget", state.budget || "all");
-        params.set("page", String(state.page || 1));
       } else if (state && state.full) {
         params.set("type", state.type || "all");
         params.set("budget", state.budget || "all");
-        params.set("page", String(state.page || 1));
         var query = normalizeSearch(state.q);
         if (query) params.set("q", query);
       }
@@ -691,39 +618,25 @@
       if (!has) return { full: false, hasQuery: params.has("q") };
       var type = params.get("type");
       var budget = params.get("budget");
-      var rawPage = params.get("page");
-      var safePage = /^\d+$/.test(rawPage || "") ? Number(rawPage) : NaN;
       if (preview) {
-        return {
-          full: false,
-          preview: true,
-          type: validTypes.indexOf(type) !== -1 ? type : "all",
-          budget: validBudgets.indexOf(budget) !== -1 ? budget : "all",
-          page: Number.isSafeInteger(safePage) && safePage > 0 ? safePage : 1
-        };
+        return { full: false, preview: true, type: validTypes.indexOf(type) !== -1 ? type : "all", budget: validBudgets.indexOf(budget) !== -1 ? budget : "all" };
       }
-      return {
-        full: true,
-        type: validTypes.indexOf(type) !== -1 ? type : "all",
-        budget: validBudgets.indexOf(budget) !== -1 ? budget : "all",
-        page: Number.isSafeInteger(safePage) && safePage > 0 ? safePage : 1,
-        q: query
-      };
+      return { full: true, type: validTypes.indexOf(type) !== -1 ? type : "all", budget: validBudgets.indexOf(budget) !== -1 ? budget : "all", q: query };
     }
 
-    function setFullState(type, budget, nextPage, query) {
+    function setFullState(type, budget, query) {
       allVisible = true;
       expandedSections = [];
       typeFilter.value = validTypes.indexOf(type) !== -1 ? type : "all";
       priceFilter.value = validBudgets.indexOf(budget) !== -1 ? budget : "all";
       searchFilter.value = normalizeSearch(query);
-      page = Number.isSafeInteger(nextPage) && nextPage > 0 ? nextPage : 1;
       return applyFilters();
     }
 
     function showAll(commit) {
-      var state = setFullState("all", "all", 1);
-      if (commit) writeUrl(urlWithState({ full: true, type: "all", budget: "all", page: page }, "#catalogue-filters"));
+      var state = setFullState("all", "all", "");
+      closeControls();
+      if (commit) writeUrl(urlWithState({ full: true, type: "all", budget: "all", q: "" }, "#catalogue-filters"));
       return state;
     }
 
@@ -733,9 +646,9 @@
       typeFilter.value = validTypes.indexOf(type) !== -1 ? type : "all";
       priceFilter.value = validBudgets.indexOf(budget) !== -1 ? budget : "all";
       searchFilter.value = "";
-      page = 1;
       applyFilters();
-      if (commit) writeUrl(urlWithState({ full: false }, "#catalogue-filters"));
+      closeControls();
+      if (commit) writeUrl(urlWithState({ preview: true, type: typeFilter.value, budget: priceFilter.value }, "#catalogue-filters"));
     }
 
     function scrollToHash(href) {
@@ -744,16 +657,17 @@
       if (target && !target.hidden && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
     }
 
-    function focusCatalogueHeading(pageCards) {
-      var target = catalogueHeading;
+    function focusCatalogueRegion() {
+      var target = catalogueRegion;
       if (!target) return;
       if (typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "auto", block: "start" });
       if (typeof target.focus === "function") target.focus({ preventScroll: true });
     }
 
     function selectCategory(category, href, commit) {
-      setFullState(category || "all", "all", 1);
-      if (commit) writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page }, href || "#catalogue-filters"));
+      setFullState(category || "all", "all", "");
+      closeControls();
+      if (commit) writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value }, href || "#catalogue-filters"));
       scrollToHash(href || "#catalogue-filters");
     }
 
@@ -762,9 +676,7 @@
       var target = id ? document.getElementById(id) : null;
       if (!target) return false;
       if (target.matches && target.matches("article")) {
-        var productPage = cataloguePages(cards).findIndex(function (pageCards) { return pageCards.indexOf(target) !== -1; });
-        if (productPage === -1) return false;
-        setFullState("all", "all", productPage + 1);
+        setFullState("all", "all", "");
         scrollToHash("#" + id);
         return true;
       }
@@ -780,37 +692,68 @@
     function restoreFromLocation() {
       var state = readLocationState();
       if (state.full) {
-        setFullState(state.type, state.budget, state.page, state.q);
-        var normalized = urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page, q: searchFilter.value });
+        setFullState(state.type, state.budget, state.q);
+        var normalized = urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, q: searchFilter.value }, window.location && window.location.hash);
         if (!sameUrl(normalized)) writeUrl(normalized, true);
+        closeControls();
         scrollToHash(window.location && window.location.hash);
-        if ((window.location && window.location.hash) === "#catalogue-filters") focusCatalogueHeading();
+        if ((window.location && window.location.hash) === "#catalogue-filters") focusCatalogueRegion();
         return;
       }
       if (state.preview) {
         showFeatured(false, state.type, state.budget);
-        var previewUrl = urlWithState({ preview: true, type: typeFilter.value, budget: priceFilter.value, page: page }, window.location && window.location.hash);
+        var previewUrl = urlWithState({ preview: true, type: typeFilter.value, budget: priceFilter.value }, window.location && window.location.hash);
         if (!sameUrl(previewUrl)) writeUrl(previewUrl, true);
         scrollToHash(window.location && window.location.hash);
         return;
       }
       if (state.hasQuery) {
-        var cleaned = urlWithState({ full: false }, window.location && window.location.hash);
+        var cleaned = urlWithState({ preview: true, type: "all", budget: "all" }, window.location && window.location.hash);
         if (!sameUrl(cleaned)) writeUrl(cleaned, true);
       }
       showFeatured(false);
       restoreLegacyHash();
     }
 
-    function movePage(direction) {
-      var matchingCards = catalogueCards();
-      var pageCount = Math.max(1, cataloguePages(matchingCards).length);
-      var nextPage = Math.min(pageCount, Math.max(1, page + direction));
-      if (nextPage === page) return;
-      page = nextPage;
-      var state = applyFilters();
-      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page, q: searchFilter.value }, "#catalogue-filters"));
-      focusCatalogueHeading(state && state.pageCards);
+    function closeControls(returnFocus) {
+      if (searchPanel) searchPanel.hidden = true;
+      if (filterPanel) filterPanel.hidden = true;
+      if (searchToggle) searchToggle.setAttribute("aria-expanded", "false");
+      if (filterToggle) filterToggle.setAttribute("aria-expanded", "false");
+      if (returnFocus && typeof returnFocus.focus === "function") returnFocus.focus({ preventScroll: true });
+    }
+
+    function openControl(kind) {
+      var button = kind === "search" ? searchToggle : filterToggle;
+      var panel = kind === "search" ? searchPanel : filterPanel;
+      if (!button || !panel) return;
+      var wasOpen = button.getAttribute("aria-expanded") === "true";
+      closeControls();
+      if (wasOpen) return;
+      panel.hidden = false;
+      button.setAttribute("aria-expanded", "true");
+      var target = kind === "search" ? searchFilter : typeFilter;
+      if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
+    }
+
+    function commitFilterChange() {
+      allVisible = true;
+      expandedSections = [];
+      applyFilters();
+      closeControls();
+      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, q: searchFilter.value }, "#catalogue-filters"));
+    }
+
+    function commitSearchInput(event) {
+      if (event && event.isComposing) return;
+      var query = normalizeSearch(searchFilter.value);
+      allVisible = Boolean(query);
+      expandedSections = [];
+      applyFilters();
+      var state = { full: allVisible, type: typeFilter.value, budget: priceFilter.value, q: query };
+      if (!allVisible && (typeFilter.value !== "all" || priceFilter.value !== "all")) state = { preview: true, type: typeFilter.value, budget: priceFilter.value };
+      writeUrl(urlWithState(state, "#catalogue-filters"), true);
+      if (!query) closeControls();
     }
 
     document.querySelectorAll("[data-browse-filters]").forEach(function (link) {
@@ -832,8 +775,8 @@
     document.querySelectorAll("[data-browse-all]").forEach(function (link) {
       link.addEventListener("click", function (event) {
         event.preventDefault();
-        var state = showAll(true);
-        focusCatalogueHeading(state && state.pageCards);
+        showAll(true);
+        focusCatalogueRegion();
       });
     });
     document.querySelectorAll("[data-category-shortcut]").forEach(function (link) {
@@ -850,48 +793,38 @@
       disclosure.addEventListener("click", function () {
         if (allVisible) return;
         var expandedIndex = expandedSections.indexOf(section);
-        var collapsing = expandedIndex !== -1;
         if (expandedIndex === -1) expandedSections.push(section);
         else expandedSections.splice(expandedIndex, 1);
         applyFilters();
-        if (collapsing && typeof disclosure.scrollIntoView === "function") {
-          disclosure.scrollIntoView({ behavior: "instant", block: "nearest" });
-        }
       });
     });
-    function commitFilterChange() {
-      allVisible = true;
-      expandedSections = [];
-      page = 1;
-      applyFilters();
-      writeUrl(urlWithState({ full: true, type: typeFilter.value, budget: priceFilter.value, page: page, q: searchFilter.value }, "#catalogue-filters"));
-    }
-    function commitSearchInput(event) {
-      if (event && event.isComposing) return;
-      var query = normalizeSearch(searchFilter.value);
-      allVisible = Boolean(query);
-      expandedSections = [];
-      page = 1;
-      applyFilters();
-      var state = { full: allVisible, type: typeFilter.value, budget: priceFilter.value, page: page, q: query };
-      if (!allVisible && (typeFilter.value !== "all" || priceFilter.value !== "all")) state = { preview: true, type: typeFilter.value, budget: priceFilter.value, page: page };
-      writeUrl(urlWithState(state, "#catalogue-filters"), true);
-    }
+    if (searchToggle) searchToggle.addEventListener("click", function () { openControl("search"); });
+    if (filterToggle) filterToggle.addEventListener("click", function () { openControl("filter"); });
+    if (searchForm) searchForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      commitSearchInput(event);
+      closeControls();
+      focusCatalogueRegion();
+    });
     typeFilter.addEventListener("change", commitFilterChange);
     priceFilter.addEventListener("change", commitFilterChange);
     searchFilter.addEventListener("input", commitSearchInput);
     searchFilter.addEventListener("compositionend", commitSearchInput);
     resetButton.addEventListener("click", function () { showFeatured(true); });
     emptyReset.addEventListener("click", function () {
-      var state = showAll(true);
-      focusCatalogueHeading(state && state.pageCards);
+      showAll(true);
+      focusCatalogueRegion();
     });
-    if (pagePrevious) pagePrevious.addEventListener("click", function () { movePage(-1); });
-    if (pageNext) pageNext.addEventListener("click", function () { movePage(1); });
+    if (typeof document.addEventListener === "function") document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape") return;
+      if (searchToggle && searchToggle.getAttribute("aria-expanded") === "true") closeControls(searchToggle);
+      else if (filterToggle && filterToggle.getAttribute("aria-expanded") === "true") closeControls(filterToggle);
+    });
     window.addEventListener("hashchange", restoreFromLocation);
     window.addEventListener("popstate", restoreFromLocation);
     restoreFromLocation();
   }
+
   function initOrderRequestFlow() {
     var embed = document.getElementById("order-form-embed");
     var frame = document.getElementById("order-form-frame");
@@ -918,7 +851,7 @@
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
     var requestedMode = embed.getAttribute("data-form-mode");
-    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, customizerHandoff: false, sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
+    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
     var corporateIntakeReady = embed.getAttribute("data-intake-ready") === "true";
     var orderDialogEnabled = Boolean(orderDialog && typeof orderDialog.showModal === "function");
     var orderDialogHistoryActive = false;
@@ -1102,6 +1035,7 @@
       frameState.pinnedSender = null;
       frameState.pinnedOrigin = "";
       frameState.customizerHandoff = false;
+      frameState.catalogueSeedKey = "";
     }
 
     function postCaptchaResult(request, ok, token) {
@@ -1151,8 +1085,10 @@
         orderDialogCloseFromHistory = false;
         orderDialogCustomizerHandoff = false;
         if (wasCustomizerRequest) notifyCustomizerRequestOutcome("cancelled");
-        frameState.sourceKind = "";
-        frameState.customizerHandoff = false;
+        if (!frameState.catalogueSeedKey) {
+          frameState.sourceKind = "";
+          frameState.customizerHandoff = false;
+        }
         restoreOrderDialogFocus();
       });
       orderDialog.addEventListener("click", function (event) {
@@ -1262,7 +1198,7 @@
       return seed;
     }
 
-    function submitSeed(seed, shouldScroll, identity, previewSnapshot, previewExpected, opener, customizerHandoff) {
+    function submitSeed(seed, shouldScroll, identity, previewSnapshot, previewExpected, opener, customizerHandoff, openDialog) {
       if (!configured) {
         invalidateChannel();
         status.innerHTML = frameState.mode === "corporate"
@@ -1315,10 +1251,27 @@
       }
       document.body.appendChild(postForm); postForm.submit(); postForm.remove();
       frameState.loaded = true;
-      if (continueOrderButton) continueOrderButton.hidden = false;
-      if (orderDialogEnabled) openOrderDialog(opener, true);
-      else if (shouldScroll !== false) scrollToForm();
+      if (continueOrderButton && openDialog !== false) continueOrderButton.hidden = false;
+      if (orderDialogEnabled && openDialog !== false) openOrderDialog(opener, true);
+      else if (shouldScroll !== false && openDialog !== false) scrollToForm();
       return true;
+    }
+
+    function clearPreparedCatalogueRequest() {
+      if (orderDialogEnabled && orderDialog.open) {
+        frameState.catalogueSeedKey = "";
+        return;
+      }
+      if (frameState.sourceKind !== "catalogue") {
+        frameState.catalogueSeedKey = "";
+        return;
+      }
+      invalidateChannel();
+      frameState.loaded = false;
+      frameState.sourceKind = "";
+      frame.hidden = true;
+      if (continueOrderButton) continueOrderButton.hidden = true;
+      clearSelectedProductSummary();
     }
 
     function previewResponse(request, ok, reason, blob) {
@@ -1360,12 +1313,11 @@
 
     function chooseSource(source, options) {
       options = options || {};
-      if (frameState.loaded && !options.confirmed && !window.confirm("This order form is already loaded. Replace it with the selected item?")) return false;
       var seed = sourceSeed(source);
       seed.requestId = options.requestId || source.requestId || requestId();
       if (options.card) showSelectedProductSummary(options.card);
       else clearSelectedProductSummary();
-      return submitSeed(seed, true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected, options.opener, options.customizerHandoff);
+      return submitSeed(seed, options.openDialog === false ? false : true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected, options.opener, options.customizerHandoff, options.openDialog);
     }
 
     window.addEventListener("message", function (event) {
@@ -1619,6 +1571,7 @@
           setCatalogueSelectionStatus("");
           markCatalogueSelectionChanged();
           updateCatalogueSelection();
+          prepareCatalogueSelection();
         });
         var removeButton = document.createElement("button");
         removeButton.type = "button";
@@ -1632,6 +1585,8 @@
           setCatalogueSelectionStatus("");
           markCatalogueSelectionChanged();
           updateCatalogueSelection();
+          if (selectedCatalogueItems.length) prepareCatalogueSelection();
+          else clearPreparedCatalogueRequest();
         });
         label.appendChild(input);
         line.appendChild(name);
@@ -1669,6 +1624,7 @@
 
     function resetCatalogueSelection() {
       selectedCatalogueItems = [];
+      clearPreparedCatalogueRequest();
       setCatalogueSelectionStatus("");
       updateCatalogueSelection();
     }
@@ -1679,6 +1635,37 @@
       }).join("\n");
     }
 
+    function catalogueSelectionKey(items) {
+      return bundleDetails(items);
+    }
+
+    function prepareCatalogueSelection() {
+      if (!configured || !selectedCatalogueItems.length) return false;
+      var items = selectedCatalogueItems.slice();
+      var key = catalogueSelectionKey(items);
+      if (frameState.loaded && frameState.sourceKind === "catalogue" && frameState.catalogueSeedKey === key) return true;
+      var prepared = chooseSource({
+        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items",
+        quantity: String(bundleTotal(items)), designDetails: key, bundleItems: items
+      }, { openDialog: false });
+      if (prepared) frameState.catalogueSeedKey = key;
+      return prepared;
+    }
+
+    function openCatalogueSelectionRequest(items) {
+      var key = catalogueSelectionKey(items);
+      if (frameState.loaded && frameState.sourceKind === "catalogue" && frameState.catalogueSeedKey === key) {
+        if (continueOrderButton) continueOrderButton.hidden = false;
+        if (orderDialogEnabled) openOrderDialog(catalogueRequestSelected, true);
+        else scrollToForm();
+        return true;
+      }
+      return chooseSource({
+        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items",
+        quantity: String(bundleTotal(items)), designDetails: key, bundleItems: items
+      }, { opener: catalogueRequestSelected });
+    }
+
     function toggleCatalogueSelection(seed) {
       var existingIndex = selectedCatalogueItems.findIndex(function (item) { return item.sourceId === seed.sourceId; });
       if (existingIndex !== -1) {
@@ -1686,6 +1673,8 @@
         setCatalogueSelectionStatus("");
         markCatalogueSelectionChanged();
         updateCatalogueSelection();
+        if (selectedCatalogueItems.length) prepareCatalogueSelection();
+        else clearPreparedCatalogueRequest();
         return;
       }
       var nextItems = selectedCatalogueItems.concat([seed]);
@@ -1697,6 +1686,7 @@
       setCatalogueSelectionStatus("");
       markCatalogueSelectionChanged();
       updateCatalogueSelection();
+      prepareCatalogueSelection();
     }
 
     function catalogueSeed(card) {
@@ -1769,10 +1759,7 @@
         setCatalogueSelectionStatus("The selected list is too long. Lower a quantity before continuing.");
         return;
       }
-      chooseSource({
-        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items",
-        quantity: String(bundleTotal(items)), designDetails: bundleDetails(items), bundleItems: items
-      }, { opener: catalogueRequestSelected });
+      openCatalogueSelectionRequest(items);
     });
 
     if (catalogueCartJump) catalogueCartJump.addEventListener("click", function () {
@@ -1826,7 +1813,7 @@
         sourceKind: "customizer", sourceId: "customizer:resin-frame", productName: "Custom resin frame",
         height: fallback.dimensions.height, width: fallback.dimensions.width, heightUnit: fallback.dimensions.heightUnit, widthUnit: fallback.dimensions.widthUnit,
         designDetails: fallback.summary, requestId: identity.requestId
-      }, { identity: identity, requestId: identity.requestId, confirmed: true, previewExpected: false, opener: opener, customizerHandoff: true });
+      }, { identity: identity, requestId: identity.requestId, previewExpected: false, opener: opener, customizerHandoff: true });
       notifyCustomizerRequestOutcome(handedOff ? "success" : "failure");
     }
 
@@ -1839,10 +1826,6 @@
         if (event.preventDefault) event.preventDefault();
       }
       var requestOpener = opener || (event && event.target) || null;
-      if (frameState.loaded && !window.confirm("This order form is already loaded. Replace it with the selected item?")) {
-        notifyCustomizerRequestOutcome("cancelled");
-        return;
-      }
       resetCatalogueSelection();
       clearSelectedProductSummary();
       clearCustomizerFallback();
@@ -1872,7 +1855,7 @@
           sourceKind: "customizer", sourceId: "customizer:resin-frame", productName: "Custom resin frame",
           height: snapshot.dimensions.height, width: snapshot.dimensions.width, heightUnit: snapshot.dimensions.heightUnit, widthUnit: snapshot.dimensions.widthUnit,
           designDetails: snapshot.summary, previewSnapshot: snapshot, requestId: identity.requestId
-        }, { identity: identity, requestId: identity.requestId, previewSnapshot: snapshot, confirmed: true, previewExpected: true, opener: requestOpener, customizerHandoff: true });
+        }, { identity: identity, requestId: identity.requestId, previewSnapshot: snapshot, previewExpected: true, opener: requestOpener, customizerHandoff: true });
         notifyCustomizerRequestOutcome(handedOff ? "success" : "failure");
       };
       var reject = function (error) {
