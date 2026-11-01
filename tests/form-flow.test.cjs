@@ -106,11 +106,24 @@ test("bundle form renders every selected item and rebuilds authoritative quantit
   respondToken(runtime, 0);
   await Promise.resolve();
   assert.equal(runtime.fields.quantity.value, "9");
-  assert.equal(runtime.fields.productName.value, "4 selected catalogue items");
+  assert.equal(runtime.fields.productName.value, "One, Two, Three, Four");
   assert.match(runtime.fields.designDetails.value, /One.*Quantity: 2/);
   assert.match(runtime.fields.designDetails.value, /Two.*Quantity: 5/);
   assert.match(runtime.fields.designDetails.value, /Three.*Quantity: 1/);
   assert.match(runtime.fields.designDetails.value, /Four.*Quantity: 1/);
+});
+
+test("bundle Product name visibly lists every selected product", () => {
+  assert.match(html, /name="productName" maxlength="2000"/);
+  const runtime = makeFormRuntime({
+    sourceId: "catalogue:multi-item",
+    bundleItems: [
+      { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 1 },
+      { sourceId: "catalogue:two.webp", productName: "Two", price: "399", size: "6 in", quantity: 1 },
+      { sourceId: "catalogue:three.webp", productName: "Three", price: "499", size: "8 in", quantity: 1 },
+    ],
+  });
+  assert.equal(runtime.fields.productName.value, "One, Two, Three");
 });
 
 test("bundle quantity changes rebuild details without stale quantities before shared notes", () => {

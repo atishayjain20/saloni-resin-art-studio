@@ -6,7 +6,7 @@ const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
 const page = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-const FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery.";
+const FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery.";
 
 const CORPORATE_RESIN_GIFTS = [
   ["corporate-logo-keychain-concept.webp", "Logo resin keychain", "Clear resin with a name/initial and subtle brand-colour accents.", "Price for one piece.", "299", "199", 33],
@@ -473,6 +473,30 @@ test("resumes a closed request through the visible continue control without rese
   flow.windowObject.history.flushBack();
   assert.equal(flow.continueOrder.focused, true);
   assert.equal(flow.continueOrder.focusOptions.preventScroll, true);
+});
+
+test("reopens the selected-items order when the prior dialog history entry is still unwinding", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(flow.orderDialog.open, true);
+
+  flow.windowObject.history.deferBack = true;
+  flow.orderDialog.close();
+  assert.equal(flow.orderDialog.open, false);
+  flow.catalogueRequestSelected.dispatch("click");
+
+  assert.equal(flow.orderDialog.open, true);
+  flow.windowObject.history.flushBack();
+  assert.equal(flow.orderDialog.open, true);
+});
+
+test("keeps order-area copy short and removes the catalogue/customizer instruction", () => {
+  assert.equal((page.match(/class="order-final-quote-note">Final quote after size, materials and delivery\.<\/p>/g) || []).length, 1);
+  assert.doesNotMatch(page, /class="panel-note"/);
+  assert.doesNotMatch(page, /Add catalogue items to one request/);
+  assert.doesNotMatch(page, /choose “Request this design” in the customizer/);
 });
 
 test("browser Back closes the order modal and restores the exact opener without scrolling", () => {

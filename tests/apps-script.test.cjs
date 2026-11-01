@@ -280,6 +280,18 @@ test("retains only a bounded valid bundle seed for rendering", () => {
   assert.deepEqual(Array.from(overLimit.bundleItems), []);
 });
 
+test("accepts a full multi-item Product name within the 2000-character contract", () => {
+  const productName = Array.from({ length: 12 }, (_, index) => "Selected catalogue product " + (index + 1)).join(", ");
+  assert.ok(productName.length > 160);
+  const seed = context.parseSeed_(JSON.stringify({ productName }));
+  assert.equal(seed.productName, productName);
+  const errors = context.validatePayload_(validForm({
+    requestStage: "quote", sourceId: "catalogue:multi-item", productName,
+    height: "", heightUnit: "", width: "", widthUnit: "", designDetails: "Bundle details"
+  }));
+  assert.equal(errors.productName, undefined);
+});
+
 test("round-trips only exact customizer previewExpected booleans through doPost and render", () => {
   for (const [input, expected] of [[true, true], [false, false], [undefined, false], ["true", false], [1, false], [{ value: true }, false]]) {
     const seed = { requestId: "request-preview-roundtrip", sourceKind: "customizer", productName: "Custom resin frame" };
