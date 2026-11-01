@@ -1256,7 +1256,7 @@ function validatePayload_(payload) {
   bounded_(errors, "sourceId", payload.sourceId, 160, false);
   if (payload.sourceKind && ["catalogue", "customizer", "general"].indexOf(payload.sourceKind.toLowerCase()) === -1) errors.sourceKind = "This source is not recognised.";
   if (payload.sourceId && !/^[A-Za-z0-9_.:/-]+$/.test(payload.sourceId)) errors.sourceId = "This source is not recognised.";
-  bounded_(errors, "productName", payload.productName, 160, true);
+  bounded_(errors, "productName", payload.productName, 2000, true);
 
   var quantity = Number(payload.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
@@ -1690,7 +1690,7 @@ function parseSeed_(json) {
     requestStage: seed.requestStage === "quote" ? "quote" : "",
     previewExpected: seed.previewExpected === true,
     sourceKind: boundedSeed_(seed.sourceKind, 80), sourceId: boundedSeed_(seed.sourceId, 160),
-    productName: boundedSeed_(seed.productName, 160), quantity: boundedSeed_(seed.quantity, 4) || "1",
+    productName: boundedSeed_(seed.productName, 2000), quantity: boundedSeed_(seed.quantity, 4) || "1",
     dimensionFormat: "feet-inches",
     height: height, heightUnit: heightUnit, heightFeet: useSuppliedParts ? suppliedHeightFeet : heightParts ? heightParts.feet : "", heightInchesPart: useSuppliedParts ? suppliedHeightInches : heightParts ? heightParts.inches : "",
     width: width, widthUnit: widthUnit, widthFeet: useSuppliedParts ? suppliedWidthFeet : widthParts ? widthParts.feet : "", widthInchesPart: useSuppliedParts ? suppliedWidthInches : widthParts ? widthParts.inches : "",

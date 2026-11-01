@@ -61,7 +61,7 @@ def find_nodes(node, attr):
 
 ROOT = Path(__file__).resolve().parents[1]
 
-FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery. Saloni first confirms whether she can make it, then confirms materials, final design, price, and delivery."
+FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery."
 
 ROMANTIC_CONCEPTS = (
     ("romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "599", "399", 33),
