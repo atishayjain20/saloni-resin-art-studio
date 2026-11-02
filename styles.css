@@ -91,6 +91,9 @@ h1 em { color: var(--rose); font-style: italic; }
 .button-dark:hover, .button-dark:focus-visible { background: var(--cocoa); }
 .button-line { border-color: var(--ink); color: var(--ink); }
 .button-line:hover, .button-line:focus-visible { background: var(--ink); color: var(--ivory); }
+.button-whatsapp { justify-content: center; gap: 0.5rem; background: #25d366; border-color: #25d366; color: #0b3b1f; }
+.button-whatsapp:hover, .button-whatsapp:focus-visible { background: #1ebe5b; border-color: #1ebe5b; color: #0b3b1f; }
+.whatsapp-icon { width: 1.25rem; height: 1.25rem; flex: none; fill: currentColor; }
 .instagram-mark { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; color: var(--muted); font-size: 0.74rem; text-decoration: none; }
 .instagram-mark strong { color: var(--ink); font-weight: 800; }
 .instagram-mark:hover strong, .instagram-mark:focus-visible strong { color: var(--rose-ink); }
@@ -468,7 +471,6 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .catalogue-cart-jump .button-line { background: transparent; border-color: var(--ivory); color: var(--ivory); }
 .catalogue-cart-jump .button-dark { background: var(--rose); color: var(--ink); }
 .catalogue-cart-jump .button:disabled { cursor: not-allowed; opacity: .55; }
-.catalogue-cart-jump .catalogue-cart-whatsapp { background: var(--ivory); border-color: var(--ivory); color: var(--ink); }
 .text-button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .catalogue-section-disclosure { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; margin-top: 1rem; padding: .65rem 1rem; border: 1px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font-size: .78rem; font-weight: 800; cursor: pointer; }
 .catalogue-section-disclosure:hover, .catalogue-section-disclosure:focus-visible { background: var(--ink); color: var(--ivory); }
@@ -509,13 +511,14 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .catalogue-selection { grid-template-columns: 1fr; gap: .7rem; }
   .catalogue-selection .button { width: 100%; justify-content: center; }
   .catalogue-selection-actions { flex-direction: column; align-items: stretch; }
-  body:has(#catalogue-cart-jump:not([hidden])) { padding-bottom: calc(7.5rem + env(safe-area-inset-bottom)); }
-  html:has(#catalogue-cart-jump:not([hidden])) { scroll-padding-bottom: calc(7.5rem + env(safe-area-inset-bottom)); }
-  .catalogue-cart-jump { flex-wrap: wrap; right: max(var(--gutter), env(safe-area-inset-right)); left: max(var(--gutter), env(safe-area-inset-left)); width: auto; justify-content: center; gap: .45rem; padding: .5rem; border-radius: 1.2rem; bottom: calc(.7rem + env(safe-area-inset-bottom)); }
-  .catalogue-cart-count { flex: 1 1 40%; padding-left: .35rem; }
-  .catalogue-cart-jump .button { min-width: 0; justify-content: center; padding-inline: .5rem; text-align: center; }
-  .catalogue-cart-jump .catalogue-cart-view { flex: 1 1 40%; }
-  .catalogue-cart-jump .catalogue-cart-order, .catalogue-cart-jump .catalogue-cart-whatsapp { flex: 1 1 calc(50% - .25rem); }
+  body:has(#catalogue-cart-jump:not([hidden])) { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+  html:has(#catalogue-cart-jump:not([hidden])) { scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+  .catalogue-cart-jump { flex-wrap: nowrap; right: max(var(--gutter), env(safe-area-inset-right)); left: max(var(--gutter), env(safe-area-inset-left)); width: auto; justify-content: center; gap: .45rem; padding: .5rem; border-radius: 1.2rem; bottom: calc(.7rem + env(safe-area-inset-bottom)); }
+  .catalogue-cart-count { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .catalogue-cart-jump .button { flex: 1 1 0; min-width: 0; justify-content: center; gap: .3rem; padding-inline: .35rem; font-size: .76rem; text-align: center; }
+  .catalogue-cart-view[data-count]::after { content: attr(data-count); display: inline-grid; place-items: center; min-width: 1.15rem; height: 1.15rem; padding: 0 .25rem; border-radius: 999px; background: var(--ivory); color: var(--ink); font-size: .68rem; }
+  .catalogue-cart-jump .whatsapp-label-prefix { display: none; }
+  .catalogue-cart-jump .whatsapp-icon { width: 1.1rem; height: 1.1rem; }
   .festive-banner { display: block; line-height: 1.6; }
   .festive-banner a { display: inline-block; margin-top: .2rem; }
 }

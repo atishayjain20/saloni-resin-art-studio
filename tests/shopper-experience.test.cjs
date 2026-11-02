@@ -44,8 +44,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261031">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261031" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261103">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261103" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -1348,4 +1348,26 @@ test("studio edit section is removed before the order conversation", () => {
   assert.doesNotMatch(html, /<section[^>]+id="offerings"[\s\S]*?<\/section>/);
   assert.doesNotMatch(html, /The studio edit|A little more personal than a gift|Custom resin frames &amp; art|Explore resin photo frames|Join the Partner Circle/);
   assert.match(html, /<section class="order-section shell" id="order"/);
+});
+
+test("WhatsApp order buttons use WhatsApp green and show the WhatsApp logo", () => {
+  ["catalogue-selection-whatsapp", "catalogue-cart-whatsapp"].forEach((id) => {
+    const link = html.match(new RegExp(`<a[^>]+id="${id}"[\\s\\S]*?<\\/a>`));
+    assert.ok(link, `expected #${id}`);
+    assert.match(link[0], /class="[^"]*\bbutton-whatsapp\b/);
+    assert.match(link[0], /<svg[^>]+class="whatsapp-icon"[^>]+aria-hidden="true"/);
+    assert.match(link[0].replace(/<[^>]+>/g, ""), /Order on WhatsApp/);
+  });
+  assert.match(css, /\.button-whatsapp\s*\{[^}]*background:\s*#25d366/i);
+  assert.match(html, /id="catalogue-cart-whatsapp"[^>]+aria-label="Order on WhatsApp"/);
+  assert.doesNotMatch(css, /\.catalogue-cart-whatsapp\s*\{[^}]*background:\s*var\(--ivory\)/);
+});
+
+test("mobile cart bar keeps View cart, Order now and WhatsApp on one line with the count on View cart", () => {
+  assert.match(script, /catalogueCartView\.setAttribute\("data-count", String\(count\)\)/);
+  const mobile = css.slice(css.indexOf("@media (max-width: 620px)"));
+  assert.match(mobile, /\.catalogue-cart-jump\s*\{[^}]*flex-wrap:\s*nowrap/);
+  assert.match(mobile, /\.catalogue-cart-count\s*\{[^}]*clip:\s*rect\(0, 0, 0, 0\)/);
+  assert.match(mobile, /\.catalogue-cart-view\[data-count\]::after\s*\{[^}]*content:\s*attr\(data-count\)/);
+  assert.doesNotMatch(mobile, /\.catalogue-cart-jump\s*\{[^}]*flex-wrap:\s*wrap/);
 });

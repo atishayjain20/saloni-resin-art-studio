@@ -31,6 +31,10 @@
     textarea { min-height: 7rem; resize: vertical; }
     input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
     .dimension-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+    .bundle-size { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+    .bundle-size label { font-size: .76rem; }
+    .bundle-size .field-error { grid-column: 1 / -1; font-size: .8rem; }
+    .bundle-size-item { margin-bottom: .75rem; }
     .shipping-fields { margin-top: .85rem; }
     .more-details > summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
     .more-details[open] > summary { margin-bottom: .6rem; }
@@ -38,9 +42,6 @@
     .referral-disclosure { margin-top: .85rem; }
     .referral-disclosure summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
     .referral-box { display: grid; gap: .65rem; margin-top: .65rem; }
-    .repeat-profile-box { display: grid; gap: .65rem; margin-top: .85rem; }
-    .repeat-profile-box label { display: flex; align-items: flex-start; gap: .55rem; }
-    .repeat-profile-box input[type="checkbox"] { width: auto; min-height: auto; margin-top: .2rem; }
     .field-error { margin: 0; color: #a41f33; }
     [hidden] { display: none !important; }
     .actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
@@ -68,10 +69,9 @@
       <legend>Selected design</legend>
       <div id="product-context" class="product-context" hidden>
         <img id="product-image" alt="" loading="lazy" decoding="async" hidden>
-        <p id="bundle-product-copy" class="hint" hidden>These catalogue items will be reviewed together in one request. Saloni will confirm the final combination, price, and delivery with you.</p>
       </div>
       <div id="bundle-items" class="bundle-items" role="list" aria-label="Selected catalogue items" hidden></div>
-      <div class="grid">
+      <div class="grid" id="product-name-row">
         <label for="product-name">Product name <input id="product-name" name="productName" maxlength="2000" required></label>
       </div>
       <p id="product-name-hint" class="hint">You can edit the product name before sending the request.</p>
@@ -117,6 +117,10 @@
 
     <details class="more-details" id="more-details">
       <summary>More details (optional)</summary>
+      <fieldset id="custom-size" hidden>
+        <legend>Custom size (optional)</legend>
+        <div id="bundle-sizes" hidden></div>
+      </fieldset>
       <fieldset>
         <legend>Optional details</legend>
         <div class="grid">
@@ -132,28 +136,21 @@
           </div>
         </details>
       </fieldset>
-
-      <div class="repeat-profile-box" id="repeat-profile-box">
-        <label for="remember-repeat-profile"><input id="remember-repeat-profile" type="checkbox"> Remember my name, phone, and delivery details on this device for 30 days.</label>
-        <p class="hint">Saved only in this browser. These details are not sent to the studio again until you send a new request.</p>
-        <button id="forget-repeat-profile" class="secondary" type="button">Forget saved details on this device</button>
-        <p id="repeat-profile-status" class="hint" role="status" aria-live="polite"></p>
-      </div>
-
-      <fieldset>
-        <legend>Optional reference image</legend>
-        <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
-        <div id="reference-image-preview-wrap" hidden>
-          <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
-        </div>
-        <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
-        <div id="reference-image-actions" class="actions" hidden>
-          <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
-          <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
-          <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
-        </div>
-      </fieldset>
     </details>
+
+    <fieldset>
+      <legend>Optional reference image</legend>
+      <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+      <div id="reference-image-preview-wrap" hidden>
+        <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
+      </div>
+      <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
+      <div id="reference-image-actions" class="actions" hidden>
+        <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
+        <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
+        <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
+      </div>
+    </fieldset>
 
     <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
     <input id="bundle-source-ids" name="bundleSourceIds" type="hidden">
@@ -166,7 +163,7 @@
     <p class="privacy-summary">Your information is used only to handle your request. <a href="#privacy-details">Privacy details</a></p>
     <details class="privacy-details" id="privacy-details">
       <summary>Privacy details</summary>
-      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. If you choose to remember them, your name, phone, and delivery details stay only in this browser for up to 30 days and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
+      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
     </details>
   </form>
 </main>
@@ -186,9 +183,12 @@
   var pinField = document.getElementById("pin-field");
   var productContext = document.getElementById("product-context");
   var productImage = document.getElementById("product-image");
-  var bundleProductCopy = document.getElementById("bundle-product-copy");
+  var productNameRow = document.getElementById("product-name-row");
+  var productNameHint = document.getElementById("product-name-hint");
   var bundleItemsElement = document.getElementById("bundle-items");
   var dimensionFields = document.getElementById("dimension-fields");
+  var customSize = document.getElementById("custom-size");
+  var bundleSizesElement = document.getElementById("bundle-sizes");
   var referenceImage = document.getElementById("reference-image");
   var referenceImagePreviewWrap = document.getElementById("reference-image-preview-wrap");
   var referenceImagePreview = document.getElementById("reference-image-preview");
@@ -201,10 +201,6 @@
   var referralStatus = document.getElementById("referral-status");
   var checkReferral = document.getElementById("check-referral");
   var moreDetails = document.getElementById("more-details");
-  var moreDetailsSummary = moreDetails && moreDetails.querySelector ? moreDetails.querySelector("summary") : null;
-  var rememberRepeatProfile = document.getElementById("remember-repeat-profile");
-  var forgetRepeatProfileButton = document.getElementById("forget-repeat-profile");
-  var repeatProfileStatus = document.getElementById("repeat-profile-status");
   var active = false;
   var currentAttempt = null;
   var timeoutId = null;
@@ -273,9 +269,30 @@
     var sorted = sortedBundleItems(items);
     return sorted[0].productName + (sorted.length > 1 ? " + " + (sorted.length - 1) + " more" : "");
   }
+  var SIZE_PARTS = ["heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"];
+  function emptyCustomSize() { return { heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "" }; }
+  function sizeAxis(feetText, inchesText) {
+    var feet = String(feetText || "").trim() || "0";
+    var inches = String(inchesText || "").trim() || "0";
+    if (!/^\d+$/.test(feet) || !/^\d+(\.\d+)?$/.test(inches)) return "";
+    var feetNumber = Number(feet);
+    var inchesNumber = Number(inches);
+    var total = feetNumber * 12 + inchesNumber;
+    if (inchesNumber >= 12 || total <= 0 || total > 60) return "";
+    var inchesLabel = String(inchesNumber) + " in";
+    if (feetNumber === 0) return inchesLabel;
+    return feetNumber + " ft" + (inchesNumber > 0 ? " " + inchesLabel : "");
+  }
+  function customSizeText(item) {
+    var size = item && item.customSize;
+    if (!size) return "";
+    var height = sizeAxis(size.heightFeet, size.heightInchesPart);
+    var width = sizeAxis(size.widthFeet, size.widthInchesPart);
+    return height && width ? "Custom size: H " + height + " \u00d7 W " + width : "";
+  }
   function bundleDetails(items) {
     return sortedBundleItems(items).map(function (item) {
-      return [item.productName, item.size, item.price, "Qty " + bundleQuantity(item)].filter(Boolean).join(" \u00b7 ");
+      return [item.productName, item.size, item.price, "Qty " + bundleQuantity(item), customSizeText(item)].filter(Boolean).join(" \u00b7 ");
     }).join("\n");
   }
   function bundleSourceIds(items) {
@@ -294,7 +311,7 @@
       var quantity = Number(item.quantity);
       if (!sourceId || !/^[A-Za-z0-9_.:/-]+$/.test(sourceId) || !productName || !Number.isInteger(quantity) || quantity < 1 || quantity > 100 || seen[sourceId]) return [];
       seen[sourceId] = true;
-      normalized.push({ sourceId: sourceId, productName: productName, price: price, size: size, quantity: quantity });
+      normalized.push({ sourceId: sourceId, productName: productName, price: price, size: size, quantity: quantity, customSize: emptyCustomSize() });
     }
     return bundleTotal(normalized) <= 100 && bundleDetails(normalized).length <= 2000 ? normalized : [];
   }
@@ -308,13 +325,13 @@
     if (current === canonical) return "";
     return current.indexOf(prefix) === 0 ? current.slice(prefix.length) : current;
   }
-  function updateBundleScalars(includeDetails) {
+  function updateBundleScalars(includeDetails, explicitNotes) {
     if (!isBundle() || !bundleItems.length) return;
     form.elements.productName.value = bundleProductName(bundleItems);
     form.elements.quantity.value = String(bundleTotal(bundleItems));
     form.elements.bundleSourceIds.value = bundleSourceIds(bundleItems);
     if (includeDetails) {
-      var notes = String(bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
+      var notes = String(typeof explicitNotes === "string" ? explicitNotes : bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
       syncingBundleFields = true;
       form.elements.designDetails.value = bundleDetails(bundleItems) + (notes ? "\nOrder notes: " + notes : "");
       syncingBundleFields = false;
@@ -325,6 +342,7 @@
     if (!bundleItemsElement) return;
     var visible = isBundle() && bundleItems.length > 0;
     bundleItemsElement.hidden = !visible;
+    renderBundleSizes();
     while (bundleItemsElement.firstChild) bundleItemsElement.removeChild(bundleItemsElement.firstChild);
     if (!visible) return;
     bundleItems.forEach(function (item) {
@@ -364,7 +382,7 @@
         }
         bundleNotes = notesBeforeChange;
         setStatus("", "");
-        updateBundleScalars(true);
+        updateBundleScalars(true, notesBeforeChange);
       });
       label.appendChild(input);
       line.appendChild(name);
@@ -372,11 +390,61 @@
       bundleItemsElement.appendChild(line);
     });
   }
+  var bundleSizeInputs = {};
+  var SIZE_LABELS = { heightFeet: "Height ft", heightInchesPart: "Height in", widthFeet: "Width ft", widthInchesPart: "Width in" };
+  function renderBundleSizes() {
+    bundleSizeInputs = {};
+    if (!bundleSizesElement) return;
+    while (bundleSizesElement.firstChild) bundleSizesElement.removeChild(bundleSizesElement.firstChild);
+    if (!isBundle() || !bundleItems.length) return;
+    bundleItems.forEach(function (item, index) {
+      var group = document.createElement("fieldset");
+      group.className = "bundle-size-item";
+      var legend = document.createElement("legend");
+      legend.textContent = item.productName;
+      group.appendChild(legend);
+      var grid = document.createElement("div");
+      grid.className = "bundle-size";
+      SIZE_PARTS.forEach(function (part) {
+        var source = form.elements[part];
+        var id = "bundle-size-" + index + "-" + part;
+        var label = document.createElement("label");
+        label.setAttribute("for", id);
+        label.textContent = SIZE_LABELS[part];
+        var input = document.createElement("input");
+        input.id = id;
+        input.type = "number";
+        input.min = source.getAttribute("min"); input.max = source.getAttribute("max"); input.step = source.getAttribute("step"); input.inputMode = source.getAttribute("inputmode");
+        input.value = item.customSize[part];
+        input.setAttribute("aria-label", SIZE_LABELS[part] + " for " + item.productName);
+        input.addEventListener("change", function () {
+          var previous = item.customSize[part];
+          var notesBeforeChange = String(bundleNotesFromField(value("designDetails")) || bundleNotes || "").trim();
+          item.customSize[part] = String(input.value || "").trim();
+          if (bundleDetails(bundleItems).length > 2000) {
+            item.customSize[part] = previous;
+            input.value = previous;
+            setStatus("Those sizes make the selected list too long. Remove a size before continuing.", "error");
+            return;
+          }
+          bundleNotes = notesBeforeChange;
+          setStatus("", "");
+          updateBundleScalars(true, notesBeforeChange);
+        });
+        label.appendChild(input);
+        grid.appendChild(label);
+        bundleSizeInputs[id] = input;
+      });
+      group.appendChild(grid);
+      bundleSizesElement.appendChild(group);
+    });
+  }
+  function fieldInput(field) { return form.elements[field] || bundleSizeInputs[field]; }
   function revealField(input) {
     if (moreDetails && input && moreDetails.contains && moreDetails.contains(input) && !moreDetails.open) moreDetails.open = true;
   }
   function setError(field, message) {
-    var input = form.elements[field];
+    var input = fieldInput(field);
     if (!input) return;
     revealField(input);
     input.setAttribute("aria-invalid", "true");
@@ -384,13 +452,13 @@
     if (describedBy.indexOf(field + "-error") === -1) describedBy.push(field + "-error");
     input.setAttribute("aria-describedby", describedBy.join(" "));
     var error = document.getElementById(field + "-error");
-    if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; input.parentNode.appendChild(error); }
+    if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; (bundleSizeInputs[field] ? input.parentNode.parentNode : input.parentNode).appendChild(error); }
     error.textContent = message;
   }
   function clearErrors() {
     Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) {
       input.removeAttribute("aria-invalid");
-      var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== input.name + "-error"; });
+      var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== (input.name || input.id) + "-error"; });
       if (describedBy.length) input.setAttribute("aria-describedby", describedBy.join(" ")); else input.removeAttribute("aria-describedby");
     });
     Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); });
@@ -413,13 +481,21 @@
     ["heightInchesPart", "widthInchesPart"].forEach(function (name) { form.elements[name].setAttribute("max", "11.99"); });
   }
   function dimensionsRequired() { return String(seed.sourceKind || "").toLowerCase() === "customizer"; }
-  function setDimensionsRequired(required) {
-    dimensionFields.hidden = !required;
-    dimensionFields.setAttribute("aria-hidden", String(!required));
-    ["heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"].forEach(function (name) {
+  function applyDimensionMode() {
+    var customizer = dimensionsRequired();
+    var bundle = isBundle();
+    if (!customizer && !bundle && customSize && dimensionFields.parentNode !== customSize) customSize.appendChild(dimensionFields);
+    var showDimensions = customizer || !bundle;
+    dimensionFields.hidden = !showDimensions;
+    dimensionFields.setAttribute("aria-hidden", String(!showDimensions));
+    var showRows = bundle && bundleItems.length > 0;
+    var showCustomSize = !customizer && (!bundle || showRows);
+    if (customSize) { customSize.hidden = !showCustomSize; customSize.setAttribute("aria-hidden", String(!showCustomSize)); }
+    if (bundleSizesElement) { bundleSizesElement.hidden = !showRows; bundleSizesElement.setAttribute("aria-hidden", String(!showRows)); }
+    SIZE_PARTS.forEach(function (name) {
       var input = form.elements[name];
       if (!input) return;
-      if (required) input.setAttribute("required", "required"); else input.removeAttribute("required");
+      if (customizer) input.setAttribute("required", "required"); else input.removeAttribute("required");
     });
   }
   function productImagePath() {
@@ -431,24 +507,22 @@
     if (bundle) {
       form.elements.productName.setAttribute("readonly", "readonly");
       form.elements.quantity.setAttribute("readonly", "readonly");
-      var bundleHint = document.getElementById("product-name-hint");
-      if (bundleHint) bundleHint.textContent = "The bundle name and total quantity follow your selected items.";
+      if (productNameRow) productNameRow.hidden = bundleItems.length > 0;
+      if (productNameHint) productNameHint.hidden = bundleItems.length > 0;
       productImage.hidden = true;
       productImage.removeAttribute("src");
       productImage.removeAttribute("alt");
-      if (bundleProductCopy) bundleProductCopy.hidden = false;
-      productContext.hidden = false;
+      productContext.hidden = true;
       renderBundleItems();
       updateBundleScalars(false);
       return;
     }
     form.elements.productName.removeAttribute("readonly");
     form.elements.quantity.removeAttribute("readonly");
-    var productNameHint = document.getElementById("product-name-hint");
-    if (productNameHint) productNameHint.textContent = "You can edit the product name before sending the request.";
+    if (productNameRow) productNameRow.hidden = false;
+    if (productNameHint) productNameHint.hidden = false;
     if (bundleItemsElement) bundleItemsElement.hidden = true;
     productImage.hidden = false;
-    if (bundleProductCopy) bundleProductCopy.hidden = true;
     var imagePath = productImagePath();
     if (!imagePath) {
       productContext.hidden = true;
@@ -470,8 +544,8 @@
     if (isBundle() && bundleItems.length) form.elements.designDetails.value = "";
     toggleShipping();
     updateDimensionMaxes();
-    setDimensionsRequired(dimensionsRequired());
     applyProductContext();
+    applyDimensionMode();
   }
   function normalizeReferralCode(value) { var code = String(value || "").trim().toUpperCase(); return /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code) ? code : ""; }
   function showReferralStatus(message, kind) { if (!referralStatus) return; referralStatus.textContent = message; referralStatus.className = "hint" + (kind ? " " + kind : ""); }
@@ -482,21 +556,13 @@
     var code = referralInput ? normalizeReferralCode(referralInput.value) : "";
     showReferralStatus(code ? "Code changed. Check it again before submitting." : "No code entered. The order can continue without partner credit.", "");
   }
-  function setRepeatProfileStatus(message) {
-    if (repeatProfileStatus) repeatProfileStatus.textContent = message || "";
-  }
   function repeatProfileFromForm() {
     return {
       customerName: value("customerName"), phone: value("phone"), fulfillment: value("fulfillment"),
       shippingAddress: value("shippingAddress"), city: value("city"), state: value("state"), pin: value("pin")
     };
   }
-  function requestForgetRepeatProfile() {
-    if (window.top && window.top !== window && seed.channelNonce) {
-      try { window.top.postMessage({ type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, PARENT_ORIGIN); } catch (error) {}
-    }
-    setRepeatProfileStatus("Saved details were removed from this device.");
-  }
+
   function checkReferralCode() {
     if (!referralInput || !checkReferral || !window.google || !google.script || !google.script.run) return;
     var code = normalizeReferralCode(referralInput.value);
@@ -772,7 +838,8 @@
   }
   function focusFirstError(errors) {
     var first = errors && Object.keys(errors).filter(function (field) { return field !== "form" && field !== "captcha"; })[0];
-    if (first && form.elements[first] && form.elements[first].focus) { revealField(form.elements[first]); form.elements[first].focus(); return; }
+    var firstInput = first && fieldInput(first);
+    if (firstInput && firstInput.focus) { revealField(firstInput); firstInput.focus(); return; }
     if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
   }
   function showFailure(message, errors, attempt) {
@@ -790,12 +857,10 @@
     previewExpected = false;
     previewResolved = true;
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
-    // Keep the repeat-profile controls reachable: hide only the summary and leave the disclosure open.
-    if (moreDetails) moreDetails.open = true;
-    if (moreDetailsSummary) moreDetailsSummary.hidden = true;
+    if (moreDetails) moreDetails.hidden = true;
     anotherButton.hidden = false;
     var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
-    if (rememberRepeatProfile && rememberRepeatProfile.checked && window.top && window.top !== window && seed.channelNonce) {
+    if (window.top && window.top !== window && seed.channelNonce) {
       try { window.top.postMessage({ type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile: repeatProfileFromForm() }, PARENT_ORIGIN); } catch (error) {}
     }
     setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed." + referralMessage + " Request ID: " + result.requestId, "success");
@@ -819,7 +884,7 @@
   }
   var inlineFields = ["customerName", "phone", "shippingAddress", "pin", "requestedDate"];
   function clearError(field) {
-    var input = form.elements[field];
+    var input = fieldInput(field);
     if (!input) return;
     input.removeAttribute("aria-invalid");
     var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== field + "-error"; });
@@ -831,26 +896,49 @@
     var message = fieldError(field);
     if (message) setError(field, message); else clearError(field);
   }
+  function dimensionErrors(feetText, inchesText, label, feetKey, inchesKey, errors) {
+    var feet = Number(feetText);
+    var inches = Number(inchesText);
+    if (!/^\d+$/.test(feetText) || !Number.isInteger(feet) || feet < 0) errors[feetKey] = label + " feet must be a whole, non-negative number.";
+    if (!/^\d+(\.\d+)?$/.test(inchesText) || !Number.isFinite(inches) || inches < 0 || inches >= 12) errors[inchesKey] = label + " inches must be from 0 up to (but not including) 12.";
+    var total = feet * 12 + inches;
+    if (Number.isFinite(total) && total <= 0) errors[feetKey] = label + " must be greater than 0 inches.";
+    if (Number.isFinite(total) && total > 60) errors[feetKey] = label + " must be no more than 60 inches.";
+  }
+  function optionalSizeErrors(texts, keyFor, errors) {
+    var filled = SIZE_PARTS.some(function (part) { return String(texts[part] || "").trim() !== ""; });
+    if (!filled) return;
+    [["height", "Height"], ["width", "Width"]].forEach(function (axis) {
+      var feetText = String(texts[axis[0] + "Feet"] || "").trim();
+      var inchesText = String(texts[axis[0] + "InchesPart"] || "").trim();
+      if (!feetText && !inchesText) errors[keyFor(axis[0] + "Feet")] = "Enter both height and width, or leave both blank.";
+      else dimensionErrors(feetText || "0", inchesText || "0", axis[1], keyFor(axis[0] + "Feet"), keyFor(axis[0] + "InchesPart"), errors);
+    });
+  }
+  function fillBlankSizeParts() {
+    ["height", "width"].forEach(function (axis) {
+      var feet = form.elements[axis + "Feet"];
+      var inches = form.elements[axis + "InchesPart"];
+      var feetBlank = !String(feet.value || "").trim();
+      var inchesBlank = !String(inches.value || "").trim();
+      if (feetBlank !== inchesBlank) { if (feetBlank) feet.value = "0"; else inches.value = "0"; }
+    });
+  }
   function clientValidationErrors() {
     var errors = {};
     function required(name, message) { if (!value(name).trim()) errors[name] = message; }
     required("productName", "This field is required.");
     var quantity = Number(value("quantity"));
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
-    function dimension(name, label) {
-      var feetText = value(name + "Feet");
-      var inchesText = value(name + "InchesPart");
-      var feet = Number(feetText);
-      var inches = Number(inchesText);
-      if (!/^\d+$/.test(feetText) || !Number.isInteger(feet) || feet < 0) errors[name + "Feet"] = label + " feet must be a whole, non-negative number.";
-      if (!/^\d+(\.\d+)?$/.test(inchesText) || !Number.isFinite(inches) || inches < 0 || inches >= 12) errors[name + "InchesPart"] = label + " inches must be from 0 up to (but not including) 12.";
-      var total = feet * 12 + inches;
-      if (Number.isFinite(total) && total <= 0) errors[name + "Feet"] = label + " must be greater than 0 inches.";
-      if (Number.isFinite(total) && total > 60) errors[name + "Feet"] = label + " must be no more than 60 inches.";
-    }
     if (dimensionsRequired()) {
-      dimension("height", "Height");
-      dimension("width", "Width");
+      dimensionErrors(value("heightFeet"), value("heightInchesPart"), "Height", "heightFeet", "heightInchesPart", errors);
+      dimensionErrors(value("widthFeet"), value("widthInchesPart"), "Width", "widthFeet", "widthInchesPart", errors);
+    } else if (isBundle()) {
+      bundleItems.forEach(function (item, index) {
+        optionalSizeErrors(item.customSize, function (part) { return "bundle-size-" + index + "-" + part; }, errors);
+      });
+    } else {
+      optionalSizeErrors({ heightFeet: value("heightFeet"), heightInchesPart: value("heightInchesPart"), widthFeet: value("widthFeet"), widthInchesPart: value("widthInchesPart") }, function (part) { return part; }, errors);
     }
     required("designDetails", "This field is required.");
     inlineFields.forEach(function (name) { var message = fieldError(name); if (message) errors[name] = message; });
@@ -903,11 +991,11 @@
   });
   if (referralInput) { referralInput.addEventListener("input", clearReferralStatus); referralInput.addEventListener("change", clearReferralStatus); }
   if (checkReferral) checkReferral.addEventListener("click", checkReferralCode);
-  if (forgetRepeatProfileButton) forgetRepeatProfileButton.addEventListener("click", requestForgetRepeatProfile);
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;
     if (isBundle()) updateBundleScalars(true);
+    else if (!dimensionsRequired()) fillBlankSizeParts();
     clearErrors();
     if (previewExpected && !previewResolved) {
       setStatus(previewPending ? "The customizer preview is still loading. Please wait, retry, or continue without a preview." : "Attach the customizer preview, retry it, or continue without a preview.", "error");
@@ -952,8 +1040,7 @@
     form.reset();
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
     anotherButton.hidden = true; clearErrors(); setStatus("", "");
-    if (moreDetails) moreDetails.open = false;
-    if (moreDetailsSummary) moreDetailsSummary.hidden = false;
+    if (moreDetails) { moreDetails.hidden = false; moreDetails.open = false; }
     applySeed(seed);
     form.elements.requestId.value = newRequestId();
     clearReferralStatus();

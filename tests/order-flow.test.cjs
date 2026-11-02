@@ -834,8 +834,12 @@ test("every tel link on the site dials the full +91 number", () => {
 });
 
 test("Order on WhatsApp links open wa.me with the cart as an encoded message and follow changes", () => {
-  assert.match(page, /<a[^>]*id="catalogue-cart-whatsapp"[^>]*href="https:\/\/wa\.me\/918209238541"[^>]*target="_blank"[^>]*rel="noopener"[^>]*>Order on WhatsApp<\/a>/);
-  assert.match(page, /<a[^>]*id="catalogue-selection-whatsapp"[^>]*href="https:\/\/wa\.me\/918209238541"[^>]*target="_blank"[^>]*rel="noopener"[^>]*>Order on WhatsApp<\/a>/);
+  const cartLink = page.match(/<a[^>]*id="catalogue-cart-whatsapp"[^>]*href="https:\/\/wa\.me\/918209238541"[^>]*target="_blank"[^>]*rel="noopener"[^>]*>[\s\S]*?<\/a>/);
+  assert.ok(cartLink);
+  assert.equal(cartLink[0].replace(/<[^>]+>/g, "").trim(), "Order on WhatsApp");
+  const selectionLink = page.match(/<a[^>]*id="catalogue-selection-whatsapp"[^>]*href="https:\/\/wa\.me\/918209238541"[^>]*target="_blank"[^>]*rel="noopener"[^>]*>[\s\S]*?<\/a>/);
+  assert.ok(selectionLink);
+  assert.equal(selectionLink[0].replace(/<[^>]+>/g, "").trim(), "Order on WhatsApp");
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
   flow.generatedCatalogueButtons[2].dispatch("click");
@@ -870,9 +874,9 @@ test("phones get a full-screen order dialog where only the form iframe scrolls",
   assert.doesNotMatch(block, /lightbox/);
 });
 
-test("the mobile sticky cart keeps both Order buttons at 44px and reserves room for two rows", () => {
+test("the mobile sticky cart keeps its buttons at 44px and reserves room for one row", () => {
   assert.match(css, /\.catalogue-cart-jump \.button \{[^}]*min-height: 44px/);
-  assert.match(css, /body:has\(#catalogue-cart-jump:not\(\[hidden\]\)\) \{ padding-bottom: calc\(7\.5rem/);
+  assert.match(css, /body:has\(#catalogue-cart-jump:not\(\[hidden\]\)\) \{ padding-bottom: calc\(5rem/);
   assert.match(css, /\.catalogue-selection \.button \{[^}]*min-height: 2\.75rem/);
 });
 
