@@ -72,7 +72,10 @@ test("catalogue quote context is safe and customizer dimensions remain selected"
   assert.equal(standard.fields.requestStage.value, "quote");
   assert.equal(standard.elements.get("product-image").getAttribute("src"), "https://saloniresinart.com/assets/romantic-heart-trinket-tray.webp");
   assert.equal(standard.elements.get("product-image").getAttribute("alt"), "Test frame product photo");
-  assert.equal(standard.elements.get("dimension-fields").hidden, true);
+  assert.equal(standard.elements.get("custom-size").hidden, false);
+  assert.equal(standard.elements.get("dimension-fields").parentNode.id, "custom-size");
+  assert.equal(standard.elements.get("dimension-fields").hidden, false);
+  assert.equal(standard.elements.get("bundle-sizes").hidden, true);
   assert.equal(standard.elements.get("shipping-fields").hidden, true);
   ["height-feet", "height-inches-part", "width-feet", "width-inches-part"].forEach((id) => assert.equal(standard.elements.get(id).getAttribute("required"), ""));
 
@@ -87,6 +90,8 @@ test("catalogue quote context is safe and customizer dimensions remain selected"
   const customizer = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
   assert.equal(customizer.elements.get("product-context").hidden, true);
   assert.equal(customizer.elements.get("dimension-fields").hidden, false);
+  assert.equal(customizer.elements.get("custom-size").hidden, true);
+  assert.notEqual(customizer.elements.get("dimension-fields").parentNode && customizer.elements.get("dimension-fields").parentNode.id, "custom-size");
   ["height-feet", "height-inches-part", "width-feet", "width-inches-part"].forEach((id) => assert.equal(customizer.elements.get(id).getAttribute("required"), "required"));
 });
 
@@ -510,6 +515,7 @@ test("starting another customizer request restores its seeded dimensions", () =>
   assert.equal(runtime.fields.sourceId.value, "customizer:resin-frame");
   assert.equal(runtime.elements.get("product-context").hidden, true);
   assert.equal(runtime.elements.get("dimension-fields").hidden, false);
+  assert.equal(runtime.elements.get("custom-size").hidden, true);
   ["height-feet", "height-inches-part", "width-feet", "width-inches-part"].forEach((id) => assert.equal(runtime.elements.get(id).getAttribute("required"), "required"));
 });
 
@@ -522,8 +528,234 @@ test("starting another catalogue request restores quote context and optional dim
   assert.equal(runtime.fields.sourceId.value, "catalogue:romantic-heart-trinket-tray.webp");
   assert.equal(runtime.elements.get("product-context").hidden, false);
   assert.equal(runtime.elements.get("product-image").getAttribute("src"), "https://saloniresinart.com/assets/romantic-heart-trinket-tray.webp");
-  assert.equal(runtime.elements.get("dimension-fields").hidden, true);
+  assert.equal(runtime.elements.get("custom-size").hidden, false);
+  assert.equal(runtime.elements.get("dimension-fields").parentNode.id, "custom-size");
+  assert.equal(runtime.elements.get("dimension-fields").hidden, false);
   ["height-feet", "height-inches-part", "width-feet", "width-inches-part"].forEach((id) => assert.equal(runtime.elements.get(id).getAttribute("required"), ""));
+});
+
+// ---- Custom size (optional) in More details ----
+function findById(root, id) {
+  if (!root) return null;
+  if (root.id === id) return root;
+  for (const child of root.children || []) {
+    const found = findById(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+function sizeInput(runtime, index, part) { return findById(runtime.elements.get("bundle-sizes"), `bundle-size-${index}-${part}`); }
+function sizeError(runtime, index, part) {
+  const input = sizeInput(runtime, index, part);
+  const grid = input && input.parentNode && input.parentNode.parentNode;
+  assert.ok(!grid || grid.className === "bundle-size", "row errors belong to the row grid, not the narrow cell");
+  const error = grid ? grid.children.find((child) => child.className === "field-error") : null;
+  return error ? error.textContent : "";
+}
+function setSize(runtime, index, values) {
+  Object.entries(values).forEach(([part, text]) => { const input = sizeInput(runtime, index, part); input.value = text; input.dispatch("change"); });
+}
+function submitForm(runtime) { runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} }); }
+async function submitAndSend(runtime) {
+  submitForm(runtime);
+  await Promise.resolve();
+  if (runtime.parentMessages.some((entry) => entry.message.type === "saloni-order-captcha-request")) { respondToken(runtime, 0); await Promise.resolve(); }
+}
+const SIZE_ITEMS = [
+  { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 1 },
+  { sourceId: "catalogue:two.webp", productName: "Two", price: "399", size: "6 in", quantity: 1 },
+];
+function cartRuntime(items = SIZE_ITEMS) {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:multi-item", bundleItems: items.map((item) => Object.assign({}, item)) });
+  fillValid(runtime.fields);
+  runtime.fields.designDetails.value = "";
+  return runtime;
+}
+
+test("Form.html has a custom size fieldset as the first thing in More details, with no name on the cart rows", () => {
+  const more = html.match(/<details class="more-details" id="more-details">\s*<summary>[^<]*<\/summary>\s*([\s\S]*?)<fieldset>\s*<legend>Optional details/)?.[1] || "";
+  assert.match(more, /<fieldset id="custom-size" hidden>\s*<legend>Custom size \(optional\)<\/legend>\s*<div id="bundle-sizes" hidden><\/div>\s*<\/fieldset>/);
+  assert.match(html, /\.bundle-size\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  const renderer = formSource.match(/function renderBundleItems\(\)[\s\S]*?\n  function revealField/)[0];
+  assert.doesNotMatch(renderer, /innerHTML/);
+  assert.doesNotMatch(renderer, /\.name\s*=\s*["']?bundle-size/);
+});
+
+test("a single product moves the size fields into Custom size and a blank size is accepted", async () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
+  fillValid(runtime.fields);
+  ["heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"].forEach((name) => { runtime.fields[name].value = ""; });
+  await submitAndSend(runtime);
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.errors.length, 0);
+});
+
+test("a single product posts a custom size typed in More details", async () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
+  fillValid(runtime.fields);
+  Object.assign(runtime.fields.heightFeet, { value: "1" }); Object.assign(runtime.fields.heightInchesPart, { value: "2" });
+  Object.assign(runtime.fields.widthFeet, { value: "0" }); Object.assign(runtime.fields.widthInchesPart, { value: "10" });
+  await submitAndSend(runtime);
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.fields.heightFeet.value, "1");
+  assert.equal(runtime.fields.heightInchesPart.value, "2");
+  assert.equal(runtime.fields.widthFeet.value, "0");
+  assert.equal(runtime.fields.widthInchesPart.value, "10");
+  assert.equal(runtime.errors.length, 0);
+});
+
+test("a single product with only one dimension asks for both and opens More details on the missing one", () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
+  fillValid(runtime.fields);
+  Object.assign(runtime.fields.heightFeet, { value: "1" }); Object.assign(runtime.fields.heightInchesPart, { value: "2" });
+  Object.assign(runtime.fields.widthFeet, { value: "" }); Object.assign(runtime.fields.widthInchesPart, { value: "" });
+  submitForm(runtime);
+  assert.equal(runtime.submissions.length, 0);
+  assert.equal(errorText(runtime, "widthFeet"), "Enter both height and width, or leave both blank.");
+  assert.equal(runtime.fields.widthFeet.getAttribute("aria-invalid"), "true");
+  assert.match(runtime.fields.widthFeet.getAttribute("aria-describedby"), /widthFeet-error/);
+  assert.equal(runtime.elements.get("more-details").open, true);
+  assert.equal(runtime.fields.widthFeet.focused, true);
+});
+
+test("a single product fills a blank feet or inches part with 0 when the other part is typed", async () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
+  fillValid(runtime.fields);
+  Object.assign(runtime.fields.heightFeet, { value: "" }); Object.assign(runtime.fields.heightInchesPart, { value: "10" });
+  Object.assign(runtime.fields.widthFeet, { value: "2" }); Object.assign(runtime.fields.widthInchesPart, { value: "" });
+  await submitAndSend(runtime);
+  assert.equal(runtime.fields.heightFeet.value, "0");
+  assert.equal(runtime.fields.widthInchesPart.value, "0");
+  assert.equal(runtime.submissions.length, 1);
+});
+
+test("a single product rejects an oversized custom size with the shared message", () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
+  fillValid(runtime.fields);
+  Object.assign(runtime.fields.heightFeet, { value: "5" }); Object.assign(runtime.fields.heightInchesPart, { value: "1" });
+  submitForm(runtime);
+  assert.equal(errorText(runtime, "heightFeet"), "Height must be no more than 60 inches.");
+  assert.equal(runtime.submissions.length, 0);
+});
+
+test("a cart renders one labelled, unnamed size row per product inside Custom size", () => {
+  const runtime = cartRuntime();
+  assert.equal(runtime.elements.get("custom-size").hidden, false);
+  assert.equal(runtime.elements.get("bundle-sizes").hidden, false);
+  assert.equal(runtime.elements.get("dimension-fields").hidden, true);
+  const rows = runtime.elements.get("bundle-sizes").children;
+  assert.equal(rows.length, 2);
+  const names = ["heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"];
+  names.forEach((part) => {
+    const input = sizeInput(runtime, 0, part);
+    assert.ok(input, part);
+    assert.equal(input.type, "number");
+    assert.equal(input.getAttribute("name"), "");
+  });
+  assert.equal(sizeInput(runtime, 1, "heightFeet").getAttribute("aria-label"), "Height ft for Two");
+  assert.equal(sizeInput(runtime, 0, "widthInchesPart").getAttribute("aria-label"), "Width in for One");
+  assert.equal(sizeInput(runtime, 0, "heightFeet").max, "5");
+  assert.equal(sizeInput(runtime, 0, "heightInchesPart").max, "11.99");
+});
+
+test("a cart adds the custom size only to the item that has one, and posts no size field names", async () => {
+  const runtime = cartRuntime();
+  setSize(runtime, 0, { heightFeet: "1", heightInchesPart: "2", widthInchesPart: "10" });
+  await submitAndSend(runtime);
+  const lines = runtime.fields.designDetails.value.split("\n");
+  assert.equal(lines[0], "One · 4 in · 249 · Qty 1 · Custom size: H 1 ft 2 in × W 10 in");
+  assert.equal(lines[1], "Two · 6 in · 399 · Qty 1");
+  assert.equal(runtime.submissions.length, 1);
+  assert.ok(!Object.keys(runtime.fields).some((key) => key.startsWith("bundle-size")));
+});
+
+test("a cart size with a whole foot, a partial axis, or inches only formats compactly", () => {
+  const runtime = cartRuntime();
+  setSize(runtime, 0, { heightFeet: "2", widthInchesPart: "6.50" });
+  assert.match(runtime.fields.designDetails.value.split("\n")[0], /Custom size: H 2 ft × W 6\.5 in$/);
+  setSize(runtime, 0, { heightFeet: "", heightInchesPart: "0" });
+  assert.doesNotMatch(runtime.fields.designDetails.value, /Custom size/);
+});
+
+test("a cart row over 60 inches shows its error on that row and opens More details", () => {
+  const runtime = cartRuntime();
+  setSize(runtime, 1, { heightFeet: "5", heightInchesPart: "1", widthFeet: "1" });
+  submitForm(runtime);
+  assert.equal(runtime.submissions.length, 0);
+  assert.equal(sizeError(runtime, 1, "heightFeet"), "Height must be no more than 60 inches.");
+  assert.equal(sizeInput(runtime, 1, "heightFeet").getAttribute("aria-invalid"), "true");
+  assert.match(sizeInput(runtime, 1, "heightFeet").getAttribute("aria-describedby"), /bundle-size-1-heightFeet-error/);
+  assert.equal(sizeInput(runtime, 1, "heightFeet").focused, true);
+  assert.equal(runtime.elements.get("more-details").open, true);
+});
+
+test("a cart row with only one dimension asks for both, and a row left blank passes", async () => {
+  const runtime = cartRuntime();
+  setSize(runtime, 0, { heightFeet: "1" });
+  submitForm(runtime);
+  assert.equal(sizeError(runtime, 0, "widthFeet"), "Enter both height and width, or leave both blank.");
+  assert.equal(sizeError(runtime, 1, "widthFeet"), "");
+  assert.equal(runtime.submissions.length, 0);
+  setSize(runtime, 0, { heightFeet: "" });
+  await submitAndSend(runtime);
+  assert.equal(runtime.submissions.length, 1);
+});
+
+test("editing sizes then quantities twice does not turn the old list into Order notes", () => {
+  const runtime = cartRuntime();
+  setSize(runtime, 0, { heightFeet: "1", widthFeet: "2" });
+  const quantities = runtime.elements.get("bundle-items").children.map((line) => line.querySelector("input"));
+  quantities[0].value = "2"; quantities[0].dispatch("change");
+  quantities[1].value = "3"; quantities[1].dispatch("change");
+  assert.doesNotMatch(runtime.fields.designDetails.value, /Order notes:/);
+  assert.equal(runtime.fields.designDetails.value.split("\n").length, 2);
+  assert.match(runtime.fields.designDetails.value, /One .*Qty 2 · Custom size: H 1 ft × W 2 ft\nTwo .*Qty 3$/);
+});
+
+test("customer notes survive size and quantity edits", () => {
+  const runtime = cartRuntime();
+  runtime.fields.designDetails.value = "Warm colours";
+  runtime.fields.designDetails.dispatch("input");
+  setSize(runtime, 0, { heightFeet: "1", widthFeet: "2" });
+  const quantity = runtime.elements.get("bundle-items").children[1].querySelector("input");
+  quantity.value = "2"; quantity.dispatch("change");
+  assert.match(runtime.fields.designDetails.value, /\nOrder notes: Warm colours$/);
+  assert.equal((runtime.fields.designDetails.value.match(/Order notes:/g) || []).length, 1);
+});
+
+test("Start another request rebuilds the cart rows empty and drops the old sizes from the notes", () => {
+  const runtime = cartRuntime();
+  setSize(runtime, 1, { heightFeet: "1", heightInchesPart: "2", widthFeet: "0", widthInchesPart: "10" });
+  assert.match(runtime.fields.designDetails.value, /Custom size: H 1 ft 2 in \u00d7 W 10 in/);
+  runtime.elements.get("another-button").dispatch("click");
+  assert.equal(runtime.elements.get("bundle-sizes").children.length, 2);
+  assert.equal(sizeInput(runtime, 1, "heightFeet").value, "");
+  assert.doesNotMatch(runtime.fields.designDetails.value, /Custom size/);
+});
+
+test("a size that would push the list past 2000 characters is refused and reverted", () => {
+  const long = "N".repeat(150);
+  const items = Array.from({ length: 11 }, (_, index) => ({ sourceId: `catalogue:item${String(index).padStart(2, "0")}.webp`, productName: `${long}${String(index).padStart(2, "0")}`, price: "249", size: "4 in", quantity: 1 }));
+  const runtime = cartRuntime(items);
+  assert.equal(runtime.elements.get("bundle-sizes").children.length, 11);
+  let refusedAt = -1;
+  for (let index = 0; index < items.length && refusedAt < 0; index += 1) {
+    setSize(runtime, index, { heightFeet: "5", widthFeet: "5" });
+    if (/too long/i.test(runtime.status.textContent)) refusedAt = index;
+    else assert.ok(runtime.fields.designDetails.value.length <= 2000);
+  }
+  assert.ok(refusedAt > 0, "a refusal should happen before every row is filled");
+  assert.equal(sizeInput(runtime, refusedAt, "widthFeet").value, "");
+  assert.ok(runtime.fields.designDetails.value.length <= 2000);
+  assert.doesNotMatch(runtime.fields.designDetails.value.split("\n")[refusedAt], /Custom size/);
+});
+
+test("a customizer order keeps the size block in What should Saloni make and hides Custom size", () => {
+  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
+  assert.equal(runtime.elements.get("custom-size").hidden, true);
+  assert.equal(runtime.elements.get("bundle-sizes").hidden, true);
+  assert.equal(runtime.elements.get("dimension-fields").hidden, false);
+  assert.notEqual(runtime.elements.get("dimension-fields").parentNode && runtime.elements.get("dimension-fields").parentNode.id, "custom-size");
 });
 
 class FakeElement {
@@ -567,11 +799,12 @@ class FakeMessageChannel {
 }
 
 function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
+  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
   const errors = [];
+  const created = [];
   const fields = {
     requestId: elements.get("request-id"), requestStage: elements.get("request-stage"), sourceKind: elements.get("source-kind"), sourceId: elements.get("source-id"), productName: elements.get("product-name"),
     quantity: elements.get("quantity"), heightFeet: elements.get("height-feet"), heightInchesPart: elements.get("height-inches-part"), widthFeet: elements.get("width-feet"), widthInchesPart: elements.get("width-inches-part"),
@@ -583,11 +816,20 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
   moreDetails.open = false;
   moreDetails.summary = new FakeElement("more-details-summary");
   moreDetails.querySelector = (selector) => (selector === "summary" ? moreDetails.summary : null);
-  moreDetails.contains = (element) => ["email", "requested-date", "referral-code", "reference-image"].includes(element && element.id);
+  const dimensionIds = ["height-feet", "height-inches-part", "width-feet", "width-inches-part"];
+  moreDetails.contains = (element) => {
+    const id = element && element.id;
+    if (["email", "requested-date", "referral-code", "reference-image"].includes(id)) return true;
+    if (typeof id === "string" && id.startsWith("bundle-size-")) return true;
+    return dimensionIds.includes(id) && elements.get("dimension-fields").parentNode?.id === "custom-size";
+  };
   form.elements = fields;
   form.querySelectorAll = (selector) => {
-    if (selector === "[aria-invalid]") return Object.values(fields).filter((field) => field.getAttribute("aria-invalid"));
-    if (selector === ".field-error") return errors.slice();
+    if (selector === "[aria-invalid]") return Object.values(fields).concat(created).filter((field) => field.getAttribute("aria-invalid"));
+    if (selector === ".field-error") {
+      const attached = (element) => element.parentNode && element.parentNode.children && element.parentNode.children.includes(element);
+      return errors.concat(created.filter((element) => element.className === "field-error" && !errors.includes(element) && attached(element)));
+    }
     if (selector === "fieldset, #submit-button, #captcha-token") return [elements.get("submit-button"), elements.get("captcha-token")];
     return [];
   };
@@ -636,10 +878,17 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
   windowObject.google = { script: { run } };
   windowObject.top = windowObject.parent;
   const documentObject = {
-    getElementById(id) { return elements.get(id) || errors.find((error) => error.id === id) || null; },
+    getElementById(id) { return elements.get(id) || errors.find((error) => error.id === id) || created.find((element) => element.id === id) || null; },
     createElement(tag) {
-      const element = new FakeElement(tag); element.className = "";
-      element.remove = () => { const index = errors.indexOf(element); if (index >= 0) errors.splice(index, 1); };
+      const element = new FakeElement(tag); element.className = ""; element.name = "";
+      created.push(element);
+      element.remove = () => {
+        const index = errors.indexOf(element);
+        if (index >= 0) errors.splice(index, 1);
+        const createdIndex = created.indexOf(element);
+        if (createdIndex >= 0) created.splice(createdIndex, 1);
+        if (element.parentNode && element.parentNode.removeChild) element.parentNode.removeChild(element);
+      };
       return element;
     },
   };

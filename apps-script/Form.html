@@ -31,6 +31,10 @@
     textarea { min-height: 7rem; resize: vertical; }
     input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
     .dimension-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+    .bundle-size { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+    .bundle-size label { font-size: .76rem; }
+    .bundle-size .field-error { grid-column: 1 / -1; font-size: .8rem; }
+    .bundle-size-item { margin-bottom: .75rem; }
     .shipping-fields { margin-top: .85rem; }
     .more-details > summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
     .more-details[open] > summary { margin-bottom: .6rem; }
@@ -113,6 +117,10 @@
 
     <details class="more-details" id="more-details">
       <summary>More details (optional)</summary>
+      <fieldset id="custom-size" hidden>
+        <legend>Custom size (optional)</legend>
+        <div id="bundle-sizes" hidden></div>
+      </fieldset>
       <fieldset>
         <legend>Optional details</legend>
         <div class="grid">
@@ -179,6 +187,8 @@
   var productNameHint = document.getElementById("product-name-hint");
   var bundleItemsElement = document.getElementById("bundle-items");
   var dimensionFields = document.getElementById("dimension-fields");
+  var customSize = document.getElementById("custom-size");
+  var bundleSizesElement = document.getElementById("bundle-sizes");
   var referenceImage = document.getElementById("reference-image");
   var referenceImagePreviewWrap = document.getElementById("reference-image-preview-wrap");
   var referenceImagePreview = document.getElementById("reference-image-preview");
@@ -259,9 +269,30 @@
     var sorted = sortedBundleItems(items);
     return sorted[0].productName + (sorted.length > 1 ? " + " + (sorted.length - 1) + " more" : "");
   }
+  var SIZE_PARTS = ["heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"];
+  function emptyCustomSize() { return { heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "" }; }
+  function sizeAxis(feetText, inchesText) {
+    var feet = String(feetText || "").trim() || "0";
+    var inches = String(inchesText || "").trim() || "0";
+    if (!/^\d+$/.test(feet) || !/^\d+(\.\d+)?$/.test(inches)) return "";
+    var feetNumber = Number(feet);
+    var inchesNumber = Number(inches);
+    var total = feetNumber * 12 + inchesNumber;
+    if (inchesNumber >= 12 || total <= 0 || total > 60) return "";
+    var inchesLabel = String(inchesNumber) + " in";
+    if (feetNumber === 0) return inchesLabel;
+    return feetNumber + " ft" + (inchesNumber > 0 ? " " + inchesLabel : "");
+  }
+  function customSizeText(item) {
+    var size = item && item.customSize;
+    if (!size) return "";
+    var height = sizeAxis(size.heightFeet, size.heightInchesPart);
+    var width = sizeAxis(size.widthFeet, size.widthInchesPart);
+    return height && width ? "Custom size: H " + height + " \u00d7 W " + width : "";
+  }
   function bundleDetails(items) {
     return sortedBundleItems(items).map(function (item) {
-      return [item.productName, item.size, item.price, "Qty " + bundleQuantity(item)].filter(Boolean).join(" \u00b7 ");
+      return [item.productName, item.size, item.price, "Qty " + bundleQuantity(item), customSizeText(item)].filter(Boolean).join(" \u00b7 ");
     }).join("\n");
   }
   function bundleSourceIds(items) {
@@ -280,7 +311,7 @@
       var quantity = Number(item.quantity);
       if (!sourceId || !/^[A-Za-z0-9_.:/-]+$/.test(sourceId) || !productName || !Number.isInteger(quantity) || quantity < 1 || quantity > 100 || seen[sourceId]) return [];
       seen[sourceId] = true;
-      normalized.push({ sourceId: sourceId, productName: productName, price: price, size: size, quantity: quantity });
+      normalized.push({ sourceId: sourceId, productName: productName, price: price, size: size, quantity: quantity, customSize: emptyCustomSize() });
     }
     return bundleTotal(normalized) <= 100 && bundleDetails(normalized).length <= 2000 ? normalized : [];
   }
@@ -294,13 +325,13 @@
     if (current === canonical) return "";
     return current.indexOf(prefix) === 0 ? current.slice(prefix.length) : current;
   }
-  function updateBundleScalars(includeDetails) {
+  function updateBundleScalars(includeDetails, explicitNotes) {
     if (!isBundle() || !bundleItems.length) return;
     form.elements.productName.value = bundleProductName(bundleItems);
     form.elements.quantity.value = String(bundleTotal(bundleItems));
     form.elements.bundleSourceIds.value = bundleSourceIds(bundleItems);
     if (includeDetails) {
-      var notes = String(bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
+      var notes = String(typeof explicitNotes === "string" ? explicitNotes : bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
       syncingBundleFields = true;
       form.elements.designDetails.value = bundleDetails(bundleItems) + (notes ? "\nOrder notes: " + notes : "");
       syncingBundleFields = false;
@@ -311,6 +342,7 @@
     if (!bundleItemsElement) return;
     var visible = isBundle() && bundleItems.length > 0;
     bundleItemsElement.hidden = !visible;
+    renderBundleSizes();
     while (bundleItemsElement.firstChild) bundleItemsElement.removeChild(bundleItemsElement.firstChild);
     if (!visible) return;
     bundleItems.forEach(function (item) {
@@ -350,7 +382,7 @@
         }
         bundleNotes = notesBeforeChange;
         setStatus("", "");
-        updateBundleScalars(true);
+        updateBundleScalars(true, notesBeforeChange);
       });
       label.appendChild(input);
       line.appendChild(name);
@@ -358,11 +390,61 @@
       bundleItemsElement.appendChild(line);
     });
   }
+  var bundleSizeInputs = {};
+  var SIZE_LABELS = { heightFeet: "Height ft", heightInchesPart: "Height in", widthFeet: "Width ft", widthInchesPart: "Width in" };
+  function renderBundleSizes() {
+    bundleSizeInputs = {};
+    if (!bundleSizesElement) return;
+    while (bundleSizesElement.firstChild) bundleSizesElement.removeChild(bundleSizesElement.firstChild);
+    if (!isBundle() || !bundleItems.length) return;
+    bundleItems.forEach(function (item, index) {
+      var group = document.createElement("fieldset");
+      group.className = "bundle-size-item";
+      var legend = document.createElement("legend");
+      legend.textContent = item.productName;
+      group.appendChild(legend);
+      var grid = document.createElement("div");
+      grid.className = "bundle-size";
+      SIZE_PARTS.forEach(function (part) {
+        var source = form.elements[part];
+        var id = "bundle-size-" + index + "-" + part;
+        var label = document.createElement("label");
+        label.setAttribute("for", id);
+        label.textContent = SIZE_LABELS[part];
+        var input = document.createElement("input");
+        input.id = id;
+        input.type = "number";
+        input.min = source.getAttribute("min"); input.max = source.getAttribute("max"); input.step = source.getAttribute("step"); input.inputMode = source.getAttribute("inputmode");
+        input.value = item.customSize[part];
+        input.setAttribute("aria-label", SIZE_LABELS[part] + " for " + item.productName);
+        input.addEventListener("change", function () {
+          var previous = item.customSize[part];
+          var notesBeforeChange = String(bundleNotesFromField(value("designDetails")) || bundleNotes || "").trim();
+          item.customSize[part] = String(input.value || "").trim();
+          if (bundleDetails(bundleItems).length > 2000) {
+            item.customSize[part] = previous;
+            input.value = previous;
+            setStatus("Those sizes make the selected list too long. Remove a size before continuing.", "error");
+            return;
+          }
+          bundleNotes = notesBeforeChange;
+          setStatus("", "");
+          updateBundleScalars(true, notesBeforeChange);
+        });
+        label.appendChild(input);
+        grid.appendChild(label);
+        bundleSizeInputs[id] = input;
+      });
+      group.appendChild(grid);
+      bundleSizesElement.appendChild(group);
+    });
+  }
+  function fieldInput(field) { return form.elements[field] || bundleSizeInputs[field]; }
   function revealField(input) {
     if (moreDetails && input && moreDetails.contains && moreDetails.contains(input) && !moreDetails.open) moreDetails.open = true;
   }
   function setError(field, message) {
-    var input = form.elements[field];
+    var input = fieldInput(field);
     if (!input) return;
     revealField(input);
     input.setAttribute("aria-invalid", "true");
@@ -370,13 +452,13 @@
     if (describedBy.indexOf(field + "-error") === -1) describedBy.push(field + "-error");
     input.setAttribute("aria-describedby", describedBy.join(" "));
     var error = document.getElementById(field + "-error");
-    if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; input.parentNode.appendChild(error); }
+    if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; (bundleSizeInputs[field] ? input.parentNode.parentNode : input.parentNode).appendChild(error); }
     error.textContent = message;
   }
   function clearErrors() {
     Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) {
       input.removeAttribute("aria-invalid");
-      var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== input.name + "-error"; });
+      var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== (input.name || input.id) + "-error"; });
       if (describedBy.length) input.setAttribute("aria-describedby", describedBy.join(" ")); else input.removeAttribute("aria-describedby");
     });
     Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); });
@@ -399,13 +481,21 @@
     ["heightInchesPart", "widthInchesPart"].forEach(function (name) { form.elements[name].setAttribute("max", "11.99"); });
   }
   function dimensionsRequired() { return String(seed.sourceKind || "").toLowerCase() === "customizer"; }
-  function setDimensionsRequired(required) {
-    dimensionFields.hidden = !required;
-    dimensionFields.setAttribute("aria-hidden", String(!required));
-    ["heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"].forEach(function (name) {
+  function applyDimensionMode() {
+    var customizer = dimensionsRequired();
+    var bundle = isBundle();
+    if (!customizer && !bundle && customSize && dimensionFields.parentNode !== customSize) customSize.appendChild(dimensionFields);
+    var showDimensions = customizer || !bundle;
+    dimensionFields.hidden = !showDimensions;
+    dimensionFields.setAttribute("aria-hidden", String(!showDimensions));
+    var showRows = bundle && bundleItems.length > 0;
+    var showCustomSize = !customizer && (!bundle || showRows);
+    if (customSize) { customSize.hidden = !showCustomSize; customSize.setAttribute("aria-hidden", String(!showCustomSize)); }
+    if (bundleSizesElement) { bundleSizesElement.hidden = !showRows; bundleSizesElement.setAttribute("aria-hidden", String(!showRows)); }
+    SIZE_PARTS.forEach(function (name) {
       var input = form.elements[name];
       if (!input) return;
-      if (required) input.setAttribute("required", "required"); else input.removeAttribute("required");
+      if (customizer) input.setAttribute("required", "required"); else input.removeAttribute("required");
     });
   }
   function productImagePath() {
@@ -454,8 +544,8 @@
     if (isBundle() && bundleItems.length) form.elements.designDetails.value = "";
     toggleShipping();
     updateDimensionMaxes();
-    setDimensionsRequired(dimensionsRequired());
     applyProductContext();
+    applyDimensionMode();
   }
   function normalizeReferralCode(value) { var code = String(value || "").trim().toUpperCase(); return /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code) ? code : ""; }
   function showReferralStatus(message, kind) { if (!referralStatus) return; referralStatus.textContent = message; referralStatus.className = "hint" + (kind ? " " + kind : ""); }
@@ -748,7 +838,8 @@
   }
   function focusFirstError(errors) {
     var first = errors && Object.keys(errors).filter(function (field) { return field !== "form" && field !== "captcha"; })[0];
-    if (first && form.elements[first] && form.elements[first].focus) { revealField(form.elements[first]); form.elements[first].focus(); return; }
+    var firstInput = first && fieldInput(first);
+    if (firstInput && firstInput.focus) { revealField(firstInput); firstInput.focus(); return; }
     if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
   }
   function showFailure(message, errors, attempt) {
@@ -793,7 +884,7 @@
   }
   var inlineFields = ["customerName", "phone", "shippingAddress", "pin", "requestedDate"];
   function clearError(field) {
-    var input = form.elements[field];
+    var input = fieldInput(field);
     if (!input) return;
     input.removeAttribute("aria-invalid");
     var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== field + "-error"; });
@@ -805,26 +896,49 @@
     var message = fieldError(field);
     if (message) setError(field, message); else clearError(field);
   }
+  function dimensionErrors(feetText, inchesText, label, feetKey, inchesKey, errors) {
+    var feet = Number(feetText);
+    var inches = Number(inchesText);
+    if (!/^\d+$/.test(feetText) || !Number.isInteger(feet) || feet < 0) errors[feetKey] = label + " feet must be a whole, non-negative number.";
+    if (!/^\d+(\.\d+)?$/.test(inchesText) || !Number.isFinite(inches) || inches < 0 || inches >= 12) errors[inchesKey] = label + " inches must be from 0 up to (but not including) 12.";
+    var total = feet * 12 + inches;
+    if (Number.isFinite(total) && total <= 0) errors[feetKey] = label + " must be greater than 0 inches.";
+    if (Number.isFinite(total) && total > 60) errors[feetKey] = label + " must be no more than 60 inches.";
+  }
+  function optionalSizeErrors(texts, keyFor, errors) {
+    var filled = SIZE_PARTS.some(function (part) { return String(texts[part] || "").trim() !== ""; });
+    if (!filled) return;
+    [["height", "Height"], ["width", "Width"]].forEach(function (axis) {
+      var feetText = String(texts[axis[0] + "Feet"] || "").trim();
+      var inchesText = String(texts[axis[0] + "InchesPart"] || "").trim();
+      if (!feetText && !inchesText) errors[keyFor(axis[0] + "Feet")] = "Enter both height and width, or leave both blank.";
+      else dimensionErrors(feetText || "0", inchesText || "0", axis[1], keyFor(axis[0] + "Feet"), keyFor(axis[0] + "InchesPart"), errors);
+    });
+  }
+  function fillBlankSizeParts() {
+    ["height", "width"].forEach(function (axis) {
+      var feet = form.elements[axis + "Feet"];
+      var inches = form.elements[axis + "InchesPart"];
+      var feetBlank = !String(feet.value || "").trim();
+      var inchesBlank = !String(inches.value || "").trim();
+      if (feetBlank !== inchesBlank) { if (feetBlank) feet.value = "0"; else inches.value = "0"; }
+    });
+  }
   function clientValidationErrors() {
     var errors = {};
     function required(name, message) { if (!value(name).trim()) errors[name] = message; }
     required("productName", "This field is required.");
     var quantity = Number(value("quantity"));
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
-    function dimension(name, label) {
-      var feetText = value(name + "Feet");
-      var inchesText = value(name + "InchesPart");
-      var feet = Number(feetText);
-      var inches = Number(inchesText);
-      if (!/^\d+$/.test(feetText) || !Number.isInteger(feet) || feet < 0) errors[name + "Feet"] = label + " feet must be a whole, non-negative number.";
-      if (!/^\d+(\.\d+)?$/.test(inchesText) || !Number.isFinite(inches) || inches < 0 || inches >= 12) errors[name + "InchesPart"] = label + " inches must be from 0 up to (but not including) 12.";
-      var total = feet * 12 + inches;
-      if (Number.isFinite(total) && total <= 0) errors[name + "Feet"] = label + " must be greater than 0 inches.";
-      if (Number.isFinite(total) && total > 60) errors[name + "Feet"] = label + " must be no more than 60 inches.";
-    }
     if (dimensionsRequired()) {
-      dimension("height", "Height");
-      dimension("width", "Width");
+      dimensionErrors(value("heightFeet"), value("heightInchesPart"), "Height", "heightFeet", "heightInchesPart", errors);
+      dimensionErrors(value("widthFeet"), value("widthInchesPart"), "Width", "widthFeet", "widthInchesPart", errors);
+    } else if (isBundle()) {
+      bundleItems.forEach(function (item, index) {
+        optionalSizeErrors(item.customSize, function (part) { return "bundle-size-" + index + "-" + part; }, errors);
+      });
+    } else {
+      optionalSizeErrors({ heightFeet: value("heightFeet"), heightInchesPart: value("heightInchesPart"), widthFeet: value("widthFeet"), widthInchesPart: value("widthInchesPart") }, function (part) { return part; }, errors);
     }
     required("designDetails", "This field is required.");
     inlineFields.forEach(function (name) { var message = fieldError(name); if (message) errors[name] = message; });
@@ -881,6 +995,7 @@
     event.preventDefault();
     if (active) return;
     if (isBundle()) updateBundleScalars(true);
+    else if (!dimensionsRequired()) fillBlankSizeParts();
     clearErrors();
     if (previewExpected && !previewResolved) {
       setStatus(previewPending ? "The customizer preview is still loading. Please wait, retry, or continue without a preview." : "Attach the customizer preview, retry it, or continue without a preview.", "error");

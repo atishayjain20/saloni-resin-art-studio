@@ -149,6 +149,29 @@ test("validates the complete dimension format when a quote supplies any dimensio
   }
 });
 
+test("stores an optional custom size on a catalogue quote and still accepts none", () => {
+  const quote = (overrides) => combinedForm(Object.assign({
+    requestStage: "quote", sourceKind: "catalogue", fulfillment: "pickup", pin: "305001",
+  }, overrides));
+  const sized = makeRuntime();
+  const result = sized.context.submitOrder(quote({ heightFeet: "1", heightInchesPart: "2", widthFeet: "0", widthInchesPart: "10" }));
+  assert.equal(result.ok, true);
+  assert.equal(sized.rows[0][7], "1 ft 2 in");
+  assert.equal(sized.rows[0][9], 14);
+  assert.equal(sized.rows[0][10], "0 ft 10 in");
+  assert.equal(sized.rows[0][12], 10);
+
+  const blank = makeRuntime();
+  assert.equal(blank.context.submitOrder(quote({ heightFeet: "", heightInchesPart: "", widthFeet: "", widthInchesPart: "" })).ok, true);
+  assert.deepEqual(Array.from(blank.rows[0].slice(7, 13)), ["", "", "", "", "", ""]);
+
+  const invalid = makeRuntime();
+  const rejected = invalid.context.submitOrder(quote({ heightFeet: "1", heightInchesPart: "12", widthFeet: "0", widthInchesPart: "10" }));
+  assert.equal(rejected.ok, false);
+  assert.ok(rejected.errors.heightInchesPart);
+  assert.equal(invalid.state.appendCalls, 0);
+});
+
 test("rejects invalid request stage markers before CAPTCHA verification or writes", () => {
   for (const requestStage of ["Quote", "QUOTE", "quote ", 1, true, null, {}, ["quote"]]) {
     const runtime = makeRuntime({ captchaThrows: true });
