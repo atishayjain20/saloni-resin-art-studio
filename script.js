@@ -1720,6 +1720,7 @@
         catalogueCartJump.hidden = count === 0;
       }
       if (catalogueCartCount) catalogueCartCount.textContent = count ? count + " selected" : "";
+      if (catalogueCartView) catalogueCartView.setAttribute("data-count", String(count));
       if (catalogueCartOrder) catalogueCartOrder.disabled = count === 0;
       if (catalogueSelectionSummary) {
         if (!count) catalogueSelectionSummary.textContent = "No gifts selected.";

@@ -44,8 +44,8 @@ test("offers an unchecked repeat-details choice and an accessible forget control
   assert.match(rememberControl, /type="checkbox"/);
   assert.doesNotMatch(rememberControl, /\bchecked\b/);
   assert.match(html, /Remember .*30 days/);
-  assert.match(html, /id="forget-repeat-profile"[^>]*>Forget saved details on this device<\/button>/);
-  assert.match(html, /id="repeat-profile-status"[^>]*aria-live="polite"/);
+  assert.doesNotMatch(html, /id="forget-repeat-profile"|Forget saved details on this device/);
+  assert.doesNotMatch(html, /saloni-order-clear-repeat-profile/);
 });
 
 test("catalogue order form shows product context without internal metadata or mandatory dimensions", () => {
@@ -91,13 +91,27 @@ test("catalogue quote context is safe and customizer dimensions remain selected"
   ["height-feet", "height-inches-part", "width-feet", "width-inches-part"].forEach((id) => assert.equal(customizer.elements.get(id).getAttribute("required"), "required"));
 });
 
-test("multi-item catalogue requests show bundle copy without a single product image", () => {
-  const runtime = makeFormRuntime({ sourceId: "catalogue:multi-item", productName: "2 selected catalogue items" });
-  assert.equal(runtime.elements.get("product-context").hidden, false);
-  assert.equal(runtime.elements.get("product-image").hidden, true);
+test("multi-item catalogue requests show only the item list, without repeated product name or bundle copy", () => {
+  const runtime = makeFormRuntime({
+    sourceId: "catalogue:multi-item",
+    bundleItems: [
+      { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 1 },
+      { sourceId: "catalogue:two.webp", productName: "Two", price: "399", size: "6 in", quantity: 2 },
+    ],
+  });
+  assert.equal(runtime.elements.get("product-context").hidden, true);
   assert.equal(runtime.elements.get("product-image").getAttribute("src"), "");
-  assert.equal(runtime.elements.get("bundle-product-copy").hidden, false);
-  assert.match(html, /These catalogue items will be reviewed together in one request/);
+  assert.equal(runtime.elements.get("product-name-row").hidden, true);
+  assert.equal(runtime.elements.get("product-name-hint").hidden, true);
+  assert.equal(runtime.elements.get("bundle-items").hidden, false);
+  assert.equal(runtime.fields.productName.value, "One + 1 more");
+  assert.doesNotMatch(html, /These catalogue items will be reviewed together in one request/);
+  assert.doesNotMatch(html, /id="bundle-product-copy"/);
+  assert.doesNotMatch(html, /Saved only in this browser/);
+  assert.doesNotMatch(html, /The bundle name and total quantity follow your selected items/);
+  const single = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
+  assert.equal(single.elements.get("product-name-row").hidden, false);
+  assert.equal(single.elements.get("product-name-hint").hidden, false);
 });
 
 test("bundle form renders every selected item and rebuilds authoritative quantities", async () => {
@@ -199,30 +213,28 @@ test("non-bundle requests never send bundleSourceIds", () => {
   assert.equal(runtime.fields.bundleSourceIds.value, "");
 });
 
-test("after a successful send the More details summary is hidden, the disclosure stays open, and Start another restores it", async () => {
+test("after a successful send More details is hidden and Start another brings it back closed", async () => {
   const runtime = makeFormRuntime();
   const details = runtime.elements.get("more-details");
-  assert.equal(details.summary.hidden, false);
+  assert.equal(details.hidden, false);
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
   respondToken(runtime, 0);
   await Promise.resolve();
   runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
-  assert.equal(details.summary.hidden, true);
-  assert.equal(details.open, true);
-  assert.equal(runtime.elements.get("forget-repeat-profile").hidden, false);
+  assert.equal(details.hidden, true);
   runtime.elements.get("another-button").dispatch("click");
-  assert.equal(details.summary.hidden, false);
+  assert.equal(details.hidden, false);
   assert.equal(details.open, false);
 });
 
 test("keeps only the required fields visible and groups optional fields in a closed More details disclosure", () => {
-  const more = html.match(/<details class="more-details" id="more-details">[\s\S]*?<\/details>\s*(?=<input id="dimension-format")/)?.[0] || "";
+  const more = html.match(/<details class="more-details" id="more-details">[\s\S]*?<\/details>\s*(?=<fieldset>\s*<legend>Optional reference image)/)?.[0] || "";
   assert.match(more, /<summary>More details \(optional\)<\/summary>/);
   assert.doesNotMatch(more.split("\n")[0], /\bopen\b/);
-  ["email", "requested-date", "referral-code", "remember-repeat-profile", "forget-repeat-profile", "reference-image"].forEach((id) => assert.match(more, new RegExp(`id="${id}"`)));
-  ["customer-name", "phone", "fulfillment", "shipping-address", "pin"].forEach((id) => assert.doesNotMatch(more, new RegExp(`id="${id}"`)));
+  ["email", "requested-date", "referral-code", "remember-repeat-profile"].forEach((id) => assert.match(more, new RegExp(`id="${id}"`)));
+  ["customer-name", "phone", "fulfillment", "shipping-address", "pin", "reference-image"].forEach((id) => assert.doesNotMatch(more, new RegExp(`id="${id}"`)));
   assert.match(html, /\.more-details > summary \{[^}]*min-height: 44px/);
   const details = html.match(/<legend>Your details<\/legend>[\s\S]*?<\/fieldset>/)[0];
   ["customer-name", "phone", "fulfillment", "shipping-address", "pin"].forEach((id) => assert.match(details, new RegExp(`id="${id}"`)));
@@ -556,7 +568,7 @@ class FakeMessageChannel {
 }
 
 function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "bundle-items", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
+  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
@@ -869,17 +881,12 @@ test("saves repeat details only after success when the customer checks the devic
   assert.equal(save[0].message.nonce, "nonce-seed-123456");
 });
 
-test("uses the existing seeded fields for repeat details and can request a device-only clear", () => {
+test("uses the existing seeded fields for repeat details", () => {
   const runtime = makeFormRuntime({ seedOverrides: { customerName: "Saved Customer", phone: "+91 8209238541", fulfillment: "shipping", shippingAddress: "61 Hathi Bhata", city: "Ajmer", state: "Rajasthan", pin: "305001" } });
   assert.equal(runtime.fields.customerName.value, "Saved Customer");
   assert.equal(runtime.fields.phone.value, "+91 8209238541");
   assert.equal(runtime.fields.fulfillment.value, "shipping");
   assert.equal(runtime.fields.shippingAddress.value, "61 Hathi Bhata");
-  runtime.elements.get("forget-repeat-profile").dispatch("click");
-  const clear = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-clear-repeat-profile");
-  assert.equal(clear.length, 1);
-  assert.equal(clear[0].message.nonce, "nonce-seed-123456");
-  assert.match(runtime.elements.get("repeat-profile-status").textContent, /removed/i);
 });
 
 test("page teardown closes a pending preview port and revokes its object URL", () => {

@@ -874,9 +874,9 @@ test("phones get a full-screen order dialog where only the form iframe scrolls",
   assert.doesNotMatch(block, /lightbox/);
 });
 
-test("the mobile sticky cart keeps both Order buttons at 44px and reserves room for two rows", () => {
+test("the mobile sticky cart keeps its buttons at 44px and reserves room for one row", () => {
   assert.match(css, /\.catalogue-cart-jump \.button \{[^}]*min-height: 44px/);
-  assert.match(css, /body:has\(#catalogue-cart-jump:not\(\[hidden\]\)\) \{ padding-bottom: calc\(7\.5rem/);
+  assert.match(css, /body:has\(#catalogue-cart-jump:not\(\[hidden\]\)\) \{ padding-bottom: calc\(5rem/);
   assert.match(css, /\.catalogue-selection \.button \{[^}]*min-height: 2\.75rem/);
 });
 

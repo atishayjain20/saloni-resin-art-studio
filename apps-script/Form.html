@@ -68,10 +68,9 @@
       <legend>Selected design</legend>
       <div id="product-context" class="product-context" hidden>
         <img id="product-image" alt="" loading="lazy" decoding="async" hidden>
-        <p id="bundle-product-copy" class="hint" hidden>These catalogue items will be reviewed together in one request. Saloni will confirm the final combination, price, and delivery with you.</p>
       </div>
       <div id="bundle-items" class="bundle-items" role="list" aria-label="Selected catalogue items" hidden></div>
-      <div class="grid">
+      <div class="grid" id="product-name-row">
         <label for="product-name">Product name <input id="product-name" name="productName" maxlength="2000" required></label>
       </div>
       <p id="product-name-hint" class="hint">You can edit the product name before sending the request.</p>
@@ -135,25 +134,22 @@
 
       <div class="repeat-profile-box" id="repeat-profile-box">
         <label for="remember-repeat-profile"><input id="remember-repeat-profile" type="checkbox"> Remember my name, phone, and delivery details on this device for 30 days.</label>
-        <p class="hint">Saved only in this browser. These details are not sent to the studio again until you send a new request.</p>
-        <button id="forget-repeat-profile" class="secondary" type="button">Forget saved details on this device</button>
-        <p id="repeat-profile-status" class="hint" role="status" aria-live="polite"></p>
       </div>
-
-      <fieldset>
-        <legend>Optional reference image</legend>
-        <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
-        <div id="reference-image-preview-wrap" hidden>
-          <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
-        </div>
-        <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
-        <div id="reference-image-actions" class="actions" hidden>
-          <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
-          <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
-          <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
-        </div>
-      </fieldset>
     </details>
+
+    <fieldset>
+      <legend>Optional reference image</legend>
+      <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+      <div id="reference-image-preview-wrap" hidden>
+        <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
+      </div>
+      <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
+      <div id="reference-image-actions" class="actions" hidden>
+        <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
+        <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
+        <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
+      </div>
+    </fieldset>
 
     <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
     <input id="bundle-source-ids" name="bundleSourceIds" type="hidden">
@@ -186,7 +182,8 @@
   var pinField = document.getElementById("pin-field");
   var productContext = document.getElementById("product-context");
   var productImage = document.getElementById("product-image");
-  var bundleProductCopy = document.getElementById("bundle-product-copy");
+  var productNameRow = document.getElementById("product-name-row");
+  var productNameHint = document.getElementById("product-name-hint");
   var bundleItemsElement = document.getElementById("bundle-items");
   var dimensionFields = document.getElementById("dimension-fields");
   var referenceImage = document.getElementById("reference-image");
@@ -201,10 +198,7 @@
   var referralStatus = document.getElementById("referral-status");
   var checkReferral = document.getElementById("check-referral");
   var moreDetails = document.getElementById("more-details");
-  var moreDetailsSummary = moreDetails && moreDetails.querySelector ? moreDetails.querySelector("summary") : null;
   var rememberRepeatProfile = document.getElementById("remember-repeat-profile");
-  var forgetRepeatProfileButton = document.getElementById("forget-repeat-profile");
-  var repeatProfileStatus = document.getElementById("repeat-profile-status");
   var active = false;
   var currentAttempt = null;
   var timeoutId = null;
@@ -431,24 +425,22 @@
     if (bundle) {
       form.elements.productName.setAttribute("readonly", "readonly");
       form.elements.quantity.setAttribute("readonly", "readonly");
-      var bundleHint = document.getElementById("product-name-hint");
-      if (bundleHint) bundleHint.textContent = "The bundle name and total quantity follow your selected items.";
+      if (productNameRow) productNameRow.hidden = bundleItems.length > 0;
+      if (productNameHint) productNameHint.hidden = bundleItems.length > 0;
       productImage.hidden = true;
       productImage.removeAttribute("src");
       productImage.removeAttribute("alt");
-      if (bundleProductCopy) bundleProductCopy.hidden = false;
-      productContext.hidden = false;
+      productContext.hidden = true;
       renderBundleItems();
       updateBundleScalars(false);
       return;
     }
     form.elements.productName.removeAttribute("readonly");
     form.elements.quantity.removeAttribute("readonly");
-    var productNameHint = document.getElementById("product-name-hint");
-    if (productNameHint) productNameHint.textContent = "You can edit the product name before sending the request.";
+    if (productNameRow) productNameRow.hidden = false;
+    if (productNameHint) productNameHint.hidden = false;
     if (bundleItemsElement) bundleItemsElement.hidden = true;
     productImage.hidden = false;
-    if (bundleProductCopy) bundleProductCopy.hidden = true;
     var imagePath = productImagePath();
     if (!imagePath) {
       productContext.hidden = true;
@@ -482,21 +474,13 @@
     var code = referralInput ? normalizeReferralCode(referralInput.value) : "";
     showReferralStatus(code ? "Code changed. Check it again before submitting." : "No code entered. The order can continue without partner credit.", "");
   }
-  function setRepeatProfileStatus(message) {
-    if (repeatProfileStatus) repeatProfileStatus.textContent = message || "";
-  }
   function repeatProfileFromForm() {
     return {
       customerName: value("customerName"), phone: value("phone"), fulfillment: value("fulfillment"),
       shippingAddress: value("shippingAddress"), city: value("city"), state: value("state"), pin: value("pin")
     };
   }
-  function requestForgetRepeatProfile() {
-    if (window.top && window.top !== window && seed.channelNonce) {
-      try { window.top.postMessage({ type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, PARENT_ORIGIN); } catch (error) {}
-    }
-    setRepeatProfileStatus("Saved details were removed from this device.");
-  }
+
   function checkReferralCode() {
     if (!referralInput || !checkReferral || !window.google || !google.script || !google.script.run) return;
     var code = normalizeReferralCode(referralInput.value);
@@ -790,9 +774,7 @@
     previewExpected = false;
     previewResolved = true;
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
-    // Keep the repeat-profile controls reachable: hide only the summary and leave the disclosure open.
-    if (moreDetails) moreDetails.open = true;
-    if (moreDetailsSummary) moreDetailsSummary.hidden = true;
+    if (moreDetails) moreDetails.hidden = true;
     anotherButton.hidden = false;
     var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
     if (rememberRepeatProfile && rememberRepeatProfile.checked && window.top && window.top !== window && seed.channelNonce) {
@@ -903,7 +885,6 @@
   });
   if (referralInput) { referralInput.addEventListener("input", clearReferralStatus); referralInput.addEventListener("change", clearReferralStatus); }
   if (checkReferral) checkReferral.addEventListener("click", checkReferralCode);
-  if (forgetRepeatProfileButton) forgetRepeatProfileButton.addEventListener("click", requestForgetRepeatProfile);
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;
@@ -952,8 +933,7 @@
     form.reset();
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
     anotherButton.hidden = true; clearErrors(); setStatus("", "");
-    if (moreDetails) moreDetails.open = false;
-    if (moreDetailsSummary) moreDetailsSummary.hidden = false;
+    if (moreDetails) { moreDetails.hidden = false; moreDetails.open = false; }
     applySeed(seed);
     form.elements.requestId.value = newRequestId();
     clearReferralStatus();
