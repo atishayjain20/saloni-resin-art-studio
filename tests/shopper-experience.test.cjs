@@ -571,7 +571,7 @@ test("customizer removes the redundant handoff while preserving direct request a
   assert.match(customizerSection, /id="order-from-customizer"[^>]*data-order-prefill="customizer"[^>]*>Request this design/);
   assert.match(customizerSection, /<summary>Save or share this preview<\/summary>[\s\S]*id="download-preview"[\s\S]*id="copy-summary"[\s\S]*id="share-design"/);
   assert.doesNotMatch(customizerSection, /customizer-handoff|Take the summary to the studio|Call Saloni/);
-  assert.doesNotMatch(customizerSection, /href="tel:8209238541"|href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\//);
+  assert.doesNotMatch(customizerSection, /href="tel:(?:\+91)?8209238541"|href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\//);
 });
 
 test("homepage order panel lives in one accessible native modal with an inline fallback", () => {

@@ -1053,7 +1053,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("atishayjain20.github.io", (ROOT / "robots.txt").read_text(encoding="utf-8"))
 
     def test_contact_details_are_exact_and_visible(self):
-        self.assertIn('tel:8209238541', self.html)
+        self.assertIn('tel:+918209238541', self.html)
+        self.assertNotIn('tel:8209238541', self.html)
         self.assertIn("8209238541", self.html)
         self.assertIn("https://www.instagram.com/saloniresin_art_studio/", self.html)
         self.assertIn("@saloniresin_art_studio", self.html)
