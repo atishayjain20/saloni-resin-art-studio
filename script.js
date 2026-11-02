@@ -1385,10 +1385,9 @@
       if (!frameState.loaded || !frameState.nonce || data.nonce !== frameState.nonce || !event.source || !event.origin || event.origin === "null") return;
       var messageOrigin = previewOrigin(event.origin);
       if (!messageOrigin) return;
-      if (data.type === "saloni-order-save-repeat-profile" || data.type === "saloni-order-clear-repeat-profile") {
+      if (data.type === "saloni-order-save-repeat-profile") {
         if (data.version !== REPEAT_PROFILE_VERSION || !isCurrentFormSource(event.source) || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin) return;
-        if (data.type === "saloni-order-save-repeat-profile") saveRepeatProfile(data.profile);
-        else clearRepeatProfile();
+        saveRepeatProfile(data.profile);
         return;
       }
       if (data.type === "saloni-order-form-ready") {
@@ -1491,12 +1490,6 @@
         storage.setItem(REPEAT_PROFILE_STORAGE_KEY, JSON.stringify({ version: REPEAT_PROFILE_VERSION, expiresAt: Date.now() + REPEAT_PROFILE_TTL_MS, profile: normalized }));
         return true;
       } catch (error) { return false; }
-    }
-
-    function clearRepeatProfile() {
-      var storage = catalogueCartStorage();
-      if (!storage) return;
-      try { storage.removeItem(REPEAT_PROFILE_STORAGE_KEY); } catch (error) {}
     }
 
     function persistCatalogueSelection() {

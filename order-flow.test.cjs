@@ -926,7 +926,7 @@ test("prefills repeat customer details from a valid 30-day parent profile and re
   }));
 });
 
-test("accepts only a pinned successful iframe repeat-profile message and clears only that record", () => {
+test("accepts only a pinned successful iframe repeat-profile save", () => {
   const storage = createStorage();
   const flow = runFlow({ storage });
   const seed = requestCatalogue(flow, flow.catalogueButton, false);
@@ -937,11 +937,9 @@ test("accepts only a pinned successful iframe repeat-profile message and clears 
   const foreignSource = {};
   flow.windowObject.messageListener({ origin: "https://other.example", source, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "foreign" }, ports: [] });
   flow.windowObject.messageListener({ origin: "https://other.example", source, data: { type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile }, ports: [] });
-  flow.windowObject.messageListener({ origin: "https://other.example", source, data: { type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, ports: [] });
   flow.windowObject.messageListener({ origin, source: foreignSource, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "foreign" }, ports: [] });
   assert.equal(flow.elements.get("order-form-status").getAttribute("aria-busy"), "true");
   flow.windowObject.messageListener({ origin, source: foreignSource, data: { type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile }, ports: [] });
-  flow.windowObject.messageListener({ origin, source: foreignSource, data: { type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, ports: [] });
   assert.equal(storage.getItem("saloniRepeatProfile"), null);
   flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key" }, ports: [] });
   for (const mismatch of [
@@ -957,9 +955,11 @@ test("accepts only a pinned successful iframe repeat-profile message and clears 
   assert.deepEqual(saved.profile, { customerName: profile.customerName, phone: profile.phone, fulfillment: profile.fulfillment, shippingAddress: profile.shippingAddress, city: profile.city, state: profile.state, pin: profile.pin });
   assert.ok(saved.expiresAt > Date.now());
   const cartBefore = storage.getItem("saloniCatalogueCart");
-  flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, ports: [] });
-  assert.equal(storage.getItem("saloniRepeatProfile"), null);
   assert.equal(storage.getItem("saloniCatalogueCart"), cartBefore);
+});
+
+test("does not expose a repeat-profile clear message path", () => {
+  assert.doesNotMatch(source, /saloni-order-clear-repeat-profile|clearRepeatProfile/);
 });
 
 test("cart rows expose an accessible remove action for the exact selected item", () => {
