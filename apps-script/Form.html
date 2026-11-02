@@ -38,9 +38,6 @@
     .referral-disclosure { margin-top: .85rem; }
     .referral-disclosure summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
     .referral-box { display: grid; gap: .65rem; margin-top: .65rem; }
-    .repeat-profile-box { display: grid; gap: .65rem; margin-top: .85rem; }
-    .repeat-profile-box label { display: flex; align-items: flex-start; gap: .55rem; }
-    .repeat-profile-box input[type="checkbox"] { width: auto; min-height: auto; margin-top: .2rem; }
     .field-error { margin: 0; color: #a41f33; }
     [hidden] { display: none !important; }
     .actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
@@ -131,10 +128,6 @@
           </div>
         </details>
       </fieldset>
-
-      <div class="repeat-profile-box" id="repeat-profile-box">
-        <label for="remember-repeat-profile"><input id="remember-repeat-profile" type="checkbox"> Remember my name, phone, and delivery details on this device for 30 days.</label>
-      </div>
     </details>
 
     <fieldset>
@@ -162,7 +155,7 @@
     <p class="privacy-summary">Your information is used only to handle your request. <a href="#privacy-details">Privacy details</a></p>
     <details class="privacy-details" id="privacy-details">
       <summary>Privacy details</summary>
-      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. If you choose to remember them, your name, phone, and delivery details stay only in this browser for up to 30 days and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
+      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
     </details>
   </form>
 </main>
@@ -198,7 +191,6 @@
   var referralStatus = document.getElementById("referral-status");
   var checkReferral = document.getElementById("check-referral");
   var moreDetails = document.getElementById("more-details");
-  var rememberRepeatProfile = document.getElementById("remember-repeat-profile");
   var active = false;
   var currentAttempt = null;
   var timeoutId = null;
@@ -777,7 +769,7 @@
     if (moreDetails) moreDetails.hidden = true;
     anotherButton.hidden = false;
     var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
-    if (rememberRepeatProfile && rememberRepeatProfile.checked && window.top && window.top !== window && seed.channelNonce) {
+    if (window.top && window.top !== window && seed.channelNonce) {
       try { window.top.postMessage({ type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile: repeatProfileFromForm() }, PARENT_ORIGIN); } catch (error) {}
     }
     setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed." + referralMessage + " Request ID: " + result.requestId, "success");

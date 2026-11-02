@@ -39,11 +39,10 @@ test("keeps optional partner referral controls behind a collapsed native disclos
   assert.match(disclosure, /<p id="referral-status"[^>]*>A code is optional\./);
 });
 
-test("offers an unchecked repeat-details choice and an accessible forget control", () => {
-  const rememberControl = html.match(/<input id="remember-repeat-profile"[^>]*>/)?.[0] || "";
-  assert.match(rememberControl, /type="checkbox"/);
-  assert.doesNotMatch(rememberControl, /\bchecked\b/);
-  assert.match(html, /Remember .*30 days/);
+test("has no remember checkbox or forget control and states the automatic 30-day device-only save", () => {
+  assert.doesNotMatch(html, /id="remember-repeat-profile"|Remember my name, phone, and delivery details/);
+  assert.doesNotMatch(html, /If you choose to remember them/);
+  assert.match(html, /After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days/);
   assert.doesNotMatch(html, /id="forget-repeat-profile"|Forget saved details on this device/);
   assert.doesNotMatch(html, /saloni-order-clear-repeat-profile/);
 });
@@ -233,7 +232,7 @@ test("keeps only the required fields visible and groups optional fields in a clo
   const more = html.match(/<details class="more-details" id="more-details">[\s\S]*?<\/details>\s*(?=<fieldset>\s*<legend>Optional reference image)/)?.[0] || "";
   assert.match(more, /<summary>More details \(optional\)<\/summary>/);
   assert.doesNotMatch(more.split("\n")[0], /\bopen\b/);
-  ["email", "requested-date", "referral-code", "remember-repeat-profile"].forEach((id) => assert.match(more, new RegExp(`id="${id}"`)));
+  ["email", "requested-date", "referral-code"].forEach((id) => assert.match(more, new RegExp(`id="${id}"`)));
   ["customer-name", "phone", "fulfillment", "shipping-address", "pin", "reference-image"].forEach((id) => assert.doesNotMatch(more, new RegExp(`id="${id}"`)));
   assert.match(html, /\.more-details > summary \{[^}]*min-height: 44px/);
   const details = html.match(/<legend>Your details<\/legend>[\s\S]*?<\/fieldset>/)[0];
@@ -845,18 +844,8 @@ test("success and reset revoke the preview URL without reusing the old preview i
   assert.equal(runtime.fields.referenceImage.files.length, 0);
 });
 
-test("saves repeat details only after success when the customer checks the device-only option", async () => {
-  const unchecked = makeFormRuntime();
-  fillValid(unchecked.fields);
-  unchecked.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  respondToken(unchecked, 0);
-  await Promise.resolve();
-  unchecked.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
-  assert.equal(unchecked.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile").length, 0);
-
+test("always saves repeat details after a successful request and never after a failure", async () => {
   const failed = makeFormRuntime();
-  failed.elements.get("remember-repeat-profile").checked = true;
   fillValid(failed.fields);
   failed.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
@@ -866,7 +855,6 @@ test("saves repeat details only after success when the customer checks the devic
   assert.equal(failed.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile").length, 0);
 
   const checked = makeFormRuntime();
-  checked.elements.get("remember-repeat-profile").checked = true;
   fillValid(checked.fields);
   checked.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
