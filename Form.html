@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order request</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; background: #fffaf4; color: #2b2020; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 1rem; background: #fffaf4; }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { margin: 0 0 .45rem; font: 700 clamp(1.6rem, 4vw, 2.3rem)/1.1 Georgia, serif; }
+    .intro, .privacy, .hint, .status, .field-error { font-size: .88rem; line-height: 1.5; }
+    .intro { margin: 0 0 1rem; color: #5d4947; }
+    form { display: grid; gap: 1rem; }
+    fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fff; }
+    legend { padding: 0 .35rem; font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+    .product-context { margin: 0 0 1rem; }
+    .product-context img { display: block; width: min(100%, 22rem); max-height: 16rem; object-fit: cover; border-radius: .7rem; }
+    .bundle-items { display: grid; gap: .65rem; max-height: 15rem; margin: 0 0 1rem; padding: .7rem; overflow-y: auto; border: 1px solid #dccbc1; border-radius: .65rem; background: #fffaf4; }
+    .bundle-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(6rem, 8rem); gap: .7rem; align-items: center; }
+    .bundle-item-name { min-width: 0; overflow-wrap: anywhere; font-size: .86rem; font-weight: 700; }
+    .bundle-item label { font-size: .76rem; }
+    .reference-preview { display: block; width: min(100%, 18rem); max-height: 14rem; margin-top: .65rem; object-fit: contain; border: 1px solid #dccbc1; border-radius: .7rem; background: #fffaf4; }
+    label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; }
+    input, select, textarea, button { font: inherit; }
+    input, select, textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; }
+    input[readonly] { background: #f1e9e4; color: #5d4947; }
+    textarea { min-height: 7rem; resize: vertical; }
+    input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
+    .dimension-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+    .shipping-fields { margin-top: .85rem; }
+    .referral-disclosure { margin-top: .85rem; }
+    .referral-disclosure summary { padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
+    .referral-box { display: grid; gap: .65rem; margin-top: .65rem; }
+    .field-error { margin: 0; color: #a41f33; }
+    [hidden] { display: none !important; }
+    .actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
+    button { min-height: 2.8rem; padding: .7rem 1rem; border: 1px solid #2b2020; border-radius: 999px; background: #2b2020; color: #fffaf4; font-weight: 750; cursor: pointer; }
+    button.secondary { background: transparent; color: #2b2020; }
+    button:disabled { cursor: wait; opacity: .6; }
+    .status { min-height: 1.4rem; margin: 0; }
+    .status.error { color: #a41f33; }
+    .status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }
+    .privacy { margin: 0; padding: .75rem; border-left: 3px solid #c77d8b; color: #5d4947; }
+    .privacy a { color: inherit; font-weight: 700; }
+    @media (max-width: 560px) { body { padding: .7rem; } .grid, .dimension-pair { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Send an order request</h1>
+  <p class="intro">This is a request only. Saloni will contact you to confirm the design, price, and delivery before any production begins.</p>
+  <form id="order-form" novalidate>
+    <input id="request-id" name="requestId" type="hidden">
+    <input id="request-stage" name="requestStage" type="hidden">
+    <input id="source-kind" name="sourceKind" type="hidden">
+    <input id="source-id" name="sourceId" type="hidden">
+    <fieldset>
+      <legend>Selected design</legend>
+      <div id="product-context" class="product-context" hidden>
+        <img id="product-image" alt="" loading="lazy" decoding="async" hidden>
+        <p id="bundle-product-copy" class="hint" hidden>These catalogue items will be reviewed together in one request. Saloni will confirm the final combination, price, and delivery with you.</p>
+      </div>
+      <div id="bundle-items" class="bundle-items" role="list" aria-label="Selected catalogue items" hidden></div>
+      <div class="grid">
+        <label for="product-name">Product name <input id="product-name" name="productName" maxlength="2000" required></label>
+      </div>
+      <p id="product-name-hint" class="hint">You can edit the product name before sending the request.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>What should Saloni make?</legend>
+      <label for="quantity">Quantity <input id="quantity" name="quantity" type="number" min="1" max="100" step="1" inputmode="numeric" required></label>
+      <div id="dimension-fields">
+        <div class="dimension-pair">
+          <label for="height-feet">Height feet <input id="height-feet" name="heightFeet" type="number" min="0" max="5" step="1" inputmode="numeric"></label>
+          <label for="height-inches-part">Height inches <input id="height-inches-part" name="heightInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal"></label>
+        </div>
+        <div class="dimension-pair">
+          <label for="width-feet">Width feet <input id="width-feet" name="widthFeet" type="number" min="0" max="5" step="1" inputmode="numeric"></label>
+          <label for="width-inches-part">Width inches <input id="width-inches-part" name="widthInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal"></label>
+        </div>
+        <p class="hint">Enter each dimension as feet plus an inch remainder. Each total must be greater than 0 and no more than 60 inches. For example, 3 ft × 4 ft is valid.</p>
+      </div>
+      <label for="design-details">Order notes <textarea id="design-details" name="designDetails" maxlength="2000" required placeholder="Colours, words, occasion, reference notes, or anything Saloni should know."></textarea></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Your details</legend>
+      <div class="grid">
+        <label for="customer-name">Customer name <input id="customer-name" name="customerName" maxlength="120" autocomplete="name" required></label>
+        <label for="phone">Phone <input id="phone" name="phone" maxlength="40" autocomplete="tel" inputmode="tel" required></label>
+        <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
+        <label for="requested-date">Requested date (optional) <input id="requested-date" name="requestedDate" type="date"></label>
+      </div>
+      <details class="referral-disclosure">
+        <summary>Have a referral code?</summary>
+        <div class="referral-box">
+          <label for="referral-code">Partner referral code (optional) <input id="referral-code" name="referralCode" maxlength="32" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="referral-status"></label>
+          <button id="check-referral" class="secondary" type="button">Check code</button>
+          <p id="referral-status" class="hint" role="status" aria-live="polite">A code is optional. You can continue without partner credit.</p>
+        </div>
+      </details>
+      <label for="fulfillment">Shipping or pickup <select id="fulfillment" name="fulfillment" required><option value="shipping">Shipping</option><option value="pickup">Pickup in Ajmer</option></select></label>
+      <div class="shipping-fields" id="shipping-fields">
+        <div class="grid">
+          <label for="shipping-address">Shipping address <textarea id="shipping-address" name="shippingAddress" maxlength="300" autocomplete="street-address"></textarea></label>
+          <div class="grid">
+            <label for="city">City <input id="city" name="city" maxlength="100" autocomplete="address-level2"></label>
+            <label for="state">State <input id="state" name="state" maxlength="100" autocomplete="address-level1"></label>
+          </div>
+        </div>
+      </div>
+      <div class="shipping-fields" id="pin-field">
+        <label for="pin">PIN <input id="pin" name="pin" maxlength="6" inputmode="numeric" autocomplete="postal-code"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Optional reference image</legend>
+      <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+      <div id="reference-image-preview-wrap" hidden>
+        <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
+      </div>
+      <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
+      <div id="reference-image-actions" class="actions" hidden>
+        <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
+        <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
+        <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
+      </div>
+    </fieldset>
+
+    <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
+    <input id="captcha-token" name="captchaToken" type="hidden">
+    <p id="form-status" class="status" role="status" aria-live="polite"></p>
+    <div class="actions">
+      <button id="submit-button" type="submit">Order now</button>
+      <button id="another-button" class="secondary" type="button" hidden>Start another request</button>
+    </div>
+    <p class="privacy-summary">Your information is used only to handle your request. <a href="#privacy-details">Privacy details</a></p>
+    <details class="privacy-details" id="privacy-details">
+      <summary>Privacy details</summary>
+      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After a successful request, your name, phone, and delivery details are saved only in this browser for up to 30 days and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p>
+    </details>
+  </form>
+</main>
+<script id="seed-data" type="application/json"><?!= seedJson ?></script>
+<script>
+(function () {
+  "use strict";
+  var seed = JSON.parse(document.getElementById("seed-data").textContent || "{}");
+  var captchaEnabled = <?!= captchaEnabledJson ?>;
+  var captchaSiteKey = <?!= captchaSiteKeyJson ?>;
+  var form = document.getElementById("order-form");
+  var formElement = form;
+  var status = document.getElementById("form-status");
+  var submitButton = document.getElementById("submit-button");
+  var anotherButton = document.getElementById("another-button");
+  var shippingFields = document.getElementById("shipping-fields");
+  var pinField = document.getElementById("pin-field");
+  var productContext = document.getElementById("product-context");
+  var productImage = document.getElementById("product-image");
+  var bundleProductCopy = document.getElementById("bundle-product-copy");
+  var bundleItemsElement = document.getElementById("bundle-items");
+  var dimensionFields = document.getElementById("dimension-fields");
+  var referenceImage = document.getElementById("reference-image");
+  var referenceImagePreviewWrap = document.getElementById("reference-image-preview-wrap");
+  var referenceImagePreview = document.getElementById("reference-image-preview");
+  var referenceImageStatus = document.getElementById("reference-image-status");
+  var referenceImageActions = document.getElementById("reference-image-actions");
+  var retryPreviewButton = document.getElementById("retry-preview");
+  var continueWithoutPreviewButton = document.getElementById("continue-without-preview");
+  var removeReferenceImageButton = document.getElementById("remove-reference-image");
+  var referralInput = form.elements.referralCode || document.getElementById("referral-code");
+  var referralStatus = document.getElementById("referral-status");
+  var checkReferral = document.getElementById("check-referral");
+  var active = false;
+  var currentAttempt = null;
+  var timeoutId = null;
+  var referralCheckVersion = 0;
+  var referralAcceptedCode = "";
+  var PARENT_ORIGIN = "https://saloniresinart.com";
+  var PREVIEW_TIMEOUT_MS = 10000;
+  var PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
+  var PREVIEW_FILENAME = "saloni-customizer-preview.png";
+  var previewExpected = false;
+  var previewResolved = true;
+  var previewPending = false;
+  var previewCanRetry = false;
+  var previewCanContinue = false;
+  var previewAttempt = null;
+  var previewTimeoutId = null;
+  var attachmentGeneration = 0;
+  var previewObjectUrl = "";
+  var PRODUCT_IMAGE_ALLOWLIST = {
+    "concept-floral-coasters.webp": true, "concept-floral-memory-frame.webp": true, "concept-ocean-clock.webp": true,
+    "corporate-bag-tag-concept.webp": true, "corporate-bookmark-keychain-duo-concept.webp": true, "corporate-business-card-holder-concept.webp": true,
+    "corporate-desk-clock-concept.webp": true, "corporate-desk-essentials-set-concept.webp": true, "corporate-desk-logo-stand-concept.webp": true,
+    "corporate-desk-nameplate-concept.webp": true, "corporate-desk-organizer-concept.webp": true, "corporate-desk-trinket-tray-concept.webp": true,
+    "corporate-floral-bookmark-concept.webp": true, "corporate-fridge-magnet-concept.webp": true,
+    "corporate-lanyard-charm-concept.webp": true, "corporate-logo-coaster-set-concept.webp": true, "corporate-logo-keychain-concept.webp": true,
+    "corporate-logo-paperweight-concept.webp": true, "corporate-mini-photo-stand-concept.webp": true, "corporate-pen-cup-concept.webp": true,
+    "corporate-phone-rest-concept.webp": true, "corporate-recognition-award-concept.webp": true,
+    "diwali-emerald-led-holder-pair-concept.webp": true, "diwali-festive-keepsake-box-concept.webp": true,
+    "diwali-floral-swastik-tealight-set.webp": true, "diwali-gold-fleck-lotus-light.jpeg": true, "diwali-golden-ganesha-pooja-plate.jpg": true,
+    "diwali-golden-toran-charms-concept.webp": true, "diwali-happy-diwali-glow.webp": true, "diwali-ivory-mandala-holder-concept.webp": true,
+    "diwali-jewel-glow-tealight.jpg": true, "diwali-lotus-blue-festive-set.jpeg": true, "diwali-lotus-diya-pair.webp": true,
+    "diwali-lotus-rangoli-duo-concept.webp": true, "diwali-marigold-petal-holder-concept.webp": true, "diwali-ocean-bloom-pooja-platter.jpg": true,
+    "diwali-om-mini-tilak-plate.webp": true, "diwali-pastel-lotus-tealight.jpeg": true, "diwali-peacock-mini-pooja-thali.webp": true,
+    "diwali-pearl-rangoli-accent-concept.webp": true, "diwali-rose-gold-festive-set.jpeg": true, "diwali-rose-petal-offering-plate-concept.webp": true,
+    "diwali-ruby-leaf-dish-concept.webp": true, "diwali-saffron-tilak-duo-concept.webp": true, "diwali-shubh-labh-welcome-pair.jpg": true,
+    "navkar-resin-frame.jpg": true, "personalized-floral-hoop.jpg": true, "resin-clock.jpg": true, "resin-message-coasters.jpg": true,
+    "romantic-botanical-pendant.webp": true, "romantic-calendar-coaster.webp": true, "romantic-couple-miniature.webp": true,
+    "romantic-couple-scene.webp": true, "romantic-first-rose-bracelet.webp": true, "romantic-floral-bookmark-set.webp": true,
+    "romantic-heart-trinket-tray.webp": true, "romantic-initial-desk-stand.webp": true,
+    "romantic-ocean-memory-tray.webp": true, "romantic-us-keychain-pair.webp": true,
+    "studio-blue-mantra-frame.jpeg": true, "studio-floral-handled-tray.jpeg": true, "studio-floral-hexagon-keepsake.jpeg": true,
+    "studio-floral-square-keepsake.jpeg": true, "studio-lilac-scalloped-tray.jpeg": true, "studio-lilac-symbol-rakhi.jpeg": true,
+    "studio-little-brother-rakhi.jpeg": true, "studio-personalized-photo-clock.jpeg": true, "studio-red-rose-resin-display.jpeg": true,
+    "studio-rose-hexagon-keepsake.jpeg": true, "studio-white-mantra-frame.jpeg": true,
+    "sunflower-resin-lamp.jpeg": true, "sunflower-floral-keepsakes.jpeg": true,
+    "sunflower-plaque-hand.jpeg": true, "sunflower-plaque-easel.jpeg": true,
+    "sunflower-keepsake-set.jpeg": true, "premium-midnight-blue-tiered-set.jpeg": true,
+    "premium-smoky-bronze-tray.jpeg": true, "premium-gemstone-mug-collection.jpeg": true,
+    "premium-champagne-two-tier-set.jpeg": true, "premium-ivory-gold-tiered-set.jpeg": true,
+    "premium-champagne-white-tray.jpeg": true, "premium-pastel-butterfly-trays.jpeg": true,
+    "premium-silver-icy-blue-tray.jpeg": true, "premium-ocean-seashell-tray.jpeg": true,
+    "premium-turquoise-tray-coasters.jpeg": true, "premium-turquoise-gold-wine-glasses.jpeg": true,
+    "premium-turquoise-geode-glass-pair.jpeg": true, "premium-turquoise-geode-glass-closeup.jpeg": true,
+    "premium-black-gold-glassware-set.jpeg": true
+  };
+
+  function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
+  function isBundle() { return String(seed.sourceKind || "").toLowerCase() === "catalogue" && String(seed.sourceId || "") === "catalogue:multi-item"; }
+  function bundleQuantity(item) {
+    var quantity = Number(item && item.quantity);
+    return Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 1;
+  }
+  function bundleTotal(items) { return items.reduce(function (total, item) { return total + bundleQuantity(item); }, 0); }
+  function bundleProductName(items) { return items.map(function (item) { return item.productName; }).join(", "); }
+  function bundleDetails(items) {
+    return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); }).map(function (item, index) {
+      return "Item " + (index + 1) + ": " + item.productName + " | Source: " + item.sourceId + " | Price: " + (item.price || "not shown") + " | Size: " + (item.size || "not shown") + " | Quantity: " + bundleQuantity(item);
+    }).join("\n");
+  }
+  function normalizeBundleItems(items) {
+    if (!Array.isArray(items) || !items.length || items.length > 100) return [];
+    var seen = {};
+    var normalized = [];
+    for (var index = 0; index < items.length; index += 1) {
+      var item = items[index] || {};
+      var sourceId = String(item.sourceId || "").trim().slice(0, 160);
+      var productName = String(item.productName || "").trim().slice(0, 160);
+      var price = String(item.price || "").trim().slice(0, 120);
+      var size = String(item.size || "").trim().slice(0, 120);
+      var quantity = Number(item.quantity);
+      if (!sourceId || !/^[A-Za-z0-9_.:/-]+$/.test(sourceId) || !productName || !Number.isInteger(quantity) || quantity < 1 || quantity > 100 || seen[sourceId]) return [];
+      seen[sourceId] = true;
+      normalized.push({ sourceId: sourceId, productName: productName, price: price, size: size, quantity: quantity });
+    }
+    return bundleTotal(normalized) <= 100 && bundleDetails(normalized).length <= 2000 ? normalized : [];
+  }
+  var bundleItems = normalizeBundleItems(seed.bundleItems);
+  var bundleNotes = "";
+  var syncingBundleFields = false;
+  function bundleNotesFromField(fieldValue) {
+    var current = String(fieldValue || "");
+    var canonical = bundleDetails(bundleItems);
+    var prefix = canonical + "\nOrder notes: ";
+    if (current === canonical) return "";
+    return current.indexOf(prefix) === 0 ? current.slice(prefix.length) : current;
+  }
+  function updateBundleScalars(includeDetails) {
+    if (!isBundle() || !bundleItems.length) return;
+    form.elements.productName.value = bundleProductName(bundleItems);
+    form.elements.quantity.value = String(bundleTotal(bundleItems));
+    if (includeDetails) {
+      var notes = String(bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
+      syncingBundleFields = true;
+      form.elements.designDetails.value = bundleDetails(bundleItems) + (notes ? "\nOrder notes: " + notes : "");
+      syncingBundleFields = false;
+      bundleNotes = notes;
+    }
+  }
+  function renderBundleItems() {
+    if (!bundleItemsElement) return;
+    var visible = isBundle() && bundleItems.length > 0;
+    bundleItemsElement.hidden = !visible;
+    while (bundleItemsElement.firstChild) bundleItemsElement.removeChild(bundleItemsElement.firstChild);
+    if (!visible) return;
+    bundleItems.forEach(function (item) {
+      var line = document.createElement("div");
+      line.className = "bundle-item";
+      line.setAttribute("role", "listitem");
+      line.setAttribute("data-product-name", item.productName);
+      var name = document.createElement("span");
+      name.className = "bundle-item-name";
+      name.textContent = item.productName;
+      var label = document.createElement("label");
+      var inputId = "bundle-quantity-" + item.sourceId.replace(/[^A-Za-z0-9_-]/g, "-");
+      label.setAttribute("for", inputId);
+      label.textContent = "Quantity";
+      var input = document.createElement("input");
+      input.id = inputId;
+      input.type = "number";
+      input.min = "1"; input.max = "100"; input.step = "1"; input.inputMode = "numeric";
+      input.value = String(bundleQuantity(item));
+      input.setAttribute("aria-label", "Quantity for " + item.productName);
+      input.addEventListener("change", function () {
+        var requested = String(input.value || "").trim();
+        var nextQuantity = /^\d+$/.test(requested) ? Number(requested) : NaN;
+        var previous = bundleQuantity(item);
+        var notesBeforeChange = String(bundleNotesFromField(value("designDetails")) || bundleNotes || "").trim();
+        if (!Number.isInteger(nextQuantity) || nextQuantity < 1 || nextQuantity > 100) {
+          input.value = String(previous);
+          setStatus("Each selected item quantity must be a whole number from 1 to 100.", "error");
+          return;
+        }
+        item.quantity = nextQuantity;
+        if (bundleTotal(bundleItems) > 100 || bundleDetails(bundleItems).length > 2000) {
+          item.quantity = previous;
+          input.value = String(previous);
+          setStatus(bundleTotal(bundleItems) > 100 ? "The total selected quantity must be from 1 to 100." : "Those quantities make the selected list too long. Lower a quantity before continuing.", "error");
+          return;
+        }
+        bundleNotes = notesBeforeChange;
+        setStatus("", "");
+        updateBundleScalars(true);
+      });
+      label.appendChild(input);
+      line.appendChild(name);
+      line.appendChild(label);
+      bundleItemsElement.appendChild(line);
+    });
+  }
+  function setError(field, message) {
+    var input = form.elements[field];
+    if (!input) return;
+    input.setAttribute("aria-invalid", "true");
+    var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+    if (describedBy.indexOf(field + "-error") === -1) describedBy.push(field + "-error");
+    input.setAttribute("aria-describedby", describedBy.join(" "));
+    var error = document.getElementById(field + "-error");
+    if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; input.parentNode.appendChild(error); }
+    error.textContent = message;
+  }
+  function clearErrors() {
+    Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) {
+      input.removeAttribute("aria-invalid");
+      var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== input.name + "-error"; });
+      if (describedBy.length) input.setAttribute("aria-describedby", describedBy.join(" ")); else input.removeAttribute("aria-describedby");
+    });
+    Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); });
+  }
+  function setStatus(message, kind) { status.textContent = message || ""; status.className = "status" + (kind ? " " + kind : ""); }
+  function isQuoteRequest() {
+    return seed.requestStage === "quote" && ["catalogue", "general", "customizer"].indexOf(seed.sourceKind) >= 0;
+  }
+  function toggleShipping() {
+    var shipping = value("fulfillment") === "shipping";
+    var quoteRequest = isQuoteRequest();
+    shippingFields.hidden = !shipping || quoteRequest;
+    shippingFields.setAttribute("aria-hidden", String(!shipping || quoteRequest));
+    var showPin = shipping || quoteRequest;
+    pinField.hidden = !showPin;
+    pinField.setAttribute("aria-hidden", String(!showPin));
+  }
+  function updateDimensionMaxes() {
+    ["heightFeet", "widthFeet"].forEach(function (name) { form.elements[name].setAttribute("max", "5"); });
+    ["heightInchesPart", "widthInchesPart"].forEach(function (name) { form.elements[name].setAttribute("max", "11.99"); });
+  }
+  function dimensionsRequired() { return String(seed.sourceKind || "").toLowerCase() === "customizer"; }
+  function setDimensionsRequired(required) {
+    dimensionFields.hidden = !required;
+    dimensionFields.setAttribute("aria-hidden", String(!required));
+    ["heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"].forEach(function (name) {
+      var input = form.elements[name];
+      if (!input) return;
+      if (required) input.setAttribute("required", "required"); else input.removeAttribute("required");
+    });
+  }
+  function productImagePath() {
+    var match = /^catalogue:([A-Za-z0-9][A-Za-z0-9._-]{0,159})$/.exec(String(seed.sourceId || ""));
+    return match && PRODUCT_IMAGE_ALLOWLIST[match[1]] ? PARENT_ORIGIN + "/assets/" + match[1] : "";
+  }
+  function applyProductContext() {
+    var bundle = isBundle();
+    if (bundle) {
+      form.elements.productName.setAttribute("readonly", "readonly");
+      form.elements.quantity.setAttribute("readonly", "readonly");
+      var bundleHint = document.getElementById("product-name-hint");
+      if (bundleHint) bundleHint.textContent = "The bundle name and total quantity follow your selected items.";
+      productImage.hidden = true;
+      productImage.removeAttribute("src");
+      productImage.removeAttribute("alt");
+      if (bundleProductCopy) bundleProductCopy.hidden = false;
+      productContext.hidden = false;
+      renderBundleItems();
+      updateBundleScalars(false);
+      return;
+    }
+    form.elements.productName.removeAttribute("readonly");
+    form.elements.quantity.removeAttribute("readonly");
+    var productNameHint = document.getElementById("product-name-hint");
+    if (productNameHint) productNameHint.textContent = "You can edit the product name before sending the request.";
+    if (bundleItemsElement) bundleItemsElement.hidden = true;
+    productImage.hidden = false;
+    if (bundleProductCopy) bundleProductCopy.hidden = true;
+    var imagePath = productImagePath();
+    if (!imagePath) {
+      productContext.hidden = true;
+      productImage.removeAttribute("src");
+      productImage.removeAttribute("alt");
+      return;
+    }
+    productImage.setAttribute("src", imagePath);
+    productImage.setAttribute("alt", (value("productName") || "Selected product") + " product photo");
+    productContext.hidden = false;
+  }
+  function applySeed(next) {
+    var fields = ["requestId", "requestStage", "sourceKind", "sourceId", "productName", "quantity", "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate", "referralCode"];
+    fields.forEach(function (field) { if (form.elements[field]) form.elements[field].value = next[field] == null ? "" : next[field]; });
+    bundleItems = normalizeBundleItems(next.bundleItems);
+    bundleNotes = "";
+    if (isBundle() && bundleItems.length) form.elements.designDetails.value = "";
+    toggleShipping();
+    updateDimensionMaxes();
+    setDimensionsRequired(dimensionsRequired());
+    applyProductContext();
+  }
+  function normalizeReferralCode(value) { var code = String(value || "").trim().toUpperCase(); return /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code) ? code : ""; }
+  function showReferralStatus(message, kind) { if (!referralStatus) return; referralStatus.textContent = message; referralStatus.className = "hint" + (kind ? " " + kind : ""); }
+  function clearReferralStatus() {
+    referralCheckVersion += 1;
+    referralAcceptedCode = "";
+    if (checkReferral) checkReferral.disabled = false;
+    var code = referralInput ? normalizeReferralCode(referralInput.value) : "";
+    showReferralStatus(code ? "Code changed. Check it again before submitting." : "No code entered. The order can continue without partner credit.", "");
+  }
+  function repeatProfileFromForm() {
+    return {
+      customerName: value("customerName"), phone: value("phone"), fulfillment: value("fulfillment"),
+      shippingAddress: value("shippingAddress"), city: value("city"), state: value("state"), pin: value("pin")
+    };
+  }
+  function checkReferralCode() {
+    if (!referralInput || !checkReferral || !window.google || !google.script || !google.script.run) return;
+    var code = normalizeReferralCode(referralInput.value);
+    referralInput.value = code;
+    var requestVersion = referralCheckVersion + 1;
+    referralCheckVersion = requestVersion;
+    referralAcceptedCode = "";
+    if (!code) { showReferralStatus("No code entered. The order can continue without partner credit.", ""); return; }
+    checkReferral.disabled = true; showReferralStatus("Checking this code…", "");
+    var requested = code;
+    try {
+      google.script.run.withSuccessHandler(function (result) {
+        if (requestVersion !== referralCheckVersion || normalizeReferralCode(referralInput.value) !== requested) return;
+        checkReferral.disabled = false;
+        if (result && result.status === "active") { referralAcceptedCode = requested; showReferralStatus("Code accepted for " + String(result.displayName || "this partner") + ".", "success"); }
+        else if (result && result.status === "error") { referralAcceptedCode = ""; showReferralStatus("Could not check the code; retry or clear it to continue without partner credit.", "error"); }
+        else if (result && result.status === "paused") { referralAcceptedCode = ""; showReferralStatus("This code is paused. The order can continue without partner credit.", "error"); }
+        else { referralAcceptedCode = ""; showReferralStatus("This code is not active. The order can continue without partner credit.", "error"); }
+      }).withFailureHandler(function () {
+        if (requestVersion !== referralCheckVersion || normalizeReferralCode(referralInput.value) !== requested) return;
+        checkReferral.disabled = false;
+        referralAcceptedCode = "";
+        showReferralStatus("Could not check the code; retry or clear it to continue without partner credit.", "error");
+      }).validateReferralCode(code);
+    } catch (error) {
+      if (requestVersion !== referralCheckVersion || normalizeReferralCode(referralInput.value) !== requested) return;
+      checkReferral.disabled = false;
+      referralAcceptedCode = "";
+      showReferralStatus("Could not check the code; retry or clear it to continue without partner credit.", "error");
+    }
+  }
+  function newRequestId() {
+    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    return "request-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+  }
+  function isCustomizerOrderRequest() {
+    return seed.sourceKind === "customizer" && seed.previewExpected === true;
+  }
+  function setReferenceImageStatus(message, kind) {
+    if (!referenceImageStatus) return;
+    referenceImageStatus.textContent = message || "";
+    referenceImageStatus.className = "hint" + (kind ? " " + kind : "");
+  }
+  function revokePreviewObjectUrl() {
+    if (!previewObjectUrl) return;
+    var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+    if (urlApi && typeof urlApi.revokeObjectURL === "function") {
+      try { urlApi.revokeObjectURL(previewObjectUrl); } catch (error) {}
+    }
+    previewObjectUrl = "";
+  }
+  function updateReferenceImageActions() {
+    var hasFile = Boolean(referenceImage.files && referenceImage.files[0]);
+    if (referenceImageActions) referenceImageActions.hidden = !(previewExpected && (previewCanRetry || previewCanContinue || hasFile));
+    if (retryPreviewButton) retryPreviewButton.hidden = !(previewExpected && previewCanRetry);
+    if (continueWithoutPreviewButton) continueWithoutPreviewButton.hidden = !(previewExpected && previewCanContinue);
+    if (removeReferenceImageButton) removeReferenceImageButton.hidden = !hasFile;
+  }
+  function closePreviewAttempt(attempt) {
+    if (attempt && previewAttempt !== attempt) return;
+    var current = attempt || previewAttempt;
+    if (previewTimeoutId) window.clearTimeout(previewTimeoutId);
+    previewTimeoutId = null;
+    previewPending = false;
+    if (current && current.port && current.port.close) {
+      try { current.port.close(); } catch (error) {}
+    }
+    if (!attempt || previewAttempt === attempt) previewAttempt = null;
+  }
+  function previewCurrent(attempt) {
+    return previewExpected && previewAttempt === attempt && previewPending && !attempt.done &&
+      attachmentGeneration === attempt.attachmentGeneration &&
+      String(seed.channelNonce || "") === attempt.nonce && String(seed.requestId || "") === attempt.requestId;
+  }
+  function previewFailure(message) {
+    closePreviewAttempt();
+    previewResolved = false;
+    previewCanRetry = true;
+    previewCanContinue = true;
+    setReferenceImageStatus((message || "The customizer preview could not be attached.") + " Retry preview or continue without a preview.", "error");
+    updateReferenceImageActions();
+  }
+  function validPreviewBlob(blob) {
+    return Boolean(blob && Object.prototype.toString.call(blob) === "[object Blob]" &&
+      typeof blob.size === "number" && blob.size > 0 && blob.size <= PREVIEW_MAX_BYTES &&
+      String(blob.type || "").toLowerCase() === "image/png");
+  }
+  function attachPreviewBlob(attempt, blob) {
+    if (!validPreviewBlob(blob)) {
+      previewFailure("The customizer preview was not a non-empty PNG of 5 MB or less.");
+      return;
+    }
+    var FileCtor = window.File || (typeof File !== "undefined" ? File : null);
+    var DataTransferCtor = window.DataTransfer || (typeof DataTransfer !== "undefined" ? DataTransfer : null);
+    if (!FileCtor || !DataTransferCtor) {
+      previewFailure("This browser cannot attach the customizer preview automatically.");
+      return;
+    }
+    try {
+      var file = new FileCtor([blob], PREVIEW_FILENAME, { type: "image/png" });
+      var transfer = new DataTransferCtor();
+      if (!transfer.items || typeof transfer.items.add !== "function") throw new Error("DataTransfer is unavailable");
+      transfer.items.add(file);
+      referenceImage.files = transfer.files;
+      var assigned = referenceImage.files && referenceImage.files[0];
+      if (!assigned || assigned.name !== PREVIEW_FILENAME || String(assigned.type || "").toLowerCase() !== "image/png" || assigned.size !== blob.size) {
+        throw new Error("The preview file could not be assigned");
+      }
+      revokePreviewObjectUrl();
+      var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+      if (urlApi && typeof urlApi.createObjectURL === "function") {
+        previewObjectUrl = urlApi.createObjectURL(assigned);
+        referenceImagePreview.setAttribute("src", previewObjectUrl);
+        referenceImagePreviewWrap.hidden = false;
+      }
+      referenceImagePreview.setAttribute("alt", "Attached customizer preview");
+      previewResolved = true;
+      previewCanRetry = false;
+      previewCanContinue = false;
+      setReferenceImageStatus("Customizer preview attached as " + PREVIEW_FILENAME + ".");
+      updateReferenceImageActions();
+    } catch (error) {
+      try { referenceImage.value = ""; } catch (clearError) {}
+      try { referenceImage.files = []; } catch (clearError) {}
+      previewFailure("This browser cannot attach the customizer preview automatically.");
+    }
+  }
+  function startPreviewAttempt() {
+    if (!previewExpected) return;
+    closePreviewAttempt();
+    previewResolved = false;
+    previewPending = true;
+    previewCanRetry = false;
+    previewCanContinue = false;
+    var attempt = {
+      nonce: String(seed.channelNonce || ""), requestId: String(seed.requestId || ""),
+      attachmentGeneration: attachmentGeneration, transferId: newRequestId(), port: null, done: false
+    };
+    previewAttempt = attempt;
+    setReferenceImageStatus("Preparing the customizer preview…");
+    updateReferenceImageActions();
+    if (!attempt.nonce || !attempt.requestId || !window.MessageChannel || !window.top || window.top === window) {
+      previewFailure("The customizer preview is unavailable in this browser.");
+      return;
+    }
+    try {
+      var channel = new window.MessageChannel();
+      attempt.port = channel.port1;
+      channel.port1.onmessage = function (event) {
+        var data = event && event.data || {};
+        if (!previewCurrent(attempt) || data.type !== "saloni-preview-response" || data.version !== 1 ||
+            data.nonce !== attempt.nonce || data.requestId !== attempt.requestId || data.mode !== "order" ||
+            data.transferId !== attempt.transferId) return;
+        attempt.done = true;
+        closePreviewAttempt(attempt);
+        if (data.ok === true) attachPreviewBlob(attempt, data.blob);
+        else {
+          var responseError = typeof data.error === "string" ? data.error : "";
+          previewFailure(typeof responseError === "string" && responseError.trim() ? responseError.trim() : "The customizer preview could not be attached.");
+        }
+      };
+      window.top.postMessage({ type: "saloni-preview-request", version: 1, nonce: attempt.nonce, requestId: attempt.requestId, mode: "order", transferId: attempt.transferId }, PARENT_ORIGIN, [channel.port2]);
+      previewTimeoutId = window.setTimeout(function () {
+        if (!previewCurrent(attempt)) return;
+        attempt.done = true;
+        previewFailure("The customizer preview took too long to load.");
+      }, PREVIEW_TIMEOUT_MS);
+    } catch (error) {
+      previewFailure("The customizer preview is unavailable in this browser.");
+    }
+  }
+  function handleReferenceImageChange() {
+    attachmentGeneration += 1;
+    closePreviewAttempt();
+    previewResolved = true;
+    previewCanRetry = false;
+    previewCanContinue = false;
+    revokePreviewObjectUrl();
+    if (referenceImagePreviewWrap) referenceImagePreviewWrap.hidden = true;
+    var file = referenceImage.files && referenceImage.files[0];
+    if (file) {
+      var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+      if (urlApi && typeof urlApi.createObjectURL === "function") {
+        previewObjectUrl = urlApi.createObjectURL(file);
+        referenceImagePreview.setAttribute("src", previewObjectUrl);
+        referenceImagePreviewWrap.hidden = false;
+      }
+      referenceImagePreview.setAttribute("alt", "Attached reference image");
+      setReferenceImageStatus("Reference image attached.");
+    } else {
+      setReferenceImageStatus(previewExpected ? "Reference image removed. You can retry the customizer preview." : "No reference image attached.");
+      previewCanRetry = previewExpected;
+    }
+    updateReferenceImageActions();
+  }
+  function continueWithoutPreview() {
+    if (!previewExpected) return;
+    attachmentGeneration += 1;
+    closePreviewAttempt();
+    previewResolved = true;
+    previewCanRetry = false;
+    previewCanContinue = false;
+    setReferenceImageStatus("Continuing without a customizer preview.");
+    updateReferenceImageActions();
+  }
+  function resetPreviewState() {
+    attachmentGeneration += 1;
+    closePreviewAttempt();
+    revokePreviewObjectUrl();
+    previewCanRetry = false;
+    previewCanContinue = false;
+    previewResolved = !previewExpected;
+    if (referenceImagePreviewWrap) referenceImagePreviewWrap.hidden = true;
+    if (referenceImagePreview) referenceImagePreview.removeAttribute("src");
+    updateReferenceImageActions();
+  }
+  function disablePreviewForNewRequest() {
+    previewExpected = false;
+    previewPending = false;
+    previewResolved = true;
+    previewCanRetry = false;
+    previewCanContinue = false;
+    setReferenceImageStatus("This is a new request. Return to the designer and choose \"Request this design\" again for a new generated preview.");
+    updateReferenceImageActions();
+  }
+  function handlePageHide(event) {
+    if (event && event.persisted) {
+      closePreviewAttempt();
+      if (previewExpected && !previewResolved) {
+        previewCanRetry = true;
+        previewCanContinue = true;
+        setReferenceImageStatus("The customizer preview was paused. Retry preview or continue without a preview.", "error");
+        updateReferenceImageActions();
+      }
+      return;
+    }
+    resetPreviewState();
+  }
+  function handlePageShow(event) {
+    if (!event || !event.persisted || !previewExpected) return;
+    if (!previewResolved) {
+      previewPending = false;
+      previewCanRetry = true;
+      previewCanContinue = true;
+      setReferenceImageStatus("The customizer preview was paused. Retry preview or continue without a preview.", "error");
+    }
+    updateReferenceImageActions();
+  }
+  function getCaptchaToken(attempt, done) {
+    if (!captchaEnabled || !captchaSiteKey || !seed.channelNonce || !window.MessageChannel || !window.top || window.top === window) { done(null); return; }
+    var channel;
+    try {
+      channel = new window.MessageChannel();
+      attempt.port = channel.port1;
+      attempt.tokenDone = false;
+      channel.port1.onmessage = function (event) {
+        var data = event && event.data || {};
+        if (attempt.tokenDone || !isCurrent(attempt) || data.type !== "saloni-order-captcha-response" || data.nonce !== seed.channelNonce || data.attemptId !== attempt.id) return;
+        attempt.tokenDone = true;
+        done(data.ok === true && typeof data.token === "string" ? data.token : null);
+      };
+      window.top.postMessage({ type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: attempt.id }, PARENT_ORIGIN, [channel.port2]);
+    } catch (error) { done(null); }
+  }
+  function isCurrent(attempt) { return currentAttempt === attempt && active; }
+  function restoreSubmitState(attempt) {
+    if (attempt && currentAttempt !== attempt) return;
+    active = false;
+    submitButton.disabled = false;
+    if (currentAttempt && currentAttempt.port && currentAttempt.port.close) currentAttempt.port.close();
+    if (timeoutId) window.clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  function focusFirstError(errors) {
+    var first = errors && Object.keys(errors).filter(function (field) { return field !== "form" && field !== "captcha"; })[0];
+    if (first && form.elements[first] && form.elements[first].focus) { form.elements[first].focus(); return; }
+    if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+  }
+  function showFailure(message, errors, attempt) {
+    if (attempt && !isCurrent(attempt)) return;
+    restoreSubmitState(attempt); clearErrors();
+    if (errors) Object.keys(errors).forEach(function (field) { if (field !== "form" && field !== "captcha") setError(field, errors[field]); });
+    var general = errors && (errors.form || errors.captcha);
+    setStatus(general || message, "error");
+    focusFirstError(errors);
+  }
+  function showSuccess(result, attempt) {
+    if (attempt && !isCurrent(attempt)) return;
+    restoreSubmitState(attempt);
+    resetPreviewState();
+    previewExpected = false;
+    previewResolved = true;
+    form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
+    anotherButton.hidden = false;
+    var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
+    if (window.top && window.top !== window && seed.channelNonce) {
+      try { window.top.postMessage({ type: "saloni-order-save-repeat-profile", version: 1, nonce: seed.channelNonce, profile: repeatProfileFromForm() }, PARENT_ORIGIN); } catch (error) {}
+    }
+    setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed." + referralMessage + " Request ID: " + result.requestId, "success");
+    if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+  }
+  function validIsoDate(text) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+    var parts = text.split("-").map(Number);
+    var date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    return date.getUTCFullYear() === parts[0] && date.getUTCMonth() === parts[1] - 1 && date.getUTCDate() === parts[2];
+  }
+  function clientValidationErrors() {
+    var errors = {};
+    function required(name, message) { if (!value(name).trim()) errors[name] = message; }
+    required("productName", "This field is required.");
+    var quantity = Number(value("quantity"));
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) errors.quantity = "Enter a quantity from 1 to 100.";
+    function dimension(name, label) {
+      var feetText = value(name + "Feet");
+      var inchesText = value(name + "InchesPart");
+      var feet = Number(feetText);
+      var inches = Number(inchesText);
+      if (!/^\d+$/.test(feetText) || !Number.isInteger(feet) || feet < 0) errors[name + "Feet"] = label + " feet must be a whole, non-negative number.";
+      if (!/^\d+(\.\d+)?$/.test(inchesText) || !Number.isFinite(inches) || inches < 0 || inches >= 12) errors[name + "InchesPart"] = label + " inches must be from 0 up to (but not including) 12.";
+      var total = feet * 12 + inches;
+      if (Number.isFinite(total) && total <= 0) errors[name + "Feet"] = label + " must be greater than 0 inches.";
+      if (Number.isFinite(total) && total > 60) errors[name + "Feet"] = label + " must be no more than 60 inches.";
+    }
+    if (dimensionsRequired()) {
+      dimension("height", "Height");
+      dimension("width", "Width");
+    }
+    required("designDetails", "This field is required.");
+    required("customerName", "This field is required.");
+    if (!value("phone") || (value("phone").match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number.";
+    if (value("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("email"))) errors.email = "Enter a valid email address or leave it blank.";
+    var fulfillment = value("fulfillment");
+    if (["shipping", "pickup"].indexOf(fulfillment) === -1) errors.fulfillment = "Choose shipping or pickup.";
+    var quoteRequest = isQuoteRequest();
+    if (fulfillment === "shipping") {
+      if (!quoteRequest) {
+        required("shippingAddress", "Shipping address is required.");
+        required("city", "City is required.");
+        required("state", "State is required.");
+      }
+    }
+    if (fulfillment === "shipping" || quoteRequest) {
+      if (!/^\d{6}$/.test(value("pin"))) errors.pin = quoteRequest ? "Enter a 6-digit PIN for this quote request." : "Enter a 6-digit PIN for shipping.";
+    }
+    if (value("requestedDate") && !validIsoDate(value("requestedDate"))) errors.requestedDate = "Use a valid requested date.";
+    var file = referenceImage.files && referenceImage.files[0];
+    if (file && file.size !== 0) {
+      var fileName = String(file.name || "").toLowerCase();
+      var fileType = String(file.type || "").toLowerCase();
+      if (file.size > 5 * 1024 * 1024) errors.referenceImage = "The reference image must be 5 MB or smaller.";
+      else if (["image/jpeg", "image/png"].indexOf(fileType) === -1 && !/\.(jpe?g|png)$/.test(fileName)) errors.referenceImage = "Attach one JPG or PNG image.";
+    }
+    return errors;
+  }
+  form.addEventListener("change", function () { toggleShipping(); updateDimensionMaxes(); });
+  if (form.elements.designDetails) form.elements.designDetails.addEventListener("input", function () {
+    if (isBundle() && !syncingBundleFields) bundleNotes = bundleNotesFromField(value("designDetails"));
+  });
+  if (referenceImage) referenceImage.addEventListener("change", handleReferenceImageChange);
+  if (retryPreviewButton) retryPreviewButton.addEventListener("click", function () {
+    if (!previewExpected) return;
+    attachmentGeneration += 1;
+    startPreviewAttempt();
+  });
+  if (continueWithoutPreviewButton) continueWithoutPreviewButton.addEventListener("click", continueWithoutPreview);
+  if (removeReferenceImageButton) removeReferenceImageButton.addEventListener("click", function () {
+    try { referenceImage.value = ""; } catch (error) {}
+    if (referenceImage.files) {
+      try { referenceImage.files = []; } catch (error) {}
+    }
+    handleReferenceImageChange();
+  });
+  if (referralInput) { referralInput.addEventListener("input", clearReferralStatus); referralInput.addEventListener("change", clearReferralStatus); }
+  if (checkReferral) checkReferral.addEventListener("click", checkReferralCode);
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (active) return;
+    if (isBundle()) updateBundleScalars(true);
+    clearErrors();
+    if (previewExpected && !previewResolved) {
+      setStatus(previewPending ? "The customizer preview is still loading. Please wait, retry, or continue without a preview." : "Attach the customizer preview, retry it, or continue without a preview.", "error");
+      if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+      return;
+    }
+    var validationErrors = clientValidationErrors();
+    if (Object.keys(validationErrors).length) {
+      showFailure("Please correct the highlighted fields and try again.", validationErrors);
+      return;
+    }
+    var attempt = { id: newRequestId(), port: null, tokenDone: false };
+    currentAttempt = attempt;
+    active = true;
+    submitButton.disabled = true;
+    setStatus("Checking the request…", "");
+    timeoutId = window.setTimeout(function () {
+      if (!isCurrent(attempt)) return;
+      setStatus("This is taking longer than expected. Keep this window open; we are still confirming your request.", "");
+      if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+    }, 30000);
+    getCaptchaToken(attempt, function (token) {
+      if (!isCurrent(attempt)) return;
+      if (!token) { showFailure("We could not verify this request. Please try again.", { captcha: "Captcha verification is required." }, attempt); return; }
+      form.elements.captchaToken.value = token;
+      try {
+        google.script.run.withSuccessHandler(function (result) {
+          if (!isCurrent(attempt)) return;
+          if (result && result.ok === true) showSuccess(result, attempt); else showFailure("Please correct the highlighted fields and try again.", result && result.errors, attempt);
+        }).withFailureHandler(function () {
+          if (!isCurrent(attempt)) return;
+          showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
+        }).submitOrder(formElement);
+      } catch (error) {
+        if (isCurrent(attempt)) showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
+      }
+    });
+  });
+  anotherButton.addEventListener("click", function () {
+    var wasCustomizerRequest = isCustomizerOrderRequest();
+    resetPreviewState();
+    form.reset();
+    form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
+    anotherButton.hidden = true; clearErrors(); setStatus("", "");
+    applySeed(seed);
+    form.elements.requestId.value = newRequestId();
+    clearReferralStatus();
+    if (wasCustomizerRequest) disablePreviewForNewRequest();
+  });
+  applySeed(seed);
+  previewExpected = isCustomizerOrderRequest();
+  previewResolved = !previewExpected;
+  updateReferenceImageActions();
+  if (previewExpected) startPreviewAttempt();
+  if (window.addEventListener) {
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
+  }
+  if (seed.channelNonce && window.top && window.top !== window) {
+    try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey || "" }, PARENT_ORIGIN); } catch (error) {}
+  }
+}());
+</script>
+</body>
+</html>
