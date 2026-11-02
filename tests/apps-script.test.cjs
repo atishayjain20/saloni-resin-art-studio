@@ -111,7 +111,7 @@ test("accepts customizer quote requests without address fields while requiring P
     shippingAddress: "", city: "", state: "", pin: "305001"
   }));
   assert.equal(legacyResult.ok, false);
-  assert.match(legacyResult.errors.shippingAddress, /required/i);
+  assert.equal(legacyResult.errors.shippingAddress, "Enter the full shipping address.");
 
   for (const overrides of [
     { pin: "" },
@@ -580,6 +580,129 @@ test("preserves all legacy fingerprint vectors and appends quote stage after ref
     referralCode: quote.referralCode, requestStage: "quote"
   };
   assert.equal(runtime.context.payloadFingerprint_(quote), runtime.context.digestHex_(JSON.stringify(expected)));
+});
+
+test("keeps the row and fingerprint unchanged when bundleSourceIds is absent", () => {
+  const form = combinedForm({ referralCode: "ABC123" });
+  const runtime = makeRuntime();
+  const without = runtime.context.collectPayload_(form);
+  const blank = runtime.context.collectPayload_(Object.assign({}, form, { bundleSourceIds: "" }));
+  assert.equal(runtime.context.payloadFingerprint_(without), runtime.context.payloadFingerprint_(blank));
+  const row = runtime.context.rowForPayload_(without, "fp", new Date(), null, null, 2);
+  assert.equal(row[4], form.sourceId);
+  assert.equal(row.length, 26);
+});
+
+test("stores valid bundleSourceIds in the Source ID cell and in the fingerprint", () => {
+  const bundleSourceIds = "catalogue:a.jpg x1, catalogue:b.jpg x2";
+  const form = combinedForm({ sourceId: "catalogue:multi-item", productName: "A + 1 more", bundleSourceIds });
+  const runtime = makeRuntime();
+  assert.deepEqual(Object.assign({}, runtime.context.validatePayload_(runtime.context.collectPayload_(form)).errors), {});
+  const payload = runtime.context.collectPayload_(form);
+  assert.equal(payload.bundleSourceIds, bundleSourceIds);
+  const row = runtime.context.rowForPayload_(payload, "fp", new Date(), null, null, 2);
+  assert.equal(row[4], "catalogue:multi-item | " + bundleSourceIds);
+  const plain = runtime.context.collectPayload_(Object.assign({}, form, { bundleSourceIds: "" }));
+  assert.notEqual(runtime.context.payloadFingerprint_(payload), runtime.context.payloadFingerprint_(plain));
+  const submitted = makeRuntime();
+  assert.equal(submitted.context.submitOrder(form).ok, true);
+  assert.equal(submitted.rows[0][4], "catalogue:multi-item | " + bundleSourceIds);
+});
+
+test("rejects malformed, oversized, or non-bundle bundleSourceIds before writes", () => {
+  const bad = [
+    { sourceId: "catalogue:multi-item", bundleSourceIds: "catalogue:a.jpg x1, =HYPERLINK(1) x2" },
+    { sourceId: "catalogue:multi-item", bundleSourceIds: "catalogue:a.jpg x0, catalogue:b.jpg" },
+    { sourceId: "catalogue:multi-item", bundleSourceIds: "catalogue:a.jpg x1,catalogue:b.jpg x2" },
+    { sourceId: "catalogue:multi-item", bundleSourceIds: Array.from({ length: 300 }, (_, index) => "catalogue:product-" + index + ".jpg x1").join(", ") },
+    { sourceId: "catalogue:test.png", bundleSourceIds: "catalogue:a.jpg x1" },
+  ];
+  for (const overrides of bad) {
+    const runtime = makeRuntime();
+    const result = runtime.context.submitOrder(combinedForm(overrides));
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.bundleSourceIds);
+    assert.equal(runtime.state.captchaCalls, 0);
+    assert.equal(runtime.state.appendCalls, 0);
+  }
+});
+
+const PHONE_MESSAGE = "Enter a 10-digit mobile number, e.g. 98765 43210.";
+const NAME_MESSAGE = "Enter your name (at least 2 letters).";
+const PIN_MESSAGE = "Enter a valid 6-digit PIN code.";
+const DATE_MESSAGE = "Choose today or a later date.";
+const ADDRESS_MESSAGE = "Enter the full shipping address.";
+function istDate(offsetDays) {
+  return new Date(Date.now() + 5.5 * 3600 * 1000 + offsetDays * 86400000).toISOString().slice(0, 10);
+}
+function shippingForm(overrides = {}) {
+  return combinedForm(Object.assign({ fulfillment: "shipping", shippingAddress: "12 Hathi Bhata Road", city: "Ajmer", state: "Rajasthan", pin: "305001" }, overrides));
+}
+
+test("accepts Indian mobile numbers with +91, 91, 0 prefixes and common separators", () => {
+  ["8209238541", "98765 43210", "+91 8209238541", "+91-98765-43210", "918209238541", "08209238541", "(+91) 98765 43210", "6000000000", "7000000000"].forEach((phone) => {
+    const errors = context.validatePayload_(validForm({ phone }));
+    assert.equal(errors.errors.phone, undefined, phone);
+  });
+});
+
+test("rejects phones that are not a ten-digit Indian mobile number", () => {
+  ["", "1234567", "5876543210", "0123456789", "98765", "98765432101", "+1 8209238541", "+91 5209238541", "abcdefghij", "+9198765432109"].forEach((phone) => {
+    assert.equal(context.validatePayload_(validForm({ phone })).errors.phone, PHONE_MESSAGE, phone);
+  });
+  assert.equal(context.validatePayload_(validForm({ phone: "9".repeat(41) })).errors.phone, PHONE_MESSAGE);
+});
+
+test("requires a customer name with at least two letters", () => {
+  ["A Customer", "Al", "Saloni", "राम", "ગીતા", "முருகன்", "প্রিয়া", "ਹਰਪ੍ਰੀਤ", "Mary-Jane O'Neil", "  Åsa  ", "राधा शर्मा"].forEach((customerName) => {
+    assert.equal(context.validatePayload_(validForm({ customerName })).errors.customerName, undefined, customerName);
+  });
+  ["", " ", "  ", "A", " A ", "12", "1 2 3", "- -", "--", "A1"].forEach((customerName) => {
+    assert.equal(context.validatePayload_(validForm({ customerName })).errors.customerName, NAME_MESSAGE, JSON.stringify(customerName));
+  });
+});
+
+test("requires a 6-digit PIN that does not start with 0 wherever a PIN is already required", () => {
+  assert.equal(context.validatePayload_(shippingForm()).errors.pin, undefined);
+  ["", "012345", "30500", "3050011", "30500a", "000000"].forEach((pin) => {
+    assert.equal(context.validatePayload_(shippingForm({ pin })).errors.pin, PIN_MESSAGE, pin);
+  });
+  const quote = (overrides) => validForm(Object.assign({ requestStage: "quote", fulfillment: "pickup", height: "", heightUnit: "", width: "", widthUnit: "" }, overrides));
+  assert.equal(context.validatePayload_(quote({ pin: "305001" })).errors.pin, undefined);
+  assert.equal(context.validatePayload_(quote({ pin: "012345" })).errors.pin, PIN_MESSAGE);
+  assert.equal(context.validatePayload_(quote({ pin: "" })).errors.pin, PIN_MESSAGE);
+  assert.equal(context.validatePayload_(validForm({ fulfillment: "pickup", pin: "" })).errors.pin, undefined);
+});
+
+test("rejects a requested date before today in India time but accepts today and later", () => {
+  assert.equal(context.validatePayload_(validForm({ requestedDate: istDate(0) })).errors.requestedDate, undefined);
+  assert.equal(context.validatePayload_(validForm({ requestedDate: istDate(30) })).errors.requestedDate, undefined);
+  assert.equal(context.validatePayload_(validForm({ requestedDate: "" })).errors.requestedDate, undefined);
+  assert.equal(context.validatePayload_(validForm({ requestedDate: istDate(-1) })).errors.requestedDate, DATE_MESSAGE);
+  assert.equal(context.validatePayload_(validForm({ requestedDate: "2020-01-01" })).errors.requestedDate, DATE_MESSAGE);
+  assert.match(context.validatePayload_(validForm({ requestedDate: "2026-02-31" })).errors.requestedDate, /valid requested date/);
+});
+
+test("requires a full shipping address of at least ten characters when shipping", () => {
+  assert.equal(context.validatePayload_(shippingForm()).errors.shippingAddress, undefined);
+  ["", "   ", "Ajmer", "123456789", "  123456789  "].forEach((shippingAddress) => {
+    assert.equal(context.validatePayload_(shippingForm({ shippingAddress })).errors.shippingAddress, ADDRESS_MESSAGE, JSON.stringify(shippingAddress));
+  });
+  assert.equal(context.validatePayload_(shippingForm({ shippingAddress: "1234567890" })).errors.shippingAddress, undefined);
+  assert.equal(context.validatePayload_(validForm({ fulfillment: "pickup", shippingAddress: "" })).errors.shippingAddress, undefined);
+});
+
+test("submitOrder rejects bad contact values before CAPTCHA or writes even when the client is bypassed", () => {
+  const runtime = makeRuntime();
+  const result = runtime.context.submitOrder(shippingForm({ phone: "12345", customerName: "A", pin: "012345", shippingAddress: "short", requestedDate: "2020-01-01" }));
+  assert.equal(result.ok, false);
+  assert.equal(result.errors.phone, PHONE_MESSAGE);
+  assert.equal(result.errors.customerName, NAME_MESSAGE);
+  assert.equal(result.errors.pin, PIN_MESSAGE);
+  assert.equal(result.errors.shippingAddress, ADDRESS_MESSAGE);
+  assert.equal(result.errors.requestedDate, DATE_MESSAGE);
+  assert.equal(runtime.state.captchaCalls, 0);
+  assert.equal(runtime.state.appendCalls, 0);
 });
 
 test("reconciles append failures without deleting a file after persisted-then-threw", () => {

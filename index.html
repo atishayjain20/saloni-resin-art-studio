@@ -153,15 +153,20 @@
           <div class="catalogue-selection-previews" id="catalogue-selection-previews" aria-hidden="true"></div>
           <p class="panel-label" id="catalogue-selection-title">One request for your selected gifts</p>
           <div class="catalogue-selection-items" id="catalogue-selection-items" aria-label="Selected catalogue items"></div>
+          <p class="catalogue-selection-total" id="catalogue-selection-total" role="status" aria-live="polite"></p>
           <p class="catalogue-selection-summary" id="catalogue-selection-summary" role="status" aria-live="polite">No gifts selected.</p>
           <p class="catalogue-selection-status" id="catalogue-selection-status" role="status" aria-live="polite" hidden></p>
         </div>
-        <button class="button button-line" id="catalogue-request-selected" type="button" disabled>Order now</button>
+        <div class="catalogue-selection-actions">
+          <button class="button button-line" id="catalogue-request-selected" type="button" disabled>Order now</button>
+          <a class="button button-dark" id="catalogue-selection-whatsapp" href="https://wa.me/918209238541" target="_blank" rel="noopener">Order on WhatsApp</a>
+        </div>
     </div>
     <div class="catalogue-cart-jump" id="catalogue-cart-jump" hidden role="group" aria-label="Selected gifts">
       <span class="catalogue-cart-count" id="catalogue-cart-count" aria-live="polite"></span>
       <button class="button button-line catalogue-cart-view" id="catalogue-cart-view" type="button" aria-controls="catalogue-selection">View cart</button>
       <button class="button button-dark catalogue-cart-order" id="catalogue-cart-order" type="button" aria-controls="catalogue-selection" disabled>Order now</button>
+      <a class="button button-line catalogue-cart-whatsapp" id="catalogue-cart-whatsapp" href="https://wa.me/918209238541" target="_blank" rel="noopener">Order on WhatsApp</a>
     </div>
 
     <section class="work-section diwali-section shell" id="diwali" aria-labelledby="diwali-title">
@@ -868,13 +873,13 @@
       <div class="order-inline-fallback" id="order-inline-fallback" role="region" aria-labelledby="order-inline-fallback-title">
         <p class="panel-label" id="order-inline-fallback-title">Prefer to talk first?</p>
         <p>If the form is unavailable, call or message Saloni directly.</p>
-        <a class="contact-line" href="tel:8209238541"><span>Call Saloni</span><strong>8209238541</strong></a>
+        <a class="contact-line" href="tel:+918209238541"><span>Call Saloni</span><strong>8209238541</strong></a>
         <a class="contact-line" href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer"><span>Message on Instagram</span><strong>@saloniresin_art_studio</strong></a>
         <button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button>
         <button class="button button-line order-continue-request" id="order-continue-request" type="button" aria-controls="order-dialog" hidden>Continue your request</button>
         <p class="order-privacy-note">Your information is used only to handle your request. <a href="#privacy-details">Privacy details</a></p>
       </div>
-      <details class="privacy-details" id="privacy-details"><summary>Privacy details</summary><p>Order details and an optional image are stored in the studio’s private Google Sheet and restricted Drive folder for handling. Customer requests and uploaded images are scheduled for deletion after 90 days. If you choose to remember them, your name, phone, and delivery details stay only in this browser for up to 30 days and are not stored separately by the studio. Partner attribution and private commission records are retained for payout records. Request correction or deletion through <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p></details>
+      <details class="privacy-details" id="privacy-details"><summary>Privacy details</summary><p>Order details and an optional image are stored in the studio’s private Google Sheet and restricted Drive folder for handling. Customer requests and uploaded images are scheduled for deletion after 90 days. If you choose to remember them, your name, phone, and delivery details stay only in this browser for up to 30 days and are not stored separately by the studio. Partner attribution and private commission records are retained for payout records. Request correction or deletion through <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p></details>
     </section>
   </main>
 
@@ -886,7 +891,7 @@
       <h2 class="sr-only" id="order-dialog-title">Order request</h2>
       <div class="order-panel order-form-panel" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"><div class="selected-product-summary" id="selected-product-summary" hidden aria-live="polite"><img id="selected-product-image" alt="Selected product photo" width="280" height="280" loading="lazy" decoding="async"><div class="selected-product-summary-copy"><p class="panel-label">Selected item</p><h3 id="selected-product-name"></h3><p id="selected-product-price" hidden></p><p id="selected-product-size" hidden></p></div></div><p class="order-final-quote-note">Final quote after size, materials and delivery.</p>
         <p class="panel-label">Order request</p>
-        <div class="order-form-status" id="order-form-status" role="status" aria-live="polite"><span class="order-form-spinner" aria-hidden="true" hidden></span>Choose a product, a customizer design, or a general custom gift request to begin. You can still call Saloni at <a href="tel:8209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.<button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button></div>
+        <div class="order-form-status" id="order-form-status" role="status" aria-live="polite"><span class="order-form-spinner" aria-hidden="true" hidden></span>Choose a product, a customizer design, or a general custom gift request to begin. You can still call Saloni at <a href="tel:+918209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.<button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button></div>
         <iframe id="order-form-frame" name="saloni-order-form-frame" title="Saloni Resin Art Studio order request form" loading="lazy" hidden></iframe>
       </div>
     </div>

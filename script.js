@@ -852,6 +852,8 @@
     var catalogueSelection = document.getElementById("catalogue-selection");
     var catalogueSelectionPreviews = document.getElementById("catalogue-selection-previews");
     var catalogueSelectionItems = document.getElementById("catalogue-selection-items");
+    var catalogueSelectionTotal = document.getElementById("catalogue-selection-total");
+    var catalogueWhatsappLinks = ["catalogue-selection-whatsapp", "catalogue-cart-whatsapp"].map(function (id) { return document.getElementById(id); }).filter(Boolean);
     var catalogueSelectionSummary = document.getElementById("catalogue-selection-summary");
     var catalogueSelectionStatus = document.getElementById("catalogue-selection-status");
     var catalogueRequestSelected = document.getElementById("catalogue-request-selected");
@@ -877,6 +879,7 @@
     var pendingOrderDialogOpener = null;
     var pendingMobileCustomizerOpener = null;
     var ORDER_FORM_LOADING_TIMEOUT = 12000;
+    var ORDER_FORM_LOAD_SETTLE_TIMEOUT = 2500;
 
     function requestId() {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -950,7 +953,7 @@
         if (!frameState.loading || frameState.loadingNonce !== loadingNonce || frameState.loadingRequestId !== loadingRequestId || frameState.nonce !== loadingNonce || frameState.requestId !== loadingRequestId) return;
         frameState.loading = false;
         frameState.loadingTimer = null;
-        status.innerHTML = "The request form is taking longer than expected. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+        status.innerHTML = "The request form is taking longer than expected. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
         status.hidden = false;
         status.removeAttribute("aria-busy");
       }, ORDER_FORM_LOADING_TIMEOUT);
@@ -984,7 +987,12 @@
         if (frame !== nextFrame || !frameState.loaded || frameState.nonce !== identity.nonce || frameState.requestId !== identity.requestId) return;
         nextFrame.hidden = false;
         if (!frameState.loading || frameState.loadingNonce !== identity.nonce || frameState.loadingRequestId !== identity.requestId) return;
-        finishOrderFormLoading();
+        // Keep the loader until the form reports ready; if it never does, stop after a short settle time.
+        clearOrderLoadingTimer();
+        frameState.loadingTimer = window.setTimeout(function () {
+          if (!frameState.loading || frameState.loadingNonce !== identity.nonce || frameState.loadingRequestId !== identity.requestId) return;
+          finishOrderFormLoading();
+        }, ORDER_FORM_LOAD_SETTLE_TIMEOUT);
       });
       return nextFrame;
     }
@@ -1243,8 +1251,8 @@
       if (!configured) {
         invalidateChannel();
         status.innerHTML = frameState.mode === "corporate"
-          ? "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>."
-          : "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+          ? "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>."
+          : "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
         status.hidden = false;
         status.removeAttribute("aria-busy");
         return false;
@@ -1410,7 +1418,7 @@
     });
 
     if (frameState.mode === "corporate" && !corporateIntakeReady) {
-      status.innerHTML = "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:8209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+      status.innerHTML = "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
       status.hidden = false;
       return;
     }
@@ -1573,6 +1581,54 @@
       return items.reduce(function (total, item) { return total + bundleQuantity(item); }, 0);
     }
 
+    function cataloguePriceFrom(price) {
+      var text = String(price || "");
+      var match = text.match(/₹\s*([\d,]+(?:\.\d+)?)/);
+      var amount = match ? Number(match[1].replace(/,/g, "")) : NaN;
+      return isFinite(amount) ? { amount: amount, isRange: text.indexOf("–") !== -1 } : null;
+    }
+
+    function formatRupees(amount) {
+      return "₹" + amount.toLocaleString("en-IN");
+    }
+
+    function catalogueLinePriceText(item) {
+      var parsed = cataloguePriceFrom(item.price);
+      if (!parsed) return "Price on request";
+      var from = parsed.isRange ? "from " : "";
+      var quantity = bundleQuantity(item);
+      return from + formatRupees(parsed.amount) + " × " + quantity + " = " + from + formatRupees(parsed.amount * quantity);
+    }
+
+    function catalogueEstimatedTotalText(items) {
+      var sum = 0;
+      var priced = 0;
+      var anyRange = false;
+      items.forEach(function (item) {
+        var parsed = cataloguePriceFrom(item.price);
+        if (!parsed) return;
+        priced += 1;
+        sum += parsed.amount * bundleQuantity(item);
+        if (parsed.isRange) anyRange = true;
+      });
+      if (!items.length) return "";
+      if (!priced) return "Estimated total: price on request";
+      return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum) + " + shipping" + (priced < items.length ? " (plus price-on-request items)" : "");
+    }
+
+    function catalogueWhatsappHref(items) {
+      var base = "https://wa.me/918209238541";
+      if (!items.length) return base;
+      var lines = items.map(function (item) {
+        var parsed = cataloguePriceFrom(item.price);
+        var quantity = bundleQuantity(item);
+        var price = parsed ? (parsed.isRange ? "from " : "") + formatRupees(parsed.amount) + " × " + quantity : "Price on request × " + quantity;
+        return "- " + [item.productName, item.size, price].filter(Boolean).join(" \u00b7 ");
+      });
+      var message = "Hi Saloni Resin Art Studio, I would like to order:\n" + lines.join("\n") + "\n" + catalogueEstimatedTotalText(items);
+      return base + "?text=" + encodeURIComponent(message);
+    }
+
     function renderCatalogueSelectionItems() {
       if (!catalogueSelectionItems) return;
       while (catalogueSelectionItems.firstChild) catalogueSelectionItems.removeChild(catalogueSelectionItems.firstChild);
@@ -1623,6 +1679,9 @@
           updateCatalogueSelection();
           prepareCatalogueSelection();
         });
+        var linePrice = document.createElement("span");
+        linePrice.className = "catalogue-selection-item-price";
+        linePrice.textContent = catalogueLinePriceText(item);
         var removeButton = document.createElement("button");
         removeButton.type = "button";
         removeButton.className = "catalogue-selection-item-remove";
@@ -1642,6 +1701,7 @@
         line.appendChild(name);
         line.appendChild(label);
         line.appendChild(removeButton);
+        line.appendChild(linePrice);
         catalogueSelectionItems.appendChild(line);
       });
     }
@@ -1653,6 +1713,9 @@
       if (catalogueRequestSelected) catalogueRequestSelected.disabled = count === 0;
       renderCatalogueSelectionPreviews();
       renderCatalogueSelectionItems();
+      if (catalogueSelectionTotal) catalogueSelectionTotal.textContent = catalogueEstimatedTotalText(selectedCatalogueItems);
+      var whatsappHref = catalogueWhatsappHref(selectedCatalogueItems);
+      catalogueWhatsappLinks.forEach(function (link) { link.setAttribute("href", whatsappHref); });
       if (catalogueCartJump) {
         catalogueCartJump.hidden = count === 0;
       }
@@ -1680,14 +1743,23 @@
       updateCatalogueSelection();
     }
 
+    function sortedBundleItems(items) {
+      return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); });
+    }
+
+    function bundleProductName(items) {
+      var sorted = sortedBundleItems(items);
+      return sorted[0].productName + (sorted.length > 1 ? " + " + (sorted.length - 1) + " more" : "");
+    }
+
     function bundleDetails(items) {
-      return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); }).map(function (item, index) {
-        return "Item " + (index + 1) + ": " + item.productName + " | Source: " + item.sourceId + " | Price: " + (item.price || "not shown") + " | Size: " + (item.size || "not shown") + " | Quantity: " + bundleQuantity(item);
+      return sortedBundleItems(items).map(function (item) {
+        return [item.productName, item.size, item.price, "Qty " + bundleQuantity(item)].filter(Boolean).join(" \u00b7 ");
       }).join("\n");
     }
 
     function catalogueSelectionKey(items) {
-      return bundleDetails(items);
+      return sortedBundleItems(items).map(function (item) { return item.sourceId + ":" + bundleQuantity(item); }).join("|");
     }
 
     function prepareCatalogueSelection() {
@@ -1696,8 +1768,8 @@
       var key = catalogueSelectionKey(items);
       if (frameState.loaded && frameState.sourceKind === "catalogue" && frameState.catalogueSeedKey === key) return true;
       var prepared = chooseSource({
-        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items",
-        quantity: String(bundleTotal(items)), designDetails: key, bundleItems: items
+        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: bundleProductName(items),
+        quantity: String(bundleTotal(items)), designDetails: bundleDetails(items), bundleItems: items
       }, { openDialog: false });
       if (prepared) frameState.catalogueSeedKey = key;
       return prepared;
@@ -1713,8 +1785,8 @@
         return true;
       }
       return chooseSource({
-        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: items.length + " selected catalogue items",
-        quantity: String(bundleTotal(items)), designDetails: key, bundleItems: items
+        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: bundleProductName(items),
+        quantity: String(bundleTotal(items)), designDetails: bundleDetails(items), bundleItems: items
       }, { opener: requestOpener });
     }
 

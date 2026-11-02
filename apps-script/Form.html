@@ -32,8 +32,11 @@
     input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
     .dimension-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
     .shipping-fields { margin-top: .85rem; }
+    .more-details > summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
+    .more-details[open] > summary { margin-bottom: .6rem; }
+    .more-details > fieldset { margin-bottom: 1rem; }
     .referral-disclosure { margin-top: .85rem; }
-    .referral-disclosure summary { padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
+    .referral-disclosure summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
     .referral-box { display: grid; gap: .65rem; margin-top: .65rem; }
     .repeat-profile-box { display: grid; gap: .65rem; margin-top: .85rem; }
     .repeat-profile-box label { display: flex; align-items: flex-start; gap: .55rem; }
@@ -96,17 +99,7 @@
       <div class="grid">
         <label for="customer-name">Customer name <input id="customer-name" name="customerName" maxlength="120" autocomplete="name" required></label>
         <label for="phone">Phone <input id="phone" name="phone" maxlength="40" autocomplete="tel" inputmode="tel" required></label>
-        <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
-        <label for="requested-date">Requested date (optional) <input id="requested-date" name="requestedDate" type="date"></label>
       </div>
-      <details class="referral-disclosure">
-        <summary>Have a referral code?</summary>
-        <div class="referral-box">
-          <label for="referral-code">Partner referral code (optional) <input id="referral-code" name="referralCode" maxlength="32" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="referral-status"></label>
-          <button id="check-referral" class="secondary" type="button">Check code</button>
-          <p id="referral-status" class="hint" role="status" aria-live="polite">A code is optional. You can continue without partner credit.</p>
-        </div>
-      </details>
       <label for="fulfillment">Shipping or pickup <select id="fulfillment" name="fulfillment" required><option value="shipping">Shipping</option><option value="pickup">Pickup in Ajmer</option></select></label>
       <div class="shipping-fields" id="shipping-fields">
         <div class="grid">
@@ -118,32 +111,52 @@
         </div>
       </div>
       <div class="shipping-fields" id="pin-field">
-        <label for="pin">PIN <input id="pin" name="pin" maxlength="6" inputmode="numeric" autocomplete="postal-code"></label>
+        <label for="pin">PIN <input id="pin" name="pin" maxlength="6" inputmode="numeric" pattern="[1-9][0-9]{5}" autocomplete="postal-code"></label>
       </div>
     </fieldset>
 
-    <div class="repeat-profile-box" id="repeat-profile-box">
-      <label for="remember-repeat-profile"><input id="remember-repeat-profile" type="checkbox"> Remember my name, phone, and delivery details on this device for 30 days.</label>
-      <p class="hint">Saved only in this browser. These details are not sent to the studio again until you send a new request.</p>
-      <button id="forget-repeat-profile" class="secondary" type="button">Forget saved details on this device</button>
-      <p id="repeat-profile-status" class="hint" role="status" aria-live="polite"></p>
-    </div>
+    <details class="more-details" id="more-details">
+      <summary>More details (optional)</summary>
+      <fieldset>
+        <legend>Optional details</legend>
+        <div class="grid">
+          <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
+          <label for="requested-date">Requested date (optional) <input id="requested-date" name="requestedDate" type="date"></label>
+        </div>
+        <details class="referral-disclosure">
+          <summary>Have a referral code?</summary>
+          <div class="referral-box">
+            <label for="referral-code">Partner referral code (optional) <input id="referral-code" name="referralCode" maxlength="32" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="referral-status"></label>
+            <button id="check-referral" class="secondary" type="button">Check code</button>
+            <p id="referral-status" class="hint" role="status" aria-live="polite">A code is optional. You can continue without partner credit.</p>
+          </div>
+        </details>
+      </fieldset>
 
-    <fieldset>
-      <legend>Optional reference image</legend>
-      <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
-      <div id="reference-image-preview-wrap" hidden>
-        <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
+      <div class="repeat-profile-box" id="repeat-profile-box">
+        <label for="remember-repeat-profile"><input id="remember-repeat-profile" type="checkbox"> Remember my name, phone, and delivery details on this device for 30 days.</label>
+        <p class="hint">Saved only in this browser. These details are not sent to the studio again until you send a new request.</p>
+        <button id="forget-repeat-profile" class="secondary" type="button">Forget saved details on this device</button>
+        <p id="repeat-profile-status" class="hint" role="status" aria-live="polite"></p>
       </div>
-      <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
-      <div id="reference-image-actions" class="actions" hidden>
-        <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
-        <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
-        <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
-      </div>
-    </fieldset>
+
+      <fieldset>
+        <legend>Optional reference image</legend>
+        <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+        <div id="reference-image-preview-wrap" hidden>
+          <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
+        </div>
+        <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
+        <div id="reference-image-actions" class="actions" hidden>
+          <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
+          <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
+          <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
+        </div>
+      </fieldset>
+    </details>
 
     <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
+    <input id="bundle-source-ids" name="bundleSourceIds" type="hidden">
     <input id="captcha-token" name="captchaToken" type="hidden">
     <p id="form-status" class="status" role="status" aria-live="polite"></p>
     <div class="actions">
@@ -153,7 +166,7 @@
     <p class="privacy-summary">Your information is used only to handle your request. <a href="#privacy-details">Privacy details</a></p>
     <details class="privacy-details" id="privacy-details">
       <summary>Privacy details</summary>
-      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. If you choose to remember them, your name, phone, and delivery details stay only in this browser for up to 30 days and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:8209238541">8209238541</a>.</p>
+      <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. If you choose to remember them, your name, phone, and delivery details stay only in this browser for up to 30 days and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
     </details>
   </form>
 </main>
@@ -187,6 +200,8 @@
   var referralInput = form.elements.referralCode || document.getElementById("referral-code");
   var referralStatus = document.getElementById("referral-status");
   var checkReferral = document.getElementById("check-referral");
+  var moreDetails = document.getElementById("more-details");
+  var moreDetailsSummary = moreDetails && moreDetails.querySelector ? moreDetails.querySelector("summary") : null;
   var rememberRepeatProfile = document.getElementById("remember-repeat-profile");
   var forgetRepeatProfileButton = document.getElementById("forget-repeat-profile");
   var repeatProfileStatus = document.getElementById("repeat-profile-status");
@@ -253,11 +268,18 @@
     return Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 1;
   }
   function bundleTotal(items) { return items.reduce(function (total, item) { return total + bundleQuantity(item); }, 0); }
-  function bundleProductName(items) { return items.map(function (item) { return item.productName; }).join(", "); }
+  function sortedBundleItems(items) { return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); }); }
+  function bundleProductName(items) {
+    var sorted = sortedBundleItems(items);
+    return sorted[0].productName + (sorted.length > 1 ? " + " + (sorted.length - 1) + " more" : "");
+  }
   function bundleDetails(items) {
-    return items.slice().sort(function (left, right) { return left.sourceId.localeCompare(right.sourceId); }).map(function (item, index) {
-      return "Item " + (index + 1) + ": " + item.productName + " | Source: " + item.sourceId + " | Price: " + (item.price || "not shown") + " | Size: " + (item.size || "not shown") + " | Quantity: " + bundleQuantity(item);
+    return sortedBundleItems(items).map(function (item) {
+      return [item.productName, item.size, item.price, "Qty " + bundleQuantity(item)].filter(Boolean).join(" \u00b7 ");
     }).join("\n");
+  }
+  function bundleSourceIds(items) {
+    return sortedBundleItems(items).map(function (item) { return item.sourceId + " x" + bundleQuantity(item); }).join(", ");
   }
   function normalizeBundleItems(items) {
     if (!Array.isArray(items) || !items.length || items.length > 100) return [];
@@ -290,6 +312,7 @@
     if (!isBundle() || !bundleItems.length) return;
     form.elements.productName.value = bundleProductName(bundleItems);
     form.elements.quantity.value = String(bundleTotal(bundleItems));
+    form.elements.bundleSourceIds.value = bundleSourceIds(bundleItems);
     if (includeDetails) {
       var notes = String(bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
       syncingBundleFields = true;
@@ -349,9 +372,13 @@
       bundleItemsElement.appendChild(line);
     });
   }
+  function revealField(input) {
+    if (moreDetails && input && moreDetails.contains && moreDetails.contains(input) && !moreDetails.open) moreDetails.open = true;
+  }
   function setError(field, message) {
     var input = form.elements[field];
     if (!input) return;
+    revealField(input);
     input.setAttribute("aria-invalid", "true");
     var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
     if (describedBy.indexOf(field + "-error") === -1) describedBy.push(field + "-error");
@@ -438,6 +465,8 @@
     fields.forEach(function (field) { if (form.elements[field]) form.elements[field].value = next[field] == null ? "" : next[field]; });
     bundleItems = normalizeBundleItems(next.bundleItems);
     bundleNotes = "";
+    form.elements.bundleSourceIds.value = "";
+    if (moreDetails && (next.email || next.requestedDate || next.referralCode || isCustomizerOrderRequest())) moreDetails.open = true;
     if (isBundle() && bundleItems.length) form.elements.designDetails.value = "";
     toggleShipping();
     updateDimensionMaxes();
@@ -743,7 +772,7 @@
   }
   function focusFirstError(errors) {
     var first = errors && Object.keys(errors).filter(function (field) { return field !== "form" && field !== "captcha"; })[0];
-    if (first && form.elements[first] && form.elements[first].focus) { form.elements[first].focus(); return; }
+    if (first && form.elements[first] && form.elements[first].focus) { revealField(form.elements[first]); form.elements[first].focus(); return; }
     if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
   }
   function showFailure(message, errors, attempt) {
@@ -761,6 +790,9 @@
     previewExpected = false;
     previewResolved = true;
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
+    // Keep the repeat-profile controls reachable: hide only the summary and leave the disclosure open.
+    if (moreDetails) moreDetails.open = true;
+    if (moreDetailsSummary) moreDetailsSummary.hidden = true;
     anotherButton.hidden = false;
     var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
     if (rememberRepeatProfile && rememberRepeatProfile.checked && window.top && window.top !== window && seed.channelNonce) {
@@ -774,6 +806,30 @@
     var parts = text.split("-").map(Number);
     var date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
     return date.getUTCFullYear() === parts[0] && date.getUTCMonth() === parts[1] - 1 && date.getUTCDate() === parts[2];
+  }
+  function istToday() { return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10); }
+  function fieldError(name) {
+    var text = value(name);
+    if (name === "phone") return text.length <= 40 && /^(?:\+91|91|0)?[6-9]\d{9}$/.test(text.replace(/[\s\-()]/g, "")) ? "" : "Enter a 10-digit mobile number, e.g. 98765 43210.";
+    if (name === "customerName") return text.replace(/[\s0-9.,'’"\-_()\/&@#!?:;]/g, "").length >= 2 ? "" : "Enter your name (at least 2 letters).";
+    if (name === "pin") return value("fulfillment") !== "shipping" && !isQuoteRequest() || /^[1-9]\d{5}$/.test(text) ? "" : "Enter a valid 6-digit PIN code.";
+    if (name === "shippingAddress") return value("fulfillment") !== "shipping" || isQuoteRequest() || text.trim().length >= 10 ? "" : "Enter the full shipping address.";
+    if (name === "requestedDate") return !text ? "" : !validIsoDate(text) ? "Use a valid requested date." : text < istToday() ? "Choose today or a later date." : "";
+    return "";
+  }
+  var inlineFields = ["customerName", "phone", "shippingAddress", "pin", "requestedDate"];
+  function clearError(field) {
+    var input = form.elements[field];
+    if (!input) return;
+    input.removeAttribute("aria-invalid");
+    var describedBy = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== field + "-error"; });
+    if (describedBy.length) input.setAttribute("aria-describedby", describedBy.join(" ")); else input.removeAttribute("aria-describedby");
+    var error = document.getElementById(field + "-error");
+    if (error && error.remove) error.remove();
+  }
+  function validateField(field) {
+    var message = fieldError(field);
+    if (message) setError(field, message); else clearError(field);
   }
   function clientValidationErrors() {
     var errors = {};
@@ -797,23 +853,17 @@
       dimension("width", "Width");
     }
     required("designDetails", "This field is required.");
-    required("customerName", "This field is required.");
-    if (!value("phone") || (value("phone").match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number.";
+    inlineFields.forEach(function (name) { var message = fieldError(name); if (message) errors[name] = message; });
     if (value("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("email"))) errors.email = "Enter a valid email address or leave it blank.";
     var fulfillment = value("fulfillment");
     if (["shipping", "pickup"].indexOf(fulfillment) === -1) errors.fulfillment = "Choose shipping or pickup.";
     var quoteRequest = isQuoteRequest();
     if (fulfillment === "shipping") {
       if (!quoteRequest) {
-        required("shippingAddress", "Shipping address is required.");
         required("city", "City is required.");
         required("state", "State is required.");
       }
     }
-    if (fulfillment === "shipping" || quoteRequest) {
-      if (!/^\d{6}$/.test(value("pin"))) errors.pin = quoteRequest ? "Enter a 6-digit PIN for this quote request." : "Enter a 6-digit PIN for shipping.";
-    }
-    if (value("requestedDate") && !validIsoDate(value("requestedDate"))) errors.requestedDate = "Use a valid requested date.";
     var file = referenceImage.files && referenceImage.files[0];
     if (file && file.size !== 0) {
       var fileName = String(file.name || "").toLowerCase();
@@ -823,7 +873,17 @@
     }
     return errors;
   }
-  form.addEventListener("change", function () { toggleShipping(); updateDimensionMaxes(); });
+  form.addEventListener("change", function () {
+    toggleShipping(); updateDimensionMaxes();
+    inlineFields.forEach(function (name) { if (form.elements[name] && form.elements[name].getAttribute("aria-invalid") === "true") validateField(name); });
+  });
+  inlineFields.forEach(function (name) {
+    var input = form.elements[name];
+    if (!input) return;
+    input.addEventListener("blur", function () { validateField(name); });
+    input.addEventListener("input", function () { if (input.getAttribute("aria-invalid") === "true") validateField(name); });
+  });
+  if (form.elements.requestedDate) form.elements.requestedDate.setAttribute("min", istToday());
   if (form.elements.designDetails) form.elements.designDetails.addEventListener("input", function () {
     if (isBundle() && !syncingBundleFields) bundleNotes = bundleNotesFromField(value("designDetails"));
   });
@@ -892,6 +952,8 @@
     form.reset();
     form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
     anotherButton.hidden = true; clearErrors(); setStatus("", "");
+    if (moreDetails) moreDetails.open = false;
+    if (moreDetailsSummary) moreDetailsSummary.hidden = false;
     applySeed(seed);
     form.elements.requestId.value = newRequestId();
     clearReferralStatus();

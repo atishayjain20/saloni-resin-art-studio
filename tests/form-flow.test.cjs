@@ -124,14 +124,16 @@ test("bundle form renders every selected item and rebuilds authoritative quantit
   respondToken(runtime, 0);
   await Promise.resolve();
   assert.equal(runtime.fields.quantity.value, "9");
-  assert.equal(runtime.fields.productName.value, "One, Two, Three, Four");
-  assert.match(runtime.fields.designDetails.value, /One.*Quantity: 2/);
-  assert.match(runtime.fields.designDetails.value, /Two.*Quantity: 5/);
-  assert.match(runtime.fields.designDetails.value, /Three.*Quantity: 1/);
-  assert.match(runtime.fields.designDetails.value, /Four.*Quantity: 1/);
+  assert.equal(runtime.fields.productName.value, "Four + 3 more");
+  assert.match(runtime.fields.designDetails.value, /One .*4 in .*₹?249.* Qty 2/);
+  assert.match(runtime.fields.designDetails.value, /Two .*Qty 5/);
+  assert.match(runtime.fields.designDetails.value, /Three .*Qty 1/);
+  assert.match(runtime.fields.designDetails.value, /Four .*Qty 1/);
+  assert.doesNotMatch(runtime.fields.designDetails.value, /Source:|catalogue:|Quantity:/);
+  assert.equal(runtime.fields.bundleSourceIds.value, "catalogue:four.webp x1, catalogue:one.webp x2, catalogue:three.webp x1, catalogue:two.webp x5");
 });
 
-test("bundle Product name visibly lists every selected product", () => {
+test("bundle Product name shows the first product and a count of the rest", () => {
   assert.match(html, /name="productName" maxlength="2000"/);
   const runtime = makeFormRuntime({
     sourceId: "catalogue:multi-item",
@@ -141,7 +143,8 @@ test("bundle Product name visibly lists every selected product", () => {
       { sourceId: "catalogue:three.webp", productName: "Three", price: "499", size: "8 in", quantity: 1 },
     ],
   });
-  assert.equal(runtime.fields.productName.value, "One, Two, Three");
+  assert.equal(runtime.fields.productName.value, "One + 2 more");
+  assert.equal(runtime.fields.bundleSourceIds.value, "catalogue:one.webp x1, catalogue:three.webp x1, catalogue:two.webp x1");
 });
 
 test("bundle quantity changes rebuild details without stale quantities before shared notes", () => {
@@ -154,8 +157,8 @@ test("bundle quantity changes rebuild details without stale quantities before sh
   });
   const notes = "Please use warm colours";
   runtime.fields.designDetails.value = [
-    "Item 1: One | Source: catalogue:one.webp | Price: 249 | Size: 4 in | Quantity: 2",
-    "Item 2: Two | Source: catalogue:two.webp | Price: 399 | Size: 6 in | Quantity: 1",
+    "One \u00b7 4 in \u00b7 249 \u00b7 Qty 2",
+    "Two \u00b7 6 in \u00b7 399 \u00b7 Qty 1",
     "Order notes: " + notes,
   ].join("\n");
   runtime.fields.designDetails.dispatch("input");
@@ -165,10 +168,11 @@ test("bundle quantity changes rebuild details without stale quantities before sh
   firstQuantity.dispatch("change");
 
   assert.equal(runtime.fields.designDetails.value, [
-    "Item 1: One | Source: catalogue:one.webp | Price: 249 | Size: 4 in | Quantity: 3",
-    "Item 2: Two | Source: catalogue:two.webp | Price: 399 | Size: 6 in | Quantity: 1",
+    "One \u00b7 4 in \u00b7 249 \u00b7 Qty 3",
+    "Two \u00b7 6 in \u00b7 399 \u00b7 Qty 1",
     "Order notes: " + notes,
   ].join("\n"));
+  assert.equal(runtime.fields.bundleSourceIds.value, "catalogue:one.webp x3, catalogue:two.webp x1");
 });
 
 test("bundle form keeps shared contact and delivery controls singular and scopes scrolling to selected designs", () => {
@@ -177,6 +181,207 @@ test("bundle form keeps shared contact and delivery controls singular and scopes
   assert.equal((html.match(/name="shippingAddress"/g) || []).length, 1);
   assert.match(html, /id="bundle-items"[^>]*class="bundle-items"/);
   assert.match(html, /\.bundle-items\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto/s);
+});
+
+test("bundle details omit missing size and price parts and never show internal source ids", () => {
+  const runtime = makeFormRuntime({
+    sourceId: "catalogue:multi-item",
+    bundleItems: [{ sourceId: "catalogue:solo.webp", productName: "Solo", price: "", size: "", quantity: 1 }],
+  });
+  assert.equal(runtime.fields.productName.value, "Solo");
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  assert.equal(runtime.fields.designDetails.value, "Solo \u00b7 Qty 1");
+  assert.equal(runtime.fields.bundleSourceIds.value, "catalogue:solo.webp x1");
+});
+
+test("non-bundle requests never send bundleSourceIds", () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
+  assert.equal(runtime.fields.bundleSourceIds.value, "");
+});
+
+test("after a successful send the More details summary is hidden, the disclosure stays open, and Start another restores it", async () => {
+  const runtime = makeFormRuntime();
+  const details = runtime.elements.get("more-details");
+  assert.equal(details.summary.hidden, false);
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
+  runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(details.summary.hidden, true);
+  assert.equal(details.open, true);
+  assert.equal(runtime.elements.get("forget-repeat-profile").hidden, false);
+  runtime.elements.get("another-button").dispatch("click");
+  assert.equal(details.summary.hidden, false);
+  assert.equal(details.open, false);
+});
+
+test("keeps only the required fields visible and groups optional fields in a closed More details disclosure", () => {
+  const more = html.match(/<details class="more-details" id="more-details">[\s\S]*?<\/details>\s*(?=<input id="dimension-format")/)?.[0] || "";
+  assert.match(more, /<summary>More details \(optional\)<\/summary>/);
+  assert.doesNotMatch(more.split("\n")[0], /\bopen\b/);
+  ["email", "requested-date", "referral-code", "remember-repeat-profile", "forget-repeat-profile", "reference-image"].forEach((id) => assert.match(more, new RegExp(`id="${id}"`)));
+  ["customer-name", "phone", "fulfillment", "shipping-address", "pin"].forEach((id) => assert.doesNotMatch(more, new RegExp(`id="${id}"`)));
+  assert.match(html, /\.more-details > summary \{[^}]*min-height: 44px/);
+  const details = html.match(/<legend>Your details<\/legend>[\s\S]*?<\/fieldset>/)[0];
+  ["customer-name", "phone", "fulfillment", "shipping-address", "pin"].forEach((id) => assert.match(details, new RegExp(`id="${id}"`)));
+  ["email", "requested-date", "referral-code"].forEach((id) => assert.doesNotMatch(details, new RegExp(`id="${id}"`)));
+  assert.match(html, /<input id="bundle-source-ids" name="bundleSourceIds" type="hidden">/);
+});
+
+test("More details opens for a field error and starts open only for seeded optional values or customizer previews", async () => {
+  const plain = makeFormRuntime();
+  assert.equal(plain.elements.get("more-details").open, false);
+  const emailError = makeFormRuntime();
+  fillValid(emailError.fields);
+  emailError.fields.email.value = "not-an-email";
+  emailError.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  assert.equal(emailError.elements.get("more-details").open, true);
+  assert.equal(emailError.fields.email.focused, true);
+  const serverError = makeFormRuntime();
+  fillValid(serverError.fields);
+  serverError.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(serverError, 0);
+  await Promise.resolve();
+  assert.equal(serverError.elements.get("more-details").open, false);
+  serverError.callbacks[0].success({ ok: false, errors: { referralCode: "Enter a valid referral code or clear this field." } });
+  assert.equal(serverError.elements.get("more-details").open, true);
+  assert.equal(serverError.fields.referralCode.focused, true);
+  for (const seedOverrides of [{ email: "a@b.co" }, { requestedDate: "2026-12-01" }, { referralCode: "ABC123" }]) {
+    assert.equal(makeFormRuntime({ seedOverrides }).elements.get("more-details").open, true);
+  }
+  const customizer = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
+  assert.equal(customizer.elements.get("more-details").open, true);
+});
+
+const serverSource = fs.readFileSync(path.join(__dirname, "..", "apps-script", "Code.gs"), "utf8");
+const serverContext = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Utilities: { getUuid: () => "00000000-0000-4000-8000-000000000000" } };
+vm.createContext(serverContext);
+vm.runInContext(serverSource, serverContext, { filename: "Code.gs" });
+const MESSAGES = {
+  phone: "Enter a 10-digit mobile number, e.g. 98765 43210.",
+  customerName: "Enter your name (at least 2 letters).",
+  pin: "Enter a valid 6-digit PIN code.",
+  requestedDate: "Choose today or a later date.",
+  shippingAddress: "Enter the full shipping address.",
+};
+function istDate(offsetDays) {
+  return new Date(Date.now() + 5.5 * 3600 * 1000 + offsetDays * 86400000).toISOString().slice(0, 10);
+}
+function errorText(runtime, field) {
+  const error = runtime.errors.find((entry) => entry.id === field + "-error");
+  return error ? error.textContent : "";
+}
+function shippingRuntime() {
+  const runtime = makeFormRuntime({ requestStage: "", sourceKind: "general", sourceId: "general:custom" });
+  runtime.fields.fulfillment.value = "shipping";
+  runtime.fields.fulfillment.dispatch("change");
+  runtime.elements.get("order-form").dispatch("change");
+  return runtime;
+}
+
+test("client and server use identical messages for the contact validation rules", () => {
+  Object.values(MESSAGES).forEach((message) => {
+    assert.ok(html.includes(JSON.stringify(message)), "Form.html is missing: " + message);
+    assert.ok(serverSource.includes(JSON.stringify(message)), "Code.gs is missing: " + message);
+  });
+});
+
+test("client and server accept and reject the same phones, names, and PINs", () => {
+  const phones = ["8209238541", "98765 43210", "+91 8209238541", "+91-98765-43210", "918209238541", "08209238541", "(+91) 98765 43210", "1234567", "5876543210", "98765", "+1 8209238541", "", "98765432101"];
+  const names = ["A Customer", "Al", "Saloni", "राम", "ગીતા", "முருகன்", "প্রিয়া", "ਹਰਪ੍ਰੀਤ", "Mary-Jane O'Neil", "Åsa", "राधा शर्मा", "A", "12", "", " ", "  ", "--", "A1"];
+  const pins = ["305001", "012345", "30500", "3050011", "", "30500a"];
+  const check = (field, values, serverValid) => values.forEach((fieldValue) => {
+    const runtime = makeFormRuntime();
+    runtime.fields[field].value = fieldValue;
+    runtime.fields[field].dispatch("blur");
+    const clientRejects = runtime.fields[field].getAttribute("aria-invalid") === "true";
+    assert.equal(clientRejects, !serverValid(fieldValue), field + " " + JSON.stringify(fieldValue));
+  });
+  check("phone", phones, (value) => serverContext.validIndianMobile_(value));
+  check("customerName", names, (value) => serverContext.validCustomerName_(value));
+  const shipping = (pin) => { const runtime = shippingRuntime(); runtime.fields.pin.value = pin; runtime.fields.pin.dispatch("blur"); return runtime.fields.pin.getAttribute("aria-invalid") === "true"; };
+  pins.forEach((pin) => assert.equal(shipping(pin), !serverContext.validPin_(pin), "pin " + JSON.stringify(pin)));
+});
+
+test("blur validates a field with the shared rule, input revalidates only after an error, and fixing clears it", () => {
+  const runtime = makeFormRuntime();
+  const phone = runtime.fields.phone;
+  phone.value = "12345";
+  phone.dispatch("input");
+  assert.equal(phone.getAttribute("aria-invalid"), "");
+  phone.dispatch("blur");
+  assert.equal(phone.getAttribute("aria-invalid"), "true");
+  assert.match(phone.getAttribute("aria-describedby"), /phone-error/);
+  assert.equal(errorText(runtime, "phone"), MESSAGES.phone);
+  phone.value = "98765 43210";
+  phone.dispatch("input");
+  assert.equal(phone.getAttribute("aria-invalid"), "");
+  assert.equal(phone.getAttribute("aria-describedby"), "");
+  assert.equal(errorText(runtime, "phone"), "");
+  phone.value = "1";
+  phone.dispatch("input");
+  assert.equal(phone.getAttribute("aria-invalid"), "");
+  phone.dispatch("blur");
+  assert.equal(phone.getAttribute("aria-invalid"), "true");
+  phone.value = "12";
+  phone.dispatch("input");
+  assert.equal(errorText(runtime, "phone"), MESSAGES.phone);
+  assert.equal(runtime.errors.filter((entry) => entry.id === "phone-error").length, 1);
+  const name = runtime.fields.customerName;
+  name.value = "A"; name.dispatch("blur");
+  assert.equal(errorText(runtime, "customerName"), MESSAGES.customerName);
+  name.value = "Asha"; name.dispatch("blur");
+  assert.equal(name.getAttribute("aria-invalid"), "");
+});
+
+test("shipping address and PIN validate inline only when they apply and use the shared messages", () => {
+  const pickup = makeFormRuntime({ requestStage: "", sourceKind: "general", sourceId: "general:custom" });
+  pickup.fields.pin.value = "12"; pickup.fields.pin.dispatch("blur");
+  pickup.fields.shippingAddress.value = "x"; pickup.fields.shippingAddress.dispatch("blur");
+  assert.equal(pickup.fields.pin.getAttribute("aria-invalid"), "");
+  assert.equal(pickup.fields.shippingAddress.getAttribute("aria-invalid"), "");
+  const runtime = shippingRuntime();
+  runtime.fields.shippingAddress.value = "Ajmer"; runtime.fields.shippingAddress.dispatch("blur");
+  runtime.fields.pin.value = "012345"; runtime.fields.pin.dispatch("blur");
+  assert.equal(errorText(runtime, "shippingAddress"), MESSAGES.shippingAddress);
+  assert.equal(errorText(runtime, "pin"), MESSAGES.pin);
+  runtime.fields.shippingAddress.value = "12 Hathi Bhata Road"; runtime.fields.shippingAddress.dispatch("input");
+  runtime.fields.pin.value = "305001"; runtime.fields.pin.dispatch("input");
+  assert.equal(runtime.fields.shippingAddress.getAttribute("aria-invalid"), "");
+  assert.equal(runtime.fields.pin.getAttribute("aria-invalid"), "");
+  const quote = makeFormRuntime();
+  quote.fields.pin.value = "012345"; quote.fields.pin.dispatch("blur");
+  assert.equal(errorText(quote, "pin"), MESSAGES.pin);
+});
+
+test("requested date gets today as its minimum and rejects earlier dates inline", () => {
+  const runtime = makeFormRuntime();
+  assert.equal(runtime.fields.requestedDate.getAttribute("min"), istDate(0));
+  runtime.fields.requestedDate.value = istDate(-1); runtime.fields.requestedDate.dispatch("blur");
+  assert.equal(errorText(runtime, "requestedDate"), MESSAGES.requestedDate);
+  runtime.fields.requestedDate.value = istDate(0); runtime.fields.requestedDate.dispatch("input");
+  assert.equal(runtime.fields.requestedDate.getAttribute("aria-invalid"), "");
+  runtime.fields.requestedDate.value = ""; runtime.fields.requestedDate.dispatch("blur");
+  assert.equal(runtime.fields.requestedDate.getAttribute("aria-invalid"), "");
+  assert.match(html, /id="pin"[^>]*pattern="\[1-9\]\[0-9\]\{5\}"/);
+});
+
+test("an invalid optional date opens More details and the submit reports every contact error at once", () => {
+  const runtime = shippingRuntime();
+  fillValid(runtime.fields);
+  runtime.fields.fulfillment.value = "shipping";
+  Object.assign(runtime.fields.phone, { value: "123" });
+  Object.assign(runtime.fields.customerName, { value: "A" });
+  Object.assign(runtime.fields.shippingAddress, { value: "short" });
+  Object.assign(runtime.fields.pin, { value: "012345" });
+  Object.assign(runtime.fields.requestedDate, { value: istDate(-3) });
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  ["phone", "customerName", "shippingAddress", "pin", "requestedDate"].forEach((field) => assert.equal(errorText(runtime, field), MESSAGES[field], field));
+  assert.equal(runtime.elements.get("more-details").open, true);
+  assert.equal(runtime.callbacks.length, 0);
 });
 
 test("descriptive catalogue filenames are allowlisted while lookalikes stay hidden", () => {
@@ -351,7 +556,7 @@ class FakeMessageChannel {
 }
 
 function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "bundle-items", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data"];
+  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-product-copy", "bundle-items", "product-name", "quantity", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
@@ -361,12 +566,17 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
     quantity: elements.get("quantity"), heightFeet: elements.get("height-feet"), heightInchesPart: elements.get("height-inches-part"), widthFeet: elements.get("width-feet"), widthInchesPart: elements.get("width-inches-part"),
     designDetails: elements.get("design-details"), customerName: elements.get("customer-name"), phone: elements.get("phone"), email: elements.get("email"), fulfillment: elements.get("fulfillment"),
     shippingAddress: elements.get("shipping-address"), city: elements.get("city"), state: elements.get("state"), pin: elements.get("pin"), requestedDate: elements.get("requested-date"),
-    referenceImage: elements.get("reference-image"), captchaToken: elements.get("captcha-token"), referralCode: elements.get("referral-code"),
+    referenceImage: elements.get("reference-image"), captchaToken: elements.get("captcha-token"), referralCode: elements.get("referral-code"), bundleSourceIds: elements.get("bundle-source-ids"),
   };
+  const moreDetails = elements.get("more-details");
+  moreDetails.open = false;
+  moreDetails.summary = new FakeElement("more-details-summary");
+  moreDetails.querySelector = (selector) => (selector === "summary" ? moreDetails.summary : null);
+  moreDetails.contains = (element) => ["email", "requested-date", "referral-code", "reference-image"].includes(element && element.id);
   form.elements = fields;
   form.querySelectorAll = (selector) => {
     if (selector === "[aria-invalid]") return Object.values(fields).filter((field) => field.getAttribute("aria-invalid"));
-    if (selector === ".field-error") return errors;
+    if (selector === ".field-error") return errors.slice();
     if (selector === "fieldset, #submit-button, #captcha-token") return [elements.get("submit-button"), elements.get("captcha-token")];
     return [];
   };
@@ -415,8 +625,12 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
   windowObject.google = { script: { run } };
   windowObject.top = windowObject.parent;
   const documentObject = {
-    getElementById(id) { return elements.get(id) || null; },
-    createElement(tag) { const element = new FakeElement(tag); element.className = ""; return element; },
+    getElementById(id) { return elements.get(id) || errors.find((error) => error.id === id) || null; },
+    createElement(tag) {
+      const element = new FakeElement(tag); element.className = "";
+      element.remove = () => { const index = errors.indexOf(element); if (index >= 0) errors.splice(index, 1); };
+      return element;
+    },
   };
   const context = {
     console, document: documentObject, window: windowObject, MessageChannel: FakeMessageChannel,
@@ -427,7 +641,7 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
   vm.createContext(context);
   vm.runInContext(captchaSiteKey ? formSource : formSourceWithoutCaptchaSiteKey, context, { filename: "Form.html" });
   elements.get("submit-button").dispatch("click");
-  return { elements, fields, status, timers, timerDelays, clearedTimers, submissions, callbacks, lookupCallbacks, parentMessages, windowObject, objectUrls, pageListeners };
+  return { elements, fields, errors, status, timers, timerDelays, clearedTimers, submissions, callbacks, lookupCallbacks, parentMessages, windowObject, objectUrls, pageListeners };
 }
 
 function fillValid(fields) {

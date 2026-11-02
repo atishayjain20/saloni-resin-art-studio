@@ -1235,9 +1235,16 @@ function collectPayload_(form) {
     pin: fulfillment.toLowerCase() === "shipping" || form.requestStage === "quote" ? stringValue_(form.pin) : "",
     requestedDate: stringValue_(form.requestedDate),
     referralCode: normalizeReferralCode_(form.referralCode),
+    bundleSourceIds: stringValue_(form.bundleSourceIds),
     captchaToken: stringValue_(form.captchaToken),
     referenceImage: normalizeReferenceImage_(form.referenceImage)
   };
+}
+
+function validBundleSourceIds_(payload) {
+  var value = payload.bundleSourceIds;
+  if (value.length > 4000 || payload.sourceId !== "catalogue:multi-item") return false;
+  return value.split(", ").every(function (token) { return /^[A-Za-z0-9_.:\/-]+ x\d{1,3}$/.test(token); });
 }
 
 function normalizeReferenceImage_(blob) {
@@ -1274,22 +1281,26 @@ function validatePayload_(payload) {
 
   bounded_(errors, "designDetails", payload.designDetails, 2000, true);
   bounded_(errors, "customerName", payload.customerName, 120, true);
-  if (!payload.phone || payload.phone.length > 40 || (payload.phone.match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone number.";
+  if (errors.customerName !== "This field is too long." && !validCustomerName_(payload.customerName)) errors.customerName = "Enter your name (at least 2 letters).";
+  if (!validIndianMobile_(payload.phone)) errors.phone = "Enter a 10-digit mobile number, e.g. 98765 43210.";
   if (payload.email && (payload.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))) errors.email = "Enter a valid email address or leave it blank.";
   if (["shipping", "pickup"].indexOf(payload.fulfillment.toLowerCase()) === -1) errors.fulfillment = "Choose shipping or pickup.";
   if (payload.fulfillment.toLowerCase() === "shipping") {
     bounded_(errors, "shippingAddress", payload.shippingAddress, 300, !quoteRequest && !customizerQuoteRequest);
+    if (!quoteRequest && !customizerQuoteRequest && errors.shippingAddress !== "This field is too long." && payload.shippingAddress.trim().length < 10) errors.shippingAddress = "Enter the full shipping address.";
     bounded_(errors, "city", payload.city, 100, !quoteRequest && !customizerQuoteRequest);
     bounded_(errors, "state", payload.state, 100, !quoteRequest && !customizerQuoteRequest);
-    if (!/^\d{6}$/.test(payload.pin)) errors.pin = "Enter a 6-digit PIN for shipping.";
+    if (!validPin_(payload.pin)) errors.pin = "Enter a valid 6-digit PIN code.";
   } else {
     ["shippingAddress", "city", "state", "pin"].forEach(function (field) {
       if (payload[field].length > 300) errors[field] = "This field is too long.";
     });
-    if ((quoteRequest || customizerQuoteRequest) && !/^\d{6}$/.test(payload.pin)) errors.pin = "Enter a 6-digit PIN for shipping.";
+    if ((quoteRequest || customizerQuoteRequest) && !validPin_(payload.pin)) errors.pin = "Enter a valid 6-digit PIN code.";
   }
   if (payload.requestedDate && !isIsoDate_(payload.requestedDate)) errors.requestedDate = "Use a valid requested date.";
+  else if (payload.requestedDate && payload.requestedDate < todayIst_()) errors.requestedDate = "Choose today or a later date.";
   if (payload.referralCode && !PARTNER_CODE_PATTERN.test(payload.referralCode)) errors.referralCode = "Enter a valid referral code or clear this field.";
+  if (payload.bundleSourceIds && !validBundleSourceIds_(payload)) errors.bundleSourceIds = "The selected products could not be verified. Please reload and try again.";
 
   var fileError = validateReferenceImage_(payload.referenceImage);
   if (fileError) errors.referenceImage = fileError;
@@ -1357,6 +1368,22 @@ function canonicalDimension_(inches) {
   var remainder = Math.round((rounded - feet * 12) * 1000000) / 1000000;
   var remainderText = String(remainder).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
   return feet + " ft " + (remainderText || "0") + " in";
+}
+
+function validIndianMobile_(phone) {
+  return phone.length <= 40 && /^(?:\+91|91|0)?[6-9]\d{9}$/.test(phone.replace(/[\s\-()]/g, ""));
+}
+
+function validCustomerName_(name) {
+  return name.replace(/[\s0-9.,'’"\-_()\/&@#!?:;]/g, "").length >= 2;
+}
+
+function validPin_(pin) {
+  return /^[1-9]\d{5}$/.test(pin);
+}
+
+function todayIst_() {
+  return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function isIsoDate_(value) {
@@ -1601,7 +1628,7 @@ function rowForPayload_(payload, fingerprint, receivedAt, referenceFile, attribu
   var validation = validatePayload_(payload);
   var row = [
     neutralizeForSheet_(payload.requestId), neutralizeForSheet_(fingerprint), receivedAt,
-    neutralizeForSheet_(payload.sourceKind), neutralizeForSheet_(payload.sourceId), neutralizeForSheet_(payload.productName),
+    neutralizeForSheet_(payload.sourceKind), neutralizeForSheet_(payload.bundleSourceIds ? payload.sourceId + " | " + payload.bundleSourceIds : payload.sourceId), neutralizeForSheet_(payload.productName),
     Number(payload.quantity), neutralizeForSheet_(validation.heightExpression), neutralizeForSheet_(validation.heightUnit), validation.heightInches,
     neutralizeForSheet_(validation.widthExpression), neutralizeForSheet_(validation.widthUnit), validation.widthInches,
     neutralizeForSheet_(payload.designDetails),
@@ -1652,6 +1679,7 @@ function payloadFingerprint_(payload) {
     canonical.widthInchesPart = payload.widthInchesPart;
   }
   if (payload.referralCode) canonical.referralCode = payload.referralCode;
+  if (payload.bundleSourceIds) canonical.bundleSourceIds = payload.bundleSourceIds;
   if (payload.requestStage === "quote") canonical.requestStage = payload.requestStage;
   return digestHex_(JSON.stringify(canonical));
 }
