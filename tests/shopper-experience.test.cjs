@@ -1349,3 +1349,16 @@ test("studio edit section is removed before the order conversation", () => {
   assert.doesNotMatch(html, /The studio edit|A little more personal than a gift|Custom resin frames &amp; art|Explore resin photo frames|Join the Partner Circle/);
   assert.match(html, /<section class="order-section shell" id="order"/);
 });
+
+test("WhatsApp order buttons use WhatsApp green and show the WhatsApp logo", () => {
+  ["catalogue-selection-whatsapp", "catalogue-cart-whatsapp"].forEach((id) => {
+    const link = html.match(new RegExp(`<a[^>]+id="${id}"[\\s\\S]*?<\\/a>`));
+    assert.ok(link, `expected #${id}`);
+    assert.match(link[0], /class="[^"]*\bbutton-whatsapp\b/);
+    assert.match(link[0], /<svg[^>]+class="whatsapp-icon"[^>]+aria-hidden="true"/);
+    assert.match(link[0].replace(/<[^>]+>/g, ""), /Order on WhatsApp/);
+  });
+  assert.match(css, /\.button-whatsapp\s*\{[^}]*background:\s*#25d366/i);
+  assert.match(html, /id="catalogue-cart-whatsapp"[^>]+aria-label="Order on WhatsApp"/);
+  assert.doesNotMatch(css, /\.catalogue-cart-whatsapp\s*\{[^}]*background:\s*var\(--ivory\)/);
+});

@@ -834,8 +834,12 @@ test("every tel link on the site dials the full +91 number", () => {
 });
 
 test("Order on WhatsApp links open wa.me with the cart as an encoded message and follow changes", () => {
-  assert.match(page, /<a[^>]*id="catalogue-cart-whatsapp"[^>]*href="https:\/\/wa\.me\/918209238541"[^>]*target="_blank"[^>]*rel="noopener"[^>]*>Order on WhatsApp<\/a>/);
-  assert.match(page, /<a[^>]*id="catalogue-selection-whatsapp"[^>]*href="https:\/\/wa\.me\/918209238541"[^>]*target="_blank"[^>]*rel="noopener"[^>]*>Order on WhatsApp<\/a>/);
+  const cartLink = page.match(/<a[^>]*id="catalogue-cart-whatsapp"[^>]*href="https:\/\/wa\.me\/918209238541"[^>]*target="_blank"[^>]*rel="noopener"[^>]*>[\s\S]*?<\/a>/);
+  assert.ok(cartLink);
+  assert.equal(cartLink[0].replace(/<[^>]+>/g, "").trim(), "Order on WhatsApp");
+  const selectionLink = page.match(/<a[^>]*id="catalogue-selection-whatsapp"[^>]*href="https:\/\/wa\.me\/918209238541"[^>]*target="_blank"[^>]*rel="noopener"[^>]*>[\s\S]*?<\/a>/);
+  assert.ok(selectionLink);
+  assert.equal(selectionLink[0].replace(/<[^>]+>/g, "").trim(), "Order on WhatsApp");
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
   flow.generatedCatalogueButtons[2].dispatch("click");
