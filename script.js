@@ -133,10 +133,18 @@
     var lightboxSize = document.getElementById("lightbox-product-size");
     var lightboxDescription = document.getElementById("lightbox-image-description");
     var lightboxRequest = document.getElementById("lightbox-request");
+    var lightboxStage = document.getElementById("lightbox-stage");
+    var photoPrev = document.getElementById("lightbox-photo-prev");
+    var photoNext = document.getElementById("lightbox-photo-next");
+    var photoLabel = document.getElementById("lightbox-photo-label");
+    var lightboxIncluded = document.getElementById("lightbox-included");
     var lightboxTriggers = document.querySelectorAll("[data-lightbox-trigger]");
     var lastTrigger = null;
     var lightboxItems = [];
     var lightboxIndex = 0;
+    var lightboxPhotos = [];
+    var lightboxPhotoIndex = 0;
+    var swipeStart = null;
     var pendingLightboxRequest = null;
     var lightboxHistoryActive = false;
     var lightboxCloseFromHistory = false;
@@ -212,17 +220,69 @@
         });
         var imageAlt = image ? (image.alt || "") : "";
         var paragraphs = card ? Array.prototype.map.call(card.querySelectorAll("figcaption p"), function (paragraph) { return paragraph.textContent.trim(); }).filter(function (paragraph) { return paragraph; }) : [];
-        var description = paragraphs.join(" ");
+        var includedAt = -1;
+        paragraphs.some(function (paragraph, index) { if (paragraph.indexOf(" · ") !== -1) { includedAt = index; return true; } return false; });
+        var included = includedAt === -1 ? "" : paragraphs[includedAt];
+        var description = paragraphs.filter(function (paragraph, index) { return index !== includedAt; }).join(" ");
+        var colourList = typeof trigger.getAttribute === "function" ? (trigger.getAttribute("data-colour-options") || "") : "";
+        var colours = colourList.split(/\s+/).filter(function (name) { return /^[A-Za-z]+$/.test(name); });
         if (!description) description = imageAlt;
         else if (imageAlt && /illustrative preview|reference image|reference design/i.test(imageAlt) && description.indexOf(imageAlt) === -1) description += " " + imageAlt;
-        return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description };
+        return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description, included: included, colours: colours };
+      }
+
+      function photosFor(item) {
+        var photos = [{ src: item.trigger.href, alt: item.imageAlt || item.description || "Artwork preview", label: "As shown" }];
+        var stem = String(item.trigger.href || "").split(/[?#]/)[0].split("/").pop().replace(/\.[^.]*$/, "");
+        item.colours.forEach(function (colour) {
+          photos.push({
+            src: "assets/colour-options/" + stem + "--" + colour.toLowerCase() + ".webp",
+            alt: "Colour option – preview: " + colour + ". " + (item.imageAlt || item.description || ""),
+            label: "Colour option – preview: " + colour,
+            colour: colour
+          });
+        });
+        return photos;
+      }
+
+      function renderPhoto() {
+        var photo = lightboxPhotos[lightboxPhotoIndex];
+        if (!photo) return;
+        lightboxImage.src = photo.src;
+        lightboxImage.alt = photo.alt;
+        var several = lightboxPhotos.length > 1;
+        if (photoPrev) photoPrev.hidden = !several;
+        if (photoNext) photoNext.hidden = !several;
+        if (photoLabel) {
+          photoLabel.hidden = !several;
+          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (photo.colour ? "\nDigital recolour – mention \"" + photo.colour + "\" in your order notes." : "") : "";
+        }
+      }
+
+      function stepPhoto(delta) {
+        var count = lightboxPhotos.length;
+        if (count < 2) return;
+        lightboxPhotoIndex = (lightboxPhotoIndex + delta + count) % count;
+        renderPhoto();
+      }
+
+      function clearPhotos() {
+        lightboxPhotos = [];
+        lightboxPhotoIndex = 0;
+        swipeStart = null;
+        if (photoPrev) photoPrev.hidden = true;
+        if (photoNext) photoNext.hidden = true;
+        if (photoLabel) { photoLabel.textContent = ""; photoLabel.hidden = true; }
+        if (lightboxIncluded) { lightboxIncluded.textContent = ""; lightboxIncluded.hidden = true; }
       }
 
       function renderLightboxItem() {
         var item = lightboxItems[lightboxIndex] || productDetails(lastTrigger);
         if (!item) return;
-        lightboxImage.src = item.trigger.href;
-        lightboxImage.alt = item.imageAlt || item.description || "Artwork preview";
+        lightboxPhotos = photosFor(item);
+        lightboxPhotoIndex = 0;
+        renderPhoto();
+        if (lightboxIncluded) { lightboxIncluded.textContent = item.included ? "What's included: " + item.included : ""; lightboxIncluded.hidden = !item.included; }
         if (lightboxName) { lightboxName.textContent = item.title; lightboxName.hidden = !item.title; }
         if (lightboxPrice) { lightboxPrice.textContent = item.price || ""; lightboxPrice.hidden = !item.price; }
         if (lightboxSize) { lightboxSize.textContent = item.size || ""; lightboxSize.hidden = !item.size; }
@@ -245,8 +305,37 @@
         }
       }
 
+      var pressStartedInside = false;
+      lightbox.addEventListener("pointerdown", function (event) { pressStartedInside = event.target !== lightbox; });
       lightbox.addEventListener("click", function (event) {
-        if (event.target === lightbox) lightbox.close();
+        var dragEndedOnBackdrop = pressStartedInside;
+        pressStartedInside = false;
+        if (event.target === lightbox && !dragEndedOnBackdrop) lightbox.close();
+      });
+      if (photoPrev) photoPrev.addEventListener("click", function () { stepPhoto(-1); });
+      if (photoNext) photoNext.addEventListener("click", function () { stepPhoto(1); });
+      lightbox.addEventListener("keydown", function (event) {
+        if (lightboxPhotos.length < 2 || !event || event.altKey || event.metaKey || event.ctrlKey || event.shiftKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+        event.preventDefault();
+        stepPhoto(event.key === "ArrowRight" ? 1 : -1);
+      });
+      if (lightboxStage) {
+        lightboxStage.addEventListener("pointerdown", function (event) { swipeStart = { x: event.clientX, y: event.clientY }; });
+        lightboxStage.addEventListener("pointercancel", function () { swipeStart = null; });
+        lightboxStage.addEventListener("pointerup", function (event) {
+          var start = swipeStart;
+          swipeStart = null;
+          if (!start || lightboxPhotos.length < 2) return;
+          var dx = event.clientX - start.x;
+          var dy = event.clientY - start.y;
+          if (Math.abs(dx) >= 40 && Math.abs(dx) > 1.5 * Math.abs(dy)) stepPhoto(dx < 0 ? 1 : -1);
+        });
+      }
+      if (typeof lightboxImage.addEventListener === "function") lightboxImage.addEventListener("error", function () {
+        if (!lightbox.open || lightboxPhotoIndex === 0) return;
+        lightboxPhotos.splice(lightboxPhotoIndex, 1);
+        lightboxPhotoIndex = 0;
+        renderPhoto();
       });
       lightbox.addEventListener("close", function () {
         var restoreTrigger = lastTrigger;
@@ -259,6 +348,7 @@
         if (lightboxSize) { lightboxSize.textContent = ""; lightboxSize.hidden = true; }
         if (lightboxDescription) lightboxDescription.textContent = "";
         if (lightboxRequest) { lightboxRequest.hidden = true; lightboxRequest.disabled = true; }
+        clearPhotos();
         if (pendingLightboxRequest) {
           invalidateLightboxFocus();
           var requestButton = pendingLightboxRequest;
