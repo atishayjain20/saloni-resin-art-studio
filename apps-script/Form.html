@@ -36,8 +36,11 @@
     .bundle-size .field-error { grid-column: 1 / -1; font-size: .8rem; }
     .bundle-size-item { margin-bottom: .75rem; }
     .shipping-fields { margin-top: .85rem; }
-    .more-details > summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
+    .more-details > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; padding: .55rem 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fffaf4; color: #5d4947; font-weight: 700; cursor: pointer; list-style: none; }
+    .more-details > summary::-webkit-details-marker { display: none; }
+    .more-details > summary::after { content: ""; flex: none; width: .6rem; height: .6rem; margin-top: -.3rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s; }
     .more-details[open] > summary { margin-bottom: .6rem; }
+    .more-details[open] > summary::after { margin-top: .3rem; transform: rotate(-135deg); }
     .more-details > fieldset { margin-bottom: 1rem; }
     .referral-disclosure { margin-top: .85rem; }
     .referral-disclosure summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
