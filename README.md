@@ -94,3 +94,7 @@ After the custom domain is deployed, use the existing `saloniresinart.com` prope
 ## Content notes
 
 The published gallery uses curated product and process photography supplied with the project. Catalogue cards show regular and festive prices for pictured/base designs. Size, materials, and personalisation can change the final quote; Saloni confirms the final quote. Contact details are the requested phone number and Instagram profile. The studio is based in Ajmer, Rajasthan, ships across India, and accepts order enquiries 24 hours a day.
+
+### Colour previews in the product gallery
+
+Each product preview can show digitally recoloured copies of Saloni's photo (`assets/colour-options/<photo>--<colour>.webp`, labelled "Colour option – preview"). After adding or replacing a product photo, run `tools/recolour.py` from the repo root in a scratch virtual environment that has `pillow` and `numpy` (they are not site dependencies): `selftest`, `generate`, `sheet` (contact sheets in git-ignored `work/recolour/`), review the sheets and delete any bad variant, then `annotate` to rewrite the `data-colour-options` attributes in `index.html` from the files on disk. To drop previews entirely, empty the folder and run `annotate`.

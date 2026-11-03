@@ -42,8 +42,8 @@
     }
   </script>
   <title>Custom Resin Art &amp; Gifts | Saloni Resin Art Studio</title>
-  <link rel="stylesheet" href="styles.css?v=20261104">
-  <script class="site-script" src="script.js?v=20261104" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261105">
+  <script class="site-script" src="script.js?v=20261105" defer></script>
   <script class="customizer-script" src="customizer.js?v=20261031" defer></script>
 </head>
 <body>
@@ -924,11 +924,26 @@
       </form>
       <h2 class="sr-only" id="lightbox-title">Artwork preview</h2>
       <figure class="lightbox-figure" tabindex="0" aria-label="Scrollable artwork details">
-        <img class="lightbox-image" id="lightbox-image" alt="Artwork preview" width="1200" height="900">
+        <div class="lightbox-stage" id="lightbox-stage">
+          <img class="lightbox-image" id="lightbox-image" alt="Artwork preview" width="1200" height="900">
+          <button type="button" class="lightbox-photo-nav lightbox-photo-prev" id="lightbox-photo-prev" aria-label="Previous image" hidden><span aria-hidden="true">&lsaquo;</span></button>
+          <button type="button" class="lightbox-photo-nav lightbox-photo-next" id="lightbox-photo-next" aria-label="Next image" hidden><span aria-hidden="true">&rsaquo;</span></button>
+        </div>
+        <p class="lightbox-photo-label" id="lightbox-photo-label" aria-live="polite" hidden></p>
         <figcaption class="lightbox-caption" id="lightbox-caption">
           <span id="lightbox-product-size" hidden></span>
           <span id="lightbox-image-description"></span>
+          <span id="lightbox-included" hidden></span>
         </figcaption>
+        <details class="lightbox-care">
+          <summary>Resin care tips</summary>
+          <ul>
+            <li>Wipe with a soft, dry cloth.</li>
+            <li>Keep out of direct sunlight; UV can yellow resin over time.</li>
+            <li>Not for hot pans, or candles placed directly on the resin; not dishwasher-safe.</li>
+            <li>Avoid harsh cleaners and alcohol.</li>
+          </ul>
+        </details>
       </figure>
       <div class="lightbox-order-summary">
         <strong id="lightbox-product-name"></strong>

@@ -1356,6 +1356,44 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertEqual(section.group(0).count(card_class), cards)
                 self.assertEqual(section.group(0).count('class="product-pricing"'), pricing_blocks)
 
+    def test_lightbox_gallery_dialog_markup(self):
+        dialog = re.search(r'<dialog\b[^>]*id=["\']art-lightbox["\'][\s\S]*?</dialog>', self.html).group(0)
+        for button_id, label in (("lightbox-photo-prev", "Previous image"), ("lightbox-photo-next", "Next image")):
+            with self.subTest(button=button_id):
+                button = re.search(rf'<button\b[^>]*id="{button_id}"[^>]*>', dialog)
+                self.assertIsNotNone(button)
+                self.assertIn('type="button"', button.group(0))
+                self.assertIn(f'aria-label="{label}"', button.group(0))
+        self.assertRegex(dialog, r'<p\b[^>]*id="lightbox-photo-label"[^>]*aria-live="polite"')
+        self.assertIn('id="lightbox-included"', dialog)
+        care = re.search(r'<details class="lightbox-care">[\s\S]*?</details>', dialog)
+        self.assertIsNotNone(care)
+        self.assertEqual(care.group(0).count("<li>"), 4)
+
+    def test_colour_options_are_declared_for_card_triggers_and_match_files_on_disk(self):
+        folder = ROOT / "assets" / "colour-options"
+        allowed = {"Teal", "Rose", "Amethyst", "Emerald"}
+        declared = set()
+        for trigger in re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html):
+            match = re.search(r'data-colour-options="([^"]*)"', trigger)
+            if not match:
+                continue
+            with self.subTest(trigger=trigger[:120]):
+                self.assertNotIn("data-lightbox-target", trigger)
+                names = match.group(1).split()
+                self.assertTrue(1 <= len(names) <= 3)
+                self.assertEqual(len(names), len(set(names)))
+                self.assertLessEqual(set(names), allowed)
+                stem = Path(re.search(r'href="([^"?#]+)', trigger).group(1)).stem
+                for name in names:
+                    path = folder / f"{stem}--{name.lower()}.webp"
+                    declared.add(path.name)
+                    self.assertTrue(path.exists(), path)
+                    self.assertLessEqual(path.stat().st_size, 150 * 1024, path)
+        on_disk = {path.name for path in folder.glob("*.webp")} if folder.exists() else set()
+        self.assertEqual(on_disk - declared, set(), "colour previews that no card declares")
+        self.assertNotIn("colour-options/", self.html, "the homepage must not fetch colour previews")
+
     def test_generated_designs_are_studio_catalogue_cards(self):
         self.assertNotRegex(self.html, re.compile(r'id=["\']commission-concepts["\']|Concepts to commission|data-carousel=["\']commission-concepts["\']'))
         studio_match = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)

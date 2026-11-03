@@ -44,8 +44,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261104">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261104" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261105">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261105" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -752,6 +752,231 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(trigger.focused, undefined);
 });
 
+function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false } = {}) {
+  const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
+  const end = script.indexOf("\n\n    initCatalogueExperience();", start);
+  const makeElement = (extra = {}) => Object.assign({
+    hidden: false,
+    textContent: "",
+    attributes: {},
+    listeners: {},
+    prevented: 0,
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    closest() { return null; },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null; },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
+    focus() { this.focused = true; },
+  }, extra);
+  const requestButton = makeElement({ clicked: 0, click() { this.clicked += 1; }, attributes: { "data-order-prefill": "sample" } });
+  const paras = (paragraphs || ["Rich colour and golden flecks", "one holder · tealight not included · shown palette or custom colours"]).map((textContent) => ({ textContent }));
+  const card = makeElement({
+    querySelector(selector) {
+      if (selector === "figcaption strong") return { textContent: "Sample gift" };
+      if (selector === "[data-order-prefill]") return requestButton;
+      return null;
+    },
+    querySelectorAll(selector) { return selector === "figcaption p" ? paras : []; },
+  });
+  const attributes = colours === undefined ? {} : { "data-colour-options": colours };
+  const trigger = makeElement({
+    href,
+    attributes,
+    querySelector(selector) { return selector === "img" ? { alt: "Sample gift photo" } : null; },
+    closest(selector) { return selector === "article" ? card : null; },
+  });
+  const heroTrigger = makeElement({
+    href: "assets/hero-copy.webp",
+    attributes: { "data-lightbox-target": "sample-card" },
+    querySelector(selector) { return selector === "img" ? { alt: "Hero copy" } : null; },
+    closest() { return null; },
+  });
+  const targetCard = makeElement({ querySelector(selector) { return selector === "[data-lightbox-trigger]" ? trigger : null; } });
+  const lightbox = makeElement({
+    showModal() { this.open = true; },
+    close() { this.open = false; this.listeners.close(); },
+  });
+  const srcAssignments = [];
+  const imageTarget = makeElement();
+  Object.defineProperty(imageTarget, "src", { get() { return this._src; }, set(value) { this._src = value; srcAssignments.push(value); } });
+  const gallery = withGalleryElements ? {
+    "lightbox-stage": makeElement(),
+    "lightbox-photo-prev": makeElement({ hidden: true }),
+    "lightbox-photo-next": makeElement({ hidden: true }),
+    "lightbox-photo-label": makeElement({ hidden: true }),
+    "lightbox-included": makeElement({ hidden: true }),
+  } : {};
+  const docElements = Object.assign({
+    "art-lightbox": lightbox,
+    "lightbox-image": imageTarget,
+    "lightbox-caption": makeElement(),
+    "lightbox-product-name": makeElement(),
+    "lightbox-product-price": makeElement(),
+    "lightbox-product-size": makeElement(),
+    "lightbox-image-description": makeElement(),
+    "lightbox-request": makeElement(),
+    "sample-card": targetCard,
+    order: makeElement(),
+  }, gallery);
+  const documentObject = {
+    getElementById(id) { return docElements[id] || null; },
+    querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? (heroTarget ? [heroTrigger] : [trigger]) : []; },
+  };
+  const windowObject = { setTimeout(callback) { callback(); } };
+  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
+  const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
+  const open = () => (heroTarget ? heroTrigger : trigger).listeners.click(click);
+  const press = (key) => { const event = { key, prevented: 0, preventDefault() { this.prevented += 1; } }; lightbox.listeners.keydown(event); return event; };
+  const swipe = (dx, dy) => {
+    docElements["lightbox-stage"].listeners.pointerdown({ clientX: 200, clientY: 100 });
+    docElements["lightbox-stage"].listeners.pointerup({ clientX: 200 + dx, clientY: 100 + dy });
+  };
+  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe };
+}
+
+test("lightbox gallery steps through the card photo and its colour previews", () => {
+  const h = galleryHarness({ colours: "Teal Rose" });
+  assert.deepEqual(h.srcAssignments, []);
+  h.open();
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
+  assert.equal(h.docElements["lightbox-photo-prev"].hidden, false);
+  assert.equal(h.docElements["lightbox-photo-next"].hidden, false);
+  assert.equal(h.docElements["lightbox-photo-label"].hidden, false);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 3 · As shown/);
+  assert.deepEqual(h.srcAssignments, ["assets/sample-gift.jpg?v=3"], "no variant URL until it is shown");
+  h.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--teal.webp");
+  assert.match(h.imageTarget.alt, /^Colour option – preview: Teal\. Sample gift photo/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour option – preview: Teal/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /Digital recolour – mention "Teal" in your order notes\./);
+  h.docElements["lightbox-photo-next"].listeners.click();
+  h.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "next wraps to the card photo");
+  h.docElements["lightbox-photo-prev"].listeners.click();
+  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--rose.webp", "prev wraps to the last colour");
+});
+
+test("lightbox gallery stays single-photo without colour options", () => {
+  [undefined, ""].forEach((colours) => {
+    const h = galleryHarness({ colours });
+    h.open();
+    assert.equal(h.docElements["lightbox-photo-prev"].hidden, true);
+    assert.equal(h.docElements["lightbox-photo-next"].hidden, true);
+    assert.equal(h.docElements["lightbox-photo-label"].hidden, true);
+    const event = h.press("ArrowRight");
+    assert.equal(event.prevented, 0);
+    assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
+  });
+});
+
+test("lightbox gallery follows arrow keys and swipes without hijacking vertical scroll", () => {
+  const h = galleryHarness({ colours: "Teal Rose" });
+  h.open();
+  assert.equal(h.press("ArrowRight").prevented, 1);
+  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--teal.webp");
+  assert.equal(h.press("ArrowLeft").prevented, 1);
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
+  assert.equal(h.press("Enter").prevented, 0);
+  h.swipe(-80, 5);
+  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--teal.webp", "left swipe shows the next photo");
+  h.swipe(80, 5);
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "right swipe shows the previous photo");
+  h.swipe(-30, 0);
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "short drag is ignored");
+  h.swipe(-60, 70);
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "vertical scroll is ignored");
+});
+
+test("lightbox request button keeps acting on the product from any colour photo", () => {
+  const h = galleryHarness({ colours: "Teal Rose" });
+  h.open();
+  h.docElements["lightbox-photo-next"].listeners.click();
+  h.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(h.docElements["lightbox-request"].textContent, "Add to cart");
+  h.docElements["lightbox-request"].listeners.click();
+  assert.equal(h.requestButton.clicked, 1);
+  assert.equal(h.docElements.order.focused, true);
+});
+
+test("lightbox shows What's included from the card note and keeps the rest as description", () => {
+  const h = galleryHarness({ colours: "Teal" });
+  h.open();
+  assert.equal(h.docElements["lightbox-image-description"].textContent, "Rich colour and golden flecks");
+  assert.equal(h.docElements["lightbox-included"].hidden, false);
+  assert.equal(h.docElements["lightbox-included"].textContent, "What's included: one holder · tealight not included · shown palette or custom colours");
+  const plain = galleryHarness({ paragraphs: ["Just a description"] });
+  plain.open();
+  assert.equal(plain.docElements["lightbox-image-description"].textContent, "Just a description");
+  assert.equal(plain.docElements["lightbox-included"].hidden, true);
+  assert.equal(plain.docElements["lightbox-included"].textContent, "");
+});
+
+test("lightbox gallery resets on close and reopens at the card photo", () => {
+  const h = galleryHarness({ colours: "Teal Rose" });
+  h.open();
+  h.docElements["lightbox-photo-next"].listeners.click();
+  h.lightbox.close();
+  assert.equal(h.docElements["lightbox-photo-label"].textContent, "");
+  assert.equal(h.docElements["lightbox-photo-label"].hidden, true);
+  assert.equal(h.docElements["lightbox-included"].textContent, "");
+  assert.equal(h.docElements["lightbox-photo-prev"].hidden, true);
+  assert.equal(h.press("ArrowRight").prevented, 0);
+  h.open();
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 3 · As shown/);
+});
+
+test("hero lightbox trigger uses the colour options of its target card", () => {
+  const h = galleryHarness({ colours: "Amethyst", heroTarget: true });
+  h.open();
+  h.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--amethyst.webp");
+});
+
+test("lightbox gallery drops a colour preview that fails to load and shows the card photo", () => {
+  const h = galleryHarness({ colours: "Teal Rose" });
+  h.open();
+  h.docElements["lightbox-photo-next"].listeners.click();
+  h.imageTarget.listeners.error();
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 2 · As shown/);
+  h.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--rose.webp");
+  h.imageTarget.listeners.error();
+  assert.equal(h.docElements["lightbox-photo-next"].hidden, true, "no variants left means a single photo");
+  h.imageTarget.listeners.error();
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "an error on the card photo changes nothing");
+});
+
+test("lightbox gallery works when the dialog has no gallery elements", () => {
+  const h = galleryHarness({ colours: "Teal", withGalleryElements: false });
+  h.open();
+  assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
+  assert.doesNotThrow(() => h.press("ArrowRight"));
+});
+
+test("lightbox gallery markup, care tips and styles meet the touch and scroll contract", () => {
+  const dialog = html.match(/<dialog class="lightbox-dialog"[\s\S]*?<\/dialog>/)?.[0] || "";
+  const figure = dialog.match(/<figure class="lightbox-figure"[^>]*>[\s\S]*?<\/figure>/)?.[0] || "";
+  const summary = dialog.match(/<div class="lightbox-order-summary">[\s\S]*?<\/div>/)?.[0] || "";
+  assert.match(figure, /<div class="lightbox-stage" id="lightbox-stage">[\s\S]*id="lightbox-image"[\s\S]*id="lightbox-photo-prev"[\s\S]*id="lightbox-photo-next"/);
+  assert.match(figure, /<button type="button" class="lightbox-photo-nav lightbox-photo-prev" id="lightbox-photo-prev" aria-label="Previous image" hidden>/);
+  assert.match(figure, /<button type="button" class="lightbox-photo-nav lightbox-photo-next" id="lightbox-photo-next" aria-label="Next image" hidden>/);
+  assert.match(figure, /id="lightbox-photo-label"[^>]*aria-live="polite"[^>]*hidden/);
+  assert.match(figure, /id="lightbox-included"[^>]*hidden/);
+  const care = figure.match(/<details class="lightbox-care">[\s\S]*?<\/details>/)?.[0] || "";
+  assert.match(care, /<summary>Resin care tips<\/summary>/);
+  assert.equal((care.match(/<li>/g) || []).length, 4);
+  assert.doesNotMatch(summary, /lightbox-care|lightbox-photo/);
+  assert.doesNotMatch(dialog, /lightbox-(?:previous|next|position)/);
+  assert.match(css, /\.lightbox-stage\s*\{[^}]*touch-action:\s*pan-y/);
+  assert.match(css, /\.lightbox-photo-nav\s*\{[^}]*width:\s*44px[^}]*height:\s*44px/);
+  assert.match(css, /\.lightbox-care summary\s*\{[^}]*min-height:\s*44px/);
+  assert.doesNotMatch(html, /colour-options\//, "the homepage must not fetch colour previews");
+});
+
 test("catalogue card body opens its existing preview while native link focus stays independent", () => {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
@@ -803,6 +1028,7 @@ test("catalogue card body opens its existing preview while native link focus sta
     "lightbox-product-price": makeElement(),
     "lightbox-product-size": makeElement(),
     "lightbox-image-description": makeElement(),
+    "lightbox-included": makeElement(),
     "lightbox-request": makeElement(),
   };
   const documentObject = {
@@ -817,7 +1043,8 @@ test("catalogue card body opens its existing preview while native link focus sta
   card.listeners.click({ target: bodyTarget, defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
   assert.equal(lightbox.open, true);
   assert.equal(docElements["lightbox-product-name"].textContent, "Sample gift");
-  assert.match(docElements["lightbox-image-description"].textContent, /one keepsake · display props not included/);
+  assert.equal(docElements["lightbox-image-description"].textContent, "A sample gift description.");
+  assert.match(docElements["lightbox-included"].textContent, /^What's included: one keepsake · display props not included/);
   lightbox.close();
   assert.equal(trigger.focused, true);
   const orderEvent = { target: orderButton, defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() { this.defaultPrevented = true; } };

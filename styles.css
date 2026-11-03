@@ -232,6 +232,18 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 .lightbox-caption strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
 .lightbox-caption span { display: block; }
 .lightbox-caption span:not(:last-child) { color: var(--cocoa); font-weight: 800; }
+.lightbox-stage { position: relative; touch-action: pan-y; }
+.lightbox-stage .lightbox-image { display: block; }
+.lightbox-photo-nav { position: absolute; top: 50%; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; transform: translateY(-50%); border: 1px solid var(--line); border-radius: 50%; background: var(--ivory); color: var(--ink); font-size: 1.6rem; line-height: 1; opacity: 0.9; }
+.lightbox-photo-prev { left: 0.4rem; }
+.lightbox-photo-next { right: 0.4rem; }
+.lightbox-photo-nav:hover, .lightbox-photo-nav:focus-visible { background: var(--ink); color: var(--ivory); opacity: 1; }
+.lightbox-photo-label { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.76rem; text-align: center; white-space: pre-line; }
+.lightbox-photo-label::first-line { color: var(--cocoa); font-weight: 800; }
+.lightbox-caption #lightbox-image-description, .lightbox-caption #lightbox-included { color: var(--muted); font-weight: 400; }
+.lightbox-care { max-width: 60ch; margin: 0.9rem auto 0; border-top: 1px solid var(--line); }
+.lightbox-care summary { display: flex; align-items: center; justify-content: center; min-height: 44px; cursor: pointer; color: var(--cocoa); font-size: 0.74rem; font-weight: 800; }
+.lightbox-care ul { margin: 0 0 0.4rem; padding-left: 1.2rem; color: var(--muted); font-size: 0.76rem; text-align: left; }
 .lightbox-order-summary { display: grid; flex: 0 0 auto; justify-items: center; gap: .3rem; margin-top: .9rem; text-align: center; }
 .lightbox-order-summary strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
 .lightbox-order-summary #lightbox-product-price { color: var(--cocoa); font-weight: 800; }
