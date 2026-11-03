@@ -673,6 +673,7 @@ test("lightbox keeps product details and request action without catalogue naviga
   assert.doesNotMatch(script, /lightbox-(?:previous|next|position)/);
   assert.match(script, /pendingLightboxRequest[\s\S]*requestButton\.click\(\)[\s\S]*focusOrderLocation/);
   assert.match(script, /selected \? "Remove from cart" : "Add to cart"/);
+  assert.match(script, /getAttribute\("data-order-prefill"\) === "quote"[\s\S]*"Ask for a quote"[\s\S]*"Ask for a quote for "/);
   assert.match(script, /selected \? " from cart" : " to cart"/);
   assert.match(html, /id="order"[^>]*tabindex="-1"/);
   assert.match(script, /data-lightbox-trigger/);
