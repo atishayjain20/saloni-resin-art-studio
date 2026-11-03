@@ -463,6 +463,21 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn('id="resin-art-track"', self.html)
         self.assertNotIn("Made to be looked at twice", self.html)
 
+    def test_stale_root_duplicates_are_removed(self):
+        stale = (
+            "Form.html",
+            "form-flow.test.cjs",
+            "order-flow.test.cjs",
+            "catalogue-filter.test.cjs",
+            "script-interactivity-recovery.test.cjs",
+            "shopper-experience.test.cjs",
+            "test_order_flow.py",
+            "test_site.py",
+        )
+        for name in stale:
+            with self.subTest(name=name):
+                self.assertFalse((ROOT / name).exists(), f"{name} is a stale root copy")
+
     def test_seo_metadata_and_studio_namokar_label(self):
         title = "Custom Resin Art &amp; Gifts | Saloni Resin Art Studio"
         description = "Explore custom resin frames, personalized gifts and resin art from Saloni Resin Art Studio. Share your colours, theme and occasion with Saloni."
