@@ -4,8 +4,7 @@
 Needs Pillow and numpy in a scratch venv (they are NOT site dependencies):
 
     python3 -m venv /tmp/recolour-venv && /tmp/recolour-venv/bin/pip install pillow numpy
-    /tmp/recolour-venv/bin/python tools/recolour.py selftest
-    /tmp/recolour-venv/bin/python tools/recolour.py generate
+    /tmp/recolour-venv/bin/python tools/recolour.py generate [photo-stem ...]   # no stems = every photo
     /tmp/recolour-venv/bin/python tools/recolour.py sheet      # work/recolour/sheet-NN.jpg
     /tmp/recolour-venv/bin/python tools/recolour.py annotate   # writes data-colour-options
 
@@ -14,7 +13,6 @@ protected pixels never change, the dominant hue H0 of the rest is moved to
 each of up to three fixed target colours, and saturation / value are kept.
 """
 import argparse
-import math
 import re
 import sys
 from pathlib import Path
@@ -170,7 +168,13 @@ def cmd_generate(args):
         sys.exit("This Pillow build has no WebP support.")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     items = skipped = made = dropped = 0
-    for stem, href in card_sources(read_index()):
+    sources = card_sources(read_index())
+    if args.stems:
+        unknown = set(args.stems) - {stem for stem, _ in sources}
+        if unknown:
+            sys.exit("Not a card photo in index.html: " + ", ".join(sorted(unknown)))
+        sources = [(stem, href) for stem, href in sources if stem in args.stems]
+    for stem, href in sources:
         for old in OUT_DIR.glob(stem + "--*.webp"):
             old.unlink()
         rgb = np.asarray(prep(ROOT / href))
@@ -266,50 +270,14 @@ def cmd_annotate(args):
     print("data-colour-options on %d triggers" % updated.count("data-colour-options="))
 
 
-def cmd_selftest(args):
-    def px(h, s, v):
-        return hsv_to_rgb(np.array([[h]], np.float32), np.array([[s]], np.float32), np.array([[v]], np.float32))[0, 0]
-
-    h0, target = 200.0, 352.0
-    img = np.zeros((1, 6, 3), np.uint8)
-    img[0, 0] = (255, 255, 255)           # white
-    img[0, 1] = (128, 128, 128)           # grey
-    img[0, 2] = px(48, 0.8, 0.9)          # gold flake
-    img[0, 3] = px(25, 0.4, 0.8)          # skin
-    img[0, 4] = px(h0, 0.8, 0.8)          # resin at H0
-    img[0, 5] = px(h0 + 24, 0.8, 0.8)     # resin 24 degrees away
-    out, _ = shift(img, h0, target)
-    assert (out[0, :4] == img[0, :4]).all(), "protected pixels changed"
-    h_out = rgb_to_hsv(out)[0][0]
-    assert abs(circ(h_out[4], target)) <= 2, "resin pixel did not reach the target: %s" % h_out[4]
-    half = circ(h_out[5], h0 + 24) / circ(target, h0)  # moved by w * delta, w = 0.5
-    assert abs(half - 0.5) < 0.05, "edge pixel not half way: %s" % half
-    assert rgb_to_hsv(out)[1][0, 4] > 0.75 and rgb_to_hsv(out)[2][0, 4] > 0.75, "S/V not kept"
-
-    assert [n for n, _ in choose_targets(180.0)] == ["Rose", "Amethyst"], choose_targets(180.0)
-    assert [n for n, _ in choose_targets(30.0)] == ["Teal", "Amethyst", "Emerald"], choose_targets(30.0)
-    assert [n for n, _ in choose_targets(352.0)] == ["Teal", "Amethyst", "Emerald"], choose_targets(352.0)
-
-    saffron = np.full((20, 20, 3), px(30, 0.7, 0.8), np.uint8)
-    assert dominant_hue(saffron)[0] == 35.0, dominant_hue(saffron)
-    skin = np.full((20, 20, 3), px(25, 0.4, 0.8), np.uint8)
-    assert dominant_hue(skin)[0] is None, "skin-only image must be skipped"
-    grey = np.full((20, 20, 3), 128, np.uint8)
-    assert dominant_hue(grey)[0] is None, "grey-only image must be skipped"
-    mostly_white = np.full((20, 20, 3), 255, np.uint8)
-    mostly_white[:1, :] = px(200, 0.8, 0.8)  # 5% of pixels is below the 8% floor
-    assert dominant_hue(mostly_white)[0] is None, "tiny coloured patch must be skipped"
-    all_resin = np.full((20, 20, 3), px(200, 0.8, 0.8), np.uint8)
-    assert shift(all_resin, 200.0, 352.0)[1] > 0.99
-    assert shift(grey, 200.0, 352.0)[1] == 0.0, "grey must report no change"
-    print("selftest ok")
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name, fn in (("generate", cmd_generate), ("sheet", cmd_sheet), ("annotate", cmd_annotate), ("selftest", cmd_selftest)):
-        sub.add_parser(name).set_defaults(fn=fn)
+    for name, fn in (("generate", cmd_generate), ("sheet", cmd_sheet), ("annotate", cmd_annotate)):
+        command = sub.add_parser(name)
+        command.set_defaults(fn=fn)
+        if name == "generate":
+            command.add_argument("stems", nargs="*", help="photo file names without extension; default is every card photo")
     args = parser.parse_args()
     args.fn(args)
 

@@ -950,6 +950,29 @@ test("lightbox gallery drops a colour preview that fails to load and shows the c
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "an error on the card photo changes nothing");
 });
 
+test("lightbox ignores arrow keys with a modifier and survives a drag that ends on the backdrop", () => {
+  const h = galleryHarness({ colours: "Teal Rose" });
+  h.open();
+  ["altKey", "metaKey", "ctrlKey", "shiftKey"].forEach((modifier) => {
+    const event = { key: "ArrowLeft", prevented: 0, preventDefault() { this.prevented += 1; } };
+    event[modifier] = true;
+    h.lightbox.listeners.keydown(event);
+    assert.equal(event.prevented, 0, `${modifier}+ArrowLeft must stay with the browser`);
+    assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
+  });
+  assert.equal(h.press("ArrowRight").prevented, 1);
+  // A press that starts on the panel and ends on the backdrop fires click on the dialog.
+  h.lightbox.listeners.pointerdown({ target: { id: "lightbox-stage" } });
+  h.lightbox.listeners.click({ target: h.lightbox });
+  assert.equal(h.lightbox.open, true, "a drag that ends on the backdrop keeps the lightbox open");
+  h.lightbox.listeners.click({ target: h.lightbox });
+  assert.equal(h.lightbox.open, false, "a plain backdrop click still closes it");
+  h.open();
+  h.lightbox.listeners.pointerdown({ target: h.lightbox });
+  h.lightbox.listeners.click({ target: h.lightbox });
+  assert.equal(h.lightbox.open, false, "a press that starts on the backdrop closes it");
+});
+
 test("lightbox gallery works when the dialog has no gallery elements", () => {
   const h = galleryHarness({ colours: "Teal", withGalleryElements: false });
   h.open();

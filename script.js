@@ -305,13 +305,17 @@
         }
       }
 
+      var pressStartedInside = false;
+      lightbox.addEventListener("pointerdown", function (event) { pressStartedInside = event.target !== lightbox; });
       lightbox.addEventListener("click", function (event) {
-        if (event.target === lightbox) lightbox.close();
+        var dragEndedOnBackdrop = pressStartedInside;
+        pressStartedInside = false;
+        if (event.target === lightbox && !dragEndedOnBackdrop) lightbox.close();
       });
       if (photoPrev) photoPrev.addEventListener("click", function () { stepPhoto(-1); });
       if (photoNext) photoNext.addEventListener("click", function () { stepPhoto(1); });
       lightbox.addEventListener("keydown", function (event) {
-        if (lightboxPhotos.length < 2 || !event || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+        if (lightboxPhotos.length < 2 || !event || event.altKey || event.metaKey || event.ctrlKey || event.shiftKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
         event.preventDefault();
         stepPhoto(event.key === "ArrowRight" ? 1 : -1);
       });
