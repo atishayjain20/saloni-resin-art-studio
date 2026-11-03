@@ -59,6 +59,20 @@ test("mobile footer links, Instagram and trust-strip links are at least 44px tal
   assert.match(mobileCss, /\.footer-links\s*\{[^}]*gap:\s*0 1rem/);
 });
 
+test("header cart button sits in the catalogue controls and keeps the header on one row on phones", () => {
+  const controls = html.match(/<div class="catalogue-control-bar"[\s\S]*?<\/div>/)?.[0] || "";
+  const button = controls.match(/<button[^>]*id="catalogue-header-cart"[^>]*>/)?.[0] || "";
+  assert.match(button, /\bhidden\b/);
+  assert.match(button, /aria-controls="catalogue-selection"/);
+  assert.match(button, /aria-label="View cart"/);
+  assert.match(controls, /id="catalogue-header-cart-count"[^>]*aria-hidden="true"/);
+  assert.match(css, /\.catalogue-header-cart-count\s*\{[^}]*position:\s*absolute/);
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"), css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  assert.match(mobileCss, /\.header-inner\s*\{[^}]*column-gap:\s*\.5rem/);
+  assert.match(css, /@media \(max-width: 620px\)\s*\{[^@]*?\.catalogue-control-bar\s*\{[^}]*gap:\s*\.25rem/);
+  assert.match(css, /@media \(max-width: 370px\)\s*\{[^}]*\.site-header \.wordmark-subtitle\s*\{[^}]*letter-spacing:\s*\.08em/);
+});
+
 test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable", () => {
   const mobileStart = css.indexOf("@media (max-width: 620px)");
   const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");

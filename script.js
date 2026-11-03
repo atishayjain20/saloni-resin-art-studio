@@ -860,6 +860,8 @@
     var catalogueCartJump = document.getElementById("catalogue-cart-jump");
     var catalogueCartCount = document.getElementById("catalogue-cart-count");
     var catalogueCartView = document.getElementById("catalogue-cart-view");
+    var headerCart = document.getElementById("catalogue-header-cart");
+    var headerCartCount = document.getElementById("catalogue-header-cart-count");
     var catalogueCartOrder = document.getElementById("catalogue-cart-order");
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
@@ -1721,6 +1723,11 @@
       }
       if (catalogueCartCount) catalogueCartCount.textContent = count ? count + " selected" : "";
       if (catalogueCartView) catalogueCartView.setAttribute("data-count", String(count));
+      if (headerCart) {
+        headerCart.hidden = count === 0;
+        headerCart.setAttribute("aria-label", count ? "View cart, " + count + (count === 1 ? " item" : " items") : "View cart");
+      }
+      if (headerCartCount) headerCartCount.textContent = count ? String(count) : "";
       if (catalogueCartOrder) catalogueCartOrder.disabled = count === 0;
       if (catalogueSelectionSummary) {
         if (!count) catalogueSelectionSummary.textContent = "No gifts selected.";
@@ -1894,11 +1901,13 @@
       requestSelectedCatalogueItems(catalogueCartOrder);
     });
 
-    if (catalogueCartView) catalogueCartView.addEventListener("click", function () {
+    function viewCatalogueCart() {
       if (!catalogueSelection || catalogueSelection.hidden) return;
       catalogueSelection.scrollIntoView({ behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
       catalogueSelection.focus({ preventScroll: true });
-    });
+    }
+    if (catalogueCartView) catalogueCartView.addEventListener("click", viewCatalogueCart);
+    if (headerCart) headerCart.addEventListener("click", viewCatalogueCart);
 
     function clearCustomizerFallback() {
       frameState.customizerFallback = null;

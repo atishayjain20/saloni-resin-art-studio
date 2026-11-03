@@ -146,6 +146,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const catalogueCartCount = new Element("catalogue-cart-count");
   const catalogueCartView = new Element("catalogue-cart-view");
   const catalogueCartOrder = new Element("catalogue-cart-order"); catalogueCartOrder.disabled = true;
+  const headerCart = new Element("catalogue-header-cart"); headerCart.hidden = true;
+  const headerCartCount = new Element("catalogue-header-cart-count");
   const customizer = new Element("order-from-customizer");
   const continueWithoutPreview = new Element("customizer-continue-without-preview"); continueWithoutPreview.hidden = true;
   const generalRequest = new Element("general-custom-gift");
@@ -157,7 +159,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -382,7 +384,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
+  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
@@ -812,6 +814,27 @@ test("previews selected catalogue items and provides an accessible cart jump", (
   flow.generatedCatalogueButtons[2].dispatch("click");
   assert.equal(flow.catalogueCartJump.hidden, true);
   assert.equal(flow.catalogueSelectionPreviews.children.length, 0);
+});
+
+test("the header cart shows the item count, hides when empty and opens the cart", () => {
+  const flow = runFlow();
+  assert.equal(flow.headerCart.hidden, true);
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.headerCart.hidden, false);
+  assert.equal(flow.headerCartCount.textContent, "1");
+  assert.equal(flow.headerCart.getAttribute("aria-label"), "View cart, 1 item");
+  flow.generatedCatalogueButtons[0].dispatch("click");
+  assert.equal(flow.headerCartCount.textContent, "2");
+  assert.equal(flow.headerCart.getAttribute("aria-label"), "View cart, 2 items");
+  flow.headerCart.dispatch("click");
+  assert.equal(flow.catalogueSelection.focused, true);
+  assert.equal(flow.catalogueSelection.focusOptions.preventScroll, true);
+  assert.equal(flow.catalogueSelection.scrollCalls.length, 1);
+  flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButtons[0].dispatch("click");
+  assert.equal(flow.headerCart.hidden, true);
+  assert.equal(flow.headerCartCount.textContent, "");
+  assert.equal(flow.headerCart.getAttribute("aria-label"), "View cart");
 });
 
 test("the fixed selected-items cart exposes separate View cart and Order now actions", () => {
