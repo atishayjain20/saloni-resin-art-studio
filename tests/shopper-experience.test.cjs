@@ -977,6 +977,19 @@ test("lightbox gallery markup, care tips and styles meet the touch and scroll co
   assert.doesNotMatch(html, /colour-options\//, "the homepage must not fetch colour previews");
 });
 
+test("lightbox keeps the whole photo and its colour label on screen on desktop and closes the phone gap", () => {
+  const desktop = css.match(/@media \(min-width: 621px\) and \(min-height: 621px\) \{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.ok(desktop, "expected a desktop lightbox media query");
+  assert.match(desktop, /dialog\.lightbox-dialog,\s*\.lightbox-panel\s*\{[^}]*max-height:\s*calc\(100dvh - 2rem\)/);
+  assert.match(desktop, /\.lightbox-image\s*\{[^}]*max-height:\s*min\(50vh, 460px\)/);
+  assert.match(css, /\.lightbox-image\s*\{[^}]*object-fit:\s*contain/);
+  const phone = css.match(/@media \(max-width: 620px\),\s*\(max-height: 620px\) and \(max-width: 900px\) \{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(phone, /\.lightbox-panel\s*\{[^}]*justify-content:\s*center/);
+  assert.match(phone, /\.lightbox-figure\s*\{[^}]*flex-grow:\s*0/);
+  assert.match(css, /\.lightbox-photo-label\s*\{[^}]*min-height:\s*2\.6em/);
+  assert.match(phone, /\.lightbox-photo-label\s*\{[^}]*min-height:\s*3\.9em/);
+});
+
 test("catalogue card body opens its existing preview while native link focus stays independent", () => {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
