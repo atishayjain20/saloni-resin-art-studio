@@ -44,8 +44,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261106">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261106" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261107">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261107" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -926,6 +926,17 @@ test("lightbox gallery resets on close and reopens at the card photo", () => {
   h.open();
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
   assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 3 · As shown/);
+});
+
+test("lightbox ignores a late close event that arrives after it reopened", () => {
+  const h = galleryHarness({ colours: "Teal Rose" });
+  h.open();
+  h.docElements["lightbox-photo-next"].listeners.click();
+  // Chrome can deliver a stale close event after the dialog is already open again.
+  h.lightbox.listeners.close();
+  assert.equal(h.lightbox.open, true);
+  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--teal.webp");
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour option – preview: Teal/);
 });
 
 test("hero lightbox trigger uses the colour options of its target card", () => {
