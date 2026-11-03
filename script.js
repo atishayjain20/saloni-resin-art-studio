@@ -443,7 +443,7 @@
 
       function addCardPhotos(trigger) {
         var image = trigger.querySelector("img");
-        if (!image || !image.parentNode || typeof document.createElement !== "function") return;
+        if (!image || !image.parentNode) return;
         var photos = photosFor(productDetails(trigger));
         if (photos.length < 2) return;
         var strip = document.createElement("span");
