@@ -732,7 +732,6 @@ class StaticSiteContractTests(unittest.TestCase):
     def test_homepage_uses_approved_visit_copy_without_stale_online_only_claim(self):
         self.assertIn("Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India.", self.html)
         self.assertIn("Open every day, 11:00 AM–4:00 PM.", self.html)
-        self.assertIn("Shipping across India.", self.html)
         self.assertNotIn("Online orders only", self.html)
         self.assertNotIn("no customer visits", self.html)
 
@@ -1056,7 +1055,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "Personalized message coasters",
             "Pearl white Namokar mantra frame",
             "Personalized photo clock",
-            "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM. Shipping across India.",
+            "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM.",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.html)
@@ -1065,7 +1064,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(order)
         order_html = order.group(0)
         details = re.findall(r'<details\b[\s\S]*?</details>', order_html)
-        self.assertEqual(len(details), 4)
+        self.assertEqual(len(details), 5)
+        self.assertIn('class="meet-saloni"', details[0])
         for question in (
             "What can I personalize?",
             "Is the preview final?",
@@ -1110,11 +1110,13 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(css, r'\.order-inline-fallback \.contact-line::after \{[^}]*content:')
 
     def test_meet_saloni_shows_a_small_round_photo_before_next_steps(self):
-        block = re.search(r'<div class="meet-saloni"[^>]*aria-labelledby="meet-saloni-title">(.*?)</div>\s*</div>', self.html, re.S)
+        block = re.search(r'<details class="meet-saloni" id="meet-saloni">(.*?)</details>', self.html, re.S)
         self.assertIsNotNone(block)
         self.assertLess(self.html.index('class="meet-saloni"'), self.html.index('id="customer-confidence-title"'))
-        self.assertIn('<h2 id="meet-saloni-title">Meet Saloni</h2>', block.group(1))
-        self.assertRegex(block.group(1), r'<img class="meet-saloni-photo" src="assets/saloni-portrait\.jpg" alt="[^"]{9,}" width="320" height="320" loading="lazy"')
+        summary = re.search(r'<summary>(.*?)</summary>', block.group(1), re.S)
+        self.assertIsNotNone(summary)
+        self.assertIn('<h2 id="meet-saloni-title">Meet Saloni</h2>', summary.group(1))
+        self.assertRegex(summary.group(1), r'<img class="meet-saloni-photo" src="assets/saloni-portrait\.jpg" alt="[^"]{9,}" width="320" height="320" loading="lazy"')
         self.assertTrue((ROOT / "assets/saloni-portrait.jpg").is_file())
         self.assertLess((ROOT / "assets/saloni-portrait.jpg").stat().st_size, 60_000)
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -1122,6 +1124,17 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(photo)
         self.assertIn("border-radius: 50%", photo.group(1))
         self.assertRegex(photo.group(1), r'width: (?:[1-9]\d)px')
+
+    def test_meet_saloni_opens_to_show_the_studio_address_only_there(self):
+        visit = "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM."
+        block = re.search(r'<details class="meet-saloni" id="meet-saloni">(.*?)</details>', self.html, re.S)
+        self.assertIsNotNone(block)
+        after_summary = block.group(1).split('</summary>', 1)[1]
+        self.assertIn(visit, after_summary)
+        self.assertEqual(self.html.count("Visit Saloni Resin Art Studio at"), 1)
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertRegex(css, r'\.meet-saloni > summary::after \{[^}]*content:')
+        self.assertRegex(css, r'\.meet-saloni\[open\] > summary::after \{[^}]*transform:')
 
     def test_published_assets_exist_and_do_not_reference_source_folder(self):
         asset_sources = re.findall(r'<img[^>]+src=["\']([^"\']+)', self.html)
