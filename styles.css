@@ -572,6 +572,7 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .order-dialog-close-form { margin: -2.9rem -.7rem 1rem; }
   .lightbox-panel { height: calc(100dvh - 1rem); max-height: calc(100dvh - 1rem); justify-content: center; overflow: hidden; }
   .lightbox-figure { flex-grow: 0; }
+  .lightbox-image { max-height: min(55dvh, calc(100dvh - 11rem)); }
   .lightbox-photo-label { min-height: 3.9em; }
 }
 

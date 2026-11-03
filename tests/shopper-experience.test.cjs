@@ -44,8 +44,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261105">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261105" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261106">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261106" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -1009,6 +1009,7 @@ test("lightbox keeps the whole photo and its colour label on screen on desktop a
   const phone = css.match(/@media \(max-width: 620px\),\s*\(max-height: 620px\) and \(max-width: 900px\) \{([\s\S]*?)\n\}/)?.[1] || "";
   assert.match(phone, /\.lightbox-panel\s*\{[^}]*justify-content:\s*center/);
   assert.match(phone, /\.lightbox-figure\s*\{[^}]*flex-grow:\s*0/);
+  assert.match(phone, /\.lightbox-image\s*\{[^}]*max-height:\s*min\(55dvh, calc\(100dvh - 11rem\)\)/, "tall photos must leave room for the colour label on phones");
   assert.match(css, /\.lightbox-photo-label\s*\{[^}]*min-height:\s*2\.6em/);
   assert.match(phone, /\.lightbox-photo-label\s*\{[^}]*min-height:\s*3\.9em/);
 });
