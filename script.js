@@ -278,11 +278,11 @@
         if (lightboxIncluded) { lightboxIncluded.textContent = ""; lightboxIncluded.hidden = true; }
       }
 
-      function renderLightboxItem() {
+      function renderLightboxItem(photoIndex) {
         var item = lightboxItems[lightboxIndex] || productDetails(lastTrigger);
         if (!item) return;
         lightboxPhotos = photosFor(item);
-        lightboxPhotoIndex = 0;
+        lightboxPhotoIndex = photoIndex > 0 && photoIndex < lightboxPhotos.length ? photoIndex : 0;
         renderPhoto();
         if (lightboxIncluded) { lightboxIncluded.textContent = item.included ? "What's included: " + item.included : ""; lightboxIncluded.hidden = !item.included; }
         if (lightboxName) { lightboxName.textContent = item.title; lightboxName.hidden = !item.title; }
@@ -436,6 +436,44 @@
         pendingLightboxRequest = requestButton;
         lightbox.close();
       });
+      function cardPhotoIndex(trigger) {
+        var strip = trigger.querySelector(".card-photos");
+        return strip && strip.clientWidth ? Math.round(strip.scrollLeft / strip.clientWidth) : 0;
+      }
+
+      function addCardPhotos(trigger) {
+        var image = trigger.querySelector("img");
+        if (!image || !image.parentNode || typeof document.createElement !== "function") return;
+        var photos = photosFor(productDetails(trigger));
+        if (photos.length < 2) return;
+        var strip = document.createElement("span");
+        strip.className = "card-photos";
+        image.parentNode.insertBefore(strip, image);
+        strip.appendChild(image);
+        var extras = photos.slice(1).map(function (photo) {
+          var extra = document.createElement("img");
+          extra.alt = "";
+          extra.decoding = "async";
+          extra.setAttribute("data-src", photo.src);
+          strip.appendChild(extra);
+          return extra;
+        });
+        var dots = document.createElement("span");
+        dots.className = "card-photo-dots";
+        dots.setAttribute("aria-hidden", "true");
+        photos.forEach(function (photo, index) { dots.appendChild(document.createElement("span")).className = index ? "" : "is-active"; });
+        trigger.appendChild(dots);
+        function loadExtras() {
+          extras.forEach(function (extra) { if (!extra.src) extra.src = extra.getAttribute("data-src"); });
+        }
+        strip.addEventListener("pointerdown", loadExtras, { passive: true });
+        strip.addEventListener("scroll", function () {
+          loadExtras();
+          var index = cardPhotoIndex(trigger);
+          Array.prototype.forEach.call(dots.children, function (dot, dotIndex) { dot.className = dotIndex === index ? "is-active" : ""; });
+        }, { passive: true });
+      }
+
       function openLightbox(trigger, restoreTarget) {
         invalidateLightboxFocus();
         lastTrigger = restoreTarget || trigger;
@@ -444,11 +482,12 @@
         var targetTrigger = targetCard && targetCard.querySelector ? targetCard.querySelector("[data-lightbox-trigger]") : null;
         lightboxItems = [productDetails(targetTrigger || trigger)];
         lightboxIndex = 0;
-        renderLightboxItem();
+        renderLightboxItem(cardPhotoIndex(targetTrigger || trigger));
         pushLightboxHistory();
         if (!lightbox.open) lightbox.showModal();
       }
       lightboxTriggers.forEach(function (trigger) {
+        addCardPhotos(trigger);
         var card = trigger.closest ? trigger.closest("article") : null;
         if (card && card.addEventListener) {
           card.addEventListener("click", function (event) {
