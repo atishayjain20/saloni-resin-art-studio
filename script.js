@@ -338,6 +338,7 @@
         renderPhoto();
       });
       lightbox.addEventListener("close", function () {
+        if (lightbox.open) return;
         var restoreTrigger = lastTrigger;
         var closeFromHistory = lightboxCloseFromHistory;
         lightboxCloseFromHistory = false;
