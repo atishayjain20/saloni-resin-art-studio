@@ -239,7 +239,7 @@
           var colour = styled ? "" : name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " ");
           photos.push({
             src: "assets/ai-images/" + stem + "--" + name + ".webp",
-            alt: (styled ? "AI concept – styled scene. " : "AI concept – " + colour + " colour idea. ") + (item.imageAlt || item.description || ""),
+            alt: (styled ? "Styled scene. " : colour + " colour idea. ") + (item.imageAlt || item.description || ""),
             label: styled ? "Styled scene" : "Colour idea: " + colour,
             colour: colour
           });
@@ -257,7 +257,7 @@
         if (photoNext) photoNext.hidden = !several;
         if (photoLabel) {
           photoLabel.hidden = !several;
-          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (lightboxPhotoIndex ? "\nAI concept – final piece is handmade and will vary." + (photo.colour ? " Mention \"" + photo.colour + "\" in your order notes." : "") : "") : "";
+          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (lightboxPhotoIndex && photo.colour ? "\nMention \"" + photo.colour + "\" in your order notes." : "") : "";
         }
       }
 

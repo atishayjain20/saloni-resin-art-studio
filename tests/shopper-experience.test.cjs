@@ -44,8 +44,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261108">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261108" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261109">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261109" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -836,7 +836,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
   return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe };
 }
 
-test("lightbox gallery steps through the card photo and its AI concept images", () => {
+test("lightbox gallery steps through the card photo and its extra images", () => {
   const h = galleryHarness({ colours: "teal styled" });
   assert.deepEqual(h.srcAssignments, []);
   h.open();
@@ -848,16 +848,17 @@ test("lightbox gallery steps through the card photo and its AI concept images", 
   assert.deepEqual(h.srcAssignments, ["assets/sample-gift.jpg?v=3"], "no variant URL until it is shown");
   h.docElements["lightbox-photo-next"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp");
-  assert.match(h.imageTarget.alt, /^AI concept – Teal colour idea\. Sample gift photo/);
+  assert.match(h.imageTarget.alt, /^Teal colour idea\. Sample gift photo/);
   assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour idea: Teal/);
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /\nAI concept – final piece is handmade and will vary\. Mention "Teal" in your order notes\./);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /\nMention "Teal" in your order notes\.$/);
+  assert.doesNotMatch(h.docElements["lightbox-photo-label"].textContent, /AI concept|handmade and will vary/);
   h.docElements["lightbox-photo-next"].listeners.click();
   h.docElements["lightbox-photo-next"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "next wraps to the card photo");
   h.docElements["lightbox-photo-prev"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--styled.webp", "prev wraps to the styled scene");
-  assert.match(h.imageTarget.alt, /^AI concept – styled scene\. Sample gift photo/);
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /^3 of 3 · Styled scene\nAI concept – final piece is handmade and will vary\.$/);
+  assert.match(h.imageTarget.alt, /^Styled scene\. Sample gift photo/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /^3 of 3 · Styled scene$/);
 });
 
 test("lightbox gallery stays single-photo without valid AI images", () => {
