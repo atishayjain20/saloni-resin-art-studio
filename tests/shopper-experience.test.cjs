@@ -44,8 +44,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261107">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261107" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261108">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261108" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -780,7 +780,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     },
     querySelectorAll(selector) { return selector === "figcaption p" ? paras : []; },
   });
-  const attributes = colours === undefined ? {} : { "data-colour-options": colours };
+  const attributes = colours === undefined ? {} : { "data-ai-images": colours };
   const trigger = makeElement({
     href,
     attributes,
@@ -836,8 +836,8 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
   return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe };
 }
 
-test("lightbox gallery steps through the card photo and its colour previews", () => {
-  const h = galleryHarness({ colours: "Teal Rose" });
+test("lightbox gallery steps through the card photo and its AI concept images", () => {
+  const h = galleryHarness({ colours: "teal styled" });
   assert.deepEqual(h.srcAssignments, []);
   h.open();
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
@@ -847,19 +847,21 @@ test("lightbox gallery steps through the card photo and its colour previews", ()
   assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 3 · As shown/);
   assert.deepEqual(h.srcAssignments, ["assets/sample-gift.jpg?v=3"], "no variant URL until it is shown");
   h.docElements["lightbox-photo-next"].listeners.click();
-  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--teal.webp");
-  assert.match(h.imageTarget.alt, /^Colour option – preview: Teal\. Sample gift photo/);
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour option – preview: Teal/);
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /Digital recolour – mention "Teal" in your order notes\./);
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp");
+  assert.match(h.imageTarget.alt, /^AI concept – Teal colour idea\. Sample gift photo/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour idea: Teal/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /\nAI concept – final piece is handmade and will vary\. Mention "Teal" in your order notes\./);
   h.docElements["lightbox-photo-next"].listeners.click();
   h.docElements["lightbox-photo-next"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "next wraps to the card photo");
   h.docElements["lightbox-photo-prev"].listeners.click();
-  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--rose.webp", "prev wraps to the last colour");
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--styled.webp", "prev wraps to the styled scene");
+  assert.match(h.imageTarget.alt, /^AI concept – styled scene\. Sample gift photo/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /^3 of 3 · Styled scene\nAI concept – final piece is handmade and will vary\.$/);
 });
 
-test("lightbox gallery stays single-photo without colour options", () => {
-  [undefined, ""].forEach((colours) => {
+test("lightbox gallery stays single-photo without valid AI images", () => {
+  [undefined, "", "Teal ../x styled.webp"].forEach((colours) => {
     const h = galleryHarness({ colours });
     h.open();
     assert.equal(h.docElements["lightbox-photo-prev"].hidden, true);
@@ -872,15 +874,15 @@ test("lightbox gallery stays single-photo without colour options", () => {
 });
 
 test("lightbox gallery follows arrow keys and swipes without hijacking vertical scroll", () => {
-  const h = galleryHarness({ colours: "Teal Rose" });
+  const h = galleryHarness({ colours: "teal styled" });
   h.open();
   assert.equal(h.press("ArrowRight").prevented, 1);
-  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--teal.webp");
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp");
   assert.equal(h.press("ArrowLeft").prevented, 1);
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
   assert.equal(h.press("Enter").prevented, 0);
   h.swipe(-80, 5);
-  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--teal.webp", "left swipe shows the next photo");
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp", "left swipe shows the next photo");
   h.swipe(80, 5);
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3", "right swipe shows the previous photo");
   h.swipe(-30, 0);
@@ -890,7 +892,7 @@ test("lightbox gallery follows arrow keys and swipes without hijacking vertical 
 });
 
 test("lightbox request button keeps acting on the product from any colour photo", () => {
-  const h = galleryHarness({ colours: "Teal Rose" });
+  const h = galleryHarness({ colours: "teal styled" });
   h.open();
   h.docElements["lightbox-photo-next"].listeners.click();
   h.docElements["lightbox-photo-next"].listeners.click();
@@ -901,7 +903,7 @@ test("lightbox request button keeps acting on the product from any colour photo"
 });
 
 test("lightbox shows What's included from the card note and keeps the rest as description", () => {
-  const h = galleryHarness({ colours: "Teal" });
+  const h = galleryHarness({ colours: "teal" });
   h.open();
   assert.equal(h.docElements["lightbox-image-description"].textContent, "Rich colour and golden flecks");
   assert.equal(h.docElements["lightbox-included"].hidden, false);
@@ -914,7 +916,7 @@ test("lightbox shows What's included from the card note and keeps the rest as de
 });
 
 test("lightbox gallery resets on close and reopens at the card photo", () => {
-  const h = galleryHarness({ colours: "Teal Rose" });
+  const h = galleryHarness({ colours: "teal styled" });
   h.open();
   h.docElements["lightbox-photo-next"].listeners.click();
   h.lightbox.close();
@@ -929,32 +931,33 @@ test("lightbox gallery resets on close and reopens at the card photo", () => {
 });
 
 test("lightbox ignores a late close event that arrives after it reopened", () => {
-  const h = galleryHarness({ colours: "Teal Rose" });
+  const h = galleryHarness({ colours: "teal styled" });
   h.open();
   h.docElements["lightbox-photo-next"].listeners.click();
   // Chrome can deliver a stale close event after the dialog is already open again.
   h.lightbox.listeners.close();
   assert.equal(h.lightbox.open, true);
-  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--teal.webp");
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour option – preview: Teal/);
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp");
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour idea: Teal/);
 });
 
-test("hero lightbox trigger uses the colour options of its target card", () => {
-  const h = galleryHarness({ colours: "Amethyst", heroTarget: true });
+test("hero lightbox trigger uses the AI images of its target card and names multi-word colours", () => {
+  const h = galleryHarness({ colours: "royal-blue", heroTarget: true });
   h.open();
   h.docElements["lightbox-photo-next"].listeners.click();
-  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--amethyst.webp");
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--royal-blue.webp");
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 2 · Colour idea: Royal blue\n[^\n]*Mention "Royal blue" in your order notes\./);
 });
 
-test("lightbox gallery drops a colour preview that fails to load and shows the card photo", () => {
-  const h = galleryHarness({ colours: "Teal Rose" });
+test("lightbox gallery drops an AI image that fails to load and shows the card photo", () => {
+  const h = galleryHarness({ colours: "teal styled" });
   h.open();
   h.docElements["lightbox-photo-next"].listeners.click();
   h.imageTarget.listeners.error();
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
   assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 2 · As shown/);
   h.docElements["lightbox-photo-next"].listeners.click();
-  assert.equal(h.imageTarget.src, "assets/colour-options/sample-gift--rose.webp");
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--styled.webp");
   h.imageTarget.listeners.error();
   assert.equal(h.docElements["lightbox-photo-next"].hidden, true, "no variants left means a single photo");
   h.imageTarget.listeners.error();
@@ -962,7 +965,7 @@ test("lightbox gallery drops a colour preview that fails to load and shows the c
 });
 
 test("lightbox ignores arrow keys with a modifier and survives a drag that ends on the backdrop", () => {
-  const h = galleryHarness({ colours: "Teal Rose" });
+  const h = galleryHarness({ colours: "teal styled" });
   h.open();
   ["altKey", "metaKey", "ctrlKey", "shiftKey"].forEach((modifier) => {
     const event = { key: "ArrowLeft", prevented: 0, preventDefault() { this.prevented += 1; } };
@@ -985,7 +988,7 @@ test("lightbox ignores arrow keys with a modifier and survives a drag that ends 
 });
 
 test("lightbox gallery works when the dialog has no gallery elements", () => {
-  const h = galleryHarness({ colours: "Teal", withGalleryElements: false });
+  const h = galleryHarness({ colours: "teal", withGalleryElements: false });
   h.open();
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
   assert.doesNotThrow(() => h.press("ArrowRight"));
@@ -1008,7 +1011,8 @@ test("lightbox gallery markup, care tips and styles meet the touch and scroll co
   assert.match(css, /\.lightbox-stage\s*\{[^}]*touch-action:\s*pan-y/);
   assert.match(css, /\.lightbox-photo-nav\s*\{[^}]*width:\s*44px[^}]*height:\s*44px/);
   assert.match(css, /\.lightbox-care summary\s*\{[^}]*min-height:\s*44px/);
-  assert.doesNotMatch(html, /colour-options\//, "the homepage must not fetch colour previews");
+  assert.doesNotMatch(html, /(?:colour-options|ai-images)\//, "the homepage must not fetch AI images");
+  assert.doesNotMatch(html, /data-colour-options/, "recolour previews are retired");
 });
 
 test("lightbox keeps the whole photo and its colour label on screen on desktop and closes the phone gap", () => {
