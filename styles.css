@@ -672,3 +672,30 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
     margin-top: 0;
   }
 }
+
+@media (min-width: 1024px) {
+  body:has(#catalogue-selection) { --max: 1320px; }
+  #catalogue-selection { width: min(calc(100% - (var(--gutter) * 2)), var(--max)); margin: 1rem auto 0; grid-template-columns: minmax(0, 1fr) minmax(15rem, auto); align-items: center; gap: 1.25rem 2.5rem; padding: 1.25rem 1.5rem; border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }
+  #catalogue-selection .catalogue-selection-items { max-width: 40rem; }
+  #catalogue-selection .catalogue-selection-actions { flex-direction: column; align-items: stretch; }
+  #catalogue-selection .catalogue-selection-actions .button { justify-content: center; }
+  body:has(#catalogue-selection) .hero { grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr); gap: clamp(2rem, 4vw, 4.5rem); }
+  body:has(#catalogue-selection) .hero h1 { max-width: 13ch; font-size: clamp(3.6rem, 5.2vw, 5.4rem); line-height: 1; }
+  body:has(#catalogue-selection) .hero .hero-actions .button { min-height: 3.25rem; padding: .85rem 1.45rem; font-size: .9rem; }
+  #order { grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr); column-gap: clamp(2.5rem, 5vw, 5rem); align-items: start; }
+  #order-inline-fallback { align-self: start; }
+  #order .order-copy h2 { max-width: 16ch; font-size: clamp(2.6rem, 3.6vw, 3.6rem); }
+  #order .order-copy > p:not(.eyebrow), #order .ordering-questions { max-width: 60ch; }
+  #customizer .customizer-heading { grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr); column-gap: 3rem; }
+  #customizer .customizer-disclosure-row:not(:has(> .customizer-disclosure[open])) { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+  #customizer .customizer-disclosure-row:not(:has(> .customizer-disclosure[open])) > .customizer-disclosure { border-top: 0; }
+  #customizer .customizer-disclosure-row:not(:has(> .customizer-disclosure[open])) > .customizer-design-help { margin-top: 0; }
+  #customizer .customizer-disclosure:not([open]) > summary { display: inline-flex; gap: .6rem; min-height: 3rem; padding: .72rem 1.3rem; border-radius: 999px; background: var(--ink); color: var(--ivory); }
+  #customizer .customizer-disclosure:not([open]) > summary::after { color: inherit; }
+  body:has(#catalogue-selection) #footer .footer-inner { grid-template-columns: minmax(12rem, .6fr) minmax(0, 2fr) auto; align-items: start; gap: 2rem 2.5rem; }
+  body:has(#catalogue-selection) #footer :is(.footer-inner p, .footer-links) { font-size: .875rem; }
+  body:has(#catalogue-selection) #footer .footer-links { justify-content: flex-end; gap: .75rem 1.25rem; padding-top: .35rem; }
+  body:has(#catalogue-selection) #footer .hero-trust-strip { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: .8rem; }
+  body:has(#catalogue-cart-jump:not([hidden])) #footer { padding-bottom: 7rem; }
+  html:has(#catalogue-cart-jump:not([hidden])) { scroll-padding-bottom: 6rem; }
+}

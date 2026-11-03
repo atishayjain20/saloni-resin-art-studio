@@ -44,7 +44,7 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261112">/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261113">/);
   assert.match(html, /<script class="site-script" src="script\.js\?v=20261112" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
