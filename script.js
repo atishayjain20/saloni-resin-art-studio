@@ -224,21 +224,23 @@
         paragraphs.some(function (paragraph, index) { if (paragraph.indexOf(" · ") !== -1) { includedAt = index; return true; } return false; });
         var included = includedAt === -1 ? "" : paragraphs[includedAt];
         var description = paragraphs.filter(function (paragraph, index) { return index !== includedAt; }).join(" ");
-        var colourList = typeof trigger.getAttribute === "function" ? (trigger.getAttribute("data-colour-options") || "") : "";
-        var colours = colourList.split(/\s+/).filter(function (name) { return /^[A-Za-z]+$/.test(name); });
+        var aiList = typeof trigger.getAttribute === "function" ? (trigger.getAttribute("data-ai-images") || "") : "";
+        var aiImages = aiList.split(/\s+/).filter(function (name) { return /^[a-z]+(?:-[a-z]+)*$/.test(name); });
         if (!description) description = imageAlt;
         else if (imageAlt && /illustrative preview|reference image|reference design/i.test(imageAlt) && description.indexOf(imageAlt) === -1) description += " " + imageAlt;
-        return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description, included: included, colours: colours };
+        return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description, included: included, aiImages: aiImages };
       }
 
       function photosFor(item) {
         var photos = [{ src: item.trigger.href, alt: item.imageAlt || item.description || "Artwork preview", label: "As shown" }];
         var stem = String(item.trigger.href || "").split(/[?#]/)[0].split("/").pop().replace(/\.[^.]*$/, "");
-        item.colours.forEach(function (colour) {
+        item.aiImages.forEach(function (name) {
+          var styled = name === "styled";
+          var colour = styled ? "" : name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " ");
           photos.push({
-            src: "assets/colour-options/" + stem + "--" + colour.toLowerCase() + ".webp",
-            alt: "Colour option – preview: " + colour + ". " + (item.imageAlt || item.description || ""),
-            label: "Colour option – preview: " + colour,
+            src: "assets/ai-images/" + stem + "--" + name + ".webp",
+            alt: (styled ? "AI concept – styled scene. " : "AI concept – " + colour + " colour idea. ") + (item.imageAlt || item.description || ""),
+            label: styled ? "Styled scene" : "Colour idea: " + colour,
             colour: colour
           });
         });
@@ -255,7 +257,7 @@
         if (photoNext) photoNext.hidden = !several;
         if (photoLabel) {
           photoLabel.hidden = !several;
-          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (photo.colour ? "\nDigital recolour – mention \"" + photo.colour + "\" in your order notes." : "") : "";
+          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (lightboxPhotoIndex ? "\nAI concept – final piece is handmade and will vary." + (photo.colour ? " Mention \"" + photo.colour + "\" in your order notes." : "") : "") : "";
         }
       }
 
