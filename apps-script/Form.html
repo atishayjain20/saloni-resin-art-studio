@@ -32,15 +32,18 @@
     input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
     .dimension-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
     .bundle-size { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
-    .bundle-size label { font-size: .76rem; }
+    .bundle-size label { display: flex; flex-direction: column; justify-content: flex-end; gap: .35rem; font-size: .76rem; }
+    .bundle-size input { min-height: 44px; padding-inline: .45rem; }
     .bundle-size .field-error { grid-column: 1 / -1; font-size: .8rem; }
     .bundle-size-item { margin-bottom: .75rem; }
     .shipping-fields { margin-top: .85rem; }
     .more-details > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; padding: .55rem 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fffaf4; color: #5d4947; font-weight: 700; cursor: pointer; list-style: none; }
     .more-details > summary::-webkit-details-marker { display: none; }
+    .more-details > summary:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
     .more-details > summary::after { content: ""; flex: none; width: .6rem; height: .6rem; margin-top: -.3rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s; }
     .more-details[open] > summary { margin-bottom: .6rem; }
     .more-details[open] > summary::after { margin-top: .3rem; transform: rotate(-135deg); }
+    @media (prefers-reduced-motion: reduce) { .more-details > summary::after { transition: none; } }
     .more-details > fieldset { margin-bottom: 1rem; }
     .referral-disclosure { margin-top: .85rem; }
     .referral-disclosure summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
@@ -82,7 +85,7 @@
 
     <fieldset>
       <legend>What should Saloni make?</legend>
-      <label for="quantity">Quantity <input id="quantity" name="quantity" type="number" min="1" max="100" step="1" inputmode="numeric" required></label>
+      <label id="quantity-row" for="quantity">Quantity <input id="quantity" name="quantity" type="number" min="1" max="100" step="1" inputmode="numeric" required></label>
       <div id="dimension-fields">
         <div class="dimension-pair">
           <label for="height-feet">Height feet <input id="height-feet" name="heightFeet" type="number" min="0" max="5" step="1" inputmode="numeric"></label>
@@ -147,7 +150,7 @@
       <div id="reference-image-preview-wrap" hidden>
         <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
       </div>
-      <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps. Customizer designs transfer directly with your request.</p>
+      <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps.</p>
       <div id="reference-image-actions" class="actions" hidden>
         <button id="retry-preview" class="secondary" type="button" hidden>Retry preview</button>
         <button id="continue-without-preview" class="secondary" type="button" hidden>Continue without preview</button>
@@ -187,6 +190,7 @@
   var productContext = document.getElementById("product-context");
   var productImage = document.getElementById("product-image");
   var productNameRow = document.getElementById("product-name-row");
+  var quantityRow = document.getElementById("quantity-row");
   var productNameHint = document.getElementById("product-name-hint");
   var bundleItemsElement = document.getElementById("bundle-items");
   var dimensionFields = document.getElementById("dimension-fields");
@@ -511,6 +515,7 @@
       form.elements.productName.setAttribute("readonly", "readonly");
       form.elements.quantity.setAttribute("readonly", "readonly");
       if (productNameRow) productNameRow.hidden = bundleItems.length > 0;
+      if (quantityRow) quantityRow.hidden = bundleItems.length > 0;
       if (productNameHint) productNameHint.hidden = bundleItems.length > 0;
       productImage.hidden = true;
       productImage.removeAttribute("src");
@@ -523,6 +528,7 @@
     form.elements.productName.removeAttribute("readonly");
     form.elements.quantity.removeAttribute("readonly");
     if (productNameRow) productNameRow.hidden = false;
+    if (quantityRow) quantityRow.hidden = false;
     if (productNameHint) productNameHint.hidden = false;
     if (bundleItemsElement) bundleItemsElement.hidden = true;
     productImage.hidden = false;
@@ -543,7 +549,8 @@
     bundleItems = normalizeBundleItems(next.bundleItems);
     bundleNotes = "";
     form.elements.bundleSourceIds.value = "";
-    if (moreDetails && (next.email || next.requestedDate || next.referralCode || isCustomizerOrderRequest())) moreDetails.open = true;
+    if (moreDetails && (next.email || next.requestedDate || next.referralCode)) moreDetails.open = true;
+    setReferenceImageStatus("Optional: attach a separate reference image if it helps." + (dimensionsRequired() ? " Customizer designs transfer directly with your request." : ""), "");
     if (isBundle() && bundleItems.length) form.elements.designDetails.value = "";
     toggleShipping();
     updateDimensionMaxes();

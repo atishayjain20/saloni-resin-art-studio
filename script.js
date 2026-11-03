@@ -232,9 +232,15 @@
           lightboxRequest.hidden = !itemRequestButton;
           lightboxRequest.disabled = lightboxRequest.hidden;
           if (!lightboxRequest.hidden) {
+            var isQuote = typeof itemRequestButton.getAttribute === "function" && itemRequestButton.getAttribute("data-order-prefill") === "quote";
             var selected = typeof itemRequestButton.getAttribute === "function" && itemRequestButton.getAttribute("aria-pressed") === "true";
-            lightboxRequest.textContent = selected ? "Remove from cart" : "Add to cart";
-            lightboxRequest.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from cart" : " to cart"));
+            if (isQuote) {
+              lightboxRequest.textContent = "Ask for a quote";
+              lightboxRequest.setAttribute("aria-label", "Ask for a quote for " + (item.title || "item"));
+            } else {
+              lightboxRequest.textContent = selected ? "Remove from cart" : "Add to cart";
+              lightboxRequest.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from cart" : " to cart"));
+            }
           }
         }
       }
@@ -860,6 +866,8 @@
     var catalogueCartJump = document.getElementById("catalogue-cart-jump");
     var catalogueCartCount = document.getElementById("catalogue-cart-count");
     var catalogueCartView = document.getElementById("catalogue-cart-view");
+    var headerCart = document.getElementById("catalogue-header-cart");
+    var headerCartCount = document.getElementById("catalogue-header-cart-count");
     var catalogueCartOrder = document.getElementById("catalogue-cart-order");
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
@@ -1721,6 +1729,11 @@
       }
       if (catalogueCartCount) catalogueCartCount.textContent = count ? count + " selected" : "";
       if (catalogueCartView) catalogueCartView.setAttribute("data-count", String(count));
+      if (headerCart) {
+        headerCart.hidden = count === 0;
+        headerCart.setAttribute("aria-label", count ? "View cart, " + count + (count === 1 ? " item" : " items") : "View cart");
+      }
+      if (headerCartCount) headerCartCount.textContent = count ? String(count) : "";
       if (catalogueCartOrder) catalogueCartOrder.disabled = count === 0;
       if (catalogueSelectionSummary) {
         if (!count) catalogueSelectionSummary.textContent = "No gifts selected.";
@@ -1833,11 +1846,22 @@
       return Object.assign(sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details }), { price: price, size: size, imageSrc: image.getAttribute("src") });
     }
 
+    var quoteCards = Array.prototype.slice.call(document.querySelectorAll("#premium-collection .work-card"));
     document.querySelectorAll(".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card").forEach(function (card) {
       var seed = catalogueSeed(card);
       var caption = card.querySelector("figcaption");
       if (!seed || !caption || caption.querySelector("[data-order-prefill]")) return;
       var button = document.createElement("button");
+      if (quoteCards.indexOf(card) !== -1) {
+        button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "quote");
+        button.textContent = "Ask for a quote";
+        button.setAttribute("aria-label", "Ask for a quote for " + seed.productName);
+        button.addEventListener("click", function () {
+          chooseSource(Object.assign({}, seed, { quantity: "1" }), { opener: button, card: card });
+        });
+        caption.appendChild(button);
+        return;
+      }
       button.type = "button"; button.className = "catalogue-order-button"; button.setAttribute("data-order-prefill", "catalogue");
       button.__saloniCatalogueSourceId = seed.sourceId;
       button.__saloniCatalogueTitle = seed.productName;
@@ -1894,11 +1918,13 @@
       requestSelectedCatalogueItems(catalogueCartOrder);
     });
 
-    if (catalogueCartView) catalogueCartView.addEventListener("click", function () {
+    function viewCatalogueCart() {
       if (!catalogueSelection || catalogueSelection.hidden) return;
       catalogueSelection.scrollIntoView({ behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
       catalogueSelection.focus({ preventScroll: true });
-    });
+    }
+    if (catalogueCartView) catalogueCartView.addEventListener("click", viewCatalogueCart);
+    if (headerCart) headerCart.addEventListener("click", viewCatalogueCart);
 
     function clearCustomizerFallback() {
       frameState.customizerFallback = null;

@@ -146,6 +146,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const catalogueCartCount = new Element("catalogue-cart-count");
   const catalogueCartView = new Element("catalogue-cart-view");
   const catalogueCartOrder = new Element("catalogue-cart-order"); catalogueCartOrder.disabled = true;
+  const headerCart = new Element("catalogue-header-cart"); headerCart.hidden = true;
+  const headerCartCount = new Element("catalogue-header-cart-count");
   const customizer = new Element("order-from-customizer");
   const continueWithoutPreview = new Element("customizer-continue-without-preview"); continueWithoutPreview.hidden = true;
   const generalRequest = new Element("general-custom-gift");
@@ -157,7 +159,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, frame, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -191,7 +193,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const movedStudioCatalogue = [
     ["resin-clock.jpg", "Blue hour resin clock", "A little sky, a little shoreline, and a moment that keeps time."],
     ["resin-message-coasters.jpg", "Personalized message coasters", "Playful coasters for the person who makes ordinary days better."],
-    ["navkar-resin-frame.jpg", "Namokar mantra resin frame", "Soft white texture, gold detail, and words that belong at home."],
+    ["navkar-resin-frame.jpg", "Pearl white Namokar mantra frame", "Soft white texture, gold detail, and words that belong at home."],
     ["personalized-floral-hoop.jpg", "A tiny beginning", "Floral detail arranged around a memory worth marking."],
   ];
   const movedStudioCards = movedStudioCatalogue.map(([asset, title, copy]) => {
@@ -309,6 +311,19 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     const override = priceOverrides[pricedCard.title.textContent];
     if (override) pricedCard.priceRows[0] = { querySelector(selector) { return selector === "dt" ? { textContent: "Price" } : { textContent: override }; } };
   });
+  const premiumCards = [
+    ["premium-midnight-blue-tiered-set.jpeg", "Midnight blue tiered set", "₹20,000–₹25,000"],
+    ["premium-ivory-gold-tiered-set.jpeg", "Ivory-gold tiered set", "Price on request"],
+  ].map(([asset, title, price]) => {
+    const premiumCard = new Element("work-card");
+    premiumCard.caption = new Element("figcaption");
+    premiumCard.image = { getAttribute: () => `assets/${asset}` };
+    premiumCard.title = { textContent: title };
+    premiumCard.titleTag = "strong";
+    premiumCard.detailNodes = [{ textContent: "A full premium set." }];
+    premiumCard.priceRows = [["Price", price]].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
+    return premiumCard;
+  });
   const posted = [];
   const customizerOutcomes = [];
   const body = { appendChild() {}, removeChild() {} };
@@ -354,7 +369,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     addEventListener(type, listener) { if (type === "DOMContentLoaded") this.ready = listener; },
     getElementById(id) { return elements.get(id) || null; },
     querySelectorAll(selector) {
-      if (selector === ".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card") return [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards, ...corporateCards, ...diwaliCards];
+      if (selector === ".catalogue-grid .work-card, .catalogue-grid .romantic-keepsake-card") return [card, ...movedStudioCards, ...romanticExistingCards, ...generatedCards, ...romanticConceptCards, ...corporateCards, ...diwaliCards, ...premiumCards];
+      if (selector === "#premium-collection .work-card") return premiumCards;
       if (selector === '[data-order-prefill="general"]') return [generalRequest, designHelp];
       return [];
     },
@@ -381,8 +397,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const romanticConceptButtons = romanticConceptCards.map((romanticCard) => romanticCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
+  const premiumQuoteButtons = premiumCards.map((premiumCard) => premiumCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "quote"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
+  return { elements, premiumCards, premiumQuoteButtons, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
@@ -812,6 +829,64 @@ test("previews selected catalogue items and provides an accessible cart jump", (
   flow.generatedCatalogueButtons[2].dispatch("click");
   assert.equal(flow.catalogueCartJump.hidden, true);
   assert.equal(flow.catalogueSelectionPreviews.children.length, 0);
+});
+
+test("premium sets open a one-item quote request and never touch the cart", () => {
+  const flow = runFlow();
+  const [button] = flow.premiumQuoteButtons;
+  assert.ok(button, "premium card has a quote button");
+  assert.equal(button.textContent, "Ask for a quote");
+  assert.equal(button.getAttribute("aria-label"), "Ask for a quote for Midnight blue tiered set");
+  assert.equal(button.hasAttribute("aria-pressed"), false);
+  assert.equal(flow.posted.length, 0);
+  button.dispatch("click");
+  assert.equal(flow.posted.length, 1);
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.sourceKind, "catalogue");
+  assert.equal(seed.sourceId, "catalogue:premium-midnight-blue-tiered-set.jpeg");
+  assert.equal(seed.productName, "Midnight blue tiered set");
+  assert.equal(seed.quantity, "1");
+  assert.equal(Object.prototype.hasOwnProperty.call(seed, "bundleItems"), false);
+  assert.equal(flow.orderDialog.open, true);
+  assert.equal(flow.elements.get("selected-product-name").textContent, "Midnight blue tiered set");
+  assert.equal(flow.catalogueSelection.hidden, true);
+  assert.equal(flow.catalogueCartJump.hidden, true);
+  assert.equal(flow.headerCart.hidden, true);
+});
+
+test("a premium quote keeps the cart and Order now still opens the cart request", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.premiumQuoteButtons[0].dispatch("click");
+  assert.equal(submittedSeed(flow.posted).sourceId, "catalogue:premium-midnight-blue-tiered-set.jpeg");
+  assert.equal(flow.catalogueCartCount.textContent, "1 selected");
+  flow.orderDialog.close();
+  flow.catalogueCartOrder.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.sourceId, "catalogue:multi-item");
+  assert.deepEqual(seed.bundleItems.map((item) => item.sourceId), ["catalogue:test-frame.png"]);
+  assert.equal(flow.orderDialog.open, true);
+});
+
+test("the header cart shows the item count, hides when empty and opens the cart", () => {
+  const flow = runFlow();
+  assert.equal(flow.headerCart.hidden, true);
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.headerCart.hidden, false);
+  assert.equal(flow.headerCartCount.textContent, "1");
+  assert.equal(flow.headerCart.getAttribute("aria-label"), "View cart, 1 item");
+  flow.generatedCatalogueButtons[0].dispatch("click");
+  assert.equal(flow.headerCartCount.textContent, "2");
+  assert.equal(flow.headerCart.getAttribute("aria-label"), "View cart, 2 items");
+  flow.headerCart.dispatch("click");
+  assert.equal(flow.catalogueSelection.focused, true);
+  assert.equal(flow.catalogueSelection.focusOptions.preventScroll, true);
+  assert.equal(flow.catalogueSelection.scrollCalls.length, 1);
+  flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButtons[0].dispatch("click");
+  assert.equal(flow.headerCart.hidden, true);
+  assert.equal(flow.headerCartCount.textContent, "");
+  assert.equal(flow.headerCart.getAttribute("aria-label"), "View cart");
 });
 
 test("the fixed selected-items cart exposes separate View cart and Order now actions", () => {
@@ -1244,7 +1319,7 @@ test("keeps moved studio art cards on the shared catalogue order path", () => {
   const expected = [
     ["resin-clock.jpg", "Blue hour resin clock"],
     ["resin-message-coasters.jpg", "Personalized message coasters"],
-    ["navkar-resin-frame.jpg", "Namokar mantra resin frame"],
+    ["navkar-resin-frame.jpg", "Pearl white Namokar mantra frame"],
     ["personalized-floral-hoop.jpg", "A tiny beginning"],
   ];
   expected.forEach(([asset, title], index) => {

@@ -44,9 +44,33 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261103">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261103" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261104">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261104" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
+});
+
+test("mobile footer links, Instagram and trust-strip links are at least 44px tall", () => {
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"), css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  const tapRule = mobileCss.match(/\.footer-links a, \.site-footer \.instagram-mark, \.site-footer \.hero-trust-strip a\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(tapRule, /display:\s*inline-flex/);
+  assert.match(tapRule, /align-items:\s*center/);
+  assert.match(tapRule, /min-height:\s*44px/);
+  assert.match(mobileCss, /\.site-footer \.wordmark-footer\s*\{[^}]*min-height:\s*44px/);
+  assert.match(mobileCss, /\.footer-links\s*\{[^}]*gap:\s*0 1rem/);
+});
+
+test("header cart button sits in the catalogue controls and keeps the header on one row on phones", () => {
+  const controls = html.match(/<div class="catalogue-control-bar"[\s\S]*?<\/div>/)?.[0] || "";
+  const button = controls.match(/<button[^>]*id="catalogue-header-cart"[^>]*>/)?.[0] || "";
+  assert.match(button, /\bhidden\b/);
+  assert.match(button, /aria-controls="catalogue-selection"/);
+  assert.match(button, /aria-label="View cart"/);
+  assert.match(controls, /id="catalogue-header-cart-count"[^>]*aria-hidden="true"/);
+  assert.match(css, /\.catalogue-header-cart-count\s*\{[^}]*position:\s*absolute/);
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"), css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  assert.match(mobileCss, /\.header-inner\s*\{[^}]*column-gap:\s*\.5rem/);
+  assert.match(css, /@media \(max-width: 620px\)\s*\{[^@]*?\.catalogue-control-bar\s*\{[^}]*gap:\s*\.25rem/);
+  assert.match(css, /@media \(max-width: 370px\)\s*\{[^}]*\.site-header \.wordmark-subtitle\s*\{[^}]*letter-spacing:\s*\.08em/);
 });
 
 test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable", () => {
@@ -649,6 +673,7 @@ test("lightbox keeps product details and request action without catalogue naviga
   assert.doesNotMatch(script, /lightbox-(?:previous|next|position)/);
   assert.match(script, /pendingLightboxRequest[\s\S]*requestButton\.click\(\)[\s\S]*focusOrderLocation/);
   assert.match(script, /selected \? "Remove from cart" : "Add to cart"/);
+  assert.match(script, /getAttribute\("data-order-prefill"\) === "quote"[\s\S]*"Ask for a quote"[\s\S]*"Ask for a quote for "/);
   assert.match(script, /selected \? " from cart" : " to cart"/);
   assert.match(html, /id="order"[^>]*tabindex="-1"/);
   assert.match(script, /data-lightbox-trigger/);

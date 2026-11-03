@@ -26,8 +26,14 @@ test("announces a seeded embedded form even when CAPTCHA has no site key", () =>
 test("customizer handoff copy does not ask customers to download or reattach a preview", () => {
   const status = html.match(/<p id="reference-image-status"[^>]*>[\s\S]*?<\/p>/)?.[0] || "";
   assert.match(status, /Optional: attach a separate reference image if it helps/);
-  assert.match(status, /Customizer designs transfer directly with your request/);
+  assert.doesNotMatch(status, /Customizer designs transfer/);
   assert.doesNotMatch(status, /download it first|reattach/i);
+  const status_ = (runtime) => runtime.elements.get("reference-image-status").textContent;
+  const catalogue = makeFormRuntime();
+  assert.equal(status_(catalogue), "Optional: attach a separate reference image if it helps.");
+  const customizer = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: false });
+  assert.match(status_(customizer), /Customizer designs transfer directly with your request/);
+  assert.doesNotMatch(status_(customizer), /download it first|reattach/i);
 });
 
 test("keeps optional partner referral controls behind a collapsed native disclosure", () => {
@@ -246,7 +252,7 @@ test("keeps only the required fields visible and groups optional fields in a clo
   assert.match(html, /<input id="bundle-source-ids" name="bundleSourceIds" type="hidden">/);
 });
 
-test("More details opens for a field error and starts open only for seeded optional values or customizer previews", async () => {
+test("More details opens for a field error and starts open only for seeded optional values", async () => {
   const plain = makeFormRuntime();
   assert.equal(plain.elements.get("more-details").open, false);
   const emailError = makeFormRuntime();
@@ -269,7 +275,7 @@ test("More details opens for a field error and starts open only for seeded optio
     assert.equal(makeFormRuntime({ seedOverrides }).elements.get("more-details").open, true);
   }
   const customizer = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  assert.equal(customizer.elements.get("more-details").open, true);
+  assert.equal(customizer.elements.get("more-details").open, false);
 });
 
 const serverSource = fs.readFileSync(path.join(__dirname, "..", "apps-script", "Code.gs"), "utf8");
@@ -581,6 +587,29 @@ test("Form.html has a custom size fieldset as the first thing in More details, w
   assert.doesNotMatch(renderer, /\.name\s*=\s*["']?bundle-size/);
 });
 
+test("a cart order hides the read-only Quantity row but still submits the total", async () => {
+  assert.match(html, /<label id="quantity-row" for="quantity">Quantity /);
+  const fresh = makeFormRuntime({ sourceId: "catalogue:multi-item", bundleItems: SIZE_ITEMS.map((item) => Object.assign({}, item)) });
+  assert.equal(fresh.elements.get("quantity-row").hidden, true);
+  assert.equal(fresh.fields.quantity.value, "2");
+  const runtime = cartRuntime();
+  await submitAndSend(runtime);
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.submissions[0].elements.quantity.value, "2");
+  const single = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
+  assert.notEqual(single.elements.get("quantity-row").hidden, true);
+});
+
+test("per-item custom size inputs are 44px tall and aligned to the bottom of each cell", () => {
+  assert.match(html, /\.bundle-size label\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*justify-content:\s*flex-end/);
+  assert.match(html, /\.bundle-size input\s*\{[^}]*min-height:\s*44px/);
+});
+
+test("More details summary has a focus ring and its chevron respects reduced motion", () => {
+  assert.match(html, /\.more-details > summary:focus-visible\s*\{[^}]*outline:\s*3px solid #b24b60/);
+  assert.match(html, /@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\.more-details > summary::after\s*\{[^}]*transition:\s*none/);
+});
+
 test("a single product moves the size fields into Custom size and a blank size is accepted", async () => {
   const runtime = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
   fillValid(runtime.fields);
@@ -799,7 +828,7 @@ class FakeMessageChannel {
 }
 
 function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
+  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
