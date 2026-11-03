@@ -1092,6 +1092,11 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn("https://www.instagram.com/saloniresin_art_studio/", self.html)
         self.assertIn("@saloniresin_art_studio", self.html)
 
+    def test_talk_first_box_offers_whatsapp(self):
+        box = re.search(r'id="order-inline-fallback-title".*?</div>', self.html, re.S)
+        self.assertIsNotNone(box)
+        self.assertRegex(box.group(0), r'<a class="contact-line" href="https://wa\.me/918209238541\?text=[^"]+" target="_blank" rel="noopener"><span>Message on WhatsApp</span><strong>8209238541</strong></a>')
+
     def test_published_assets_exist_and_do_not_reference_source_folder(self):
         asset_sources = re.findall(r'<img[^>]+src=["\']([^"\']+)', self.html)
         self.assertGreaterEqual(len(asset_sources), 10)
