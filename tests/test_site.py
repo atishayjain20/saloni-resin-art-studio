@@ -1109,6 +1109,20 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertRegex(css, r'\.order-inline-fallback \.contact-line\[' + selector + r'\]::before \{[^}]*background')
         self.assertRegex(css, r'\.order-inline-fallback \.contact-line::after \{[^}]*content:')
 
+    def test_meet_saloni_shows_a_small_round_photo_before_next_steps(self):
+        block = re.search(r'<div class="meet-saloni"[^>]*aria-labelledby="meet-saloni-title">(.*?)</div>\s*</div>', self.html, re.S)
+        self.assertIsNotNone(block)
+        self.assertLess(self.html.index('class="meet-saloni"'), self.html.index('id="customer-confidence-title"'))
+        self.assertIn('<h2 id="meet-saloni-title">Meet Saloni</h2>', block.group(1))
+        self.assertRegex(block.group(1), r'<img class="meet-saloni-photo" src="assets/saloni-portrait\.jpg" alt="[^"]{9,}" width="320" height="320" loading="lazy"')
+        self.assertTrue((ROOT / "assets/saloni-portrait.jpg").is_file())
+        self.assertLess((ROOT / "assets/saloni-portrait.jpg").stat().st_size, 60_000)
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        photo = re.search(r'\.meet-saloni-photo \{([^}]*)\}', css)
+        self.assertIsNotNone(photo)
+        self.assertIn("border-radius: 50%", photo.group(1))
+        self.assertRegex(photo.group(1), r'width: (?:[1-9]\d)px')
+
     def test_published_assets_exist_and_do_not_reference_source_folder(self):
         asset_sources = re.findall(r'<img[^>]+src=["\']([^"\']+)', self.html)
         self.assertGreaterEqual(len(asset_sources), 10)
