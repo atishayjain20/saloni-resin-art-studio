@@ -1097,6 +1097,18 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(box)
         self.assertRegex(box.group(0), r'<a class="contact-line" href="https://wa\.me/918209238541\?text=[^"]+" target="_blank" rel="noopener"><span>Message on WhatsApp</span><strong>8209238541</strong></a>')
 
+    def test_talk_first_contacts_look_like_buttons(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        rule = re.search(r'\.order-inline-fallback \.contact-line \{([^}]*)\}', css)
+        self.assertIsNotNone(rule)
+        for prop in (r'border: 1px solid', r'border-radius:', r'min-height: 44px'):
+            with self.subTest(prop=prop):
+                self.assertRegex(rule.group(1), prop)
+        for selector in ('href\\^="tel:"', 'href\\*="wa\\.me"', 'href\\*="instagram"'):
+            with self.subTest(selector=selector):
+                self.assertRegex(css, r'\.order-inline-fallback \.contact-line\[' + selector + r'\]::before \{[^}]*background')
+        self.assertRegex(css, r'\.order-inline-fallback \.contact-line::after \{[^}]*content:')
+
     def test_published_assets_exist_and_do_not_reference_source_folder(self):
         asset_sources = re.findall(r'<img[^>]+src=["\']([^"\']+)', self.html)
         self.assertGreaterEqual(len(asset_sources), 10)
