@@ -191,7 +191,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const movedStudioCatalogue = [
     ["resin-clock.jpg", "Blue hour resin clock", "A little sky, a little shoreline, and a moment that keeps time."],
     ["resin-message-coasters.jpg", "Personalized message coasters", "Playful coasters for the person who makes ordinary days better."],
-    ["navkar-resin-frame.jpg", "Namokar mantra resin frame", "Soft white texture, gold detail, and words that belong at home."],
+    ["navkar-resin-frame.jpg", "Pearl white Namokar mantra frame", "Soft white texture, gold detail, and words that belong at home."],
     ["personalized-floral-hoop.jpg", "A tiny beginning", "Floral detail arranged around a memory worth marking."],
   ];
   const movedStudioCards = movedStudioCatalogue.map(([asset, title, copy]) => {
@@ -1244,7 +1244,7 @@ test("keeps moved studio art cards on the shared catalogue order path", () => {
   const expected = [
     ["resin-clock.jpg", "Blue hour resin clock"],
     ["resin-message-coasters.jpg", "Personalized message coasters"],
-    ["navkar-resin-frame.jpg", "Namokar mantra resin frame"],
+    ["navkar-resin-frame.jpg", "Pearl white Namokar mantra frame"],
     ["personalized-floral-hoop.jpg", "A tiny beginning"],
   ];
   expected.forEach(([asset, title], index) => {

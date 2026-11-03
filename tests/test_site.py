@@ -503,8 +503,26 @@ class StaticSiteContractTests(unittest.TestCase):
         card = studio_card.group(0)
         self.assertIn('src="assets/studio-blue-mantra-frame.jpeg"', card)
         self.assertIn("Namokar", card)
-        self.assertIn("<strong>Namokar mantra frame</strong>", card)
         self.assertNotIn("<strong>Blue mantra frame</strong>", card)
+
+    def test_namokar_frames_are_named_by_colour(self):
+        titles = {
+            "blue-mantra-frame": "Blue and white Namokar mantra frame",
+            "white-mantra-frame": "White and gold Namokar mantra frame",
+            "navkar-resin-frame": "Pearl white Namokar mantra frame",
+        }
+        self.assertEqual(len(set(titles.values())), 3)
+        sub_page = (ROOT / "namokar-mantra-frames" / "index.html").read_text(encoding="utf-8")
+        json_ld = json.loads(re.search(r'<script\b[^>]*type=["\']application/ld\+json["\']>([\s\S]*?)</script>', sub_page).group(1))
+        list_names = {item["url"].split("#")[1]: item["name"] for item in json_ld["mainEntity"]["itemListElement"]}
+        for card_id, title in titles.items():
+            with self.subTest(card_id=card_id):
+                card = re.search(rf'<article\b[^>]*id="{card_id}"[\s\S]*?</article>', self.html).group(0)
+                self.assertIn(f"<strong>{title}</strong>", card)
+                self.assertEqual(list_names[card_id], title)
+                link = re.search(rf'<h2>([^<]+)</h2>(?:(?!</figcaption>)[\s\S])*?href="\.\./#{card_id}"', sub_page)
+                self.assertIsNotNone(link)
+                self.assertEqual(link.group(1), title)
 
     def test_search_console_ownership_verification_tag(self):
         verification_tag = '<meta name="google-site-verification" content="DabWPBofb7rmKPDncFwmqhELfgYwyiXGu0IxJCXR0SE" />'
@@ -591,7 +609,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 "Share the photo, flowers, date, and preferred dimensions when you enquire.",
             ],
             "namokar-mantra-frames": [
-                "Compare the three finishes—blue, white, and Navkar—then share the intended location and size.",
+                "Compare the three finishes—blue and white, white and gold, and pearl white—then share the intended location and size.",
                 "Confirm the inscription and design before production.",
             ],
         }
@@ -1036,7 +1054,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "Resin keepsakes from the studio",
             "Blue hour resin clock",
             "Personalized message coasters",
-            "Namokar mantra resin frame",
+            "Pearl white Namokar mantra frame",
             "Personalized photo clock",
             "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM. Shipping across India.",
         ):
