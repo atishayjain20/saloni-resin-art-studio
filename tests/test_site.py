@@ -1470,6 +1470,13 @@ class StaticSiteContractTests(unittest.TestCase):
             with self.subTest(stem=stem):
                 self.assertEqual(declared.get(stem), names)
 
+    def test_sizes_do_not_say_each(self):
+        sizes = re.findall(r"<dt>Size</dt><dd>([^<]*)</dd>", self.html)
+        self.assertGreater(len(sizes), 10)
+        for size in sizes:
+            with self.subTest(size=size):
+                self.assertNotIn("each", size)
+
     def test_order_copy_is_plain_and_privacy_note_is_not_repeated(self):
         self.assertNotIn("visible request fields", self.html)
         self.assertIn("then review your request before sending.", self.html)
