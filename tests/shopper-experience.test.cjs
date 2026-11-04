@@ -143,8 +143,8 @@ test("initHeroBanner scrolls by slide without timers and honours reduced motion"
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261121">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261121" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261122">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261122" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -266,7 +266,8 @@ test("hero banner CSS snaps full-bleed photo slides with a bottom-centre Shop no
   assert.match(photosRule, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(slideRule, /position:\s*relative/);
   assert.doesNotMatch(slideRule, /padding\s*:/);
-  assert.match(slideRule, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(slideRule, /height:\s*50svh/, "the banner fills about half the screen");
+  assert.doesNotMatch(css, /\.hero-slide\s*\{[^}]*aspect-ratio/, "no width-based banner shape");
   assert.match(photosRule, /height:\s*100%/);
   assert.match(ctaRule, /position:\s*absolute/);
   assert.match(ctaRule, /bottom:\s*[^;]+;/);
@@ -278,7 +279,7 @@ test("hero banner CSS snaps full-bleed photo slides with a bottom-centre Shop no
   assert.match(ctaRule, /box-shadow:/);
   assert.doesNotMatch(css, /\.hero-slide(?:-copy|-narrow)\b|\.hero-slide \.eyebrow|\.hero-slide h2|\.hero-banner-title|\.hero-slide:nth-child/);
   assert.match(imageRule, /object-fit:\s*cover/);
-  assert.match(wideCss, /\.hero-slide\s*\{[^}]*aspect-ratio:\s*21\s*\/\s*9/);
+  assert.doesNotMatch(wideCss, /\.hero-slide\s*\{/);
   assert.doesNotMatch(wideCss, /grid-template-columns:\s*minmax\(0,\s*0?\.8fr\)/);
   assert.match(arrowRule, /width:\s*44px/);
   assert.match(arrowRule, /height:\s*44px/);

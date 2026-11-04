@@ -1174,6 +1174,11 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('<p class="panel-label" id="catalogue-selection-title">Your cart</p>', self.html)
         self.assertIn('aria-labelledby="catalogue-selection-title"', self.html)
 
+    def test_empty_catalogue_results_region_draws_no_focus_box(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertIn('id="catalogue-filters" aria-label="Gift catalogue results" tabindex="-1"', self.html)
+        self.assertRegex(css, r"\n\.catalogue-status-region:focus \{\n  outline: none;\n\}")
+
     def test_cart_sits_after_design_a_frame_and_before_meet_saloni(self):
         customizer = self.html.index('id="customizer-mobile-actions"')
         cart = self.html.index('id="catalogue-selection"')

@@ -50,9 +50,9 @@ test("desktop order columns align to the top", () => {
   assert.match(rule(block, "#order-inline-fallback"), /align-self:\s*start/);
 });
 
-test("desktop hero banner goes wider (3/1) and never uses an #hero selector", () => {
+test("desktop hero banner keeps the half-screen height and never uses an #hero selector", () => {
   const block = desktopBlock();
-  assert.match(block, /\.hero-slide\s*\{[^}]*aspect-ratio:\s*3\s*\/\s*1/);
+  assert.doesNotMatch(block, /\.hero-slide\s*\{/);
   assert.doesNotMatch(block, /hero-slide-narrow/);
   assert.doesNotMatch(block, /\.hero(?![-\w])|#hero|hero-actions|hero-collage/);
   // the mobile hero test forbids "#hero" anywhere after the reduced-motion media query
