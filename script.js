@@ -560,6 +560,7 @@
     var empty = document.getElementById("catalogue-filter-empty");
     var results = document.getElementById("catalogue-results");
     if (!tools || !searchFilter || !typeFilter || !priceFilter || !applyButton || !resetButton || !emptyReset || !status || !empty || !results) return;
+    var categoryTabs = document.querySelectorAll("[data-category-tab]");
     var searchForm = document.getElementById("catalogue-search-form");
     var searchToggle = document.getElementById("catalogue-search-toggle");
     var filterToggle = document.getElementById("catalogue-filter-toggle");
@@ -691,6 +692,14 @@
       });
     }
 
+    function syncCategoryTabs() {
+      if (!categoryTabs || typeof categoryTabs.forEach !== "function") return;
+      categoryTabs.forEach(function (tab) {
+        if (tab.getAttribute("data-category-tab") === appliedType) tab.setAttribute("aria-current", "true");
+        else if (typeof tab.removeAttribute === "function") tab.removeAttribute("aria-current");
+      });
+    }
+
     function applyFilters() {
       var matchingCards = catalogueCards();
       cards.forEach(function (card) {
@@ -718,6 +727,7 @@
         disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : "View all";
       });
       updateCataloguePresentation();
+      syncCategoryTabs();
       empty.hidden = matchingCards.length !== 0;
       status.textContent = !matchingCards.length ? "No gifts match those choices." : "";
       document.documentElement.classList.add("catalogue-ready");
