@@ -44,8 +44,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261115">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261115" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261116">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261116" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -193,9 +193,7 @@ test("catalogue enhancement has accessible filters, preview mode, and a no-resul
   assert.match(siteHeader, /id="catalogue-filter-toggle"/);
   assert.match(siteHeader, /aria-controls="catalogue-search-panel"/);
   assert.match(siteHeader, /aria-controls="catalogue-filter-panel"/);
-  assert.match(html, /data-category-shortcut="corporate"/);
   assert.doesNotMatch(html, /catalogue-pagination|catalogue-page-(?:previous|next|status)/);
-  assert.match(css, /\.category-shortcuts\s*\{[^}]*repeat\(6/);
   assert.match(script, /initCatalogueExperience/);
 });
 
@@ -348,31 +346,13 @@ test("catalogue section disclosures sit below their grids", () => {
   });
 });
 
-test("category shortcuts use three columns at tablet widths and two on mobile", () => {
-  const base = css.indexOf(".category-shortcuts {");
-  const baseColumns = css.indexOf("repeat(6", base);
-  const tablet = css.indexOf(".category-shortcuts { grid-template-columns: repeat(3", css.indexOf("@media (max-width: 840px)"));
-  const mobile = css.indexOf(".category-shortcuts { grid-template-columns: repeat(2", css.indexOf("@media (max-width: 620px)"));
-  assert.ok(base >= 0);
-  assert.ok(baseColumns > base);
-  assert.ok(tablet > baseColumns);
-  assert.ok(mobile > tablet);
+test("the row of category tiles under the hero is removed completely", () => {
+  assert.doesNotMatch(html, /class="category-shortcuts/);
+  assert.doesNotMatch(html, /aria-label="Browse gift categories"/);
+  assert.doesNotMatch(css, /\.category-shortcuts/);
 });
 
-test("category shortcuts use accessible local icons while action arrows stay text", () => {
-  const shortcuts = html.match(/<nav class="category-shortcuts[^\"]*"[\s\S]*?<\/nav>/)?.[0] || "";
-  [
-    ["couple", "heart"],
-    ["diwali", "diya"],
-    ["frames", "frame"],
-    ["premium", "gem"],
-    ["corporate", "gift"],
-  ].forEach(([category, icon]) => {
-    const link = shortcuts.match(new RegExp(`<a[^>]+data-category-shortcut="${category}"[\\s\\S]*?<\\/a>`))?.[0] || "";
-    assert.match(link, new RegExp(`assets/category-icons\\.svg#${icon}`));
-    assert.match(link, /<svg class="category-icon" aria-hidden="true" focusable="false">/);
-  });
-  assert.doesNotMatch(shortcuts, /↘/);
+test("menu and footer links use accessible local icons", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
   assert.match(nav, /data-browse-all>Gifts <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift/);
   assert.match(nav, /data-category-shortcut="couple">Couple keepsakes <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#heart/);
@@ -401,7 +381,6 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   const baseMobileCss = nextMedia(firstMobileStart);
   const catalogueMobileCss = nextMedia(catalogueMobileStart);
   const customizerMobileCss = nextMedia(customizerMobileStart);
-  const shortcutsRule = css.match(/\.category-shortcuts a\s*\{([^}]*)\}/)?.[1] || "";
   const filterRule = catalogueMobileCss.match(/\.catalogue-filter-fields\s*\{([^}]*)\}/)?.[1] || "";
   const selectRule = catalogueMobileCss.match(/\.catalogue-filter-fields select\s*\{([^}]*)\}/)?.[1] || "";
   const mobilePreviewRule = customizerMobileCss.match(/\.customizer-preview-panel\s*\{([^}]*)\}/)?.[1] || "";
@@ -433,9 +412,6 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   assert.match(mainMarkup, /id="customizer-title"/);
   assert.match(html, /<section[^>]*id="romantic-keepsakes"[^>]*aria-labelledby="romantic-keepsakes-title"/);
   assert.match(html, /<section[^>]*class="[^"]*\bwork-section\b[^"]*"[^>]*aria-labelledby="[^"]+"/);
-  assert.match(shortcutsRule, /min-width:\s*0/);
-  assert.match(shortcutsRule, /flex-wrap:\s*wrap/);
-  assert.match(shortcutsRule, /overflow-wrap:\s*anywhere/);
   assert.match(css, /\.catalogue-grid\s*\{[^}]*display:\s*grid/);
   assert.doesNotMatch(css, /body\s*\{[^}]*overflow-x:\s*hidden/);
 });
@@ -650,7 +626,7 @@ test("footer trust strip and primary navigation use the approved customer vocabu
   assert.match(trustStrip, /aria-label="Studio facts"/);
   assert.match(trustStrip, /<a href="#order" data-order-prefill="general">Contact Saloni<\/a>/);
   ["Ajmer studio", "Shipping across India", "Handmade to order"].forEach((fact) => assert.match(trustStrip, new RegExp(fact)));
-  assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
+  assert.doesNotMatch(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
   assert.doesNotMatch(html, /<a href="#diwali" data-category-shortcut="diwali">Browse Diwali designs/);
   assert.match(html, /<div class="footer-links">[\s\S]*<a href="#studio-art" data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame[\s\S]*<\/a>/);
   assert.doesNotMatch(html, /data-category-shortcut="hampers"|href="#hamper-rail"/);
