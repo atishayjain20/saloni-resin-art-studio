@@ -1125,6 +1125,11 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn("border-radius: 50%", photo.group(1))
         self.assertRegex(photo.group(1), r'width: (?:[1-9]\d)px')
 
+    def test_cart_has_a_short_your_cart_heading(self):
+        self.assertNotIn("One request for your selected gifts", self.html)
+        self.assertIn('<p class="panel-label" id="catalogue-selection-title">Your cart</p>', self.html)
+        self.assertIn('aria-labelledby="catalogue-selection-title"', self.html)
+
     def test_meet_saloni_opens_to_show_the_studio_address_only_there(self):
         visit = "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM."
         block = re.search(r'<details class="meet-saloni" id="meet-saloni">(.*?)</details>', self.html, re.S)
