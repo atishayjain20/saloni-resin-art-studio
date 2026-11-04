@@ -192,6 +192,25 @@ test("jewel festive palette keeps WCAG AA contrast for text and primary buttons"
   atLeast(leaf, paper, 4.5, "teal link on white");
 });
 
+test("focus rings on plum surfaces use cream so they keep 3:1 contrast", () => {
+  const rule = css.match(/\.catalogue-cart-jump :focus-visible,[^{]*\{([^}]*)\}/);
+  assert.ok(rule, "expected a dark-surface focus rule");
+  assert.match(css.match(/\.catalogue-cart-jump :focus-visible,([^{]*)\{/)[1], /\.order-section \.order-panel :focus-visible[\s\S]*\.customizer-summary-card :focus-visible[\s\S]*\.premium-collection-section :focus-visible/);
+  assert.match(rule[1], /outline-color:\s*var\(--ivory\)/);
+  assert.ok(contrast(rootToken("ivory"), rootToken("ink")) >= 3, "cream ring on plum");
+  assert.ok(contrast(rootToken("rose"), rootToken("ink")) < 3, "the default magenta ring is too faint on plum");
+  assert.match(css, /\.premium-collection-section \.catalogue-order-button:focus-visible\s*\{[^}]*border-color:\s*var\(--premium-gold\)/);
+});
+
+test("leftover beige colours and theme-color use the new cream", () => {
+  assert.doesNotMatch(css, /#ead6cc|rgba\(247, 240, 231, \.97\)/);
+  assert.match(css, /\.customizer-mobile-actions \{[^}]*background:\s*rgba\(255, 246, 233, \.97\)/);
+  ["index.html", "partners/index.html", "corporate-gifting/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html"].forEach((page) => {
+    const source = fs.readFileSync(path.join(root, page), "utf8");
+    assert.match(source, /<meta name="theme-color" content="#fff6e9">/, page);
+  });
+});
+
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
   assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261123">/);
   assert.match(html, /<script class="site-script" src="script\.js\?v=20261123" defer><\/script>/);
