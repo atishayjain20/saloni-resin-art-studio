@@ -1470,6 +1470,11 @@ class StaticSiteContractTests(unittest.TestCase):
             with self.subTest(stem=stem):
                 self.assertEqual(declared.get(stem), names)
 
+    def test_order_copy_is_plain_and_privacy_note_is_not_repeated(self):
+        self.assertNotIn("visible request fields", self.html)
+        self.assertIn("then review your request before sending.", self.html)
+        self.assertEqual(self.html.count("Your information is used only to handle your request."), 1)
+
     def test_third_ai_image_batch_is_declared(self):
         declared = {}
         for trigger in re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html):
