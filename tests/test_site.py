@@ -778,9 +778,12 @@ class StaticSiteContractTests(unittest.TestCase):
                         self.assertNotIn('fetchpriority', image)
 
     def test_hero_copy_keeps_the_heading_without_the_removed_intro(self):
-        self.assertIn('<h1 id="hero-title" class="hero-banner-title">Handmade resin gifts from Ajmer</h1>', self.html)
+        self.assertIn('<h1 id="hero-title" class="sr-only">Handmade resin gifts from Ajmer</h1>', self.html)
         self.assertNotIn("Made for the moment", self.html)
         self.assertNotIn('class="hero-intro"', self.html)
+        hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html).group(0)
+        self.assertNotRegex(hero, r'<h2|class="eyebrow"')
+        self.assertEqual(len(re.findall(r'>Shop now</a>', hero)), 4)
         self.assertNotIn("Thoughtful custom resin frames, resin art, and personalized gifts from Ajmer, Rajasthan", self.html)
 
     def test_romantic_keepsake_highlight_contract(self):

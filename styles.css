@@ -97,15 +97,6 @@ html:not(.js) .site-nav .nav-link-button { display: none; }
 .hero-banner {
   padding-block: 0.75rem 1rem;
 }
-.hero-banner-title {
-  max-width: none;
-  margin: 0 0 0.6rem;
-  color: var(--cocoa);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
 .hero-banner-track {
   position: relative;
   display: flex;
@@ -119,55 +110,26 @@ html:not(.js) .site-nav .nav-link-button { display: none; }
   display: none;
 }
 .hero-slide {
-  display: grid;
+  position: relative;
   flex: 0 0 100%;
-  gap: 0.75rem;
   min-width: 0;
-  padding: 1rem;
+  aspect-ratio: 16 / 9;
   scroll-snap-align: start;
   scroll-snap-stop: always;
   background: var(--paper);
 }
-.hero-slide:nth-child(1) {
-  background: #f3e6cf;
-}
-.hero-slide:nth-child(2) {
-  background: #f6dfe0;
-}
-.hero-slide:nth-child(3) {
-  background: #e3e8de;
-}
-.hero-slide:nth-child(4) {
-  background: #f6e2bd;
-}
-.hero-slide-copy {
-  align-self: center;
-  min-width: 0;
-}
-.hero-slide .eyebrow {
-  margin-bottom: 0.3rem;
-}
-.hero-slide h2 {
-  max-width: 16ch;
-  margin-bottom: 0.7rem;
-  font-size: clamp(1.7rem, 6.5vw, 2.4rem);
-  line-height: 1.04;
-  overflow-wrap: anywhere;
-}
 .hero-slide-photos {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1fr);
-  gap: 0.4rem;
-  min-width: 0;
-  aspect-ratio: 16 / 9;
+  gap: 0.125rem;
+  width: 100%;
+  height: 100%;
 }
 .hero-slide-photos img {
   width: 100%;
   height: 100%;
   min-height: 0;
   object-fit: cover;
-  border-radius: 0.7rem;
 }
 .hero-banner-controls {
   display: flex;
@@ -242,17 +204,7 @@ html:not(.js) .hero-banner-controls {
   .hero-banner {
     padding-block: 1.25rem 1.5rem;
   }
-  .hero-banner-title {
-    margin-bottom: 0.75rem;
-    font-size: 1.15rem;
-  }
   .hero-slide {
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    align-items: center;
-    gap: clamp(1.25rem, 3vw, 3rem);
-    padding: 1.5rem clamp(1.25rem, 3vw, 3rem);
-  }
-  .hero-slide-photos {
     aspect-ratio: 21 / 9;
   }
 }
@@ -270,6 +222,23 @@ h1 em { color: var(--rose); font-style: italic; }
 .button-dark:hover, .button-dark:focus-visible { background: var(--cocoa); }
 .button-line { border-color: var(--ink); color: var(--ink); }
 .button-line:hover, .button-line:focus-visible { background: var(--ink); color: var(--ivory); }
+.hero-slide-cta {
+  position: absolute;
+  right: 0;
+  bottom: 0.75rem;
+  left: 0;
+  justify-content: center;
+  width: max-content;
+  min-height: 44px;
+  margin-inline: auto;
+  padding: 0.5rem 1.4rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+.hero-slide-cta:focus-visible {
+  outline: 3px solid var(--ivory);
+  outline-offset: 2px;
+}
 .button-whatsapp { justify-content: center; gap: 0.5rem; background: #25d366; border-color: #25d366; color: #0b3b1f; }
 .button-whatsapp:hover, .button-whatsapp:focus-visible { background: #1ebe5b; border-color: #1ebe5b; color: #0b3b1f; }
 .whatsapp-icon { width: 1.25rem; height: 1.25rem; flex: none; fill: currentColor; }
@@ -851,8 +820,7 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
   body:has(#catalogue-selection) #footer .hero-trust-strip { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: .8rem; }
   body:has(#catalogue-cart-jump:not([hidden])) #footer { padding-bottom: 7rem; }
   html:has(#catalogue-cart-jump:not([hidden])) { scroll-padding-bottom: 6rem; }
-  .hero-slide-narrow .hero-slide-photos {
-    max-width: 40rem;
-    justify-self: end;
+  .hero-slide {
+    aspect-ratio: 3 / 1;
   }
 }

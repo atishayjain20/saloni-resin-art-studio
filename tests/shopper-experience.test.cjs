@@ -20,10 +20,10 @@ function section(id) {
 }
 
 const bannerSlides = [
-  { label: "Premium", shortcut: "premium", href: "#premium-collection", headline: "Gold-trimmed serving sets", images: ["premium-midnight-blue-tiered-set.jpeg", "premium-turquoise-tray-coasters.jpeg", "premium-smoky-bronze-tray.jpeg"] },
-  { label: "Couple", shortcut: "couple", href: "#romantic-keepsakes", headline: "Keepsakes made for two", images: ["romantic-heart-trinket-tray.webp", "romantic-initial-desk-stand.webp", "romantic-us-keychain-pair.webp"] },
-  { label: "Corporate", shortcut: "corporate", href: "#corporate-resin-gifts", headline: "Gifts your team keeps", images: ["corporate-desk-nameplate-concept.webp", "corporate-logo-coaster-set-concept.webp", "corporate-recognition-award-concept.webp"] },
-  { label: "Diwali", shortcut: "diwali", href: "#diwali", headline: "Diwali glow, handmade", images: ["diwali-shubh-labh-welcome-pair.jpg", "diwali-lotus-blue-festive-set.jpeg", "diwali-ocean-bloom-pooja-platter.jpg"] },
+  { label: "Premium", name: "Premium gifts", shortcut: "premium", href: "#premium-collection", images: ["premium-midnight-blue-tiered-set.jpeg", "premium-turquoise-tray-coasters.jpeg", "premium-smoky-bronze-tray.jpeg"] },
+  { label: "Couple", name: "Couple gifts", shortcut: "couple", href: "#romantic-keepsakes", images: ["romantic-heart-trinket-tray.webp", "romantic-initial-desk-stand.webp", "romantic-us-keychain-pair.webp"] },
+  { label: "Corporate", name: "Corporate gifts", shortcut: "corporate", href: "#corporate-resin-gifts", images: ["corporate-desk-nameplate-concept.webp", "corporate-logo-coaster-set-concept.webp", "corporate-recognition-award-concept.webp"] },
+  { label: "Diwali", name: "Diwali gifts", shortcut: "diwali", href: "#diwali", images: ["diwali-shubh-labh-welcome-pair.jpg", "diwali-lotus-blue-festive-set.jpeg", "diwali-ocean-bloom-pooja-platter.jpg"] },
 ];
 
 function bannerSlideHtml() {
@@ -33,7 +33,7 @@ function bannerSlideHtml() {
 test("homepage first screen is a four-slide hero banner ordered Premium, Couple, Corporate, Diwali", () => {
   const hero = section("hero");
   assert.match(hero, /^<section class="hero-banner shell" id="hero" aria-labelledby="hero-title" aria-roledescription="carousel">/);
-  assert.match(hero, /<h1 id="hero-title" class="hero-banner-title">Handmade resin gifts from Ajmer<\/h1>/);
+  assert.match(hero, /<h1 id="hero-title" class="sr-only">Handmade resin gifts from Ajmer<\/h1>/);
   assert.doesNotMatch(html, /Made for the moment|hero-collage|hero-note|hero-actions|hero-catalogue-action/);
   assert.doesNotMatch(hero, /data-lightbox|reveal|Explore gifts|data-browse-all/);
   assert.match(hero, /<div class="hero-banner-track" data-banner-track>/);
@@ -42,8 +42,9 @@ test("homepage first screen is a four-slide hero banner ordered Premium, Couple,
   slides.forEach((slide, index) => {
     const expected = bannerSlides[index];
     assert.match(slide, new RegExp(`role="group" aria-roledescription="slide" aria-label="${index + 1} of 4: ${expected.label}"`));
-    assert.match(slide, new RegExp(`<h2[^>]*>${expected.headline}</h2>`));
-    assert.match(slide, new RegExp(`<a class="button button-dark" href="${expected.href}" data-category-shortcut="${expected.shortcut}">Shop ${expected.label}</a>`));
+    assert.doesNotMatch(slide, /<h2|class="eyebrow"|hero-slide-copy/);
+    assert.equal((slide.match(/<a\b/g) || []).length, 1);
+    assert.match(slide, new RegExp(`<a class="button button-dark hero-slide-cta" href="${expected.href}" data-category-shortcut="${expected.shortcut}" aria-label="Shop now: ${expected.name}">Shop now</a>`));
     assert.deepEqual(Array.from(slide.matchAll(/<img\b[^>]*src="assets\/([^"]+)"/g), (match) => match[1]), expected.images);
   });
   assert.deepEqual(Array.from(hero.matchAll(/data-category-shortcut="([^"]+)"/g), (match) => match[1]), ["premium", "couple", "corporate", "diwali"]);
@@ -236,7 +237,7 @@ test("header cart button sits in the catalogue controls and keeps the header on 
   assert.match(css, /@media \(max-width: 370px\)\s*\{[^}]*\.site-header \.wordmark-subtitle\s*\{[^}]*letter-spacing:\s*\.08em/);
 });
 
-test("hero banner CSS snaps slides, keeps text off the photos, and avoids forbidden selectors", () => {
+test("hero banner CSS snaps full-bleed photo slides with a bottom-centre Shop now button", () => {
   const mobileStart = css.indexOf("@media (max-width: 620px)");
   const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
   const mobileCss = css.slice(mobileStart, reducedMotionStart);
@@ -245,6 +246,7 @@ test("hero banner CSS snaps slides, keeps text off the photos, and avoids forbid
   const trackRule = css.match(/\.hero-banner-track\s*\{([^}]*)\}/)?.[1] || "";
   const slideRule = css.match(/\.hero-slide\s*\{([^}]*)\}/)?.[1] || "";
   const photosRule = css.match(/\.hero-slide-photos\s*\{([^}]*)\}/)?.[1] || "";
+  const ctaRule = css.match(/\.hero-slide-cta\s*\{([^}]*)\}/)?.[1] || "";
   const imageRule = css.match(/\.hero-slide-photos img\s*\{([^}]*)\}/)?.[1] || "";
   const arrowRule = css.match(/\.hero-banner-arrow,\s*\.hero-banner-dot\s*\{([^}]*)\}/)?.[1] || "";
   const wideCss = css.slice(css.indexOf("@media (min-width: 621px)"), css.indexOf("@media (max-width: 840px)"));
@@ -262,10 +264,22 @@ test("hero banner CSS snaps slides, keeps text off the photos, and avoids forbid
   assert.match(slideRule, /flex:\s*0 0 100%/);
   assert.match(slideRule, /scroll-snap-align:\s*start/);
   assert.match(photosRule, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(photosRule, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(slideRule, /position:\s*relative/);
+  assert.doesNotMatch(slideRule, /padding\s*:/);
+  assert.match(slideRule, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(photosRule, /height:\s*100%/);
+  assert.match(ctaRule, /position:\s*absolute/);
+  assert.match(ctaRule, /bottom:\s*[^;]+;/);
+  assert.match(ctaRule, /left:\s*0/);
+  assert.match(ctaRule, /right:\s*0/);
+  assert.match(ctaRule, /margin-inline:\s*auto/);
+  assert.match(ctaRule, /width:\s*max-content/);
+  assert.match(ctaRule, /min-height:\s*44px/);
+  assert.match(ctaRule, /box-shadow:/);
+  assert.doesNotMatch(css, /\.hero-slide(?:-copy|-narrow)\b|\.hero-slide \.eyebrow|\.hero-slide h2|\.hero-banner-title|\.hero-slide:nth-child/);
   assert.match(imageRule, /object-fit:\s*cover/);
-  assert.match(wideCss, /\.hero-slide\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*0?\.8fr\)\s+minmax\(0,\s*1\.2fr\)/);
-  assert.match(wideCss, /\.hero-slide-photos\s*\{[^}]*aspect-ratio:\s*21\s*\/\s*9/);
+  assert.match(wideCss, /\.hero-slide\s*\{[^}]*aspect-ratio:\s*21\s*\/\s*9/);
+  assert.doesNotMatch(wideCss, /grid-template-columns:\s*minmax\(0,\s*0?\.8fr\)/);
   assert.match(arrowRule, /width:\s*44px/);
   assert.match(arrowRule, /height:\s*44px/);
   assert.match(css, /\.hero-banner-arrow:focus-visible, \.hero-banner-dot:focus-visible\s*\{[^}]*outline:\s*3px solid/);
