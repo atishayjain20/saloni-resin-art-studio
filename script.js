@@ -66,6 +66,20 @@
 
   if (typeof window !== "undefined") window.saloniReferral = { normalize: normalizeReferralCode, read: readReferralCode, save: saveReferralCode, init: initReferralAttribution, append: appendReferralToHref };
 
+  // The colour ideas a card declares in data-ai-images, minus anything that is not a plain lowercase name.
+  function aiImageNames(trigger) {
+    var list = trigger && typeof trigger.getAttribute === "function" ? (trigger.getAttribute("data-ai-images") || "") : "";
+    return list.split(/\s+/).filter(function (name) { return /^[a-z]+(?:-[a-z]+)*$/.test(name); });
+  }
+
+  // One AI photo of the design at href: "styled" is the styled scene, any other name a colour idea.
+  function aiPhoto(href, name) {
+    var stem = String(href || "").split(/[?#]/)[0].split("/").pop().replace(/\.[^.]*$/, "");
+    var styled = name === "styled";
+    var colour = styled ? "" : name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " ");
+    return { name: name, src: "assets/ai-images/" + stem + "--" + name + ".webp", colour: colour, label: styled ? "Styled scene" : "Colour idea: " + colour };
+  }
+
   document.documentElement.classList.add("js");
 
   function initializePage() {
@@ -229,25 +243,18 @@
         paragraphs.some(function (paragraph, index) { if (paragraph.indexOf(" · ") !== -1) { includedAt = index; return true; } return false; });
         var included = includedAt === -1 ? "" : paragraphs[includedAt];
         var description = paragraphs.filter(function (paragraph, index) { return index !== includedAt; }).join(" ");
-        var aiList = typeof trigger.getAttribute === "function" ? (trigger.getAttribute("data-ai-images") || "") : "";
-        var aiImages = aiList.split(/\s+/).filter(function (name) { return /^[a-z]+(?:-[a-z]+)*$/.test(name); });
+        var aiImages = aiImageNames(trigger);
         if (!description) description = imageAlt;
         else if (imageAlt && /illustrative preview|reference image|reference design/i.test(imageAlt) && description.indexOf(imageAlt) === -1) description += " " + imageAlt;
         return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description, included: included, aiImages: aiImages };
       }
 
       function photosFor(item) {
-        var photos = [{ src: item.trigger.href, alt: item.imageAlt || item.description || "Artwork preview", label: "As shown" }];
-        var stem = String(item.trigger.href || "").split(/[?#]/)[0].split("/").pop().replace(/\.[^.]*$/, "");
+        var photos = [{ name: "", src: item.trigger.href, alt: item.imageAlt || item.description || "Artwork preview", label: "As shown" }];
         item.aiImages.forEach(function (name) {
-          var styled = name === "styled";
-          var colour = styled ? "" : name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " ");
-          photos.push({
-            src: "assets/ai-images/" + stem + "--" + name + ".webp",
-            alt: (styled ? "Styled scene. " : colour + " colour idea. ") + (item.imageAlt || item.description || ""),
-            label: styled ? "Styled scene" : "Colour idea: " + colour,
-            colour: colour
-          });
+          var photo = aiPhoto(item.trigger.href, name);
+          photo.alt = (name === "styled" ? "Styled scene. " : photo.colour + " colour idea. ") + (item.imageAlt || item.description || "");
+          photos.push(photo);
         });
         return photos;
       }
@@ -262,7 +269,7 @@
         if (photoNext) photoNext.hidden = !several;
         if (photoLabel) {
           photoLabel.hidden = !several;
-          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (lightboxPhotoIndex && photo.colour ? "\nMention \"" + photo.colour + "\" in your order notes." : "") : "";
+          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (lightboxPhotoIndex && photo.colour ? (lightboxRequest && !lightboxRequest.hidden ? "\nUse the button below on this photo to choose \"" + photo.colour + "\"." : "\nMention \"" + photo.colour + "\" in your order notes.") : "") : "";
         }
       }
 
@@ -288,7 +295,6 @@
         if (!item) return;
         lightboxPhotos = photosFor(item);
         lightboxPhotoIndex = photoIndex > 0 && photoIndex < lightboxPhotos.length ? photoIndex : 0;
-        renderPhoto();
         if (lightboxIncluded) { lightboxIncluded.textContent = item.included ? "What's included: " + item.included : ""; lightboxIncluded.hidden = !item.included; }
         if (lightboxName) { lightboxName.textContent = item.title; lightboxName.hidden = !item.title; }
         if (lightboxPrice) { lightboxPrice.textContent = item.price || ""; lightboxPrice.hidden = !item.price; }
@@ -310,6 +316,8 @@
             }
           }
         }
+        // After the request button is set, so the photo hint knows whether it is there.
+        renderPhoto();
       }
 
       var pressStartedInside = false;
@@ -439,6 +447,8 @@
         if (!requestButton) return;
         invalidateLightboxFocus();
         pendingLightboxRequest = requestButton;
+        // The order button reads this once, so the cart gets the photo on show.
+        requestButton.__saloniChosenPhoto = (lightboxPhotos[lightboxPhotoIndex] || {}).name || "";
         lightbox.close();
       });
       function cardPhotoIndex(trigger) {
@@ -475,6 +485,7 @@
         strip.addEventListener("scroll", function () {
           loadExtras();
           var index = cardPhotoIndex(trigger);
+          trigger.__saloniPhotoName = (photos[index] || {}).name || "";
           Array.prototype.forEach.call(dots.children, function (dot, dotIndex) { dot.className = dotIndex === index ? "is-active" : ""; });
         }, { passive: true });
       }
@@ -1672,7 +1683,9 @@
           version: 1,
           expiresAt: catalogueCartExpiresAt,
           items: selectedCatalogueItems.map(function (item) {
-            return { sourceId: item.sourceId, quantity: bundleQuantity(item) };
+            var saved = { sourceId: item.sourceId, quantity: bundleQuantity(item) };
+            if (item.photo) saved.photo = item.photo;
+            return saved;
           })
         }));
       } catch (error) {}
@@ -1923,7 +1936,7 @@
     }
 
     function catalogueSelectionKey(items) {
-      return sortedBundleItems(items).map(function (item) { return item.sourceId + ":" + bundleQuantity(item); }).join("|");
+      return sortedBundleItems(items).map(function (item) { return item.sourceId + ":" + bundleQuantity(item) + (item.photo ? ":" + item.photo : ""); }).join("|");
     }
 
     function prepareCatalogueSelection() {
@@ -1993,7 +2006,30 @@
       if (pricingDetails.length) details += (details ? " " : "") + pricingDetails.join(" ");
       var price = pricingDetails.map(function (detail) { return /^(?:price|from):\s*/i.test(detail) ? detail.replace(/^(?:price|from):\s*/i, "") : ""; }).filter(Boolean)[0] || "";
       var size = pricingDetails.map(function (detail) { return /^size:\s*/i.test(detail) ? detail.replace(/^size:\s*/i, "") : ""; }).filter(Boolean)[0] || "";
-      return Object.assign(sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details }), { price: price, size: size, imageSrc: image.getAttribute("src") });
+      return Object.assign(sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details }), { price: price, size: size, imageSrc: image.getAttribute("src"), aiImages: aiImageNames(card.querySelector("[data-lightbox-trigger]")) });
+    }
+
+    // A colour idea only counts when the card offers it; "styled" shows the same design, so it stays as shown.
+    function offeredPhotoName(seed, name) {
+      return typeof name === "string" && name !== "styled" && seed.aiImages.indexOf(name) !== -1 ? name : "";
+    }
+
+    // The photo the shopper had on show: the lightbox hands it over once, else the card's photo strip.
+    function chosenPhotoName(button, card, seed) {
+      var name = button.__saloniChosenPhoto;
+      button.__saloniChosenPhoto = null;
+      if (typeof name !== "string") {
+        var trigger = card.querySelector("[data-lightbox-trigger]");
+        name = trigger ? trigger.__saloniPhotoName : "";
+      }
+      return offeredPhotoName(seed, name);
+    }
+
+    // The seed for the chosen colour photo: its name, thumbnail and photo on the order line. Empty means as shown.
+    function withPhoto(seed, name) {
+      if (!name) return Object.assign({}, seed, { photo: "" });
+      var photo = aiPhoto(seed.imageSrc, name);
+      return Object.assign({}, seed, { photo: name, productName: seed.productName + " (colour: " + photo.colour + ")", imageSrc: photo.src });
     }
 
     var quoteCards = Array.prototype.slice.call(document.querySelectorAll("#premium-collection .work-card"));
@@ -2007,7 +2043,7 @@
         button.textContent = "Ask for a quote";
         button.setAttribute("aria-label", "Ask for a quote for " + seed.productName);
         button.addEventListener("click", function () {
-          chooseSource(Object.assign({}, seed, { quantity: "1" }), { opener: button, card: card });
+          chooseSource(Object.assign({}, withPhoto(seed, chosenPhotoName(button, card, seed)), { quantity: "1" }), { opener: button, card: card });
         });
         caption.appendChild(button);
         return;
@@ -2021,7 +2057,7 @@
       button.setAttribute("aria-pressed", "false");
       button.setAttribute("aria-label", "Add " + seed.productName + " to cart");
       button.addEventListener("click", function () {
-        toggleCatalogueSelection(seed);
+        toggleCatalogueSelection(withPhoto(seed, chosenPhotoName(button, card, seed)));
       });
       caption.appendChild(button);
     });
@@ -2035,7 +2071,7 @@
         if (!entry || typeof entry.sourceId !== "string" || seen[entry.sourceId] || !seedsBySourceId[entry.sourceId]) return;
         var quantity = Number(entry.quantity);
         if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) return;
-        var item = Object.assign({}, seedsBySourceId[entry.sourceId], { quantity: quantity });
+        var item = Object.assign(withPhoto(seedsBySourceId[entry.sourceId], offeredPhotoName(seedsBySourceId[entry.sourceId], entry.photo)), { quantity: quantity });
         var candidate = restored.concat([item]);
         if (bundleTotal(candidate) > 100 || bundleDetails(candidate).length > 2000) return;
         seen[entry.sourceId] = true;

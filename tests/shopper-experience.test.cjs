@@ -7,6 +7,8 @@ const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
+// The lightbox harnesses run only the lightbox block, so they also need the shared AI-photo helpers.
+const aiPhotoHelpers = script.slice(script.indexOf("  function aiImageNames("), script.indexOf('  document.documentElement.classList.add("js");'));
 const customizer = fs.readFileSync(path.join(root, "customizer.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 const icons = fs.readFileSync(path.join(root, "assets/category-icons.svg"), "utf8");
@@ -44,8 +46,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261118">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261118" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261119">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261119" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -720,7 +722,7 @@ test("lightbox request focuses the order location after native close", () => {
     querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [trigger] : []; },
   };
   const windowObject = { setTimeout(callback) { callback(); } };
-  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
+  vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
   trigger.listeners.click({ defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
   docElements["lightbox-request"].listeners.click();
   assert.equal(requestButton.clicked, 1);
@@ -728,7 +730,7 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(trigger.focused, undefined);
 });
 
-function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false } = {}) {
+function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true } = {}) {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
   const makeElement = (extra = {}) => Object.assign({
@@ -751,7 +753,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
   const card = makeElement({
     querySelector(selector) {
       if (selector === "figcaption strong") return { textContent: "Sample gift" };
-      if (selector === "[data-order-prefill]") return requestButton;
+      if (selector === "[data-order-prefill]") return withRequest ? requestButton : null;
       return null;
     },
     querySelectorAll(selector) { return selector === "figcaption p" ? paras : []; },
@@ -812,7 +814,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
   };
   if (cardPhotos) documentObject.createElement = (tagName) => children(makeElement({ tagName }));
   const windowObject = { setTimeout(callback) { callback(); } };
-  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
+  vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
   const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
   const open = () => (heroTarget ? heroTrigger : trigger).listeners.click(click);
   const press = (key) => { const event = { key, prevented: 0, preventDefault() { this.prevented += 1; } }; lightbox.listeners.keydown(event); return event; };
@@ -837,7 +839,7 @@ test("lightbox gallery steps through the card photo and its extra images", () =>
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp");
   assert.match(h.imageTarget.alt, /^Teal colour idea\. Sample gift photo/);
   assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour idea: Teal/);
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /\nMention "Teal" in your order notes\.$/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /\nUse the button below on this photo to choose "Teal"\.$/);
   assert.doesNotMatch(h.docElements["lightbox-photo-label"].textContent, /AI concept|handmade and will vary/);
   h.docElements["lightbox-photo-next"].listeners.click();
   h.docElements["lightbox-photo-next"].listeners.click();
@@ -874,6 +876,51 @@ test("card image box scrolls through the extra photos and opens the lightbox at 
   h.open();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp", "the lightbox opens on the photo the card shows");
   assert.match(h.docElements["lightbox-photo-label"].textContent, /^2 of 3 · Colour idea: Teal/);
+});
+
+test("card photo strip remembers the colour on show for the Add to cart button", () => {
+  const h = galleryHarness({ colours: "teal styled", cardPhotos: true });
+  const strip = h.trigger.children[0];
+  strip.clientWidth = 300;
+  strip.scrollLeft = 300;
+  strip.listeners.scroll();
+  assert.equal(h.trigger.__saloniPhotoName, "teal");
+  strip.scrollLeft = 600;
+  strip.listeners.scroll();
+  assert.equal(h.trigger.__saloniPhotoName, "styled");
+  strip.scrollLeft = 0;
+  strip.listeners.scroll();
+  assert.equal(h.trigger.__saloniPhotoName, "", "the real photo carries no colour");
+});
+
+test("lightbox request button hands the photo on show to the card's order button", () => {
+  const h = galleryHarness({ colours: "teal styled" });
+  const choose = () => { h.docElements["lightbox-request"].listeners.click(); const name = h.requestButton.__saloniChosenPhoto; h.requestButton.__saloniChosenPhoto = undefined; return name; };
+  h.open();
+  assert.equal(choose(), "", "the real photo carries no colour");
+  h.open();
+  h.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(choose(), "teal");
+  assert.equal(h.requestButton.clicked, 2, "the card's own button still receives the click");
+  h.open();
+  h.docElements["lightbox-photo-prev"].listeners.click();
+  assert.equal(choose(), "styled");
+});
+
+test("lightbox hint points at the request button, and falls back to order notes without one", () => {
+  const withButton = galleryHarness({ colours: "teal", cardPhotos: true });
+  const strip = withButton.trigger.children[0];
+  strip.clientWidth = 300;
+  strip.scrollLeft = 300;
+  strip.listeners.scroll();
+  withButton.open();
+  assert.equal(withButton.docElements["lightbox-request"].hidden, false);
+  assert.match(withButton.docElements["lightbox-photo-label"].textContent, /\nUse the button below on this photo to choose "Teal"\.$/, "right on the first open too");
+  const without = galleryHarness({ colours: "teal", withRequest: false });
+  without.open();
+  without.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(without.docElements["lightbox-request"].hidden, true);
+  assert.match(without.docElements["lightbox-photo-label"].textContent, /\nMention "Teal" in your order notes\.$/);
 });
 
 test("card image box stays a single photo without valid AI images", () => {
@@ -971,7 +1018,7 @@ test("hero lightbox trigger uses the AI images of its target card and names mult
   h.open();
   h.docElements["lightbox-photo-next"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--royal-blue.webp");
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 2 · Colour idea: Royal blue\n[^\n]*Mention "Royal blue" in your order notes\./);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 2 · Colour idea: Royal blue\n[^\n]*Use the button below on this photo to choose "Royal blue"\./);
 });
 
 test("lightbox gallery drops an AI image that fails to load and shows the card photo", () => {
@@ -1112,7 +1159,7 @@ test("catalogue card body opens its existing preview while native link focus sta
     getElementById(id) { return docElements[id] || null; },
     querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [trigger] : []; },
   };
-  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: {} });
+  vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: {} });
   assert.equal(card.getAttribute("tabindex"), "");
   assert.equal(typeof card.listeners.click, "function");
   assert.equal(card.listeners.keydown, undefined);
@@ -1192,7 +1239,7 @@ test("hero lightbox targets the hidden canonical card and restores focus to the 
     getElementById(id) { return docElements[id] || null; },
     querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [heroTrigger] : []; },
   };
-  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: {} });
+  vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: {} });
   heroTrigger.listeners.click({ defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
   assert.equal(imageTarget.src, "assets/romantic-heart-trinket-tray.webp");
   assert.equal(docElements["lightbox-product-name"].textContent, "Tiny tray, big feelings");
@@ -1300,7 +1347,7 @@ test("lightbox owns one history entry and consumes it on browser back or native 
     querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [trigger] : []; },
   };
   activeElement = documentObject.body;
-  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
+  vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
 
   const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
   trigger.listeners.click(click);
@@ -1479,7 +1526,7 @@ test("hero lightbox request consumes history and restores the visible opener aft
     getElementById(id) { return docElements[id] || null; },
     querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? [heroTrigger] : []; },
   };
-  vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
+  vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
   const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
   heroTrigger.listeners.click(click);
   docElements["lightbox-request"].listeners.click();
