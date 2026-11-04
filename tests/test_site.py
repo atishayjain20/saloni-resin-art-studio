@@ -1447,6 +1447,62 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("data-colour-options", self.html)
         self.assertFalse((ROOT / "assets" / "colour-options").exists(), "recolour previews are retired")
 
+    def test_fifth_ai_image_batch_is_declared_without_rejected_images(self):
+        declared = {}
+        for trigger in re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html):
+            match = re.search(r'data-ai-images="([^"]*)"', trigger)
+            if match and "data-lightbox-target" not in trigger:
+                declared[Path(re.search(r'href="([^"?#]+)', trigger).group(1)).stem] = match.group(1).split()
+        for stem in [
+            "corporate-bag-tag-concept",
+            "corporate-bookmark-keychain-duo-concept",
+            "corporate-business-card-holder-concept",
+            "corporate-desk-essentials-set-concept",
+            "corporate-desk-organizer-concept",
+            "corporate-desk-trinket-tray-concept",
+            "corporate-lanyard-charm-concept",
+            "corporate-mini-photo-stand-concept",
+            "corporate-pen-cup-concept",
+            "corporate-phone-rest-concept",
+            "corporate-recognition-award-concept",
+            "diwali-emerald-led-holder-pair-concept",
+            "diwali-festive-keepsake-box-concept",
+            "diwali-floral-swastik-tealight-set",
+            "diwali-golden-toran-charms-concept",
+            "diwali-ivory-mandala-holder-concept",
+            "diwali-lotus-rangoli-duo-concept",
+            "diwali-marigold-petal-holder-concept",
+            "diwali-om-mini-tilak-plate",
+            "diwali-peacock-mini-pooja-thali",
+            "diwali-pearl-rangoli-accent-concept",
+            "diwali-rose-petal-offering-plate-concept",
+            "diwali-ruby-leaf-dish-concept",
+            "diwali-saffron-tilak-duo-concept",
+            "premium-black-gold-glassware-set",
+            "premium-champagne-two-tier-set",
+            "premium-gemstone-mug-collection",
+            "premium-ocean-seashell-tray",
+            "premium-pastel-butterfly-trays",
+            "premium-silver-icy-blue-tray",
+            "premium-smoky-bronze-tray",
+            "premium-turquoise-geode-glass-closeup",
+            "premium-turquoise-geode-glass-pair",
+            "premium-turquoise-gold-wine-glasses",
+            "premium-turquoise-tray-coasters",
+            "studio-lilac-symbol-rakhi",
+            "studio-little-brother-rakhi",
+            "sunflower-floral-keepsakes",
+            "sunflower-keepsake-set",
+            "sunflower-plaque-easel",
+            "sunflower-plaque-hand",
+            "sunflower-resin-lamp",
+        ]:
+            with self.subTest(stem=stem):
+                self.assertIn(stem, declared)
+        self.assertNotIn("premium-champagne-white-tray", declared, "its photo carries another studio's watermark")
+        self.assertNotIn("styled-alt", declared.get("sunflower-keepsake-set", []))
+        self.assertNotIn("styled", declared.get("premium-black-gold-glassware-set", []), "the styled scene shows a branded bottle")
+
     def test_fourth_ai_image_batch_is_declared(self):
         declared = {}
         for trigger in re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html):
@@ -1456,7 +1512,7 @@ class StaticSiteContractTests(unittest.TestCase):
         expected = {
             "corporate-desk-logo-stand-concept": "rose styled",
             "corporate-fridge-magnet-concept": "royal-blue styled",
-            "corporate-recognition-award-concept": "amethyst",
+            "corporate-recognition-award-concept": "amethyst styled",
             "diwali-lotus-diya-pair": "blue styled",
             "premium-ivory-gold-tiered-set": "teal styled",
             "premium-midnight-blue-tiered-set": "emerald styled",
@@ -1464,7 +1520,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "studio-floral-hexagon-keepsake": "amethyst styled",
             "studio-floral-square-keepsake": "emerald styled",
             "studio-lilac-scalloped-tray": "teal styled",
-            "studio-little-brother-rakhi": "teal",
+            "studio-little-brother-rakhi": "teal styled",
         }
         for stem, names in expected.items():
             with self.subTest(stem=stem):
@@ -1494,7 +1550,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "corporate-logo-coaster-set-concept": "ruby styled",
             "diwali-golden-ganesha-pooja-plate": "mint styled",
             "diwali-ocean-bloom-pooja-platter": "rose styled",
-            "diwali-om-mini-tilak-plate": "blue",
+            "diwali-om-mini-tilak-plate": "blue styled",
             "romantic-botanical-pendant": "blue styled",
             "romantic-calendar-coaster": "blue styled",
             "romantic-couple-miniature": "ruby styled",
