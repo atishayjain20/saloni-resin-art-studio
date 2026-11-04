@@ -923,6 +923,25 @@ test("lightbox hint points at the request button, and falls back to order notes 
   assert.match(without.docElements["lightbox-photo-label"].textContent, /\nMention "Teal" in your order notes\.$/);
 });
 
+test("lightbox hint tells a shopper to remove the item first when it is already in the cart", () => {
+  const inCart = galleryHarness({ colours: "teal" });
+  inCart.requestButton.setAttribute("aria-pressed", "true");
+  inCart.open();
+  inCart.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(inCart.docElements["lightbox-request"].textContent, "Remove from cart");
+  assert.match(inCart.docElements["lightbox-photo-label"].textContent, /\nRemove it from the cart first to choose "Teal" instead\.$/);
+  const notInCart = galleryHarness({ colours: "teal" });
+  notInCart.open();
+  notInCart.docElements["lightbox-photo-next"].listeners.click();
+  assert.match(notInCart.docElements["lightbox-photo-label"].textContent, /\nUse the button below on this photo to choose "Teal"\.$/);
+  const quote = galleryHarness({ colours: "teal" });
+  quote.requestButton.setAttribute("data-order-prefill", "quote");
+  quote.open();
+  quote.docElements["lightbox-photo-next"].listeners.click();
+  assert.equal(quote.docElements["lightbox-request"].textContent, "Ask for a quote");
+  assert.match(quote.docElements["lightbox-photo-label"].textContent, /\nUse the button below on this photo to choose "Teal"\.$/);
+});
+
 test("card image box stays a single photo without valid AI images", () => {
   [undefined, "", "Teal ../x styled.webp"].forEach((colours) => {
     const h = galleryHarness({ colours, cardPhotos: true });

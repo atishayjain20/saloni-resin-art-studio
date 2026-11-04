@@ -269,7 +269,7 @@
         if (photoNext) photoNext.hidden = !several;
         if (photoLabel) {
           photoLabel.hidden = !several;
-          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (lightboxPhotoIndex && photo.colour ? (lightboxRequest && !lightboxRequest.hidden ? "\nUse the button below on this photo to choose \"" + photo.colour + "\"." : "\nMention \"" + photo.colour + "\" in your order notes.") : "") : "";
+          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (lightboxPhotoIndex && photo.colour ? (lightboxRequest && !lightboxRequest.hidden ? (lightboxRequest.textContent === "Remove from cart" ? "\nRemove it from the cart first to choose \"" + photo.colour + "\" instead." : "\nUse the button below on this photo to choose \"" + photo.colour + "\".") : "\nMention \"" + photo.colour + "\" in your order notes.") : "") : "";
         }
       }
 
