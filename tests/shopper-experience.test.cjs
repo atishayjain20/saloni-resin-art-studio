@@ -142,9 +142,59 @@ test("initHeroBanner scrolls by slide without timers and honours reduced motion"
   assert.equal(next.disabled, false);
 });
 
+function rootToken(name) {
+  return css.match(new RegExp(`:root\\s*\\{[^}]*--${name}:\\s*([^;]+);`))?.[1].trim();
+}
+
+function luminance(hex) {
+  const channels = [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16) / 255);
+  const [r, g, b] = channels.map((value) => (value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(foreground, background) {
+  const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+test("jewel festive palette tokens and primary button colours", () => {
+  assert.equal(rootToken("ivory"), "#fff6e9");
+  assert.equal(rootToken("paper"), "#ffffff");
+  assert.equal(rootToken("ink"), "#2a0e1f");
+  assert.equal(rootToken("rose"), "#b0125b");
+  assert.equal(rootToken("cocoa"), "#b0125b");
+  assert.equal(rootToken("marigold"), "#f2a007");
+  assert.equal(rootToken("leaf"), "#0e7c7b");
+  assert.match(css, /\.button-dark\s*\{[^}]*background:\s*var\(--rose\)[^}]*color:\s*#fff/);
+  assert.match(css, /\.button-dark:hover, \.button-dark:focus-visible\s*\{[^}]*background:\s*var\(--rose-ink\)/);
+  assert.match(css, /\.catalogue-order-button\s*\{[^}]*background:\s*var\(--rose\)[^}]*color:\s*#fff/);
+  assert.match(css, /\.premium-collection-section \.catalogue-order-button\s*\{[^}]*background:\s*transparent/);
+  assert.match(css, /\.catalogue-cart-jump \.button-dark\s*\{[^}]*background:\s*var\(--rose\)[^}]*color:\s*#fff/);
+  assert.match(css, /\.hero-banner-dot\[aria-current="true"\]::before\s*\{[^}]*background:\s*var\(--leaf\)/);
+  assert.match(css, /\.hero-banner-custom a\s*\{[^}]*color:\s*var\(--leaf\)/);
+  assert.match(css, /product-pricing > div:first-child dd\s*\{[^}]*background:\s*var\(--marigold\)[^}]*color:\s*var\(--ink\)/);
+});
+
+test("jewel festive palette keeps WCAG AA contrast for text and primary buttons", () => {
+  const [ivory, paper, ink, muted] = ["ivory", "paper", "ink", "muted"].map(rootToken);
+  const [rose, roseInk, marigold, leaf] = ["rose", "rose-ink", "marigold", "leaf"].map(rootToken);
+  const atLeast = (foreground, background, ratio, label) => assert.ok(contrast(foreground, background) >= ratio, `${label}: ${contrast(foreground, background).toFixed(2)}`);
+  atLeast(ink, ivory, 4.5, "body on cream");
+  atLeast(ink, paper, 4.5, "body on white");
+  atLeast(muted, ivory, 4.5, "muted on cream");
+  atLeast(muted, paper, 4.5, "muted on white");
+  atLeast("#ffffff", rose, 4.5, "button text on magenta");
+  atLeast("#ffffff", roseInk, 4.5, "button hover text");
+  atLeast(rose, ivory, 4.5, "magenta text on cream");
+  atLeast(roseInk, ivory, 4.5, "dark magenta text on cream");
+  atLeast(ink, marigold, 4.5, "price text on saffron fill");
+  atLeast(leaf, ivory, 4.5, "teal link on cream");
+  atLeast(leaf, paper, 4.5, "teal link on white");
+});
+
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261121">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261121" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261122">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261122" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -195,7 +245,7 @@ test("category tabs are 44px, scroll sideways quietly, and mark the current tab 
 
 test("sticky header is fully opaque and keeps the tabs close under the icon row", () => {
   const header = css.match(/\.site-header\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(header, /background:\s*var\(--ivory\)/);
+  assert.match(header, /background:\s*var\(--paper\)/);
   assert.doesNotMatch(header, /rgba\(/);
   assert.match(css, /\.site-header:has\(\.category-tabs\) \.header-inner\s*\{[^}]*min-height:\s*0/);
   assert.doesNotMatch(css, /\.site-header \.header-inner\s*\{/, "pages without tabs keep their original header row");
@@ -388,15 +438,15 @@ test("premium catalogue results keep readable text on the dark section", () => {
 test("studio and corporate catalogue sections use distinct soft panels", () => {
   const corporateRule = css.match(/\.corporate-resin-gifts-section\s*\{([^}]*)\}/)?.[1] || "";
   const studioRule = css.match(/\.studio-art-section\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(corporateRule, /border:\s*1px solid rgba\(85, 113, 95, 0\.24\)/);
+  assert.match(corporateRule, /border:\s*1px solid rgba\(14, 124, 123, 0\.32\)/);
   assert.match(corporateRule, /border-radius:\s*1\.5rem/);
   assert.match(corporateRule, /margin-block:\s*1rem/);
-  assert.match(corporateRule, /background:\s*#edf2ec/);
+  assert.match(corporateRule, /background:\s*#d3efec/);
   assert.match(corporateRule, /padding-inline:\s*clamp\(1rem, 4vw, 3\.5rem\)/);
-  assert.match(studioRule, /border:\s*1px solid rgba\(201, 101, 114, 0\.18\)/);
+  assert.match(studioRule, /border:\s*1px solid rgba\(138, 106, 168, 0\.3\)/);
   assert.match(studioRule, /border-radius:\s*1\.5rem/);
   assert.match(studioRule, /margin-block:\s*1rem/);
-  assert.match(studioRule, /background:\s*#f6e9e5/);
+  assert.match(studioRule, /background:\s*#eddcf3/);
   assert.match(studioRule, /padding-inline:\s*clamp\(1rem, 4vw, 3\.5rem\)/);
   const mobileCss = css.slice(css.indexOf("@media (max-width: 620px)"));
   assert.match(mobileCss, /\.corporate-resin-gifts-section, \.studio-art-section\s*\{[^}]*margin-block:\s*0\.75rem[^}]*border-radius:\s*1\.1rem/);
@@ -405,7 +455,7 @@ test("studio and corporate catalogue sections use distinct soft panels", () => {
 test("Diwali collection uses the compact vertical spacing of Couple gifts", () => {
   const diwaliRule = css.match(/\.diwali-section\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(diwaliRule, /padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)\s+clamp\(1rem, 4vw, 3\.5rem\)/);
-  assert.match(diwaliRule, /border:\s*1px solid rgba\(201, 139, 58, 0\.28\)/);
+  assert.match(diwaliRule, /border:\s*1px solid rgba\(242, 160, 7, 0\.45\)/);
   assert.match(diwaliRule, /border-radius:\s*1\.5rem/);
   assert.match(diwaliRule, /margin-block:\s*1rem/);
   assert.match(css, /\.romantic-keepsakes\s*\{[^}]*padding:\s*clamp\(1\.25rem, 3\.5vw, 3rem\)/);
