@@ -1130,6 +1130,14 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('<p class="panel-label" id="catalogue-selection-title">Your cart</p>', self.html)
         self.assertIn('aria-labelledby="catalogue-selection-title"', self.html)
 
+    def test_cart_sits_after_design_a_frame_and_before_meet_saloni(self):
+        customizer = self.html.index('id="customizer-mobile-actions"')
+        cart = self.html.index('id="catalogue-selection"')
+        order = self.html.index('id="order"')
+        self.assertLess(customizer, cart)
+        self.assertLess(cart, order)
+        self.assertLess(cart, self.html.index('id="meet-saloni"'))
+
     def test_meet_saloni_opens_to_show_the_studio_address_only_there(self):
         visit = "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM."
         block = re.search(r'<details class="meet-saloni" id="meet-saloni">(.*?)</details>', self.html, re.S)
