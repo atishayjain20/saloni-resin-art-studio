@@ -44,8 +44,8 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261113">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261112" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261115">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261115" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -752,7 +752,7 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(trigger.focused, undefined);
 });
 
-function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false } = {}) {
+function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false } = {}) {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
   const makeElement = (extra = {}) => Object.assign({
@@ -781,12 +781,22 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     querySelectorAll(selector) { return selector === "figcaption p" ? paras : []; },
   });
   const attributes = colours === undefined ? {} : { "data-ai-images": colours };
+  const children = (element) => Object.assign(element, {
+    children: [],
+    appendChild(child) { if (child.parentNode) child.parentNode.children.splice(child.parentNode.children.indexOf(child), 1); child.parentNode = this; this.children.push(child); return child; },
+    insertBefore(child, ref) { child.parentNode = this; this.children.splice(this.children.indexOf(ref), 0, child); return child; },
+  });
+  const cardImage = cardPhotos ? makeElement({ alt: "Sample gift photo" }) : null;
   const trigger = makeElement({
     href,
     attributes,
-    querySelector(selector) { return selector === "img" ? { alt: "Sample gift photo" } : null; },
+    querySelector(selector) {
+      if (selector === ".card-photos") return (this.children || []).find((child) => child.className === "card-photos") || null;
+      return selector === "img" ? (cardImage || { alt: "Sample gift photo" }) : null;
+    },
     closest(selector) { return selector === "article" ? card : null; },
   });
+  if (cardImage) children(trigger).appendChild(cardImage);
   const heroTrigger = makeElement({
     href: "assets/hero-copy.webp",
     attributes: { "data-lightbox-target": "sample-card" },
@@ -824,6 +834,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     getElementById(id) { return docElements[id] || null; },
     querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? (heroTarget ? [heroTrigger] : [trigger]) : []; },
   };
+  if (cardPhotos) documentObject.createElement = (tagName) => children(makeElement({ tagName }));
   const windowObject = { setTimeout(callback) { callback(); } };
   vm.runInNewContext(`(function () { ${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
   const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
@@ -833,7 +844,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     docElements["lightbox-stage"].listeners.pointerdown({ clientX: 200, clientY: 100 });
     docElements["lightbox-stage"].listeners.pointerup({ clientX: 200 + dx, clientY: 100 + dy });
   };
-  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe };
+  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe, trigger, cardImage };
 }
 
 test("lightbox gallery steps through the card photo and its extra images", () => {
@@ -859,6 +870,43 @@ test("lightbox gallery steps through the card photo and its extra images", () =>
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--styled.webp", "prev wraps to the styled scene");
   assert.match(h.imageTarget.alt, /^Styled scene\. Sample gift photo/);
   assert.match(h.docElements["lightbox-photo-label"].textContent, /^3 of 3 · Styled scene$/);
+});
+
+test("card image box scrolls through the extra photos and opens the lightbox at the one shown", () => {
+  const h = galleryHarness({ colours: "teal styled", cardPhotos: true });
+  const strip = h.trigger.children[0];
+  assert.equal(strip.className, "card-photos", "the card photo moves into a scroll strip");
+  const [first, teal, styled] = strip.children;
+  const dots = h.trigger.children[1];
+  assert.equal(first, h.cardImage, "the real photo stays first");
+  assert.equal(teal.tagName, "img");
+  assert.equal(styled.tagName, "img");
+  assert.equal(teal.src, undefined, "extra photos load nothing before the shopper scrolls");
+  assert.equal(styled.alt, "");
+  assert.equal(strip.children.length, 3);
+  assert.equal(dots.className, "card-photo-dots", "the dots sit over the photo and do not scroll away");
+  assert.equal(dots.attributes["aria-hidden"], "true");
+  assert.equal(dots.children.length, 3);
+  assert.equal(dots.children[0].className, "is-active");
+  strip.clientWidth = 300;
+  strip.scrollLeft = 300;
+  strip.listeners.scroll();
+  assert.equal(teal.src, "assets/ai-images/sample-gift--teal.webp");
+  assert.equal(styled.src, "assets/ai-images/sample-gift--styled.webp");
+  assert.equal(dots.children[0].className, "");
+  assert.equal(dots.children[1].className, "is-active");
+  h.open();
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp", "the lightbox opens on the photo the card shows");
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /^2 of 3 · Colour idea: Teal/);
+});
+
+test("card image box stays a single photo without valid AI images", () => {
+  [undefined, "", "Teal ../x styled.webp"].forEach((colours) => {
+    const h = galleryHarness({ colours, cardPhotos: true });
+    assert.deepEqual(h.trigger.children, [h.cardImage]);
+    h.open();
+    assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
+  });
 });
 
 test("lightbox gallery stays single-photo without valid AI images", () => {
