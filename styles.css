@@ -13,7 +13,7 @@
   --soft-line: rgba(44, 37, 35, 0.09);
   --gutter: clamp(1.1rem, 4vw, 3.5rem);
   --category-tabs-height: 2.75rem;
-  --sticky-offset: calc(6rem + var(--category-tabs-height));
+  --sticky-offset: calc(4.75rem + var(--category-tabs-height));
   --max: 1180px;
   --display: Georgia, "Times New Roman", serif;
   --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -46,9 +46,13 @@ button:disabled { cursor: not-allowed; opacity: 0.36; }
 .skip-link:focus { transform: translateY(0); }
 
 .site-header {
-  position: sticky; z-index: 10; top: 0; background: rgba(247, 240, 231, 0.97); border-bottom: 1px solid var(--line);
+  position: sticky; z-index: 10; top: 0; background: var(--ivory); border-bottom: 1px solid var(--line);
 }
 .header-inner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-height: 5.25rem; padding-block: 0.75rem; }
+/* The tab bar follows the icon row directly, so the header row drops its fixed height and bottom padding. */
+.site-header .header-inner {
+  min-height: 0; padding-block: 0.6rem 0.15rem;
+}
 .wordmark { display: inline-flex; flex-direction: column; gap: 0.02rem; color: var(--ink); text-decoration: none; line-height: 1; }
 .wordmark-name { font: 700 1.45rem/1 var(--display); letter-spacing: -0.03em; }
 .wordmark-subtitle { margin-top: 0.35rem; color: var(--cocoa); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.17em; text-transform: uppercase; }
@@ -417,7 +421,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(44, 37, 35, 0.72); }
 }
 
 @media (max-width: 620px) {
-  :root { --sticky-offset: calc(7.5rem + var(--category-tabs-height)); }
+  :root { --sticky-offset: calc(5.5rem + var(--category-tabs-height)); }
   html { scroll-padding-top: var(--sticky-offset); }
   .corporate-resin-gifts-section { scroll-margin-top: 4rem; }
   :root { --gutter: 1rem; }.header-inner { display: flex; flex-wrap: wrap; column-gap: .5rem; padding-block: 0.85rem; }.nav-toggle { display: grid; width: 44px; height: 44px; min-height: 44px; margin-left: auto; }.site-nav { flex-basis: 100%; justify-content: flex-start; margin-top: 0.9rem; font-size: 0.75rem; }#primary-navigation { display: none; }#primary-navigation.is-open { display: flex; }.site-nav .nav-cta { margin-left: auto; }html:not(.js) .nav-toggle { display: none; }html:not(.js) #primary-navigation { display: flex; }.hero { padding-block: 3.5rem 4rem; }.hero h1 { font-size: clamp(3.2rem, 16vw, 5rem); }.hero-actions { align-items: stretch; flex-direction: column; max-width: 15rem; }.button { justify-content: space-between; }.hero-collage { min-height: 105vw; max-height: 31rem; }.hero-image-main { inset: 1% 15% 0 0; }.hero-image-clock { inset: 37% -1% 4% 64%; border-width: 0.45rem; }.hero-note { right: 0; top: 4%; font-size: 0.9rem; }

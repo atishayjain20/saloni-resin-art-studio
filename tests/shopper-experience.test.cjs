@@ -96,10 +96,17 @@ test("category tabs are 44px, scroll sideways quietly, and mark the current tab 
   assert.match(reduced.slice(0, reduced.indexOf("\n}\n")), /\.category-tab\s*\{\s*transition:\s*none;\s*\}/);
 });
 
+test("sticky header is fully opaque and keeps the tabs close under the icon row", () => {
+  const header = css.match(/\.site-header\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(header, /background:\s*var\(--ivory\)/);
+  assert.doesNotMatch(header, /rgba\(/);
+  assert.match(css, /\.site-header \.header-inner\s*\{[^}]*min-height:\s*0/);
+});
+
 test("sticky offset includes the category tab bar and the 1024px block stays last", () => {
   assert.match(css, /--category-tabs-height:\s*2\.75rem/);
-  assert.match(css, /:root \{ --sticky-offset: calc\(7\.5rem \+ var\(--category-tabs-height\)\); \}/);
-  assert.match(css, /--sticky-offset:\s*calc\(6rem \+ var\(--category-tabs-height\)\)/);
+  assert.match(css, /:root \{ --sticky-offset: calc\(5\.5rem \+ var\(--category-tabs-height\)\); \}/);
+  assert.match(css, /--sticky-offset:\s*calc\(4\.75rem \+ var\(--category-tabs-height\)\)/);
   assert.match(css, /\.customizer-preview-panel \{ position: sticky; top: calc\(var\(--sticky-offset\) \+ 1rem\); \}/);
   const last = css.lastIndexOf("@media (");
   assert.equal(css.slice(last, last + "@media (min-width: 1024px)".length), "@media (min-width: 1024px)");

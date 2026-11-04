@@ -451,7 +451,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn(".site-nav a:not(.nav-cta):focus-visible", css)
         self.assertIn("background: var(--paper)", css)
         self.assertRegex(css, r"\.site-nav \{[^}]*flex-wrap: wrap")
-        self.assertRegex(css, r":root \{ --sticky-offset: calc\(7\.5rem \+ var\(--category-tabs-height\)\); \}")
+        self.assertRegex(css, r":root \{ --sticky-offset: calc\(5\.5rem \+ var\(--category-tabs-height\)\); \}")
 
     def test_removed_homepage_sections_have_no_markup_or_internal_links(self):
         for removed_id in ("process", "gallery", "resin-art"):
