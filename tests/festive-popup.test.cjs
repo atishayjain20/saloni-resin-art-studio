@@ -12,7 +12,7 @@ test("festive banner is removed while the Diwali collection remains available", 
   assert.doesNotMatch(html, /class="festive-banner/);
   assert.doesNotMatch(html, /<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs/);
   assert.match(html, /<section[^>]+id="diwali"[\s\S]*Diwali prices/);
-  assert.match(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
+  assert.doesNotMatch(html, /<a href="#diwali" data-category-shortcut="diwali">Diwali/);
   assert.doesNotMatch(html, /id="festive-offers(?:-fallback)?"/);
   assert.doesNotMatch(html, /<dialog[^>]+festive-offers|special discounts/);
   assert.doesNotMatch(script, /initFestiveOffers|openDialog/);

@@ -239,7 +239,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertLess(hero_end, diwali_start)
         self.assertNotIn('id="offerings"', self.html)
         self.assertNotRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
-        self.assertRegex(self.html, r'<a href="#diwali" data-category-shortcut="diwali">Diwali')
+        self.assertNotRegex(self.html, r'<a href="#diwali" data-category-shortcut="diwali">Diwali')
         self.assertIn('<h2 id="diwali-title">Little lights. Lovely beginnings.</h2>', section_html)
         self.assertNotIn("Diwali prices ₹249–₹1,799", section_html)
         self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
