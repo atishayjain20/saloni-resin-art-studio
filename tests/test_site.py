@@ -1447,6 +1447,36 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("data-colour-options", self.html)
         self.assertFalse((ROOT / "assets" / "colour-options").exists(), "recolour previews are retired")
 
+    def test_third_ai_image_batch_is_declared(self):
+        declared = {}
+        for trigger in re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html):
+            match = re.search(r'data-ai-images="([^"]*)"', trigger)
+            if match and "data-lightbox-target" not in trigger:
+                declared[Path(re.search(r'href="([^"?#]+)', trigger).group(1)).stem] = match.group(1)
+        expected = {
+            "corporate-desk-nameplate-concept": "rose styled",
+            "corporate-fridge-magnet-concept": "royal-blue",
+            "corporate-logo-coaster-set-concept": "ruby styled",
+            "diwali-golden-ganesha-pooja-plate": "mint styled",
+            "diwali-ocean-bloom-pooja-platter": "rose styled",
+            "diwali-om-mini-tilak-plate": "blue",
+            "romantic-botanical-pendant": "blue styled",
+            "romantic-calendar-coaster": "blue styled",
+            "romantic-couple-miniature": "ruby styled",
+            "romantic-couple-scene": "emerald styled",
+            "romantic-first-rose-bracelet": "amethyst styled",
+            "romantic-ocean-memory-tray": "emerald styled",
+            "studio-personalized-photo-clock": "blue styled",
+            "studio-rose-hexagon-keepsake": "ruby styled",
+            "personalized-floral-hoop": "rose styled",
+            "resin-clock": "amethyst styled",
+            "resin-message-coasters": "royal-blue styled",
+            "studio-floral-handled-tray": "teal styled",
+        }
+        for stem, names in expected.items():
+            with self.subTest(stem=stem):
+                self.assertEqual(declared.get(stem), names)
+
     def test_generated_designs_are_studio_catalogue_cards(self):
         self.assertNotRegex(self.html, re.compile(r'id=["\']commission-concepts["\']|Concepts to commission|data-carousel=["\']commission-concepts["\']'))
         studio_match = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
