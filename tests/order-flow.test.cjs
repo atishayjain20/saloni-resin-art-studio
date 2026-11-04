@@ -72,6 +72,7 @@ class Element {
     if (selector === ".product-pricing dt") return this.priceLabel || null;
     if (selector === ".product-pricing dd") return this.priceValue || null;
     if (selector === "[data-order-prefill]") return null;
+    if (selector === "[data-lightbox-trigger]") return this.lightboxTrigger || null;
     if (selector === "input") {
       for (const child of this.children) {
         if (child.type === "number" || child.tagName === "INPUT") return child;
@@ -104,7 +105,7 @@ function createStorage(initial = {}) {
   };
 }
 
-function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage(), priceOverrides = {} } = {}) {
+function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "" } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
@@ -324,6 +325,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     premiumCard.priceRows = [["Price", price]].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return premiumCard;
   });
+  const photoTrigger = () => ({ getAttribute: (name) => (name === "data-ai-images" ? aiImages : null) });
+  if (aiImages) [card, premiumCards[0]].forEach((photoCard) => { photoCard.lightboxTrigger = photoTrigger(); });
   const posted = [];
   const customizerOutcomes = [];
   const body = { appendChild() {}, removeChild() {} };
@@ -399,7 +402,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const premiumQuoteButtons = premiumCards.map((premiumCard) => premiumCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "quote"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, premiumCards, premiumQuoteButtons, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
+  return { elements, photoTriggers: [card.lightboxTrigger, premiumCards[0].lightboxTrigger], premiumCards, premiumQuoteButtons, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
@@ -1738,4 +1741,139 @@ test("invalidates a prior preview snapshot when a newer source is selected", () 
   const stale = new CapturingPort();
   flow.windowObject.messageListener({ origin, source: nestedSource, data: { type: "saloni-preview-request", version: 1, nonce: first.channelNonce, requestId: first.requestId, mode: "order", transferId: "stale" }, ports: [stale] });
   assert.equal(stale.messages.length, 0);
+});
+
+const EMERALD_NAME = "Test frame (colour: Emerald)";
+const EMERALD_IMAGE = "assets/ai-images/test-frame--emerald.webp";
+
+function cartLines(flow) { return flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")); }
+function whatsappText(flow) { return decodeURIComponent(flow.catalogueSelectionWhatsapp.attributes.href); }
+
+function assertChosenEmerald(flow) {
+  assert.equal(flow.catalogueSelectionPreviews.children[0].attributes.src, EMERALD_IMAGE);
+  assert.deepEqual(cartLines(flow), [EMERALD_NAME]);
+  assert.match(flow.catalogueSelectionSummary.textContent, /\(colour: Emerald\)/);
+  assert.match(whatsappText(flow), /\(colour: Emerald\)/);
+  flow.catalogueRequestSelected.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.deepEqual(seed.bundleItems.map((item) => item.productName), [EMERALD_NAME]);
+  assert.equal(seed.bundleItems[0].sourceId, "catalogue:test-frame.png", "the source id does not change");
+  assert.match(seed.designDetails, /Test frame \(colour: Emerald\)/);
+}
+
+test("adds the colour photo a shopper swiped to on the card to the cart and the order", () => {
+  const flow = runFlow({ aiImages: "emerald styled" });
+  flow.photoTriggers[0].__saloniPhotoName = "emerald";
+  flow.catalogueButton.dispatch("click");
+  assertChosenEmerald(flow);
+});
+
+test("adds the colour photo shown in the lightbox to the cart and clears the one-shot choice", () => {
+  const flow = runFlow({ aiImages: "emerald styled" });
+  flow.catalogueButton.__saloniChosenPhoto = "emerald";
+  flow.catalogueButton.dispatch("click");
+  assertChosenEmerald(flow);
+  assert.ok(!flow.catalogueButton.__saloniChosenPhoto, "the lightbox choice is used once");
+  assert.equal(flow.catalogueButton.getAttribute("aria-label"), "Remove Test frame from cart", "labels keep the plain title");
+});
+
+test("a lightbox choice wins over the card photo and does not stick to the next add", () => {
+  const flow = runFlow({ aiImages: "emerald styled" });
+  flow.photoTriggers[0].__saloniPhotoName = "emerald";
+  flow.catalogueButton.__saloniChosenPhoto = "";
+  flow.catalogueButton.dispatch("click");
+  assert.deepEqual(cartLines(flow), ["Test frame"], "viewing the real photo in the lightbox adds it as shown");
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueButton.dispatch("click");
+  assert.deepEqual(cartLines(flow), [EMERALD_NAME], "the card photo choice applies when no lightbox choice is waiting");
+});
+
+test("adds the photo as shown for the first photo and the styled scene", () => {
+  for (const name of [undefined, "", "styled"]) {
+    const flow = runFlow({ aiImages: "emerald styled" });
+    flow.photoTriggers[0].__saloniPhotoName = name;
+    flow.catalogueButton.dispatch("click");
+    assert.deepEqual(cartLines(flow), ["Test frame"], String(name));
+    assert.equal(flow.catalogueSelectionPreviews.children[0].attributes.src, "assets/test-frame.png");
+    flow.catalogueRequestSelected.dispatch("click");
+    const seed = submittedSeed(flow.posted);
+    assert.doesNotMatch(seed.designDetails, /colour:/);
+    assert.equal(seed.bundleItems[0].productName, "Test frame");
+  }
+});
+
+test("ignores a photo name the card does not offer", () => {
+  const flow = runFlow({ aiImages: "emerald styled" });
+  flow.photoTriggers[0].__saloniPhotoName = "purple";
+  flow.catalogueButton.dispatch("click");
+  assert.deepEqual(cartLines(flow), ["Test frame"]);
+  assert.equal(flow.catalogueSelectionPreviews.children[0].attributes.src, "assets/test-frame.png");
+});
+
+test("removes the item from the cart even when another colour is on show", () => {
+  const flow = runFlow({ aiImages: "emerald styled" });
+  flow.photoTriggers[0].__saloniPhotoName = "emerald";
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.catalogueButton.textContent, "Remove from cart");
+  flow.photoTriggers[0].__saloniPhotoName = "styled";
+  flow.catalogueButton.dispatch("click");
+  assert.deepEqual(cartLines(flow), []);
+  assert.equal(flow.catalogueButton.textContent, "Add to cart");
+});
+
+test("sends the colour on view with a quote request", () => {
+  const flow = runFlow({ aiImages: "emerald styled" });
+  flow.photoTriggers[1].__saloniPhotoName = "emerald";
+  flow.premiumQuoteButtons[0].dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.sourceId, "catalogue:premium-midnight-blue-tiered-set.jpeg");
+  assert.equal(seed.productName, "Midnight blue tiered set (colour: Emerald)");
+  flow.photoTriggers[1].__saloniPhotoName = "";
+  flow.premiumQuoteButtons[0].dispatch("click");
+  assert.equal(submittedSeed(flow.posted).productName, "Midnight blue tiered set");
+});
+
+test("saves the chosen colour and restores it after a reload", () => {
+  const storage = createStorage();
+  const first = runFlow({ storage, aiImages: "emerald styled" });
+  first.photoTriggers[0].__saloniPhotoName = "emerald";
+  first.catalogueButton.dispatch("click");
+  first.generatedCatalogueButtons[0].dispatch("click");
+  assert.deepEqual(JSON.parse(storage.getItem("saloniCatalogueCart")).items, [
+    { sourceId: "catalogue:test-frame.png", quantity: 1, photo: "emerald" },
+    { sourceId: "catalogue:concept-floral-memory-frame.webp", quantity: 1 },
+  ]);
+  const reloaded = runFlow({ storage, aiImages: "emerald styled" });
+  assert.deepEqual(cartLines(reloaded), [EMERALD_NAME, "Your flowers, held close"]);
+  assert.equal(reloaded.catalogueSelectionPreviews.children[0].attributes.src, EMERALD_IMAGE);
+});
+
+test("restores as shown when the saved photo is unknown, styled or not a string", () => {
+  for (const photo of ["purple", "styled", "", 7, null, "Emerald"]) {
+    const storage = createStorage({
+      saloniCatalogueCart: JSON.stringify({ version: 1, expiresAt: Date.now() + 1000 * 60, items: [{ sourceId: "catalogue:test-frame.png", quantity: 2, photo }] }),
+    });
+    const flow = runFlow({ storage, aiImages: "emerald styled" });
+    assert.deepEqual(cartLines(flow), ["Test frame"], String(photo));
+    assert.equal(flow.catalogueSelectionPreviews.children[0].attributes.src, "assets/test-frame.png");
+  }
+});
+
+test("restores an older saved cart that has no photo field", () => {
+  const storage = createStorage({
+    saloniCatalogueCart: JSON.stringify({ version: 1, expiresAt: Date.now() + 1000 * 60, items: [{ sourceId: "catalogue:test-frame.png", quantity: 2 }] }),
+  });
+  const flow = runFlow({ storage, aiImages: "emerald styled" });
+  assert.deepEqual(cartLines(flow), ["Test frame"]);
+});
+
+test("prepares the request with the new colour after the item is removed and added again", () => {
+  const flow = runFlow({ aiImages: "emerald styled" });
+  flow.catalogueButton.dispatch("click");
+  const before = flow.posted.length;
+  flow.catalogueButton.dispatch("click");
+  flow.photoTriggers[0].__saloniPhotoName = "emerald";
+  flow.catalogueButton.dispatch("click");
+  assert.ok(flow.posted.length > before, "the form is prepared again for the new colour");
+  assert.equal(submittedSeed(flow.posted).bundleItems[0].productName, EMERALD_NAME);
 });
