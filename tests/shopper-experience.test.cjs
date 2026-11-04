@@ -193,8 +193,8 @@ test("jewel festive palette keeps WCAG AA contrast for text and primary buttons"
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261122">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261122" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261123">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261123" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
