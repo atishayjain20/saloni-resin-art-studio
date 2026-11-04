@@ -1713,7 +1713,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(f">{price}</dd>", card)
                 self.assertIn(f'"{asset}": true', form)
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
-        self.assertRegex(css, r'\.premium-collection-section[^}]*background:\s*#2f2522')
+        self.assertRegex(css, r'\.premium-collection-section[^}]*background:\s*var\(--ink\)')
         self.assertIn(".premium-collection-section .premium-photo-card img", css)
         self.assertIn(".premium-collection-section .premium-photo-card figcaption .product-pricing > div:last-child dt", css)
         self.assertIn("object-fit: contain", css)
