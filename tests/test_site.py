@@ -1447,6 +1447,29 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("data-colour-options", self.html)
         self.assertFalse((ROOT / "assets" / "colour-options").exists(), "recolour previews are retired")
 
+    def test_fourth_ai_image_batch_is_declared(self):
+        declared = {}
+        for trigger in re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html):
+            match = re.search(r'data-ai-images="([^"]*)"', trigger)
+            if match and "data-lightbox-target" not in trigger:
+                declared[Path(re.search(r'href="([^"?#]+)', trigger).group(1)).stem] = match.group(1)
+        expected = {
+            "corporate-desk-logo-stand-concept": "rose styled",
+            "corporate-fridge-magnet-concept": "royal-blue styled",
+            "corporate-recognition-award-concept": "amethyst",
+            "diwali-lotus-diya-pair": "blue styled",
+            "premium-ivory-gold-tiered-set": "teal styled",
+            "premium-midnight-blue-tiered-set": "emerald styled",
+            "studio-red-rose-resin-display": "rose styled",
+            "studio-floral-hexagon-keepsake": "amethyst styled",
+            "studio-floral-square-keepsake": "emerald styled",
+            "studio-lilac-scalloped-tray": "teal styled",
+            "studio-little-brother-rakhi": "teal",
+        }
+        for stem, names in expected.items():
+            with self.subTest(stem=stem):
+                self.assertEqual(declared.get(stem), names)
+
     def test_third_ai_image_batch_is_declared(self):
         declared = {}
         for trigger in re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html):
@@ -1455,7 +1478,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 declared[Path(re.search(r'href="([^"?#]+)', trigger).group(1)).stem] = match.group(1)
         expected = {
             "corporate-desk-nameplate-concept": "rose styled",
-            "corporate-fridge-magnet-concept": "royal-blue",
+            "corporate-fridge-magnet-concept": "royal-blue styled",
             "corporate-logo-coaster-set-concept": "ruby styled",
             "diwali-golden-ganesha-pooja-plate": "mint styled",
             "diwali-ocean-bloom-pooja-platter": "rose styled",
