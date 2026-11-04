@@ -46,9 +46,74 @@ test("homepage hero has exactly two actions into gifts and customizer", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261119">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261119" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261120">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261120" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
+});
+
+test("category tab bar sits in the sticky header after the header row with ALL current", () => {
+  const header = html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1] || "";
+  const nav = header.match(/<nav class="category-tabs" aria-label="Gift categories"><div class="category-tabs-list">([\s\S]*?)<\/div><\/nav>/);
+  assert.ok(nav, "category tab nav must live inside .site-header");
+  assert.match(header, /<\/nav>\n    <\/div>\n    <nav class="category-tabs"/, "tabs follow the header-inner block");
+  const tabs = Array.from(nav[1].matchAll(/<a class="category-tab"([^>]*)>([^<]*)<\/a>/g), (match) => ({ attrs: match[1], label: match[2].trim() }));
+  assert.deepEqual(tabs.map((tab) => tab.label), ["All", "Diwali", "Couple", "Corporate", "Premium"]);
+  const expected = [
+    ["#catalogue-filters", "all"],
+    ["#diwali", "diwali"],
+    ["#romantic-keepsakes", "couple"],
+    ["#corporate-resin-gifts", "corporate"],
+    ["#premium-collection", "premium"],
+  ];
+  tabs.forEach((tab, index) => {
+    assert.match(tab.attrs, new RegExp('href="' + expected[index][0] + '"'));
+    assert.match(tab.attrs, new RegExp('data-category-tab="' + expected[index][1] + '"'));
+    assert.equal(/aria-current="true"/.test(tab.attrs), index === 0);
+    assert.equal(/data-browse-all/.test(tab.attrs), index === 0);
+    assert.equal(/data-category-shortcut="/.test(tab.attrs), index !== 0);
+    assert.doesNotMatch(tab.attrs, /frames/);
+    assert.ok(html.includes('id="' + expected[index][0].slice(1) + '"'), expected[index][0] + " target exists");
+  });
+});
+
+test("category tabs are 44px, scroll sideways quietly, and mark the current tab as a folder tab", () => {
+  const list = css.match(/\.category-tabs-list\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(list, /display:\s*flex/);
+  assert.match(list, /overflow-x:\s*auto/);
+  assert.match(list, /scrollbar-width:\s*none/);
+  assert.match(list, /overscroll-behavior-x:\s*contain/);
+  assert.match(list, /box-shadow:\s*inset 0 -1px 0 var\(--cocoa\)/);
+  assert.match(css, /\.category-tabs-list::-webkit-scrollbar\s*\{[^}]*display:\s*none/);
+  const tab = css.match(/\.category-tab\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(tab, /min-height:\s*44px/);
+  assert.match(tab, /border-radius:\s*0?\.6rem 0?\.6rem 0 0/);
+  assert.match(tab, /text-transform:\s*uppercase/);
+  const current = css.match(/\.category-tab\[aria-current="true"\]\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(current, /background:\s*var\(--paper\)/);
+  assert.match(current, /border-color:\s*var\(--cocoa\)/);
+  assert.match(css, /\.category-tab:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--rose\)/);
+  const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  assert.match(reduced.slice(0, reduced.indexOf("\n}\n")), /\.category-tab\s*\{\s*transition:\s*none;\s*\}/);
+});
+
+test("sticky header is fully opaque and keeps the tabs close under the icon row", () => {
+  const header = css.match(/\.site-header\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(header, /background:\s*var\(--ivory\)/);
+  assert.doesNotMatch(header, /rgba\(/);
+  assert.match(css, /\.site-header:has\(\.category-tabs\) \.header-inner\s*\{[^}]*min-height:\s*0/);
+  assert.doesNotMatch(css, /\.site-header \.header-inner\s*\{/, "pages without tabs keep their original header row");
+});
+
+test("sticky offset includes the category tab bar and the 1024px block stays last", () => {
+  assert.match(css, /--category-tabs-height:\s*2\.75rem/);
+  assert.match(css, /--sticky-offset:\s*6rem;/);
+  assert.match(css, /:root \{ --sticky-offset: 7\.5rem; \}/);
+  assert.match(css, /:root:has\(\.category-tabs\) \{ --sticky-offset: calc\(4\.75rem \+ var\(--category-tabs-height\)\); \}/);
+  assert.match(css, /:root:has\(\.category-tabs\) \{ --sticky-offset: calc\(5\.5rem \+ var\(--category-tabs-height\)\); \}/);
+  assert.match(css, /\.customizer-preview-panel \{ position: sticky; top: calc\(var\(--sticky-offset\) \+ 1rem\); \}/);
+  const last = css.lastIndexOf("@media (");
+  assert.equal(css.slice(last, last + "@media (min-width: 1024px)".length), "@media (min-width: 1024px)");
+  assert.ok(css.indexOf(".category-tabs-list") < last);
 });
 
 test("mobile footer links, Instagram and trust-strip links are at least 44px tall", () => {

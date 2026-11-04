@@ -106,7 +106,12 @@ class FakeLink extends FakeControl {
   getAttribute(name) { return name === "href" ? this.href : name === "data-category-shortcut" ? this.value : super.getAttribute(name); }
 }
 
-function createHarness({ hash = "", url = "", count = 77, includePremium = false, realCatalogue = false } = {}) {
+class FakeTab extends FakeLink {
+  constructor(href, tab, shortcut = "") { super(href, shortcut); this.tab = tab; }
+  getAttribute(name) { return name === "data-category-tab" ? this.tab : name === "data-category-shortcut" ? this.value || "" : super.getAttribute(name); }
+}
+
+function createHarness({ hash = "", url = "", count = 77, includePremium = false, realCatalogue = false, withTabs = false } = {}) {
   const eventLog = [];
   const sections = [
     new FakeSection("diwali"),
@@ -180,6 +185,17 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   const diwaliShortcut = new FakeLink("#diwali", "diwali");
   const corporateShortcut = new FakeLink("#corporate-resin-gifts", "corporate");
   const premiumShortcut = new FakeLink("#premium-collection", "premium");
+  // Tab bar links join the same browse-all/shortcut stubs the nav links use.
+  const tabs = withTabs ? {
+    all: new FakeTab("#catalogue-filters", "all"),
+    diwali: new FakeTab("#diwali", "diwali", "diwali"),
+    couple: new FakeTab("#romantic-keepsakes", "couple", "couple"),
+    corporate: new FakeTab("#corporate-resin-gifts", "corporate", "corporate"),
+    premium: new FakeTab("#premium-collection", "premium", "premium"),
+  } : {};
+  const tabList = Object.values(tabs);
+  const framesShortcut = new FakeLink("#studio-art", "frames");
+  const currentTabs = () => tabList.filter((tab) => tab.getAttribute("aria-current") === "true").map((tab) => tab.tab);
   const elements = new Map([
     ["catalogue-filters", tools],
     ["catalogue-search", searchFilter],
@@ -213,8 +229,12 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
     querySelectorAll(selector) {
       if (selector === ".work-card, .romantic-keepsake-card") return cards;
       if (selector === "[data-browse-filters]") return [browseFilters];
-      if (selector === "[data-browse-all]") return [navBrowseAll];
-      if (selector === "[data-category-shortcut]") return includePremium ? [diwaliShortcut, corporateShortcut, premiumShortcut] : [diwaliShortcut, corporateShortcut];
+      if (selector === "[data-category-tab]") return tabList;
+      if (selector === "[data-browse-all]") return withTabs ? [navBrowseAll, tabs.all] : [navBrowseAll];
+      if (selector === "[data-category-shortcut]") {
+        const base = includePremium ? [diwaliShortcut, corporateShortcut, premiumShortcut] : [diwaliShortcut, corporateShortcut];
+        return withTabs ? base.concat([framesShortcut, tabs.diwali, tabs.couple, tabs.corporate, tabs.premium]) : base;
+      }
       return [];
     },
   };
@@ -248,7 +268,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   const context = { document: documentObject, window: windowObject, URL, URLSearchParams };
   vm.createContext(context);
   vm.runInContext(`${catalogueFunction}\ninitCatalogueExperience();`, context, { filename: "script.js" });
-  return { cards, sections, tools, searchFilter, typeFilter, priceFilter, applyButton, resetButton, emptyReset, status, empty, searchForm, searchToggle, filterToggle, searchPanel, filterPanel, results, sectionHeadings, browseFilters, navBrowseAll, diwaliShortcut, corporateShortcut, premiumShortcut, windowObject, documentListeners, eventLog };
+  return { cards, sections, tools, searchFilter, typeFilter, priceFilter, applyButton, resetButton, emptyReset, status, empty, searchForm, searchToggle, filterToggle, searchPanel, filterPanel, results, sectionHeadings, browseFilters, navBrowseAll, diwaliShortcut, corporateShortcut, premiumShortcut, framesShortcut, tabs, currentTabs, windowObject, documentListeners, eventLog };
 }
 
 function visibleCards(harness) { return harness.cards.filter((card) => !card.hidden); }
@@ -703,4 +723,38 @@ test("reset removes catalogue query keys, collapses controls, and popstate resto
   harness.windowObject.listeners.popstate();
   assert.equal(harness.typeFilter.value, "all");
   assert.equal(harness.windowObject.history.pushes.length, previousPushes);
+});
+
+test("category tab bar marks the tab that matches the applied catalogue type", () => {
+  const harness = createHarness({ count: 91, includePremium: true, withTabs: true });
+  assert.deepEqual(harness.currentTabs(), ["all"]);
+
+  harness.tabs.diwali.dispatch("click");
+  assert.equal(harness.typeFilter.value, "diwali");
+  assert.deepEqual(harness.currentTabs(), ["diwali"]);
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "diwali");
+
+  harness.typeFilter.value = "corporate";
+  harness.applyButton.dispatch("click");
+  assert.deepEqual(harness.currentTabs(), ["corporate"]);
+
+  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=couple#catalogue-filters");
+  harness.windowObject.listeners.popstate();
+  assert.deepEqual(harness.currentTabs(), ["couple"]);
+
+  harness.resetButton.dispatch("click");
+  assert.deepEqual(harness.currentTabs(), ["all"]);
+
+  harness.tabs.premium.dispatch("click");
+  assert.deepEqual(harness.currentTabs(), ["premium"]);
+  harness.tabs.all.dispatch("click");
+  assert.equal(harness.typeFilter.value, "all");
+  assert.deepEqual(harness.currentTabs(), ["all"]);
+});
+
+test("the frames shortcut leaves every category tab unmarked", () => {
+  const harness = createHarness({ withTabs: true });
+  harness.framesShortcut.dispatch("click");
+  assert.equal(harness.typeFilter.value, "frames");
+  assert.deepEqual(harness.currentTabs(), []);
 });
