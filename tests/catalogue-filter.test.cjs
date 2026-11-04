@@ -24,6 +24,7 @@ class FakeControl {
   removeAttribute(name) { delete this.attributes[name]; }
   focus() { this.focused = true; }
   scrollIntoView(options) { this.scrolledIntoView = options; }
+  contains(node) { return node === this || (this.inside || []).includes(node); }
 }
 
 class FakeContainer {
@@ -456,6 +457,44 @@ test("Escape discards staged filters and returns focus to the toggle", () => {
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "corporate");
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("budget"), "999");
   assert.ok(visibleCards(harness).every((card) => card.getAttribute("data-product-type") === "corporate"));
+});
+
+test("an outside tap closes open search or filters and discards staged filters", () => {
+  const harness = createHarness({ count: 77 });
+  harness.searchPanel.inside = [harness.searchFilter];
+  harness.filterPanel.inside = [harness.typeFilter, harness.priceFilter, harness.applyButton];
+  const outside = new FakeControl("");
+
+  harness.searchToggle.dispatch("click");
+  harness.documentListeners.click({ target: harness.searchToggle });
+  harness.documentListeners.click({ target: harness.searchFilter });
+  assert.equal(harness.searchPanel.hidden, false, "taps on the toggle or inside the panel keep search open");
+  harness.searchToggle.focused = false;
+  harness.documentListeners.click({ target: outside });
+  assert.equal(harness.searchPanel.hidden, true);
+  assert.equal(harness.searchToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(harness.searchToggle.focused, false, "an outside tap does not pull focus back");
+
+  harness.filterToggle.dispatch("click");
+  harness.typeFilter.value = "corporate";
+  harness.priceFilter.value = "999";
+  harness.applyButton.dispatch("click");
+  harness.filterToggle.dispatch("click");
+  harness.typeFilter.value = "diwali";
+  harness.typeFilter.dispatch("change");
+  harness.documentListeners.click({ target: harness.typeFilter });
+  assert.equal(harness.filterPanel.hidden, false, "a tap inside the filter panel keeps it open");
+  harness.filterToggle.focused = false;
+  harness.documentListeners.click({ target: outside });
+  assert.equal(harness.filterPanel.hidden, true);
+  assert.equal(harness.filterToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(harness.typeFilter.value, "corporate", "staged filter choices are discarded like Escape");
+  assert.equal(harness.priceFilter.value, "999");
+  assert.equal(harness.filterToggle.focused, false);
+
+  harness.documentListeners.click({ target: outside });
+  assert.equal(harness.filterPanel.hidden, true, "outside taps while closed change nothing");
+  assert.equal(harness.searchPanel.hidden, true);
 });
 
 test("URL state preserves query, filters, unrelated parameters, and back/forward restoration", () => {

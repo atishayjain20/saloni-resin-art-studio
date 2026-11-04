@@ -975,6 +975,19 @@
         closeControls(filterToggle);
       }
     });
+    if (typeof document.addEventListener === "function") document.addEventListener("click", function (event) {
+      var searchOpen = searchToggle && searchToggle.getAttribute("aria-expanded") === "true";
+      var filterOpen = filterToggle && filterToggle.getAttribute("aria-expanded") === "true";
+      if (!searchOpen && !filterOpen) return;
+      var button = searchOpen ? searchToggle : filterToggle;
+      var panel = searchOpen ? searchPanel : filterPanel;
+      if (button.contains(event.target) || (panel && panel.contains(event.target))) return;
+      if (filterOpen) {
+        typeFilter.value = appliedType;
+        priceFilter.value = appliedBudget;
+      }
+      closeControls();
+    });
     window.addEventListener("hashchange", restoreFromLocation);
     window.addEventListener("popstate", restoreFromLocation);
     restoreFromLocation();
