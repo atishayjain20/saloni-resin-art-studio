@@ -188,6 +188,13 @@ h1 em { color: var(--rose); font-style: italic; }
 .work-card img { width: 100%; border-radius: 1.2rem; box-shadow: 0 9px 25px rgba(86, 57, 45, 0.1); }
 :is(.work-card, .romantic-keepsake-card, .collection-card) img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; object-position: center; padding: 0.5rem; background: var(--paper); }
 .work-card:nth-child(2) img { object-position: center; }.work-card:nth-child(3) img { object-position: center; }
+.lightbox-trigger:has(> .card-photo-dots) { position: relative; display: block; }
+.card-photos { display: flex; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 1.2rem; }
+.card-photos::-webkit-scrollbar { display: none; }
+.card-photos > img { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; box-shadow: none; }
+.card-photo-dots { position: absolute; inset: auto 0 0.9rem; display: flex; justify-content: center; gap: 0.35rem; pointer-events: none; }
+.card-photo-dots > span { width: 0.45rem; height: 0.45rem; border-radius: 999px; background: rgba(255, 255, 255, 0.6); box-shadow: 0 0 0 1px rgba(43, 29, 23, 0.3); transition: width 0.2s ease; }
+.card-photo-dots > .is-active { width: 1rem; background: #fff; }
 .work-card figcaption { padding: 1rem 0.2rem 0; }
 .work-card figcaption span { display: block; margin-bottom: 0.42rem; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; }
 .work-card figcaption strong { display: block; margin-bottom: 0.35rem; font: 500 1.65rem/1.05 var(--display); letter-spacing: -0.03em; }
