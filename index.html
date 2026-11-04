@@ -42,8 +42,8 @@
     }
   </script>
   <title>Custom Resin Art &amp; Gifts | Saloni Resin Art Studio</title>
-  <link rel="stylesheet" href="styles.css?v=20261120">
-  <script class="site-script" src="script.js?v=20261120" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261121">
+  <script class="site-script" src="script.js?v=20261121" defer></script>
   <script class="customizer-script" src="customizer.js?v=20261031" defer></script>
 </head>
 <body>
@@ -124,25 +124,51 @@
   </header>
 
   <main id="main-content" tabindex="-1">
-    <section class="hero shell" id="hero" aria-labelledby="hero-title">
-      <div class="hero-copy reveal">
-        <h1 id="hero-title">Made for the moment they’ll <em>remember.</em></h1>
-        <div class="hero-actions">
-          <a class="button button-dark hero-catalogue-action" href="#catalogue-filters" data-browse-all>Explore gifts</a>
-          <a class="button button-line hero-catalogue-action" href="#customizer" data-customizer-open>Design a custom frame</a>
-        </div>
+    <section class="hero-banner shell" id="hero" aria-labelledby="hero-title" aria-roledescription="carousel">
+      <h1 id="hero-title" class="sr-only">Handmade resin gifts from Ajmer</h1>
+      <div class="hero-banner-track" data-banner-track>
+        <article class="hero-slide" role="group" aria-roledescription="slide" aria-label="1 of 4: Premium">
+          <div class="hero-slide-photos">
+            <img src="assets/premium-midnight-blue-tiered-set.jpeg" alt="Midnight blue and gold three-tier stand, tray and coasters" width="736" height="920" loading="eager" fetchpriority="high">
+            <img src="assets/premium-turquoise-tray-coasters.jpeg" alt="Turquoise white and gold handled tray with four coasters" width="736" height="736" loading="eager">
+            <img src="assets/premium-smoky-bronze-tray.jpeg" alt="Smoky bronze and gold handled resin tray" width="736" height="920" loading="eager">
+          </div>
+          <a class="button button-dark hero-slide-cta" href="#premium-collection" data-category-shortcut="premium" aria-label="Shop now: Premium gifts">Shop now</a>
+        </article>
+        <article class="hero-slide" role="group" aria-roledescription="slide" aria-label="2 of 4: Couple">
+          <div class="hero-slide-photos">
+            <img src="assets/romantic-heart-trinket-tray.webp" alt="Illustrative preview: Coquette heart trinket tray in soft resin" width="1024" height="1024" loading="lazy" decoding="async">
+            <img src="assets/romantic-initial-desk-stand.webp" alt="Illustrative preview: Couple initial resin desk stand" width="1024" height="1024" loading="lazy" decoding="async">
+            <img src="assets/romantic-us-keychain-pair.webp" alt="Illustrative preview: Matching resin keychains with a shared heart detail" width="1024" height="1024" loading="lazy" decoding="async">
+          </div>
+          <a class="button button-dark hero-slide-cta" href="#romantic-keepsakes" data-category-shortcut="couple" aria-label="Shop now: Couple gifts">Shop now</a>
+        </article>
+        <article class="hero-slide" role="group" aria-roledescription="slide" aria-label="3 of 4: Corporate">
+          <div class="hero-slide-photos">
+            <img src="assets/corporate-desk-nameplate-concept.webp" alt="Illustrative preview: Resin desk nameplate" width="1200" height="1200" loading="lazy" decoding="async">
+            <img src="assets/corporate-logo-coaster-set-concept.webp" alt="Illustrative preview: Branded coaster set" width="1200" height="1200" loading="lazy" decoding="async">
+            <img src="assets/corporate-recognition-award-concept.webp" alt="Illustrative preview: Recognition resin award" width="1200" height="1200" loading="lazy" decoding="async">
+          </div>
+          <a class="button button-dark hero-slide-cta" href="#corporate-resin-gifts" data-category-shortcut="corporate" aria-label="Shop now: Corporate gifts">Shop now</a>
+        </article>
+        <article class="hero-slide" role="group" aria-roledescription="slide" aria-label="4 of 4: Diwali">
+          <div class="hero-slide-photos">
+            <img src="assets/diwali-shubh-labh-welcome-pair.jpg" alt="Shubh Labh resin welcome pair with green and floral details" width="1200" height="1200" loading="lazy" decoding="async">
+            <img src="assets/diwali-lotus-blue-festive-set.jpeg" alt="Soft blue and pink lotus festive resin set" width="335" height="597" loading="lazy" decoding="async">
+            <img src="assets/diwali-ocean-bloom-pooja-platter.jpg" alt="Ocean blue pooja platter with floral and pearl-like details" width="360" height="640" loading="lazy" decoding="async">
+          </div>
+          <a class="button button-dark hero-slide-cta" href="#diwali" data-category-shortcut="diwali" aria-label="Shop now: Diwali gifts">Shop now</a>
+        </article>
       </div>
-      <div class="hero-collage reveal reveal-delay" aria-label="Finished resin artwork from the studio">
-        <figure class="hero-image hero-image-main">
-          <a class="lightbox-trigger" data-lightbox-trigger data-lightbox-target="romantic-trinket" href="assets/romantic-heart-trinket-tray.webp" aria-label="Open larger view: Tiny tray, big feelings"><img src="assets/romantic-heart-trinket-tray.webp" alt="Coquette heart trinket tray in soft resin" width="1024" height="1024" fetchpriority="high"></a>
-          <figcaption><strong>Tiny tray, big feelings</strong><span>A soft place for rings, earbuds, and the little things you share.</span></figcaption>
-        </figure>
-        <figure class="hero-image hero-image-clock">
-          <a class="lightbox-trigger" data-lightbox-trigger data-lightbox-target="romantic-initial" href="assets/romantic-initial-desk-stand.webp" aria-label="Open larger view: Your initial. Mine. Ours."><img src="assets/romantic-initial-desk-stand.webp" alt="Couple initial resin desk stand" width="1024" height="1024" loading="lazy" decoding="async"></a>
-          <figcaption><strong>Your initial. Mine. Ours.</strong><span>Two letters, one small corner that belongs to both of you.</span></figcaption>
-        </figure>
-        <span class="hero-note" aria-hidden="true">made with care<br>for your people</span>
+      <div class="hero-banner-controls">
+        <button class="hero-banner-arrow" type="button" data-banner-prev aria-label="Previous slide" disabled><span aria-hidden="true">&#8249;</span></button>
+        <button class="hero-banner-dot" type="button" data-banner-dot aria-label="Show slide 1" aria-current="true"></button>
+        <button class="hero-banner-dot" type="button" data-banner-dot aria-label="Show slide 2"></button>
+        <button class="hero-banner-dot" type="button" data-banner-dot aria-label="Show slide 3"></button>
+        <button class="hero-banner-dot" type="button" data-banner-dot aria-label="Show slide 4"></button>
+        <button class="hero-banner-arrow" type="button" data-banner-next aria-label="Next slide"><span aria-hidden="true">&#8250;</span></button>
       </div>
+      <p class="hero-banner-custom"><a href="#customizer" data-customizer-open>Or design a custom frame</a></p>
     </section>
 
     <div class="catalogue-status-region shell" id="catalogue-filters" aria-label="Gift catalogue results" tabindex="-1">

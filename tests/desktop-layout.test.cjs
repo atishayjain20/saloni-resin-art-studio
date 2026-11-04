@@ -50,11 +50,12 @@ test("desktop order columns align to the top", () => {
   assert.match(rule(block, "#order-inline-fallback"), /align-self:\s*start/);
 });
 
-test("desktop hero headline is wider and smaller so it wraps to 3 or 4 lines", () => {
+test("desktop hero banner goes wider (3/1) and never uses an #hero selector", () => {
   const block = desktopBlock();
-  assert.match(rule(block, "body:has(#catalogue-selection) .hero h1"), /max-width:\s*13ch/);
+  assert.match(block, /\.hero-slide\s*\{[^}]*aspect-ratio:\s*3\s*\/\s*1/);
+  assert.doesNotMatch(block, /hero-slide-narrow/);
+  assert.doesNotMatch(block, /\.hero(?![-\w])|#hero|hero-actions|hero-collage/);
   // the mobile hero test forbids "#hero" anywhere after the reduced-motion media query
-  assert.doesNotMatch(block, /#hero/);
 });
 
 test("desktop footer and cart bar spacing are scoped to the homepage", () => {

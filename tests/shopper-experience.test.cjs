@@ -19,35 +19,132 @@ function section(id) {
   return match[0];
 }
 
-test("homepage hero has exactly two actions into gifts and customizer", () => {
+const bannerSlides = [
+  { label: "Premium", name: "Premium gifts", shortcut: "premium", href: "#premium-collection", images: ["premium-midnight-blue-tiered-set.jpeg", "premium-turquoise-tray-coasters.jpeg", "premium-smoky-bronze-tray.jpeg"] },
+  { label: "Couple", name: "Couple gifts", shortcut: "couple", href: "#romantic-keepsakes", images: ["romantic-heart-trinket-tray.webp", "romantic-initial-desk-stand.webp", "romantic-us-keychain-pair.webp"] },
+  { label: "Corporate", name: "Corporate gifts", shortcut: "corporate", href: "#corporate-resin-gifts", images: ["corporate-desk-nameplate-concept.webp", "corporate-logo-coaster-set-concept.webp", "corporate-recognition-award-concept.webp"] },
+  { label: "Diwali", name: "Diwali gifts", shortcut: "diwali", href: "#diwali", images: ["diwali-shubh-labh-welcome-pair.jpg", "diwali-lotus-blue-festive-set.jpeg", "diwali-ocean-bloom-pooja-platter.jpg"] },
+];
+
+function bannerSlideHtml() {
+  return Array.from(section("hero").matchAll(/<article class="hero-slide[^"]*"[\s\S]*?<\/article>/g), (match) => match[0]);
+}
+
+test("homepage first screen is a four-slide hero banner ordered Premium, Couple, Corporate, Diwali", () => {
   const hero = section("hero");
-  assert.match(hero, /assets\/romantic-heart-trinket-tray\.webp/);
-  assert.match(hero, /Tiny tray, big feelings/);
-  assert.match(hero, /A soft place for rings, earbuds, and the little things you share\./);
-  assert.match(hero, /assets\/romantic-initial-desk-stand\.webp/);
-  assert.match(hero, /Your initial\. Mine\. Ours\./);
-  assert.match(hero, /Two letters, one small corner that belongs to both of you\./);
-  assert.match(hero, /data-lightbox-target="romantic-trinket"/);
-  assert.match(hero, /data-lightbox-target="romantic-initial"/);
-  const heroActions = hero.match(/<div class="hero-actions">([\s\S]*?)<\/div>/)?.[1] || "";
-  const actionLinks = Array.from(heroActions.matchAll(/<a\b[\s\S]*?<\/a>/g));
-  assert.equal(actionLinks.length, 2);
-  assert.match(heroActions, /<a class="button button-dark hero-catalogue-action" href="#catalogue-filters" data-browse-all>Explore gifts<\/a>/);
-  assert.match(heroActions, /<a class="button button-line hero-catalogue-action" href="#customizer" data-customizer-open>Design a custom frame<\/a>/);
-  assert.doesNotMatch(heroActions, /aria-hidden="true">↘/);
-  assert.doesNotMatch(hero, /class="hero-intro"|Thoughtful custom resin frames, resin art, and personalized gifts from Ajmer, Rajasthan/);
-  assert.doesNotMatch(hero, /class="instagram-mark"/);
+  assert.match(hero, /^<section class="hero-banner shell" id="hero" aria-labelledby="hero-title" aria-roledescription="carousel">/);
+  assert.match(hero, /<h1 id="hero-title" class="sr-only">Handmade resin gifts from Ajmer<\/h1>/);
+  assert.doesNotMatch(html, /Made for the moment|hero-collage|hero-note|hero-actions|hero-catalogue-action/);
+  assert.doesNotMatch(hero, /data-lightbox|reveal|Explore gifts|data-browse-all/);
+  assert.match(hero, /<div class="hero-banner-track" data-banner-track>/);
+  const slides = bannerSlideHtml();
+  assert.equal(slides.length, 4);
+  slides.forEach((slide, index) => {
+    const expected = bannerSlides[index];
+    assert.match(slide, new RegExp(`role="group" aria-roledescription="slide" aria-label="${index + 1} of 4: ${expected.label}"`));
+    assert.doesNotMatch(slide, /<h2|class="eyebrow"|hero-slide-copy/);
+    assert.equal((slide.match(/<a\b/g) || []).length, 1);
+    assert.match(slide, new RegExp(`<a class="button button-dark hero-slide-cta" href="${expected.href}" data-category-shortcut="${expected.shortcut}" aria-label="Shop now: ${expected.name}">Shop now</a>`));
+    assert.deepEqual(Array.from(slide.matchAll(/<img\b[^>]*src="assets\/([^"]+)"/g), (match) => match[1]), expected.images);
+  });
+  assert.deepEqual(Array.from(hero.matchAll(/data-category-shortcut="([^"]+)"/g), (match) => match[1]), ["premium", "couple", "corporate", "diwali"]);
+  assert.match(hero, /<a href="#customizer" data-customizer-open>Or design a custom frame<\/a>/);
+  assert.doesNotMatch(hero, /class="instagram-mark"|Request a custom gift|hero-floral-bouquet\.jpg/);
   const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
   assert.match(footer, /<a class="instagram-mark" href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\/" target="_blank" rel="noreferrer">Follow the studio <strong>@saloniresin_art_studio<\/strong><\/a>/);
   assert.doesNotMatch(footer, />Instagram<\/a>/);
-  assert.doesNotMatch(hero, /Request a custom gift/);
-  assert.doesNotMatch(hero, /hero-floral-bouquet\.jpg/);
   assert.doesNotMatch(html, /Some catalogue images are illustrative or reference ideas\. Saloni confirms availability, materials, final design, quote, and delivery\./);
 });
 
+test("hero banner images exist, carry alt and size, and only slide 1 loads eagerly", () => {
+  const slides = bannerSlideHtml();
+  assert.equal(slides.length, 4);
+  slides.forEach((slide, slideIndex) => {
+    const images = Array.from(slide.matchAll(/<img\b[^>]*>/g), (match) => match[0]);
+    assert.equal(images.length, 3);
+    images.forEach((image, imageIndex) => {
+      const src = image.match(/\bsrc="(assets\/[^"]+)"/)?.[1];
+      assert.ok(src && fs.existsSync(path.join(root, src)), `${src} must exist`);
+      assert.match(image, /\balt="[^"]{9,}"/);
+      assert.match(image, /\bwidth="\d+"/);
+      assert.match(image, /\bheight="\d+"/);
+      if (/corporate-|romantic-/.test(src)) assert.match(image, /alt="Illustrative preview: /);
+      if (slideIndex === 0) {
+        assert.doesNotMatch(image, /loading="lazy"/);
+        assert.equal(/fetchpriority="high"/.test(image), imageIndex === 0);
+      } else {
+        assert.match(image, /loading="lazy" decoding="async"/);
+        assert.doesNotMatch(image, /fetchpriority/);
+      }
+    });
+  });
+});
+
+test("hero banner controls are previous, four dots, then next, hidden without JavaScript", () => {
+  const hero = section("hero");
+  const controls = hero.match(/<div class="hero-banner-controls">([\s\S]*?)<\/div>/)?.[1] || "";
+  assert.ok(hero.indexOf("hero-banner-controls") > hero.lastIndexOf("</article>"), "controls follow the track");
+  assert.ok(hero.indexOf("data-customizer-open") > hero.indexOf("data-banner-next"), "custom-frame link sits below the controls");
+  assert.match(controls, /data-banner-prev[^>]*aria-label="Previous slide"/);
+  assert.match(controls, /data-banner-next[^>]*aria-label="Next slide"/);
+  assert.deepEqual(Array.from(controls.matchAll(/data-banner-dot[^>]*aria-label="(Show slide \d)"/g), (match) => match[1]), ["Show slide 1", "Show slide 2", "Show slide 3", "Show slide 4"]);
+  assert.equal((controls.match(/aria-current="true"/g) || []).length, 1);
+  assert.ok(controls.indexOf("data-banner-prev") < controls.indexOf("data-banner-dot") && controls.lastIndexOf("data-banner-dot") < controls.indexOf("data-banner-next"));
+  assert.match(css, /html:not\(\.js\) \.hero-banner-controls\s*\{[^}]*display:\s*none/);
+});
+
+test("initHeroBanner scrolls by slide without timers and honours reduced motion", () => {
+  const start = script.indexOf("  function initHeroBanner(");
+  assert.ok(start >= 0, "expected initHeroBanner");
+  const body = script.slice(start, script.indexOf("\n  }\n", start) + 5);
+  assert.doesNotMatch(body, /setInterval|setTimeout/);
+  assert.match(body, /prefers-reduced-motion: reduce/);
+  assert.match(body, /requestAnimationFrame/);
+  assert.match(script, /initHeroBanner\(\);/);
+
+  const listeners = {};
+  const scrolls = [];
+  const track = {
+    scrollLeft: 0,
+    scrollTo(options) { scrolls.push(options); track.scrollLeft = options.left; track.listeners.scroll(); },
+    listeners,
+    addEventListener(type, listener) { listeners[type] = listener; },
+  };
+  const slides = [0, 300, 600, 900].map((offsetLeft) => ({ offsetLeft }));
+  track.querySelectorAll = (selector) => (selector === ".hero-slide" ? slides : []);
+  const button = () => ({ disabled: false, attrs: {}, listeners: {}, addEventListener(type, listener) { this.listeners[type] = listener; }, setAttribute(name, value) { this.attrs[name] = value; }, removeAttribute(name) { delete this.attrs[name]; } });
+  const prev = button();
+  const next = button();
+  const dots = [button(), button(), button(), button()];
+  const documentObject = {
+    querySelector(selector) { return { "[data-banner-track]": track, "[data-banner-prev]": prev, "[data-banner-next]": next }[selector] || null; },
+    querySelectorAll(selector) { return selector === "[data-banner-dot]" ? dots : []; },
+  };
+  let reduced = false;
+  const windowObject = { matchMedia: () => ({ matches: reduced }), requestAnimationFrame: (callback) => callback() };
+  const context = { document: documentObject, window: windowObject, Math };
+  vm.createContext(context);
+  vm.runInContext(`(function () {\n${body}\ninitHeroBanner();\n})();`, context);
+  assert.equal(prev.disabled, true);
+  assert.equal(next.disabled, false);
+  assert.equal(dots[0].attrs["aria-current"], "true");
+  next.listeners.click();
+  assert.deepEqual(JSON.parse(JSON.stringify(scrolls.pop())), { left: 300, behavior: "smooth" });
+  assert.equal(dots[1].attrs["aria-current"], "true");
+  assert.equal(dots[0].attrs["aria-current"], undefined);
+  assert.equal(prev.disabled, false);
+  reduced = true;
+  dots[3].listeners.click();
+  assert.deepEqual(JSON.parse(JSON.stringify(scrolls.pop())), { left: 900, behavior: "auto" });
+  assert.equal(next.disabled, true);
+  prev.listeners.click();
+  assert.deepEqual(JSON.parse(JSON.stringify(scrolls.pop())), { left: 600, behavior: "auto" });
+  assert.equal(next.disabled, false);
+});
+
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261120">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261120" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261121">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261121" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -140,65 +237,60 @@ test("header cart button sits in the catalogue controls and keeps the header on 
   assert.match(css, /@media \(max-width: 370px\)\s*\{[^}]*\.site-header \.wordmark-subtitle\s*\{[^}]*letter-spacing:\s*\.08em/);
 });
 
-test("mobile hero CSS keeps the tray dominant, captions in flow, and CTAs usable", () => {
+test("hero banner CSS snaps full-bleed photo slides with a bottom-centre Shop now button", () => {
   const mobileStart = css.indexOf("@media (max-width: 620px)");
   const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)");
   const mobileCss = css.slice(mobileStart, reducedMotionStart);
   const desktopCopyRule = css.match(/^h1\s*\{([^}]*)\}/m)?.[1] || "";
-  const heroRule = mobileCss.match(/#hero\s*\{([^}]*)\}/)?.[1] || "";
-  const copyContainerRule = mobileCss.match(/#hero \.hero-copy\s*\{([^}]*)\}/)?.[1] || "";
-  const copyRule = mobileCss.match(/#hero h1\s*\{([^}]*)\}/)?.[1] || "";
-  const actionsRule = mobileCss.match(/#hero \.hero-actions\s*\{([^}]*)\}/)?.[1] || "";
   const mobileNavRule = mobileCss.match(/\.nav-toggle\s*\{([^}]*)\}/)?.[1] || "";
-  const catalogueActionRule = css.match(/\.hero-catalogue-action\s*\{([^}]*)\}/)?.[1] || "";
-  const mobileCatalogueActionRule = mobileCss.match(/#hero \.hero-actions \.button\s*\{([^}]*)\}/)?.[1] || "";
-  const collageRule = mobileCss.match(/#hero \.hero-collage\s*\{([^}]*)\}/)?.[1] || "";
-  const imageRule = mobileCss.match(/#hero \.hero-image\s*\{([^}]*)\}/)?.[1] || "";
-  const mainMediaRule = mobileCss.match(/#hero \.hero-image-main \.lightbox-trigger\s*\{([^}]*)\}/)?.[1] || "";
-  const mainImageRule = mobileCss.match(/#hero \.hero-image-main img\s*\{([^}]*)\}/)?.[1] || "";
-  const clockFigureRule = mobileCss.match(/#hero \.hero-image-clock\s*\{([^}]*)\}/)?.[1] || "";
-  const clockImageRule = mobileCss.match(/#hero \.hero-image-clock img\s*\{([^}]*)\}/)?.[1] || "";
-  const captionRule = mobileCss.match(/#hero \.hero-image figcaption\s*\{([^}]*)\}/)?.[1] || "";
-  const noteRule = mobileCss.match(/#hero \.hero-note\s*\{([^}]*)\}/)?.[1] || "";
+  const trackRule = css.match(/\.hero-banner-track\s*\{([^}]*)\}/)?.[1] || "";
+  const slideRule = css.match(/\.hero-slide\s*\{([^}]*)\}/)?.[1] || "";
+  const photosRule = css.match(/\.hero-slide-photos\s*\{([^}]*)\}/)?.[1] || "";
+  const ctaRule = css.match(/\.hero-slide-cta\s*\{([^}]*)\}/)?.[1] || "";
+  const imageRule = css.match(/\.hero-slide-photos img\s*\{([^}]*)\}/)?.[1] || "";
+  const arrowRule = css.match(/\.hero-banner-arrow,\s*\.hero-banner-dot\s*\{([^}]*)\}/)?.[1] || "";
+  const wideCss = css.slice(css.indexOf("@media (min-width: 621px)"), css.indexOf("@media (max-width: 840px)"));
 
-  assert.match(heroRule, /padding-block:\s*1rem 1rem/);
   assert.match(desktopCopyRule, /font-size:\s*clamp\(3\.4rem, 7\.1vw, 6\.6rem\)/);
   assert.match(desktopCopyRule, /line-height:\s*0\.97/);
-  assert.match(copyContainerRule, /min-width:\s*0/);
-  assert.match(copyRule, /max-width:\s*none/);
-  assert.match(copyRule, /font-size:\s*clamp\(2\.15rem, 9\.8vw, 2\.9rem\)/);
-  assert.match(copyRule, /line-height:\s*1\.02/);
-  assert.match(copyRule, /letter-spacing:\s*-0\.035em/);
-  assert.match(copyRule, /overflow-wrap:\s*anywhere/);
-  assert.match(actionsRule, /display:\s*grid/);
-  assert.match(actionsRule, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(mobileNavRule, /width:\s*44px/);
   assert.match(mobileNavRule, /height:\s*44px/);
   assert.match(mobileNavRule, /min-height:\s*44px/);
-  assert.match(catalogueActionRule, /font-size:\s*\.75rem/);
-  assert.match(catalogueActionRule, /min-height:\s*2\.75rem/);
-  assert.match(mobileCatalogueActionRule, /font-size:\s*(?:0\.)?75rem/);
-  assert.match(mobileCatalogueActionRule, /min-height:\s*44px/);
-  assert.match(collageRule, /display:\s*grid/);
-  assert.match(collageRule, /gap:\s*0\.5rem/);
-  assert.match(collageRule, /min-height:\s*auto/);
-  assert.match(collageRule, /min-width:\s*0/);
-  assert.match(imageRule, /position:\s*relative/);
-  assert.match(imageRule, /width:\s*100%/);
-  assert.match(mainMediaRule, /aspect-ratio:\s*1\.65\s*\/\s*1/);
-  assert.match(mainMediaRule, /overflow:\s*hidden/);
-  assert.match(mainImageRule, /height:\s*100%/);
-  assert.match(mainImageRule, /object-fit:\s*cover/);
-  assert.match(clockFigureRule, /width:\s*45%/);
-  assert.match(clockImageRule, /height:\s*auto/);
-  assert.match(captionRule, /position:\s*static/);
-  assert.match(captionRule, /margin-top:\s*0\.4rem/);
-  assert.match(noteRule, /max-width:\s*100%/);
-  assert.match(noteRule, /overflow-wrap:\s*anywhere/);
-  assert.match(noteRule, /right:\s*0\.5rem/);
+  assert.match(trackRule, /display:\s*flex/);
+  assert.match(trackRule, /overflow-x:\s*auto/);
+  assert.match(trackRule, /scroll-snap-type:\s*x mandatory/);
+  assert.match(trackRule, /scrollbar-width:\s*none/);
+  assert.match(css, /\.hero-banner-track::-webkit-scrollbar\s*\{[^}]*display:\s*none/);
+  assert.match(slideRule, /flex:\s*0 0 100%/);
+  assert.match(slideRule, /scroll-snap-align:\s*start/);
+  assert.match(photosRule, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(slideRule, /position:\s*relative/);
+  assert.doesNotMatch(slideRule, /padding\s*:/);
+  assert.match(slideRule, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(photosRule, /height:\s*100%/);
+  assert.match(ctaRule, /position:\s*absolute/);
+  assert.match(ctaRule, /bottom:\s*[^;]+;/);
+  assert.match(ctaRule, /left:\s*0/);
+  assert.match(ctaRule, /right:\s*0/);
+  assert.match(ctaRule, /margin-inline:\s*auto/);
+  assert.match(ctaRule, /width:\s*max-content/);
+  assert.match(ctaRule, /min-height:\s*44px/);
+  assert.match(ctaRule, /box-shadow:/);
+  assert.doesNotMatch(css, /\.hero-slide(?:-copy|-narrow)\b|\.hero-slide \.eyebrow|\.hero-slide h2|\.hero-banner-title|\.hero-slide:nth-child/);
+  assert.match(imageRule, /object-fit:\s*cover/);
+  assert.match(wideCss, /\.hero-slide\s*\{[^}]*aspect-ratio:\s*21\s*\/\s*9/);
+  assert.doesNotMatch(wideCss, /grid-template-columns:\s*minmax\(0,\s*0?\.8fr\)/);
+  assert.match(arrowRule, /width:\s*44px/);
+  assert.match(arrowRule, /height:\s*44px/);
+  assert.match(css, /\.hero-banner-arrow:focus-visible, \.hero-banner-dot:focus-visible\s*\{[^}]*outline:\s*3px solid/);
+  assert.match(css, /\.hero-banner-custom a\s*\{[^}]*min-height:\s*44px/);
+  assert.doesNotMatch(css, /\.hero(?:-copy|-actions|-collage|-image|-note|-catalogue-action)\b/);
+  assert.doesNotMatch(css, /(?:^|[\s,}])\.hero\s*[{,]/m);
   assert.doesNotMatch(css, /body\s*\{[^}]*overflow-x:\s*hidden/);
-  assert.doesNotMatch(css.slice(0, mobileStart), /#hero/);
-  assert.doesNotMatch(css.slice(reducedMotionStart), /#hero/);
+  assert.doesNotMatch(css, /#hero\b/);
+  assert.doesNotMatch(css, /\.carousel(?:-track)?\s*\{/);
+  const lastMedia = css.lastIndexOf("\n@media ");
+  assert.match(css.slice(lastMedia), /^\n@media \(min-width: 1024px\) \{/);
 });
 
 test("browse gifts keeps the first product row clear of the sticky header", () => {

@@ -26,6 +26,23 @@ def webp_dimensions(path):
     raise AssertionError(f"Unsupported WebP header: {path}")
 
 
+def jpeg_dimensions(path):
+    """Read dimensions from the first JPEG start-of-frame marker without dependencies."""
+    data = path.read_bytes()
+    if data[:2] != b"\xff\xd8":
+        raise AssertionError(f"Not a JPEG file: {path}")
+    index = 2
+    while index + 9 < len(data):
+        if data[index] != 0xFF:
+            index += 1
+            continue
+        marker = data[index + 1]
+        if marker in (0xC0, 0xC1, 0xC2):
+            return (int.from_bytes(data[index + 7:index + 9], "big"), int.from_bytes(data[index + 5:index + 7], "big"))
+        index += 2 + int.from_bytes(data[index + 2:index + 4], "big")
+    raise AssertionError(f"Missing JPEG frame header: {path}")
+
+
 class MarkupTreeParser(HTMLParser):
     VOID_ELEMENTS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 
@@ -233,7 +250,7 @@ class StaticSiteContractTests(unittest.TestCase):
         section = re.search(r'<section\b[^>]*id=["\']diwali["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(section)
         section_html = section.group(0)
-        hero_start = self.html.index('<section class="hero shell"')
+        hero_start = self.html.index('<section class="hero-banner shell"')
         hero_end = self.html.index('</section>', hero_start) + len('</section>')
         diwali_start = self.html.index(section_html)
         self.assertLess(hero_end, diwali_start)
@@ -735,9 +752,38 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("Online orders only", self.html)
         self.assertNotIn("no customer visits", self.html)
 
+    def test_hero_banner_images_exist_with_real_dimensions_and_loading_rules(self):
+        hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html)
+        self.assertIsNotNone(hero)
+        slides = re.findall(r'<article class="hero-slide[^"]*"[\s\S]*?</article>', hero.group(0))
+        self.assertEqual(len(slides), 4)
+        for slide_index, slide in enumerate(slides):
+            images = re.findall(r'<img\b[^>]*>', slide)
+            self.assertEqual(len(images), 3)
+            for image_index, image in enumerate(images):
+                with self.subTest(slide=slide_index + 1, image=image_index + 1):
+                    src = re.search(r'\bsrc="assets/([^"]+)"', image).group(1)
+                    path = ROOT / "assets" / src
+                    self.assertTrue(path.is_file(), src)
+                    expected = webp_dimensions(path) if src.endswith(".webp") else jpeg_dimensions(path)
+                    self.assertIn(f'width="{expected[0]}"', image)
+                    self.assertIn(f'height="{expected[1]}"', image)
+                    self.assertGreater(len(re.search(r'\balt="([^"]*)"', image).group(1)), 8)
+                    if slide_index == 0:
+                        self.assertNotIn('loading="lazy"', image)
+                        self.assertEqual('fetchpriority="high"' in image, image_index == 0)
+                    else:
+                        self.assertIn('loading="lazy"', image)
+                        self.assertIn('decoding="async"', image)
+                        self.assertNotIn('fetchpriority', image)
+
     def test_hero_copy_keeps_the_heading_without_the_removed_intro(self):
-        self.assertIn('<h1 id="hero-title">Made for the moment they’ll <em>remember.</em></h1>', self.html)
+        self.assertIn('<h1 id="hero-title" class="sr-only">Handmade resin gifts from Ajmer</h1>', self.html)
+        self.assertNotIn("Made for the moment", self.html)
         self.assertNotIn('class="hero-intro"', self.html)
+        hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html).group(0)
+        self.assertNotRegex(hero, r'<h2|class="eyebrow"')
+        self.assertEqual(len(re.findall(r'>Shop now</a>', hero)), 4)
         self.assertNotIn("Thoughtful custom resin frames, resin art, and personalized gifts from Ajmer, Rajasthan", self.html)
 
     def test_romantic_keepsake_highlight_contract(self):
@@ -832,20 +878,18 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("romantic-keepsake-notes", section_html)
         self.assertNotRegex(section_html, re.compile(r"<blockquote|<cite|Gaurav Jain|Aarti Suthar|★★★★★", re.I))
 
-        hero = re.search(r'<section\b[^>]*class=["\']hero\b[\s\S]*?</section>', self.html)
+        hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html)
         self.assertIsNotNone(hero)
         hero_html = hero.group(0)
-        hero_actions = re.search(r'<div class="hero-actions">([\s\S]*?)</div>', hero_html)
-        self.assertIsNotNone(hero_actions)
-        action_links = re.findall(r'<a\b[\s\S]*?</a>', hero_actions.group(1))
-        self.assertEqual(len(action_links), 2)
-        self.assertRegex(hero_actions.group(1), r'<a class="button button-dark hero-catalogue-action" href="#catalogue-filters" data-browse-all>Explore gifts</a>')
-        self.assertRegex(hero_actions.group(1), r'<a class="button button-line hero-catalogue-action" href="#customizer" data-customizer-open>Design a custom frame</a>')
+        self.assertNotIn('hero-actions', hero_html)
+        self.assertNotIn('data-browse-all', hero_html)
+        self.assertEqual(len(re.findall(r'data-category-shortcut=', hero_html)), 4)
+        self.assertEqual(len(re.findall(r'data-customizer-open', hero_html)), 1)
         self.assertNotIn('Browse gifts by type or budget', hero_html)
         self.assertNotIn('Request a custom gift', hero_html)
         self.assertNotIn('data-browse-filters', hero_html)
         self.assertEqual(self.html.count('class="catalogue-grid"'), 5)
-        self.assertEqual(self.html.count('data-lightbox-trigger'), 91)
+        self.assertEqual(self.html.count('data-lightbox-trigger'), 89)
         self.assertEqual(self.html.count('class="product-pricing"'), 89)
         self.assertEqual(self.html.count('data-testimonial-card'), 0)
 
@@ -937,7 +981,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertEqual(trigger.group(1), f"assets/{asset}")
 
         for asset, _, _, _, _, _ in ROMANTIC_CONCEPTS:
-            expected_count = 2 if asset in {"romantic-heart-trinket-tray.webp", "romantic-initial-desk-stand.webp"} else 1
+            expected_count = 2 if asset in {"romantic-heart-trinket-tray.webp", "romantic-initial-desk-stand.webp", "romantic-us-keychain-pair.webp"} else 1
             self.assertEqual(self.html.count(f'src="assets/{asset}"'), expected_count)
         for studio_concept in (
             "concept-floral-memory-frame.webp",
@@ -1387,7 +1431,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
-        self.assertEqual(len(triggers), 91)
+        self.assertEqual(len(triggers), 89)
         for trigger in triggers:
             with self.subTest(trigger=trigger):
                 self.assertRegex(trigger, r'href=["\']assets/[^"\']+["\']')

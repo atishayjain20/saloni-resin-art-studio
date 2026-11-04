@@ -523,6 +523,7 @@
     }
 
     initCatalogueExperience();
+    initHeroBanner();
 
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
@@ -546,6 +547,54 @@
 
     initReferralAttribution();
     initOrderRequestFlow();
+  }
+
+  function initHeroBanner() {
+    var track = document.querySelector("[data-banner-track]");
+    if (!track || typeof track.scrollTo !== "function") return;
+    var slides = track.querySelectorAll(".hero-slide");
+    var dots = document.querySelectorAll("[data-banner-dot]");
+    var prev = document.querySelector("[data-banner-prev]");
+    var next = document.querySelector("[data-banner-next]");
+    var pending = false;
+    var active = 0;
+    if (!slides.length) return;
+
+    function goTo(index) {
+      var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var slide = slides[Math.max(0, Math.min(slides.length - 1, index))];
+      track.scrollTo({ left: slide.offsetLeft, behavior: reduced ? "auto" : "smooth" });
+    }
+
+    function sync() {
+      var nearest = 0;
+      var distance = Infinity;
+      pending = false;
+      for (var index = 0; index < slides.length; index += 1) {
+        var gap = Math.abs(slides[index].offsetLeft - track.scrollLeft);
+        if (gap < distance) { distance = gap; nearest = index; }
+      }
+      active = nearest;
+      for (var dot = 0; dot < dots.length; dot += 1) {
+        if (dot === active) dots[dot].setAttribute("aria-current", "true");
+        else dots[dot].removeAttribute("aria-current");
+      }
+      if (prev) prev.disabled = active === 0;
+      if (next) next.disabled = active === slides.length - 1;
+    }
+
+    track.addEventListener("scroll", function () {
+      if (pending) return;
+      pending = true;
+      if (window.requestAnimationFrame) window.requestAnimationFrame(sync);
+      else sync();
+    });
+    if (prev) prev.addEventListener("click", function () { goTo(active - 1); });
+    if (next) next.addEventListener("click", function () { goTo(active + 1); });
+    Array.prototype.forEach.call(dots, function (dot, index) {
+      dot.addEventListener("click", function () { goTo(index); });
+    });
+    sync();
   }
 
   function initCatalogueExperience() {

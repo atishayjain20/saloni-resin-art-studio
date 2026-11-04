@@ -284,8 +284,8 @@ test("catalogue browse uses one continuous result view with compact search and f
   assert.match(html, /id="catalogue-filter-panel"/);
   assert.match(html, /<button class="button button-dark" id="catalogue-filter-apply" type="button">Apply filters<\/button>/);
   assert.match(css, /\.catalogue-control-toggle[^}]*min-height:\s*44px/);
-  assert.match(html, /hero-catalogue-action[^>]*>Explore gifts/);
-  assert.match(html, /class="button button-line hero-catalogue-action"[^>]*>Design a custom frame/);
+  assert.doesNotMatch(html, /hero-catalogue-action|>Explore gifts</);
+  assert.match(html, /<a href="#customizer" data-customizer-open>Or design a custom frame<\/a>/);
 });
 
 test("no-JS source keeps every catalogue card in the document", () => {
