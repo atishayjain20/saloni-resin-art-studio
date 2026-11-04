@@ -113,8 +113,7 @@ html:not(.js) .site-nav .nav-link-button { display: none; }
   position: relative;
   flex: 0 0 100%;
   min-width: 0;
-  height: 50svh;
-  min-height: 15rem;
+  aspect-ratio: 16 / 9;
   scroll-snap-align: start;
   scroll-snap-stop: always;
   background: var(--paper);
@@ -204,6 +203,9 @@ html:not(.js) .hero-banner-controls {
   html.js #primary-navigation.is-open { position: absolute; top: calc(100% + 0.75rem); right: 0; z-index: 1; flex-wrap: wrap; justify-content: flex-start; width: min(100%, 38rem); max-width: calc(100vw - 2rem); padding: 1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--paper); box-shadow: var(--shadow); }
   .hero-banner {
     padding-block: 1.25rem 1.5rem;
+  }
+  .hero-slide {
+    aspect-ratio: 21 / 9;
   }
 }
 
@@ -822,4 +824,7 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
   body:has(#catalogue-selection) #footer .hero-trust-strip { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: .8rem; }
   body:has(#catalogue-cart-jump:not([hidden])) #footer { padding-bottom: 7rem; }
   html:has(#catalogue-cart-jump:not([hidden])) { scroll-padding-bottom: 6rem; }
+  .hero-slide {
+    aspect-ratio: 3 / 1;
+  }
 }
