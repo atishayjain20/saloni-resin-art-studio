@@ -30,6 +30,7 @@ class Element {
   }
   querySelectorAll(selector) { return selector === "a" ? this.links || [] : []; }
   focus() { this.focusCount += 1; this.ownerDocument.activeElement = this; }
+  contains(node) { return node === this || (this.links || []).includes(node) || [this.closedIcon, this.openIcon].includes(node); }
 }
 
 function runNavigation() {
@@ -119,4 +120,28 @@ test("navigation has a collapsed, keyboard-operable icon toggle", () => {
   assert.equal(toggle.getAttribute("aria-expanded"), "false");
   assert.equal(toggle.focusCount, 1);
   assert.equal(documentObject.activeElement, toggle);
+});
+
+test("an open navigation closes when the shopper taps outside it", () => {
+  const { documentObject, toggle, nav, links } = runNavigation();
+  const outside = { id: "page-body" };
+
+  toggle.dispatch("click");
+  documentObject.dispatch("click", { target: toggle });
+  assert.equal(nav.classList.contains("is-open"), true, "the toggle tap itself keeps it open");
+  documentObject.dispatch("click", { target: toggle.closedIcon });
+  assert.equal(nav.classList.contains("is-open"), true, "a tap on the toggle icon keeps it open");
+  documentObject.dispatch("click", { target: nav });
+  assert.equal(nav.classList.contains("is-open"), true, "a tap inside the menu keeps it open");
+
+  documentObject.dispatch("click", { target: outside });
+  assert.equal(nav.classList.contains("is-open"), false);
+  assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  assert.equal(toggle.getAttribute("aria-label"), "Open navigation");
+  assert.equal(toggle.closedIcon.hidden, false);
+  assert.equal(toggle.focusCount, 0, "an outside tap does not pull focus back to the toggle");
+
+  documentObject.dispatch("click", { target: outside });
+  assert.equal(nav.classList.contains("is-open"), false, "outside taps while closed change nothing");
+  assert.ok(links.length);
 });

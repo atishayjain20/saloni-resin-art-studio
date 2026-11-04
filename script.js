@@ -99,6 +99,11 @@
       navToggle.addEventListener("click", function () { setNavOpen(navToggle.getAttribute("aria-expanded") !== "true"); });
       siteNav.querySelectorAll("a").forEach(function (link) { link.addEventListener("click", function () { setNavOpen(false); }); });
       document.addEventListener("keydown", function (event) { if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true") setNavOpen(false, true); });
+      document.addEventListener("click", function (event) {
+        if (navToggle.getAttribute("aria-expanded") !== "true") return;
+        if (navToggle.contains(event.target) || siteNav.contains(event.target)) return;
+        setNavOpen(false);
+      });
     }
 
     var customizer = document.getElementById("customizer");
