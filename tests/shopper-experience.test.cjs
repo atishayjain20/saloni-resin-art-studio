@@ -212,7 +212,7 @@ test("leftover beige colours and theme-color use the new cream", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261130">/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261131">/);
   assert.match(html, /<script class="site-script" src="script\.js\?v=20261129" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
@@ -256,7 +256,7 @@ test("category tabs are 44px, scroll sideways quietly, and mark the current tab 
   assert.match(tab, /border-radius:\s*0?\.6rem 0?\.6rem 0 0/);
   assert.match(tab, /text-transform:\s*uppercase/);
   const current = css.match(/\.category-tab\[aria-current="true"\]\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(current, /background:\s*var\(--ivory\)/);
+  assert.match(current, /background:\s*var\(--page\)/);
   assert.match(current, /border-color:\s*var\(--cocoa\)/);
   assert.match(css, /\.category-tab:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--rose\)/);
   const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
@@ -2034,4 +2034,9 @@ test("phone header uses a smaller wordmark and 38px icon buttons placed after th
   assert.match(phone.body, /\.site-header \.catalogue-control-icon\s*\{[^}]*width:\s*1rem[^}]*height:\s*1rem/);
   assert.match(phone.body, /\.site-header \.wordmark-name\s*\{[^}]*font-size:\s*1\.2rem/);
   assert.match(phone.body, /\.site-header \.wordmark-subtitle\s*\{[^}]*font-size:\s*0?\.6rem/);
+});
+
+test("the page background is a very pale blush token used for the body and the current tab", () => {
+  assert.match(css, /:root\s*\{[^}]*--page:\s*#fff4f7/);
+  assert.match(css, /\nbody\s*\{[^}]*background:\s*var\(--page\)/);
 });

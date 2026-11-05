@@ -1,5 +1,6 @@
 :root {
   --ivory: #fff6e9;
+  --page: #fff4f7;
   --paper: #ffffff;
   --ink: #2a0e1f;
   --muted: #6a4a5b;
@@ -27,7 +28,7 @@
 html { scroll-behavior: smooth; scroll-padding-top: var(--sticky-offset); }
 body {
   margin: 0;
-  background: var(--ivory);
+  background: var(--page);
   color: var(--ink);
   font-family: var(--sans);
   font-size: 1rem;
@@ -90,7 +91,7 @@ html:not(.js) .site-nav .nav-link-button { display: none; }
   transition: background-color 180ms ease, color 180ms ease;
 }
 .category-tab[aria-current="true"] {
-  border-color: var(--cocoa); background: var(--ivory); color: var(--ink);
+  border-color: var(--cocoa); background: var(--page); color: var(--ink);
 }
 .category-tab:focus-visible {
   outline: 3px solid var(--rose); outline-offset: -3px;
