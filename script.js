@@ -771,7 +771,7 @@
         section.hidden = !hasVisibleCard;
         var disclosure = section.querySelector && section.querySelector("[data-catalogue-disclosure]");
         if (!disclosure) return;
-        var canExpand = !allVisible && sectionCards.length > previewLimit;
+        var canExpand = !allVisible && appliedType !== "bestsellers" && sectionCards.length > previewLimit;
         disclosure.hidden = !canExpand;
         disclosure.setAttribute("aria-expanded", String(canExpand && isExpanded(section)));
         disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : "View all";

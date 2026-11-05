@@ -787,3 +787,10 @@ test("Bestsellers tab shows the first four gifts of every section", () => {
   assert.ok(visibleCards(harness).length > 0);
   assert.ok(visibleCards(harness).every((card) => isBestseller(card) && Number(card.getAttribute("data-price-max")) <= 499));
 });
+
+test("Bestsellers preview hides View all because every bestseller is already shown", () => {
+  const harness = createHarness({ count: 91, includePremium: true, withTabs: true, url: "https://example.test/?view=preview&type=bestsellers&budget=all#catalogue-filters" });
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
+  assert.ok(visibleCards(harness).every((card) => card.section.cards.indexOf(card) < 4));
+  harness.sections.forEach((section) => assert.equal(section.disclosure.hidden, true));
+});
