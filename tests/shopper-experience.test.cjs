@@ -212,7 +212,7 @@ test("leftover beige colours and theme-color use the new cream", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261129">/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261130">/);
   assert.match(html, /<script class="site-script" src="script\.js\?v=20261129" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
@@ -256,16 +256,17 @@ test("category tabs are 44px, scroll sideways quietly, and mark the current tab 
   assert.match(tab, /border-radius:\s*0?\.6rem 0?\.6rem 0 0/);
   assert.match(tab, /text-transform:\s*uppercase/);
   const current = css.match(/\.category-tab\[aria-current="true"\]\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(current, /background:\s*var\(--paper\)/);
+  assert.match(current, /background:\s*var\(--ivory\)/);
   assert.match(current, /border-color:\s*var\(--cocoa\)/);
   assert.match(css, /\.category-tab:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--rose\)/);
   const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
   assert.match(reduced.slice(0, reduced.indexOf("\n}\n")), /\.category-tab\s*\{\s*transition:\s*none;\s*\}/);
 });
 
-test("sticky header is fully opaque and keeps the tabs close under the icon row", () => {
+test("sticky header is fully opaque blush pink and keeps the tabs close under the icon row", () => {
   const header = css.match(/\.site-header\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(header, /background:\s*var\(--paper\)/);
+  assert.match(header, /background:\s*#fbd3e5/);
+  assert.match(css, /\.nav-toggle\s*\{[^}]*background:\s*var\(--paper\)/, "menu button matches the white icon buttons on the pink header");
   assert.doesNotMatch(header, /rgba\(/);
   assert.match(css, /\.site-header:has\(\.category-tabs\) \.header-inner\s*\{[^}]*min-height:\s*0/);
   assert.doesNotMatch(css, /\.site-header \.header-inner\s*\{/, "pages without tabs keep their original header row");
@@ -2021,4 +2022,16 @@ test("What happens next is a dropdown that starts closed on phones and open on w
   wide.query.matches = true;
   wide.listeners.forEach((listener) => listener());
   assert.equal(wide.details.open, false);
+});
+
+test("phone header uses a smaller wordmark and 38px icon buttons placed after the base button rules", () => {
+  const blocks = Array.from(css.matchAll(/@media \(max-width: 620px\) \{([\s\S]*?)\n\}/g), (match) => ({ body: match[1], index: match.index }));
+  const phone = blocks.find((block) => /\.catalogue-header-tools \.catalogue-control-toggle, \.nav-toggle\s*\{/.test(block.body));
+  assert.ok(phone, "expected the phone header rules in a 620px block");
+  assert.ok(phone.index > css.indexOf(".catalogue-header-tools .catalogue-control-toggle {"), "phone rules must come after the base button rule");
+  const buttons = phone.body.match(/\.catalogue-header-tools \.catalogue-control-toggle, \.nav-toggle\s*\{([^}]*)\}/)[1];
+  ["width", "min-width", "height", "min-height"].forEach((property) => assert.match(buttons, new RegExp(`(?:^|;|\\s)${property}:\\s*38px`)));
+  assert.match(phone.body, /\.site-header \.catalogue-control-icon\s*\{[^}]*width:\s*1rem[^}]*height:\s*1rem/);
+  assert.match(phone.body, /\.site-header \.wordmark-name\s*\{[^}]*font-size:\s*1\.2rem/);
+  assert.match(phone.body, /\.site-header \.wordmark-subtitle\s*\{[^}]*font-size:\s*0?\.6rem/);
 });
