@@ -1180,6 +1180,22 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(tab, r"font:\s*800 0\.62rem/1 var\(--sans\)")
         self.assertRegex(tab, r"letter-spacing:\s*0\.04em")
 
+    def test_catalogue_sections_run_edge_to_edge_on_phones(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        phone = re.search(r"@media \(max-width: 620px\) \{([\s\S]*?)\n\}", css).group(1)
+        rule = re.search(
+            r"\.diwali-section,\s*\.romantic-keepsakes,\s*\.corporate-resin-gifts-section,\s*\.studio-art-section,\s*\.premium-collection-section\s*\{([^}]*)\}",
+            phone,
+        )
+        self.assertIsNotNone(rule)
+        for declaration in (r"width:\s*100%", r"margin-inline:\s*0", r"padding-inline:\s*0\.75rem", r"border-inline:\s*0", r"border-radius:\s*0"):
+            self.assertRegex(rule.group(1), declaration)
+        self.assertRegex(phone, r"\.catalogue-grid\s*\{[^}]*column-gap:\s*0\.75rem")
+        card = re.search(r"\n  \.romantic-keepsake-card\s*\{([^}]*)\}", phone)
+        self.assertIsNotNone(card)
+        for declaration in (r"padding:\s*0", r"border:\s*0", r"background:\s*transparent"):
+            self.assertRegex(card.group(1), declaration)
+
     def test_couple_scene_and_3d_miniature_are_removed(self):
         for gone in ("Our favourite little scene", "Your story, in 3D", "romantic-couple-scene", "romantic-couple-miniature"):
             with self.subTest(gone=gone):
