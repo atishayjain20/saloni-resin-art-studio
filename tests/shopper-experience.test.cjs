@@ -212,8 +212,8 @@ test("leftover beige colours and theme-color use the new cream", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261128">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261126" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261129">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261129" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -371,7 +371,7 @@ test("browse gifts keeps the first product row clear of the sticky header", () =
 
 test("customer confidence strip sits above the order conversation", () => {
   const order = html.match(/<section class="order-section shell" id="order"[\s\S]*?<\/section>/)?.[0] || "";
-  const confidenceStart = order.indexOf('<div class="customer-confidence-strip"');
+  const confidenceStart = order.indexOf('<details class="customer-confidence-strip"');
   const conversationStart = order.indexOf('<div class="order-copy');
   const confidence = order.slice(confidenceStart, conversationStart);
   assert.ok(confidenceStart >= 0, "expected the confidence content inside the order section");
@@ -1991,4 +1991,34 @@ test("mobile cart bar keeps View cart, Order now and WhatsApp on one line with t
   assert.match(mobile, /\.catalogue-cart-count\s*\{[^}]*clip:\s*rect\(0, 0, 0, 0\)/);
   assert.match(mobile, /\.catalogue-cart-view\[data-count\]::after\s*\{[^}]*content:\s*attr\(data-count\)/);
   assert.doesNotMatch(mobile, /\.catalogue-cart-jump\s*\{[^}]*flex-wrap:\s*wrap/);
+});
+
+test("What happens next is a dropdown that starts closed on phones and open on wider screens", () => {
+  assert.match(html, /<details class="customer-confidence-strip" id="customer-confidence" open>\s*<summary><h2 id="customer-confidence-title">What happens next<\/h2><\/summary>/);
+  assert.match(css, /\.customer-confidence-strip > summary\s*\{[^}]*list-style:\s*none/);
+  assert.match(css, /\n\.customer-confidence-strip > summary\s*\{[^}]*pointer-events:\s*none/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customer-confidence-strip > summary\s*\{[^}]*pointer-events:\s*auto/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customer-confidence-strip > summary::after/);
+  const start = script.indexOf("  function initConfidenceDropdown()");
+  assert.ok(start > 0, "expected initConfidenceDropdown");
+  const source = script.slice(start, script.indexOf("\n  }\n", start) + 4);
+  const run = (phone) => {
+    const listeners = [];
+    const details = { open: true };
+    const query = { matches: phone, addEventListener(type, listener) { listeners.push(listener); } };
+    const context = {
+      document: { getElementById: (id) => (id === "customer-confidence" ? details : null) },
+      window: { matchMedia: (media) => { assert.equal(media, "(max-width: 620px)"); return query; } },
+    };
+    vm.createContext(context);
+    vm.runInContext(`${source}\ninitConfidenceDropdown();`, context);
+    return { details, query, listeners };
+  };
+  const phone = run(true);
+  assert.equal(phone.details.open, false);
+  const wide = run(false);
+  assert.equal(wide.details.open, true);
+  wide.query.matches = true;
+  wide.listeners.forEach((listener) => listener());
+  assert.equal(wide.details.open, false);
 });

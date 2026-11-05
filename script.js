@@ -524,6 +524,7 @@
 
     initCatalogueExperience();
     initHeroBanner();
+    initConfidenceDropdown();
 
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
@@ -547,6 +548,16 @@
 
     initReferralAttribution();
     initOrderRequestFlow();
+  }
+
+  // "What happens next" starts closed on phones and open on wider screens.
+  function initConfidenceDropdown() {
+    var details = document.getElementById("customer-confidence");
+    if (!details || !window.matchMedia) return;
+    var phone = window.matchMedia("(max-width: 620px)");
+    function sync() { details.open = !phone.matches; }
+    sync();
+    if (phone.addEventListener) phone.addEventListener("change", sync);
   }
 
   function initHeroBanner() {

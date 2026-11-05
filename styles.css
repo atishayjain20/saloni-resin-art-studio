@@ -594,6 +594,13 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 /* Progressive catalogue controls: the original cards remain the no-JS source of truth. */
 .customer-confidence-strip { display: grid; grid-template-columns: minmax(8rem, .7fr) minmax(0, 1.3fr); gap: .8rem 1.8rem; margin-top: .9rem; padding-block: 1.2rem; border-block: 1px solid var(--line); }
 .customer-confidence-strip h2 { margin: 0; font-size: clamp(1.65rem, 3.5vw, 2.4rem); line-height: 1; overflow-wrap: anywhere; }
+.customer-confidence-strip > summary {
+  list-style: none;
+  pointer-events: none;
+}
+.customer-confidence-strip > summary::-webkit-details-marker {
+  display: none;
+}
 .customer-confidence-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem 1rem; min-width: 0; margin: 0; padding: 0; list-style: none; }
 .customer-confidence-steps li, .customer-confidence-notes { min-width: 0; color: var(--muted); font-size: .78rem; line-height: 1.45; overflow-wrap: anywhere; }
 .customer-confidence-steps strong { color: var(--cocoa); }
@@ -689,6 +696,32 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .customer-confidence-strip h2 { margin-bottom: .7rem; font-size: 1.75rem; }
   .customer-confidence-steps { grid-template-columns: 1fr; gap: .5rem; }
   .customer-confidence-notes { margin-top: .75rem; }
+  .customer-confidence-strip > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 44px;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .customer-confidence-strip > summary::after {
+    content: "";
+    flex: none;
+    width: .55rem;
+    height: .55rem;
+    margin-top: -.3rem;
+    border-right: 2px solid var(--muted);
+    border-bottom: 2px solid var(--muted);
+    transform: rotate(45deg);
+  }
+  .customer-confidence-strip[open] > summary::after {
+    margin-top: .3rem;
+    transform: rotate(-135deg);
+  }
+  .customer-confidence-strip:not([open]) h2 {
+    margin-bottom: 0;
+  }
   .catalogue-control-bar { gap: .25rem; }
   .catalogue-search-form { grid-template-columns: minmax(0, 1fr); }
   .catalogue-filter-fields { grid-template-columns: minmax(0, 1fr); }

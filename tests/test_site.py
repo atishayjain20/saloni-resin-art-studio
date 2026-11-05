@@ -1105,8 +1105,9 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(order)
         order_html = order.group(0)
         details = re.findall(r'<details\b[\s\S]*?</details>', order_html)
-        self.assertEqual(len(details), 5)
+        self.assertEqual(len(details), 6)
         self.assertIn('class="meet-saloni"', details[0])
+        self.assertIn('class="customer-confidence-strip"', details[1])
         for question in (
             "What can I personalize?",
             "Is the preview final?",
