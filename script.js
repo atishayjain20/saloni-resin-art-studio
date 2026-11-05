@@ -524,7 +524,7 @@
 
     initCatalogueExperience();
     initHeroBanner();
-    initConfidenceDropdown();
+    initPhoneDropdowns();
 
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
@@ -550,12 +550,13 @@
     initOrderRequestFlow();
   }
 
-  // "What happens next" starts closed on phones and open on wider screens.
-  function initConfidenceDropdown() {
-    var details = document.getElementById("customer-confidence");
-    if (!details || !window.matchMedia) return;
+  // "What happens next" and "Start a conversation" start closed on phones and open on wider screens.
+  function initPhoneDropdowns() {
+    if (!window.matchMedia) return;
+    var dropdowns = ["customer-confidence", "order-conversation"].map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    if (!dropdowns.length) return;
     var phone = window.matchMedia("(max-width: 620px)");
-    function sync() { details.open = !phone.matches; }
+    function sync() { dropdowns.forEach(function (details) { details.open = !phone.matches; }); }
     sync();
     if (phone.addEventListener) phone.addEventListener("change", sync);
   }
