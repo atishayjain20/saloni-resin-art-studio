@@ -213,7 +213,7 @@ test("leftover beige colours and theme-color use the new cream", () => {
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
   assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261134">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261134" defer><\/script>/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261135" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 

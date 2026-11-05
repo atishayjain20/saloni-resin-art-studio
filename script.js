@@ -698,12 +698,40 @@
       return title ? title.textContent : "";
     }
 
-    function matchesSearch(card) {
+    // Letters to add, drop, change or swap (two side by side) to turn one word into the other.
+    function typoDistance(a, b) {
+      var rows = [];
+      for (var i = 0; i <= a.length; i += 1) {
+        rows[i] = [i];
+        for (var j = 1; j <= b.length; j += 1) {
+          if (i === 0) { rows[i][j] = j; continue; }
+          var cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          rows[i][j] = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost);
+          if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) rows[i][j] = Math.min(rows[i][j], rows[i - 2][j - 2] + 1);
+        }
+      }
+      return rows[a.length][b.length];
+    }
+
+    function closeWordMatch(word, words) {
+      if (word.length < 4) return false;
+      var allowed = word.length >= 7 ? 2 : 1;
+      return words.some(function (candidate) {
+        return Math.abs(candidate.length - word.length) <= allowed && typoDistance(word, candidate) <= allowed;
+      });
+    }
+
+    function matchesSearch(card, closeMatch) {
       var query = normalizeSearch(searchFilter.value).toLowerCase();
       if (!query) return true;
       var type = typeFor(card);
       var searchable = [titleFor(card), type, typeLabels[type] || "", card.getAttribute("data-product-kind") || "", card.getAttribute("data-search-keywords") || ""].join(" ").toLowerCase();
-      return searchable.indexOf(query) !== -1;
+      if (searchable.indexOf(query) !== -1) return true;
+      if (!closeMatch) return false;
+      var words = searchable.split(/[^a-z0-9]+/);
+      return query.split(" ").every(function (word) {
+        return searchable.indexOf(word) !== -1 || closeWordMatch(word, words);
+      });
     }
 
     function setVisibility(card, visible) {
@@ -712,7 +740,19 @@
       else card.setAttribute("aria-hidden", "true");
     }
 
+    var showingCloseMatches = false;
+
+    // Exact matches first; when a search finds nothing, fall back to close spellings.
     function catalogueCards() {
+      var exact = filterCatalogueCards(false);
+      showingCloseMatches = false;
+      if (exact.length || !normalizeSearch(searchFilter.value)) return exact;
+      var close = filterCatalogueCards(true);
+      showingCloseMatches = close.length > 0;
+      return close;
+    }
+
+    function filterCatalogueCards(closeMatch) {
       return cards.filter(function (card) {
         var section = sectionFor(card);
         var sectionCards = cardsForSection(section);
@@ -722,7 +762,7 @@
         return isInOverview &&
           (appliedType === "all" || appliedType === type || (appliedType === "bestsellers" && (isBestseller || isExpanded(section)))) &&
           matchesPrice(card, appliedBudget) &&
-          matchesSearch(card);
+          matchesSearch(card, closeMatch);
       });
     }
 
@@ -791,7 +831,7 @@
       updateCataloguePresentation();
       syncCategoryTabs();
       empty.hidden = matchingCards.length !== 0;
-      status.textContent = !matchingCards.length ? "No gifts match those choices." : "";
+      status.textContent = !matchingCards.length ? "No gifts match those choices." : showingCloseMatches ? "Showing close matches for “" + normalizeSearch(searchFilter.value) + "”." : "";
       document.documentElement.classList.add("catalogue-ready");
       return { total: matchingCards.length, cards: matchingCards };
     }
