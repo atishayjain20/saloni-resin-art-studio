@@ -616,7 +616,7 @@
     var searchPanel = document.getElementById("catalogue-search-panel");
     var filterPanel = document.getElementById("catalogue-filter-panel");
     var catalogueRegion = tools;
-    var validTypes = ["all", "couple", "diwali", "frames", "premium", "corporate"];
+    var validTypes = ["all", "bestsellers", "couple", "diwali", "frames", "premium", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
     var typeLabels = { all: "All gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
     var searchMaxLength = 100;
@@ -704,10 +704,11 @@
       return cards.filter(function (card) {
         var section = sectionFor(card);
         var sectionCards = cardsForSection(section);
-        var isInOverview = allVisible || isExpanded(section) || sectionCards.indexOf(card) < previewLimit;
+        var isBestseller = sectionCards.indexOf(card) < previewLimit;
+        var isInOverview = allVisible || isExpanded(section) || isBestseller;
         var type = typeFor(card);
         return isInOverview &&
-          (appliedType === "all" || appliedType === type) &&
+          (appliedType === "all" || appliedType === type || (appliedType === "bestsellers" && isBestseller)) &&
           matchesPrice(card, appliedBudget) &&
           matchesSearch(card);
       });

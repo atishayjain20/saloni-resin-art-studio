@@ -213,7 +213,7 @@ test("leftover beige colours and theme-color use the new cream", () => {
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
   assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261124">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261124" defer><\/script>/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261125" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -223,9 +223,10 @@ test("category tab bar sits in the sticky header after the header row with ALL c
   assert.ok(nav, "category tab nav must live inside .site-header");
   assert.match(header, /<\/nav>\n    <\/div>\n    <nav class="category-tabs"/, "tabs follow the header-inner block");
   const tabs = Array.from(nav[1].matchAll(/<a class="category-tab"([^>]*)>([^<]*)<\/a>/g), (match) => ({ attrs: match[1], label: match[2].trim() }));
-  assert.deepEqual(tabs.map((tab) => tab.label), ["All", "Diwali", "Couple", "Corporate", "Premium"]);
+  assert.deepEqual(tabs.map((tab) => tab.label), ["All", "Bestsellers", "Diwali", "Couple", "Corporate", "Premium"]);
   const expected = [
     ["#catalogue-filters", "all"],
+    ["#catalogue-filters", "bestsellers"],
     ["#diwali", "diwali"],
     ["#romantic-keepsakes", "couple"],
     ["#corporate-resin-gifts", "corporate"],
@@ -841,11 +842,11 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("footer trust strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders"].forEach((label) => {
+  ["Gifts", "Bestsellers", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
   assert.doesNotMatch(nav, />Order\s*<\/a>/);
-  assert.equal((nav.match(/<a\b/g) || []).length, 5);
+  assert.equal((nav.match(/<a\b/g) || []).length, 6);
   const hero = section("hero");
   const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
   const trustStrip = footer.match(/<ul class="hero-trust-strip"[\s\S]*?<\/ul>/)?.[0] || "";

@@ -444,6 +444,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(
             nav,
             r'<a href="#catalogue-filters" data-browse-all>Gifts[\s\S]*?'
+            r'<a href="#catalogue-filters" data-category-shortcut="bestsellers">Bestsellers[\s\S]*?#gem[\s\S]*?'
             r'<a href="#romantic-keepsakes" data-category-shortcut="couple">Couple keepsakes[\s\S]*?'
             r'<a href="#studio-art" data-category-shortcut="frames">Resin frames[\s\S]*?'
             r'<a href="#customizer" data-customizer-open>Design a frame[\s\S]*?'

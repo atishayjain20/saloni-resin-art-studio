@@ -188,6 +188,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   // Tab bar links join the same browse-all/shortcut stubs the nav links use.
   const tabs = withTabs ? {
     all: new FakeTab("#catalogue-filters", "all"),
+    bestsellers: new FakeTab("#catalogue-filters", "bestsellers", "bestsellers"),
     diwali: new FakeTab("#diwali", "diwali", "diwali"),
     couple: new FakeTab("#romantic-keepsakes", "couple", "couple"),
     corporate: new FakeTab("#corporate-resin-gifts", "corporate", "corporate"),
@@ -233,7 +234,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
       if (selector === "[data-browse-all]") return withTabs ? [navBrowseAll, tabs.all] : [navBrowseAll];
       if (selector === "[data-category-shortcut]") {
         const base = includePremium ? [diwaliShortcut, corporateShortcut, premiumShortcut] : [diwaliShortcut, corporateShortcut];
-        return withTabs ? base.concat([framesShortcut, tabs.diwali, tabs.couple, tabs.corporate, tabs.premium]) : base;
+        return withTabs ? base.concat([framesShortcut, tabs.bestsellers, tabs.diwali, tabs.couple, tabs.corporate, tabs.premium]) : base;
       }
       return [];
     },
@@ -757,4 +758,32 @@ test("the frames shortcut leaves every category tab unmarked", () => {
   harness.framesShortcut.dispatch("click");
   assert.equal(harness.typeFilter.value, "frames");
   assert.deepEqual(harness.currentTabs(), []);
+});
+
+test("Bestsellers tab shows the first four gifts of every section", () => {
+  assert.match(html, /<option value="bestsellers">Bestsellers<\/option>/);
+  const harness = createHarness({ count: 91, includePremium: true, withTabs: true });
+  const isBestseller = (card) => card.section.cards.indexOf(card) < 4;
+  const expected = harness.cards.filter(isBestseller);
+
+  harness.tabs.bestsellers.dispatch("click");
+  assert.equal(harness.typeFilter.value, "bestsellers");
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
+  assert.deepEqual(visibleCards(harness), expected);
+  harness.sections.forEach((section) => assert.equal(section.disclosure.hidden, true));
+  const url = new URL(harness.windowObject.location.href);
+  assert.equal(url.searchParams.get("type"), "bestsellers");
+  assert.equal(url.searchParams.get("view"), null);
+  assert.equal(url.hash, "#catalogue-filters");
+
+  harness.tabs.all.dispatch("click");
+  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=bestsellers#catalogue-filters");
+  harness.windowObject.listeners.popstate();
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
+  assert.deepEqual(visibleCards(harness), expected);
+
+  harness.priceFilter.value = "499";
+  harness.applyButton.dispatch("click");
+  assert.ok(visibleCards(harness).length > 0);
+  assert.ok(visibleCards(harness).every((card) => isBestseller(card) && Number(card.getAttribute("data-price-max")) <= 499));
 });
