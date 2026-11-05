@@ -213,11 +213,11 @@ test("leftover beige colours and theme-color use the new cream", () => {
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
   assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261124">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261125" defer><\/script>/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261126" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
-test("category tab bar sits in the sticky header after the header row with ALL current", () => {
+test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
   const header = html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1] || "";
   const nav = header.match(/<nav class="category-tabs" aria-label="Gift categories"><div class="category-tabs-list">([\s\S]*?)<\/div><\/nav>/);
   assert.ok(nav, "category tab nav must live inside .site-header");
@@ -235,7 +235,7 @@ test("category tab bar sits in the sticky header after the header row with ALL c
   tabs.forEach((tab, index) => {
     assert.match(tab.attrs, new RegExp('href="' + expected[index][0] + '"'));
     assert.match(tab.attrs, new RegExp('data-category-tab="' + expected[index][1] + '"'));
-    assert.equal(/aria-current="true"/.test(tab.attrs), index === 0);
+    assert.equal(/aria-current="true"/.test(tab.attrs), index === 1);
     assert.equal(/data-browse-all/.test(tab.attrs), index === 0);
     assert.equal(/data-category-shortcut="/.test(tab.attrs), index !== 0);
     assert.doesNotMatch(tab.attrs, /frames/);

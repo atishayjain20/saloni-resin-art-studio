@@ -620,7 +620,7 @@
     var validBudgets = ["all", "499", "999", "1999", "2000"];
     var typeLabels = { all: "All gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
     var searchMaxLength = 100;
-    var appliedType = "all";
+    var appliedType = "bestsellers";
     var appliedBudget = "all";
 
     var cards = Array.prototype.filter.call(document.querySelectorAll(".work-card, .romantic-keepsake-card"), function (card) {
@@ -862,7 +862,7 @@
     function showFeatured(commit, type, budget) {
       allVisible = false;
       expandedSections = [];
-      appliedType = validTypes.indexOf(type) !== -1 ? type : "all";
+      appliedType = validTypes.indexOf(type) !== -1 ? type : "bestsellers";
       appliedBudget = validBudgets.indexOf(budget) !== -1 ? budget : "all";
       typeFilter.value = appliedType;
       priceFilter.value = appliedBudget;
@@ -934,7 +934,7 @@
         return;
       }
       if (state.hasQuery) {
-        var cleaned = urlWithState({ preview: true, type: "all", budget: "all" }, window.location && window.location.hash);
+        var cleaned = urlWithState({ preview: true, type: "bestsellers", budget: "all" }, window.location && window.location.hash);
         if (!sameUrl(cleaned)) writeUrl(cleaned, true);
       }
       showFeatured(false);
@@ -977,6 +977,10 @@
       var query = normalizeSearch(searchFilter.value);
       allVisible = Boolean(query);
       expandedSections = [];
+      // The Bestsellers home searches every gift; clearing the search returns to it.
+      if (query && appliedType === "bestsellers") appliedType = "all";
+      else if (!query && appliedType === "all") appliedType = "bestsellers";
+      typeFilter.value = appliedType;
       applyFilters();
       var state = { full: allVisible, type: appliedType, budget: appliedBudget, q: query };
       if (!allVisible && (appliedType !== "all" || appliedBudget !== "all")) state = { preview: true, type: appliedType, budget: appliedBudget };
