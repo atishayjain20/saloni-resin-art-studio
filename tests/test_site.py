@@ -604,8 +604,6 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(shared_rule, r"aspect-ratio:\s*1\s*/\s*1")
         self.assertRegex(shared_rule, r"object-fit:\s*cover")
         self.assertRegex(shared_rule, r"object-position:\s*center")
-        self.assertRegex(shared_rule, r"padding:\s*0\.5rem")
-        self.assertRegex(shared_rule, r"background:\s*var\(--paper\)")
 
         for selector in (
             r"\.romantic-keepsake-card img",
@@ -1172,6 +1170,15 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("One request for your selected gifts", self.html)
         self.assertIn('<p class="panel-label" id="catalogue-selection-title">Your cart</p>', self.html)
         self.assertIn('aria-labelledby="catalogue-selection-title"', self.html)
+
+    def test_product_photos_fill_the_card_and_category_tabs_use_small_text(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        rule = re.search(r":is\(\.work-card, \.romantic-keepsake-card, \.collection-card\) img\s*\{([^}]*)\}", css).group(1)
+        self.assertNotRegex(rule, r"\bpadding\s*:")
+        self.assertNotRegex(rule, r"\bbackground\s*:\s*var\(--paper\)")
+        tab = re.search(r"\n\.category-tab\s*\{([^}]*)\}", css).group(1)
+        self.assertRegex(tab, r"font:\s*800 0\.62rem/1 var\(--sans\)")
+        self.assertRegex(tab, r"letter-spacing:\s*0\.04em")
 
     def test_couple_scene_and_3d_miniature_are_removed(self):
         for gone in ("Our favourite little scene", "Your story, in 3D", "romantic-couple-scene", "romantic-couple-miniature"):
