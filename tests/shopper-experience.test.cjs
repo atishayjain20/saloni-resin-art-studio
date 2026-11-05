@@ -202,12 +202,12 @@ test("focus rings on plum surfaces use cream so they keep 3:1 contrast", () => {
   assert.match(css, /\.premium-collection-section \.catalogue-order-button:focus-visible\s*\{[^}]*border-color:\s*var\(--premium-gold\)/);
 });
 
-test("leftover beige colours and theme-color use the new cream", () => {
+test("leftover beige colours use the new cream and the phone bar matches the pink header", () => {
   assert.doesNotMatch(css, /#ead6cc|rgba\(247, 240, 231, \.97\)/);
   assert.match(css, /\.customizer-mobile-actions \{[^}]*background:\s*rgba\(255, 246, 233, \.97\)/);
   ["index.html", "partners/index.html", "corporate-gifting/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html"].forEach((page) => {
     const source = fs.readFileSync(path.join(root, page), "utf8");
-    assert.match(source, /<meta name="theme-color" content="#fff6e9">/, page);
+    assert.match(source, /<meta name="theme-color" content="#fbd3e5">/, page);
   });
 });
 

@@ -1197,6 +1197,23 @@ class StaticSiteContractTests(unittest.TestCase):
         for declaration in (r"padding:\s*0", r"border:\s*0", r"background:\s*transparent"):
             self.assertRegex(card.group(1), declaration)
 
+    def test_every_page_has_icon_fallbacks_pink_phone_bar_and_current_asset_versions(self):
+        ico = (ROOT / "favicon.ico").read_bytes()
+        self.assertEqual(ico[:4], b"\x00\x00\x01\x00", "favicon.ico must be an icon file")
+        self.assertIn(b"\x89PNG", ico)
+        touch = (ROOT / "assets" / "apple-touch-icon.png").read_bytes()
+        self.assertEqual(touch[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(int.from_bytes(touch[16:20], "big"), 180)
+        style_version = re.search(r'href="styles\.css\?v=(\d+)"', self.html).group(1)
+        script_version = re.search(r'src="script\.js\?v=(\d+)"', self.html).group(1)
+        for page, prefix in (("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"), ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../")):
+            with self.subTest(page=page):
+                source = (ROOT / page).read_text(encoding="utf-8")
+                self.assertIn('<meta name="theme-color" content="#fbd3e5">', source)
+                self.assertIn(f'<link rel="apple-touch-icon" href="{prefix}assets/apple-touch-icon.png">', source)
+                self.assertIn(f'{prefix}styles.css?v={style_version}"', source)
+                self.assertIn(f'{prefix}script.js?v={script_version}"', source)
+
     def test_couple_scene_and_3d_miniature_are_removed(self):
         for gone in ("Our favourite little scene", "Your story, in 3D", "romantic-couple-scene", "romantic-couple-miniature"):
             with self.subTest(gone=gone):
