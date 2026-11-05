@@ -86,7 +86,7 @@ html:not(.js) .site-nav .nav-link-button { display: none; }
 .category-tabs-list::-webkit-scrollbar { display: none; }
 .category-tab {
   display: grid; flex: 1 0 auto; place-items: center; min-height: 44px; padding-inline: 0.55rem; border: 1px solid transparent; border-bottom: 0;
-  border-radius: 0.6rem 0.6rem 0 0; color: var(--muted); font: 800 0.7rem/1 var(--sans); letter-spacing: 0.06em; text-decoration: none; text-transform: uppercase;
+  border-radius: 0.6rem 0.6rem 0 0; color: var(--muted); font: 800 0.62rem/1 var(--sans); letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase;
   transition: background-color 180ms ease, color 180ms ease;
 }
 .category-tab[aria-current="true"] {
@@ -329,7 +329,7 @@ h1 em { color: var(--rose); font-style: italic; }
 .catalogue-ready .catalogue-grid > :is(.work-card, .romantic-keepsake-card) { cursor: pointer; }
 .work-card figure { margin: 0; }
 .work-card img { width: 100%; border-radius: 1.2rem; box-shadow: 0 9px 25px rgba(42, 14, 31, 0.1); }
-:is(.work-card, .romantic-keepsake-card, .collection-card) img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; object-position: center; padding: 0.5rem; background: var(--paper); }
+:is(.work-card, .romantic-keepsake-card, .collection-card) img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; object-position: center; }
 .work-card:nth-child(2) img { object-position: center; }.work-card:nth-child(3) img { object-position: center; }
 .lightbox-trigger:has(> .card-photo-dots) { position: relative; display: block; }
 .card-photos { display: flex; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 1.2rem; }
