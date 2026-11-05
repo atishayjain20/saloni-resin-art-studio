@@ -708,7 +708,7 @@
         var isInOverview = allVisible || isExpanded(section) || isBestseller;
         var type = typeFor(card);
         return isInOverview &&
-          (appliedType === "all" || appliedType === type || (appliedType === "bestsellers" && isBestseller)) &&
+          (appliedType === "all" || appliedType === type || (appliedType === "bestsellers" && (isBestseller || isExpanded(section)))) &&
           matchesPrice(card, appliedBudget) &&
           matchesSearch(card);
       });
@@ -771,7 +771,7 @@
         section.hidden = !hasVisibleCard;
         var disclosure = section.querySelector && section.querySelector("[data-catalogue-disclosure]");
         if (!disclosure) return;
-        var canExpand = !allVisible && appliedType !== "bestsellers" && sectionCards.length > previewLimit;
+        var canExpand = !allVisible && sectionCards.length > previewLimit;
         disclosure.hidden = !canExpand;
         disclosure.setAttribute("aria-expanded", String(canExpand && isExpanded(section)));
         disclosure.textContent = canExpand && isExpanded(section) ? "Show less" : "View all";
@@ -886,6 +886,11 @@
     }
 
     function selectCategory(category, href, commit) {
+      if (category === "bestsellers") {
+        showFeatured(commit, category, "all");
+        scrollToHash(href || "#catalogue-filters");
+        return;
+      }
       setFullState(category || "all", "all", "");
       closeControls();
       if (commit) writeUrl(urlWithState({ full: true, type: appliedType, budget: appliedBudget }, href || "#catalogue-filters"));

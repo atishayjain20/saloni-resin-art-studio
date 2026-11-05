@@ -760,7 +760,7 @@ test("the frames shortcut leaves every category tab unmarked", () => {
   assert.deepEqual(harness.currentTabs(), []);
 });
 
-test("Bestsellers tab shows the first four gifts of every section", () => {
+test("Bestsellers tab shows the first four gifts of every section with View all", () => {
   assert.match(html, /<option value="bestsellers">Bestsellers<\/option>/);
   const harness = createHarness({ count: 91, includePremium: true, withTabs: true });
   const isBestseller = (card) => card.section.cards.indexOf(card) < 4;
@@ -770,14 +770,27 @@ test("Bestsellers tab shows the first four gifts of every section", () => {
   assert.equal(harness.typeFilter.value, "bestsellers");
   assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
   assert.deepEqual(visibleCards(harness), expected);
-  harness.sections.forEach((section) => assert.equal(section.disclosure.hidden, true));
+  harness.sections.forEach((section) => {
+    assert.equal(section.disclosure.hidden, section.cards.length <= 4);
+    assert.equal(section.disclosure.textContent, "View all");
+  });
   const url = new URL(harness.windowObject.location.href);
   assert.equal(url.searchParams.get("type"), "bestsellers");
-  assert.equal(url.searchParams.get("view"), null);
+  assert.equal(url.searchParams.get("view"), "preview");
   assert.equal(url.hash, "#catalogue-filters");
 
+  const target = harness.sections.find((section) => section.cards.length > 4);
+  target.disclosure.dispatch("click");
+  assert.deepEqual(target.cards.filter((card) => !card.hidden), target.cards);
+  assert.equal(target.disclosure.textContent, "Show less");
+  harness.sections.filter((section) => section !== target).forEach((section) => {
+    assert.ok(section.cards.filter((card) => !card.hidden).every(isBestseller));
+  });
+  target.disclosure.dispatch("click");
+  assert.deepEqual(visibleCards(harness), expected);
+
   harness.tabs.all.dispatch("click");
-  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=bestsellers#catalogue-filters");
+  harness.windowObject.history.replaceState({}, "", "https://example.test/?view=preview&type=bestsellers&budget=all#catalogue-filters");
   harness.windowObject.listeners.popstate();
   assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
   assert.deepEqual(visibleCards(harness), expected);
@@ -786,11 +799,4 @@ test("Bestsellers tab shows the first four gifts of every section", () => {
   harness.applyButton.dispatch("click");
   assert.ok(visibleCards(harness).length > 0);
   assert.ok(visibleCards(harness).every((card) => isBestseller(card) && Number(card.getAttribute("data-price-max")) <= 499));
-});
-
-test("Bestsellers preview hides View all because every bestseller is already shown", () => {
-  const harness = createHarness({ count: 91, includePremium: true, withTabs: true, url: "https://example.test/?view=preview&type=bestsellers&budget=all#catalogue-filters" });
-  assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
-  assert.ok(visibleCards(harness).every((card) => card.section.cards.indexOf(card) < 4));
-  harness.sections.forEach((section) => assert.equal(section.disclosure.hidden, true));
 });
