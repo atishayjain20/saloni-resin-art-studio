@@ -1,6 +1,6 @@
 :root {
   --ivory: #fff6e9;
-  --page: #fff4f7;
+  --page: #ffeaf2;
   --paper: #ffffff;
   --ink: #2a0e1f;
   --muted: #6a4a5b;
@@ -195,7 +195,7 @@ html:not(.js) .hero-banner-controls {
   align-items: center;
   min-height: 44px;
   padding-inline: 0.5rem;
-  color: var(--leaf);
+  color: #0c7372;
   font-size: 0.8rem;
   font-weight: 700;
   text-decoration: underline;

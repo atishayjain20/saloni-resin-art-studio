@@ -171,7 +171,7 @@ test("jewel festive palette tokens and primary button colours", () => {
   assert.match(css, /\.premium-collection-section \.catalogue-order-button\s*\{[^}]*background:\s*transparent/);
   assert.match(css, /\.catalogue-cart-jump \.button-dark\s*\{[^}]*background:\s*var\(--rose\)[^}]*color:\s*#fff/);
   assert.match(css, /\.hero-banner-dot\[aria-current="true"\]::before\s*\{[^}]*background:\s*var\(--leaf\)/);
-  assert.match(css, /\.hero-banner-custom a\s*\{[^}]*color:\s*var\(--leaf\)/);
+  assert.match(css, /\.hero-banner-custom a\s*\{[^}]*color:\s*#0c7372/, "a slightly darker teal stays readable on the pink page");
   assert.match(css, /product-pricing > div:first-child dd\s*\{[^}]*background:\s*var\(--marigold\)[^}]*color:\s*var\(--ink\)/);
 });
 
@@ -212,7 +212,7 @@ test("leftover beige colours and theme-color use the new cream", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261131">/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261132">/);
   assert.match(html, /<script class="site-script" src="script\.js\?v=20261129" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
@@ -2037,6 +2037,9 @@ test("phone header uses a smaller wordmark and 38px icon buttons placed after th
 });
 
 test("the page background is a very pale blush token used for the body and the current tab", () => {
-  assert.match(css, /:root\s*\{[^}]*--page:\s*#fff4f7/);
+  assert.match(css, /:root\s*\{[^}]*--page:\s*#ffeaf2/);
+  const link = css.match(/\.hero-banner-custom a\s*\{([^}]*)\}/)[1].match(/color:\s*(#[0-9a-f]{6})/i);
+  assert.ok(link, "the custom-frame link on the page sets its own readable teal");
+  ["#6a4a5b", "#b0125b", link[1]].forEach((colour) => assert.ok(contrast(colour, "#ffeaf2") >= 4.5, colour + " on the page"));
   assert.match(css, /\nbody\s*\{[^}]*background:\s*var\(--page\)/);
 });
