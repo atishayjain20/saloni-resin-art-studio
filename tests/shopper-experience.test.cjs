@@ -223,21 +223,21 @@ test("category tab bar sits in the sticky header after the header row with BESTS
   assert.ok(nav, "category tab nav must live inside .site-header");
   assert.match(header, /<\/nav>\n    <\/div>\n    <nav class="category-tabs"/, "tabs follow the header-inner block");
   const tabs = Array.from(nav[1].matchAll(/<a class="category-tab"([^>]*)>([^<]*)<\/a>/g), (match) => ({ attrs: match[1], label: match[2].trim() }));
-  assert.deepEqual(tabs.map((tab) => tab.label), ["All", "Bestsellers", "Diwali", "Couple", "Corporate", "Premium"]);
+  assert.deepEqual(tabs.map((tab) => tab.label), ["Bestsellers", "Premium", "Couple", "Corporate", "Diwali", "All"]);
   const expected = [
-    ["#catalogue-filters", "all"],
     ["#catalogue-filters", "bestsellers"],
-    ["#diwali", "diwali"],
+    ["#premium-collection", "premium"],
     ["#romantic-keepsakes", "couple"],
     ["#corporate-resin-gifts", "corporate"],
-    ["#premium-collection", "premium"],
+    ["#diwali", "diwali"],
+    ["#catalogue-filters", "all"],
   ];
   tabs.forEach((tab, index) => {
     assert.match(tab.attrs, new RegExp('href="' + expected[index][0] + '"'));
     assert.match(tab.attrs, new RegExp('data-category-tab="' + expected[index][1] + '"'));
-    assert.equal(/aria-current="true"/.test(tab.attrs), index === 1);
-    assert.equal(/data-browse-all/.test(tab.attrs), index === 0);
-    assert.equal(/data-category-shortcut="/.test(tab.attrs), index !== 0);
+    assert.equal(/aria-current="true"/.test(tab.attrs), index === 0);
+    assert.equal(/data-browse-all/.test(tab.attrs), index === 5);
+    assert.equal(/data-category-shortcut="/.test(tab.attrs), index !== 5);
     assert.doesNotMatch(tab.attrs, /frames/);
     assert.ok(html.includes('id="' + expected[index][0].slice(1) + '"'), expected[index][0] + " target exists");
   });
