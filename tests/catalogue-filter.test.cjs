@@ -845,3 +845,25 @@ test("a saved link with a search and a category still searches every gift", () =
   assert.deepEqual(harness.currentTabs(), ["all"]);
   assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "all");
 });
+
+test("misspelled searches show the closest matching gifts with a note", () => {
+  const harness = createHarness({ count: 12 });
+  harness.cards[3].title = "Heart trinket tray";
+  harness.cards[7].title = "Couple keychain";
+  harness.cards[9].title = "Lotus diya pair";
+  const search = (value) => {
+    harness.searchFilter.value = value;
+    harness.searchFilter.dispatch("input");
+    return visibleCards(harness).map((card) => card.title);
+  };
+  assert.deepEqual(search("haert"), ["Heart trinket tray"], "swapped letters");
+  assert.equal(harness.status.textContent, "Showing close matches for “haert”.");
+  assert.deepEqual(search("hert"), ["Heart trinket tray"], "missing letter");
+  assert.deepEqual(search("keychian"), ["Couple keychain"], "swapped letters in a long word");
+  assert.deepEqual(search("cuple keychain"), ["Couple keychain"], "every word must match");
+  assert.deepEqual(search("heart"), ["Heart trinket tray"], "exact match");
+  assert.equal(harness.status.textContent, "", "exact matches show no note");
+  assert.deepEqual(search("dya"), [], "short words need an exact match");
+  assert.deepEqual(search("zzzzz"), []);
+  assert.equal(harness.status.textContent, "No gifts match those choices.");
+});
