@@ -818,3 +818,30 @@ test("searching from the Bestsellers home looks through every gift and clearing 
   assert.equal(harness.typeFilter.value, "bestsellers");
   assert.ok(visibleCards(harness).every((card) => card.section.cards.indexOf(card) < 4));
 });
+
+test("search from a category tab looks through every gift", () => {
+  const harness = createHarness({ count: 91, includePremium: true, withTabs: true });
+  const coupleCard = harness.cards.find((card) => card.section.id === "romantic-keepsakes");
+  coupleCard.title = "Heart keychain";
+  harness.tabs.diwali.dispatch("click");
+  assert.deepEqual(harness.currentTabs(), ["diwali"]);
+  harness.searchFilter.value = "heart";
+  harness.searchFilter.dispatch("input");
+  assert.deepEqual(visibleCards(harness).map((card) => card.id), [coupleCard.id]);
+  assert.deepEqual(harness.currentTabs(), ["all"]);
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "all");
+  harness.searchFilter.value = "";
+  harness.searchFilter.dispatch("input");
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
+});
+
+test("the search label keeps a small gap above the search box", () => {
+  assert.match(css, /\.catalogue-search-field\s*\{[^}]*display:\s*grid[^}]*gap:\s*\.4rem/);
+});
+
+test("a saved link with a search and a category still searches every gift", () => {
+  const harness = createHarness({ count: 91, includePremium: true, withTabs: true, url: "https://example.test/?type=diwali&budget=all&q=heart#catalogue-filters" });
+  assert.equal(harness.typeFilter.value, "all");
+  assert.deepEqual(harness.currentTabs(), ["all"]);
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "all");
+});
