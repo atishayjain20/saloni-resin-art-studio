@@ -212,8 +212,8 @@ test("leftover beige colours and theme-color use the new cream", () => {
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261132">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261129" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261133">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261133" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -373,7 +373,7 @@ test("browse gifts keeps the first product row clear of the sticky header", () =
 test("customer confidence strip sits above the order conversation", () => {
   const order = html.match(/<section class="order-section shell" id="order"[\s\S]*?<\/section>/)?.[0] || "";
   const confidenceStart = order.indexOf('<details class="customer-confidence-strip"');
-  const conversationStart = order.indexOf('<div class="order-copy');
+  const conversationStart = order.indexOf('<details class="order-copy');
   const confidence = order.slice(confidenceStart, conversationStart);
   assert.ok(confidenceStart >= 0, "expected the confidence content inside the order section");
   assert.ok(confidenceStart < conversationStart, "confidence content should precede the conversation copy");
@@ -1994,34 +1994,39 @@ test("mobile cart bar keeps View cart, Order now and WhatsApp on one line with t
   assert.doesNotMatch(mobile, /\.catalogue-cart-jump\s*\{[^}]*flex-wrap:\s*wrap/);
 });
 
-test("What happens next is a dropdown that starts closed on phones and open on wider screens", () => {
+test("What happens next and Start a conversation are dropdowns that start closed on phones and open on wider screens", () => {
   assert.match(html, /<details class="customer-confidence-strip" id="customer-confidence" open>\s*<summary><h2 id="customer-confidence-title">What happens next<\/h2><\/summary>/);
   assert.match(css, /\.customer-confidence-strip > summary\s*\{[^}]*list-style:\s*none/);
-  assert.match(css, /\n\.customer-confidence-strip > summary\s*\{[^}]*pointer-events:\s*none/);
   assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customer-confidence-strip > summary\s*\{[^}]*pointer-events:\s*auto/);
   assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.customer-confidence-strip > summary::after/);
-  const start = script.indexOf("  function initConfidenceDropdown()");
-  assert.ok(start > 0, "expected initConfidenceDropdown");
+  assert.match(html, /<details class="order-copy reveal" id="order-conversation" open><summary><span class="eyebrow">Start a conversation<\/span><h2 id="order-title">Tell us the moment\. We’ll talk through the piece\.<\/h2><\/summary>/);
+  const conversation = html.match(/<details class="order-copy[\s\S]*?<\/details><\/div><\/details>/)?.[0] || "";
+  assert.match(conversation, /How do I order\?/);
+  assert.doesNotMatch(conversation, /Prefer to talk first\?/, "the contact buttons stay outside the dropdown");
+  assert.match(css, /\n\.order-copy > summary, \.customer-confidence-strip > summary\s*\{[^}]*pointer-events:\s*none/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.order-copy > summary, \.customer-confidence-strip > summary\s*\{[^}]*pointer-events:\s*auto/);
+  const start = script.indexOf("  function initPhoneDropdowns()");
+  assert.ok(start > 0, "expected initPhoneDropdowns");
   const source = script.slice(start, script.indexOf("\n  }\n", start) + 4);
   const run = (phone) => {
     const listeners = [];
-    const details = { open: true };
+    const details = { "customer-confidence": { open: true }, "order-conversation": { open: true } };
     const query = { matches: phone, addEventListener(type, listener) { listeners.push(listener); } };
     const context = {
-      document: { getElementById: (id) => (id === "customer-confidence" ? details : null) },
+      document: { getElementById: (id) => details[id] || null },
       window: { matchMedia: (media) => { assert.equal(media, "(max-width: 620px)"); return query; } },
     };
     vm.createContext(context);
-    vm.runInContext(`${source}\ninitConfidenceDropdown();`, context);
+    vm.runInContext(`${source}\ninitPhoneDropdowns();`, context);
     return { details, query, listeners };
   };
-  const phone = run(true);
-  assert.equal(phone.details.open, false);
+  const openStates = (result) => Object.values(result.details).map((details) => details.open);
+  assert.deepEqual(openStates(run(true)), [false, false]);
   const wide = run(false);
-  assert.equal(wide.details.open, true);
+  assert.deepEqual(openStates(wide), [true, true]);
   wide.query.matches = true;
   wide.listeners.forEach((listener) => listener());
-  assert.equal(wide.details.open, false);
+  assert.deepEqual(openStates(wide), [false, false]);
 });
 
 test("phone header uses a smaller wordmark and 38px icon buttons placed after the base button rules", () => {
