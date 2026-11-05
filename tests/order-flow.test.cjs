@@ -1138,7 +1138,7 @@ test("prefills repeat customer details from a valid 30-day parent profile and re
   }));
 });
 
-test("accepts only a pinned successful iframe repeat-profile message and clears only that record", () => {
+test("accepts only a pinned successful iframe repeat-profile message and ignores the retired clear message", () => {
   const storage = createStorage();
   const flow = runFlow({ storage });
   const seed = requestCatalogue(flow, flow.catalogueButton, false);
@@ -1168,9 +1168,11 @@ test("accepts only a pinned successful iframe repeat-profile message and clears 
   const saved = JSON.parse(storage.getItem("saloniRepeatProfile"));
   assert.deepEqual(saved.profile, { customerName: profile.customerName, phone: profile.phone, fulfillment: profile.fulfillment, shippingAddress: profile.shippingAddress, city: profile.city, state: profile.state, pin: profile.pin });
   assert.ok(saved.expiresAt > Date.now());
+  // The form's "forget my details" checkbox was removed, so a clear message is ignored and the cart is untouched.
+  const profileBefore = storage.getItem("saloniRepeatProfile");
   const cartBefore = storage.getItem("saloniCatalogueCart");
   flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-clear-repeat-profile", version: 1, nonce: seed.channelNonce }, ports: [] });
-  assert.equal(storage.getItem("saloniRepeatProfile"), null);
+  assert.equal(storage.getItem("saloniRepeatProfile"), profileBefore);
   assert.equal(storage.getItem("saloniCatalogueCart"), cartBefore);
 });
 
