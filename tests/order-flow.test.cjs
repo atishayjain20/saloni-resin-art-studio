@@ -237,8 +237,6 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30],
     ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33],
     ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28],
-    ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "999", "699", 30],
-    ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20],
   ];
   const romanticConceptCards = romanticCatalogue.map(([asset, title, copy, regular, festive, discount], index) => {
     const romanticCard = new Element("romantic-keepsake-card");
@@ -1535,8 +1533,6 @@ test("seeds every romantic concept with its disclosure, exact price, and blank d
     ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30],
     ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33],
     ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28],
-    ["romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "999", "699", 30],
-    ["romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20],
   ];
   expected.forEach(([asset, title, copy, regular, festive, discount], index) => {
     const button = flow.romanticConceptButtons[index];
@@ -1552,11 +1548,11 @@ test("seeds every romantic concept with its disclosure, exact price, and blank d
   });
 });
 
-test("keeps order seeds correct at the first, tenth, eleventh, and fourteenth romantic cards", () => {
+test("keeps order seeds correct at the first, eighth, ninth, and eleventh romantic cards", () => {
   const flow = runFlow();
   const selected = [
     [flow.romanticConceptButtons[0], "catalogue:romantic-us-keychain-pair.webp", "Two keys, one little us"],
-    [flow.romanticConceptButtons[9], "catalogue:romantic-couple-miniature.webp", "Your story, in 3D"],
+    [flow.romanticConceptButtons[7], "catalogue:romantic-ocean-memory-tray.webp", "Our place, held in waves"],
     [flow.romanticExistingButtons[0], "catalogue:studio-rose-hexagon-keepsake.jpeg", "Rose hexagon"],
     [flow.romanticExistingButtons[2], "catalogue:studio-red-rose-resin-display.jpeg", "Preserved rose display"],
   ];
