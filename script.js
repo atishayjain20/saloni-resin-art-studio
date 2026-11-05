@@ -856,11 +856,12 @@
     function setFullState(type, budget, query) {
       allVisible = true;
       expandedSections = [];
-      appliedType = validTypes.indexOf(type) !== -1 ? type : "all";
+      searchFilter.value = normalizeSearch(query);
+      // A search always looks through every gift, also when it comes from a saved link.
+      appliedType = searchFilter.value ? "all" : validTypes.indexOf(type) !== -1 ? type : "all";
       appliedBudget = validBudgets.indexOf(budget) !== -1 ? budget : "all";
       typeFilter.value = appliedType;
       priceFilter.value = appliedBudget;
-      searchFilter.value = normalizeSearch(query);
       return applyFilters();
     }
 
@@ -989,9 +990,9 @@
       var query = normalizeSearch(searchFilter.value);
       allVisible = Boolean(query);
       expandedSections = [];
-      // The Bestsellers home searches every gift; clearing the search returns to it.
-      if (query && appliedType === "bestsellers") appliedType = "all";
-      else if (!query && appliedType === "all") appliedType = "bestsellers";
+      // Search always looks through every gift; clearing the search returns to Bestsellers.
+      if (query) appliedType = "all";
+      else if (appliedType === "all") appliedType = "bestsellers";
       typeFilter.value = appliedType;
       applyFilters();
       var state = { full: allVisible, type: appliedType, budget: appliedBudget, q: query };
