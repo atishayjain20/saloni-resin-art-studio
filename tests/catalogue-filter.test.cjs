@@ -715,20 +715,21 @@ test("reset removes catalogue query keys, collapses controls, and popstate resto
   harness.resetButton.dispatch("click");
   assert.equal(harness.windowObject.history.pushes.length, 1);
   assert.match(harness.windowObject.location.search, /(?:\?|&)view=preview(?:&|$)/);
-  assert.match(harness.windowObject.location.search, /(?:\?|&)type=all(?:&|$)/);
+  assert.match(harness.windowObject.location.search, /(?:\?|&)type=bestsellers(?:&|$)/);
   assert.match(harness.windowObject.location.search, /(?:\?|&)budget=all(?:&|$)/);
   assert.doesNotMatch(harness.windowObject.location.search, /(?:^|&)page=/);
   assert.match(harness.windowObject.location.search, /(?:\?|&)ref=keep(?:&|$)/);
   assert.equal(harness.filterPanel.hidden, true);
   const previousPushes = harness.windowObject.history.pushes.length;
   harness.windowObject.listeners.popstate();
-  assert.equal(harness.typeFilter.value, "all");
+  assert.equal(harness.typeFilter.value, "bestsellers");
   assert.equal(harness.windowObject.history.pushes.length, previousPushes);
 });
 
 test("category tab bar marks the tab that matches the applied catalogue type", () => {
   const harness = createHarness({ count: 91, includePremium: true, withTabs: true });
-  assert.deepEqual(harness.currentTabs(), ["all"]);
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
+  assert.equal(harness.typeFilter.value, "bestsellers");
 
   harness.tabs.diwali.dispatch("click");
   assert.equal(harness.typeFilter.value, "diwali");
@@ -744,7 +745,7 @@ test("category tab bar marks the tab that matches the applied catalogue type", (
   assert.deepEqual(harness.currentTabs(), ["couple"]);
 
   harness.resetButton.dispatch("click");
-  assert.deepEqual(harness.currentTabs(), ["all"]);
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
 
   harness.tabs.premium.dispatch("click");
   assert.deepEqual(harness.currentTabs(), ["premium"]);
@@ -799,4 +800,21 @@ test("Bestsellers tab shows the first four gifts of every section with View all"
   harness.applyButton.dispatch("click");
   assert.ok(visibleCards(harness).length > 0);
   assert.ok(visibleCards(harness).every((card) => isBestseller(card) && Number(card.getAttribute("data-price-max")) <= 499));
+});
+
+test("searching from the Bestsellers home looks through every gift and clearing returns to Bestsellers", () => {
+  const harness = createHarness({ count: 12, withTabs: true });
+  const beyondPreview = harness.cards[8];
+  beyondPreview.title = "Jewel Glow Tealight";
+  harness.searchFilter.value = "Jewel Glow";
+  harness.searchFilter.dispatch("input");
+  assert.deepEqual(visibleCards(harness).map((card) => card.id), [beyondPreview.id]);
+  assert.deepEqual(harness.currentTabs(), ["all"]);
+  assert.equal(harness.typeFilter.value, "all");
+
+  harness.searchFilter.value = "";
+  harness.searchFilter.dispatch("input");
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"]);
+  assert.equal(harness.typeFilter.value, "bestsellers");
+  assert.ok(visibleCards(harness).every((card) => card.section.cards.indexOf(card) < 4));
 });
