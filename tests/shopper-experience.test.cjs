@@ -647,7 +647,7 @@ test("small-screen layout keeps long labels inside the viewport without masking 
 
 test("pricing keeps current quotes without unsupported discount claims", () => {
   const cards = html.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/g) || [];
-  assert.equal(cards.length, 89);
+  assert.equal(cards.length, 87);
   cards.forEach((card) => {
     assert.doesNotMatch(card, /<s>|Regular price|Discount|off/);
     assert.match(card, /<dt>(?:Price|From)<\/dt>/);
@@ -1828,7 +1828,7 @@ test("before-you-order buying-help section is removed from the homepage", () => 
   assert.doesNotMatch(html, /Before you order|Know what your gift will include\.|Ask Saloni about a gift/);
 });
 
-test("all 89 catalogue cards keep price first and show only known size rows", () => {
+test("all 87 catalogue cards keep price first and show only known size rows", () => {
   const expectedRows = [
     ["Size", "4 in"],
     ["Size", "4–6 in"],
@@ -1858,8 +1858,6 @@ test("all 89 catalogue cards keep price first and show only known size rows", ()
     ["Size", "3 in"],
     null,
     ["Size", "4 in"],
-    null,
-    null,
     null,
     null,
     null,
@@ -1921,8 +1919,8 @@ test("all 89 catalogue cards keep price first and show only known size rows", ()
     null,
   ];
   const cards = html.match(/<article\b[^>]*class="[^"]*(?:work-card|romantic-keepsake-card)[^"]*"[\s\S]*?<\/article>/g) || [];
-  assert.equal(cards.length, 89);
-  assert.equal(expectedRows.length, 89);
+  assert.equal(cards.length, 87);
+  assert.equal(expectedRows.length, 87);
   cards.forEach((card, index) => {
     const pricing = card.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/)?.[0] || "";
     const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g)].map((match) => match.slice(1));

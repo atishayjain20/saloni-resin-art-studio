@@ -127,11 +127,11 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
   const sectionForIndex = (index) => realCatalogue
     ? index < 23
       ? sections[0]
-      : index < 36
+      : index < 34
         ? sections[1]
-        : index < 55
+        : index < 53
           ? sections[2]
-          : index < 75
+          : index < 73
             ? sections[3]
             : sections[4]
     : index < 24
@@ -147,7 +147,7 @@ function createHarness({ hash = "", url = "", count = 77, includePremium = false
                   : includePremium ? sections[5] : sections[4];
   const cards = Array.from({ length: count }, (_, index) => {
     const section = sectionForIndex(index);
-    const premiumPrice = ["₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000"][index - (realCatalogue ? 75 : 74)];
+    const premiumPrice = ["₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000"][index - (realCatalogue ? 73 : 74)];
     const price = section.id === "premium-collection"
       ? premiumPrice
       : index % 5 === 0
@@ -634,7 +634,7 @@ test("full catalogue keeps results beside the accessible status region and focus
 });
 
 test("full browse keeps the accessible status quiet for matching results", () => {
-  const harness = createHarness({ count: 89, includePremium: true, realCatalogue: true });
+  const harness = createHarness({ count: 87, includePremium: true, realCatalogue: true });
   harness.navBrowseAll.dispatch("click");
   assert.equal(harness.status.textContent, "");
   harness.typeFilter.value = "premium";

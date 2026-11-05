@@ -89,8 +89,6 @@ ROMANTIC_CONCEPTS = (
     ("romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30),
     ("romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33),
     ("romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28),
-    ("romantic-couple-scene.webp", "Our favourite little scene", "A tiny version of the everyday moment you would replay.", "999", "699", 30),
-    ("romantic-couple-miniature.webp", "Your story, in 3D", "Two people, one meaningful detail, made into a shelf-sized memory.", "2,499", "1,999", 20),
 )
 
 DIWALI_NEW_CONCEPTS = (
@@ -153,10 +151,10 @@ class StaticSiteContractTests(unittest.TestCase):
             r'<article\b[^>]*class=["\'][^"\']*(?:work-card|romantic-keepsake-card)[^"\']*["\'][\s\S]*?</article>',
             self.html,
         )
-        self.assertEqual(len(cards), 89)
+        self.assertEqual(len(cards), 87)
         expected_prices = [
             "₹249", "₹250–₹400", "₹399", "₹849", "₹899", "₹299", "₹249", "₹1,799", "₹349", "₹249", "₹349", "₹449", "₹399", "₹249", "₹299", "₹799", "₹349", "₹399", "₹799", "₹449", "₹449", "₹399", "₹649",
-            "₹399", "₹699", "₹899", "₹599", "₹349", "₹699", "₹399", "₹1,299", "₹699", "₹1,999", "₹2,499", "₹3,000", "₹599",
+            "₹399", "₹699", "₹899", "₹599", "₹349", "₹699", "₹399", "₹1,299", "₹2,499", "₹3,000", "₹599",
             "₹199", "₹149", "₹399", "₹799", "₹749", "₹179", "₹179", "₹899", "₹999", "₹449", "₹499", "₹699", "₹449", "₹199", "₹299", "₹299", "₹999", "₹449", "₹1,199",
             "₹4,099", "₹349", "₹399", "₹4,599", "₹399", "₹1,999", "₹1,999", "₹2,299", "₹3,999", "₹2,199", "₹999", "₹2,199", "₹1,299", "₹3,499", "₹599", "₹599", "₹599", "₹599", "₹599", "₹599",
             "₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000",
@@ -199,7 +197,7 @@ class StaticSiteContractTests(unittest.TestCase):
             r'<article\b[^>]*class=["\'][^"\']*(?:work-card|romantic-keepsake-card)[^"\']*["\'][\s\S]*?</article>',
             self.html,
         )
-        self.assertEqual(len(cards), 89)
+        self.assertEqual(len(cards), 87)
         for index, card in enumerate(cards, 1):
             paragraphs = re.findall(r'<p\b[^>]*>([\s\S]*?)</p>', card)
             self.assertEqual(len(paragraphs), 2, f"card {index} has one description and one specification paragraph")
@@ -827,19 +825,19 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertRegex(image, r'\bwidth=["\']\d+["\']')
                 self.assertRegex(image, r'\bheight=["\']\d+["\']')
 
-        self.assertEqual(section_html.count("<h3"), 13)
+        self.assertEqual(section_html.count("<h3"), 11)
         self.assertIn('data-catalogue-disclosure', section_html)
         self.assertNotIn("work-card", section_html)
-        self.assertEqual(section_html.count("data-lightbox-trigger"), 13)
+        self.assertEqual(section_html.count("data-lightbox-trigger"), 11)
         for asset in assets:
             with self.subTest(lightbox_asset=asset):
                 asset_name = asset.removeprefix("assets/")
                 trigger = re.search(rf'<a\b[^>]*class=["\']lightbox-trigger["\'][^>]*data-lightbox-trigger[^>]*href=["\']assets/{re.escape(asset_name)}["\'][^>]*>[\s\S]*?</a>', section_html)
                 self.assertIsNotNone(trigger)
                 self.assertRegex(trigger.group(0), r'aria-label=["\']Open larger view: [^"\']+["\']')
-        self.assertEqual(section_html.count('class="product-pricing"'), 13)
+        self.assertEqual(section_html.count('class="product-pricing"'), 11)
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*romantic-keepsake-card[^"\']*["\'][\s\S]*?</article>', section_html)
-        self.assertEqual(len(cards), 13)
+        self.assertEqual(len(cards), 11)
         highlight_matrix = {
             "studio-rose-hexagon-keepsake.jpeg": ("2,999", "2,499", 17),
             "studio-personalized-photo-clock.jpeg": ("3,999", "3,000", 25),
@@ -889,8 +887,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn('Request a custom gift', hero_html)
         self.assertNotIn('data-browse-filters', hero_html)
         self.assertEqual(self.html.count('class="catalogue-grid"'), 5)
-        self.assertEqual(self.html.count('data-lightbox-trigger'), 89)
-        self.assertEqual(self.html.count('class="product-pricing"'), 89)
+        self.assertEqual(self.html.count('data-lightbox-trigger'), 87)
+        self.assertEqual(self.html.count('class="product-pricing"'), 87)
         self.assertEqual(self.html.count('data-testimonial-card'), 0)
 
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -927,23 +925,23 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("Some catalogue images are illustrative or reference ideas.", self.html)
 
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*romantic-keepsake-card[^"\']*["\'][\s\S]*?</article>', section_html)
-        self.assertEqual(len(cards), 13)
+        self.assertEqual(len(cards), 11)
         assets = re.findall(r'<img\b[^>]*src=["\'](assets/[^"\']+)["\'][^>]*>', section_html)
         self.assertEqual(
-            assets[:10],
+            assets[:8],
             [f"assets/{asset}" for asset, _, _, _, _, _ in ROMANTIC_CONCEPTS],
         )
         self.assertEqual(
-            assets[10:],
+            assets[8:],
             [
                 "assets/studio-rose-hexagon-keepsake.jpeg",
                 "assets/studio-personalized-photo-clock.jpeg",
                 "assets/studio-red-rose-resin-display.jpeg",
             ],
         )
-        self.assertEqual(section_html.count("data-lightbox-trigger"), 13)
-        self.assertEqual(section_html.count('class="product-pricing"'), 13)
-        for card_index in (0, 9, 10, 12):
+        self.assertEqual(section_html.count("data-lightbox-trigger"), 11)
+        self.assertEqual(section_html.count('class="product-pricing"'), 11)
+        for card_index in (0, 7, 8, 10):
             with self.subTest(card_index=card_index):
                 selected_card = cards[card_index]
                 selected_trigger = re.search(r'<a\b[^>]*data-lightbox-trigger[^>]*href=["\']([^"\']+)["\']', selected_card)
@@ -1173,6 +1171,12 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("One request for your selected gifts", self.html)
         self.assertIn('<p class="panel-label" id="catalogue-selection-title">Your cart</p>', self.html)
         self.assertIn('aria-labelledby="catalogue-selection-title"', self.html)
+
+    def test_couple_scene_and_3d_miniature_are_removed(self):
+        for gone in ("Our favourite little scene", "Your story, in 3D", "romantic-couple-scene", "romantic-couple-miniature"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, self.html)
+        self.assertEqual(sorted(p.name for p in (ROOT / "assets").rglob("romantic-couple-*")), [])
 
     def test_empty_catalogue_results_region_draws_no_focus_box(self):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -1436,7 +1440,7 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_art_lightbox_contract_preserves_product_catalogue(self):
         triggers = re.findall(r'<a\b[^>]*data-lightbox-trigger[^>]*>', self.html)
-        self.assertEqual(len(triggers), 89)
+        self.assertEqual(len(triggers), 87)
         for trigger in triggers:
             with self.subTest(trigger=trigger):
                 self.assertRegex(trigger, r'href=["\']assets/[^"\']+["\']')
@@ -1454,7 +1458,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(dialog_image)
         self.assertNotRegex(dialog_image.group(0), r'\bsrc=')
 
-        for section_id, cards, pricing_blocks in (("romantic-keepsakes", 13, 13), ("corporate-resin-gifts", 19, 19), ("studio-art", 20, 20), ("premium-collection", 14, 14), ("diwali", 23, 23)):
+        for section_id, cards, pricing_blocks in (("romantic-keepsakes", 11, 11), ("corporate-resin-gifts", 19, 19), ("studio-art", 20, 20), ("premium-collection", 14, 14), ("diwali", 23, 23)):
             section = re.search(rf'<section\b[^>]*id=["\']{section_id}["\'][\s\S]*?</section>', self.html)
             self.assertIsNotNone(section)
             with self.subTest(section=section_id):
@@ -1610,8 +1614,6 @@ class StaticSiteContractTests(unittest.TestCase):
             "diwali-om-mini-tilak-plate": "blue styled",
             "romantic-botanical-pendant": "blue styled",
             "romantic-calendar-coaster": "blue styled",
-            "romantic-couple-miniature": "ruby styled",
-            "romantic-couple-scene": "emerald styled",
             "romantic-first-rose-bracelet": "amethyst styled",
             "romantic-ocean-memory-tray": "emerald styled",
             "studio-personalized-photo-clock": "blue styled",
