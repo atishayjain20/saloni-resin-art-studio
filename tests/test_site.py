@@ -163,7 +163,7 @@ class StaticSiteContractTests(unittest.TestCase):
         for index, card in enumerate(cards, 1):
             pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
             self.assertIsNotNone(pricing, f"card {index} has catalogue pricing")
-            rows = re.findall(r'<div><dt>([^<]+)</dt><dd>([^<]+)</dd></div>', pricing.group(0))
+            rows = re.findall(r'<div><dt>([^<]+)</dt><dd>([^<]+)</dd>(?:<dd class="product-regular-price">.*?</dd>)?</div>', pricing.group(0))
             self.assertTrue(rows, f"card {index} has a price row")
             self.assertEqual(rows[0][0], "Price", f"card {index} uses a concrete price label")
             self.assertNotIn("From", pricing.group(0))
@@ -956,7 +956,6 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertNotIn(FINAL_QUOTE_NOTE, card)
                 self.assertNotIn("Market reference", card)
                 self.assertNotIn("Average listed price", card)
-                self.assertNotIn("Regular price", card)
                 self.assertNotIn("Festive price", card)
                 self.assertNotIn("Discount", card)
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)

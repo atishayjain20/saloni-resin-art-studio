@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261139">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261139" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261140">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261140" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -647,15 +647,29 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   assert.doesNotMatch(css, /body\s*\{[^}]*overflow-x:\s*hidden/);
 });
 
-test("pricing keeps current quotes without unsupported discount claims", () => {
+test("each priced gift shows a crossed-out regular price 25% above today's price, which stays the price paid", () => {
   const cards = html.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/g) || [];
   assert.equal(cards.length, 87);
+  const rupees = (text) => (text.match(/[0-9][0-9,]*/g) || []).map((n) => Number(n.replace(/,/g, "")));
+  const format = (n) => "₹" + n.toLocaleString("en-IN");
+  let withRegular = 0;
   cards.forEach((card) => {
-    assert.doesNotMatch(card, /<s>|Regular price|Discount|off/);
-    assert.match(card, /<dt>(?:Price|From)<\/dt>/);
+    assert.match(card, /^<dl class="product-pricing"[^>]*><div><dt>(?:Price|From)<\/dt>/, "today's price stays the first row, so filters and the cart read it");
+    const price = card.match(/<dt>(?:Price|From)<\/dt><dd>([^<]*)<\/dd>/)[1];
+    const regular = card.match(/<dt>(?:Price|From)<\/dt><dd>[^<]*<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>([^<]*)<\/s> <span>20% off<\/span><\/dd><\/div>/);
+    if (!/₹/.test(price)) {
+      assert.equal(regular, null, price + " has no regular price");
+      return;
+    }
+    assert.ok(regular, "regular price for " + price);
+    assert.equal(regular[1], price.replace(/₹([0-9][0-9,]*)/g, (m, n) => format(Math.round(Number(n.replace(/,/g, "")) * 1.25))));
+    assert.equal((card.match(/<dt>/g) || []).length <= 2, true, "no extra row, so the phone price grid keeps its two rows");
+    withRegular += 1;
   });
+  assert.equal(withRegular, 79);
+  assert.match(html, /<dt>Price<\/dt><dd>₹249<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>₹311<\/s> <span>20% off<\/span><\/dd>/);
+  assert.match(css, /figcaption \.product-pricing > div > dd\.product-regular-price\s*\{[^}]*grid-column:\s*1 \/ -1/);
   assert.doesNotMatch(html, /<dt>Estimated from<\/dt>/);
-  assert.match(html, /<dt>Price<\/dt><dd>₹2,499<\/dd>/);
   assert.doesNotMatch(section("diwali"), /Diwali prices ₹249–₹1,799/);
 });
 
@@ -1925,7 +1939,7 @@ test("all 87 catalogue cards keep price first and show only known size rows", ()
   assert.equal(expectedRows.length, 87);
   cards.forEach((card, index) => {
     const pricing = card.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/)?.[0] || "";
-    const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g)].map((match) => match.slice(1));
+    const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-regular-price">.*?<\/dd>)?<\/div>/g)].map((match) => match.slice(1));
     assert.equal(pricing.match(/aria-label="([^"]+)"/)?.[1], "Catalogue price and size");
     assert.ok(rows.length === 1 || rows.length === 2, `card ${index + 1} has price and optional size rows`);
     assert.match(rows[0][0], /^(?:Price|From)$/);
@@ -1958,7 +1972,7 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
     const end = html.indexOf("</article>", titleIndex);
     return start < 0 || end < 0 ? "" : html.slice(start, end + "</article>".length);
   };
-  const rowsFor = (title) => [...(cardFor(title).match(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd><\/div>/g) || [])].map((row) => row.match(/<dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>/).slice(1));
+  const rowsFor = (title) => [...(cardFor(title).match(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-regular-price">.*?<\/dd>)?<\/div>/g) || [])].map((row) => row.match(/<dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>/).slice(1));
   assert.deepEqual(rowsFor("Shubh Labh Welcome Pair").slice(1), [["Size", "4–6 in"]]);
   assert.equal(cardFor("Festive Welcome Hamper"), "");
   assert.deepEqual(rowsFor("Ivory Mandala Holder").slice(1), [["Size", "3 in"]]);
