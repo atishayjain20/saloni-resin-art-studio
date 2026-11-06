@@ -650,9 +650,9 @@
     var searchPanel = document.getElementById("catalogue-search-panel");
     var filterPanel = document.getElementById("catalogue-filter-panel");
     var catalogueRegion = tools;
-    var validTypes = ["all", "bestsellers", "couple", "diwali", "frames", "premium", "corporate"];
+    var validTypes = ["all", "bestsellers", "marriage", "couple", "diwali", "frames", "premium", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
-    var typeLabels = { all: "All gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
+    var typeLabels = { all: "All gifts", marriage: "Marriage gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
     var searchMaxLength = 100;
     var appliedType = "bestsellers";
     var appliedBudget = "all";
@@ -684,6 +684,7 @@
     function typeFor(card) {
       var section = sectionFor(card);
       var id = section ? section.id : "";
+      if (id === "marriage-gifts") return "marriage";
       if (id === "romantic-keepsakes") return "couple";
       if (id === "diwali") return "diwali";
       if (id === "corporate-resin-gifts") return "corporate";

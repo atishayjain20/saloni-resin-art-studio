@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261140">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261140" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261141">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261141" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -223,10 +223,11 @@ test("category tab bar sits in the sticky header after the header row with BESTS
   assert.ok(nav, "category tab nav must live inside .site-header");
   assert.match(header, /<\/nav>\n    <\/div>\n    <nav class="category-tabs"/, "tabs follow the header-inner block");
   const tabs = Array.from(nav[1].matchAll(/<a class="category-tab"([^>]*)>([^<]*)<\/a>/g), (match) => ({ attrs: match[1], label: match[2].trim() }));
-  assert.deepEqual(tabs.map((tab) => tab.label), ["Bestsellers", "Premium", "Couple", "Corporate", "Diwali", "All"]);
+  assert.deepEqual(tabs.map((tab) => tab.label), ["Bestsellers", "Premium", "Marriage", "Couple", "Corporate", "Diwali", "All"]);
   const expected = [
     ["#catalogue-filters", "bestsellers"],
     ["#premium-collection", "premium"],
+    ["#marriage-gifts", "marriage"],
     ["#romantic-keepsakes", "couple"],
     ["#corporate-resin-gifts", "corporate"],
     ["#diwali", "diwali"],
@@ -236,8 +237,8 @@ test("category tab bar sits in the sticky header after the header row with BESTS
     assert.match(tab.attrs, new RegExp('href="' + expected[index][0] + '"'));
     assert.match(tab.attrs, new RegExp('data-category-tab="' + expected[index][1] + '"'));
     assert.equal(/aria-current="true"/.test(tab.attrs), index === 0);
-    assert.equal(/data-browse-all/.test(tab.attrs), index === 5);
-    assert.equal(/data-category-shortcut="/.test(tab.attrs), index !== 5);
+    assert.equal(/data-browse-all/.test(tab.attrs), index === 6);
+    assert.equal(/data-category-shortcut="/.test(tab.attrs), index !== 6);
     assert.doesNotMatch(tab.attrs, /frames/);
     assert.ok(html.includes('id="' + expected[index][0].slice(1) + '"'), expected[index][0] + " target exists");
   });
@@ -649,7 +650,7 @@ test("small-screen layout keeps long labels inside the viewport without masking 
 
 test("each priced gift shows a crossed-out regular price 25% above today's price, which stays the price paid", () => {
   const cards = html.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/g) || [];
-  assert.equal(cards.length, 87);
+  assert.equal(cards.length, 97);
   const rupees = (text) => (text.match(/[0-9][0-9,]*/g) || []).map((n) => Number(n.replace(/,/g, "")));
   const format = (n) => "₹" + n.toLocaleString("en-IN");
   let withRegular = 0;
@@ -666,7 +667,7 @@ test("each priced gift shows a crossed-out regular price 25% above today's price
     assert.equal((card.match(/<dt>/g) || []).length <= 2, true, "no extra row, so the phone price grid keeps its two rows");
     withRegular += 1;
   });
-  assert.equal(withRegular, 79);
+  assert.equal(withRegular, 89);
   assert.match(html, /<dt>Price<\/dt><dd>₹249<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>₹311<\/s> <span>20% off<\/span><\/dd>/);
   assert.match(css, /figcaption \.product-pricing > div > dd\.product-regular-price\s*\{[^}]*grid-column:\s*1 \/ -1/);
   assert.doesNotMatch(html, /<dt>Estimated from<\/dt>/);
@@ -857,11 +858,11 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("footer trust strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Bestsellers", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders"].forEach((label) => {
+  ["Gifts", "Bestsellers", "Marriage gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
   assert.doesNotMatch(nav, />Order\s*<\/a>/);
-  assert.equal((nav.match(/<a\b/g) || []).length, 6);
+  assert.equal((nav.match(/<a\b/g) || []).length, 7);
   const hero = section("hero");
   const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
   const trustStrip = footer.match(/<ul class="hero-trust-strip"[\s\S]*?<\/ul>/)?.[0] || "";
@@ -1844,7 +1845,7 @@ test("before-you-order buying-help section is removed from the homepage", () => 
   assert.doesNotMatch(html, /Before you order|Know what your gift will include\.|Ask Saloni about a gift/);
 });
 
-test("all 87 catalogue cards keep price first and show only known size rows", () => {
+test("all 97 catalogue cards keep price first and show only known size rows", () => {
   const expectedRows = [
     ["Size", "4 in"],
     ["Size", "4–6 in"],
@@ -1869,6 +1870,16 @@ test("all 87 catalogue cards keep price first and show only known size rows", ()
     ["Size", "2 in"],
     ["Size", "3–4 in"],
     ["Size", "3–4 in"],
+    ["Size", "8 in"],
+    ["Size", "8 × 12 in"],
+    ["Size", "10 × 12 in"],
+    ["Size", "4 in"],
+    ["Size", "8 × 10 in"],
+    ["Size", "10 in"],
+    ["Size", "7 in"],
+    ["Size", "12 in"],
+    ["Size", "1 in"],
+    ["Size", "6 in"],
     ["Size", "1.5–2 in"],
     ["Size", "5–6 in"],
     ["Size", "3 in"],
@@ -1935,8 +1946,8 @@ test("all 87 catalogue cards keep price first and show only known size rows", ()
     null,
   ];
   const cards = html.match(/<article\b[^>]*class="[^"]*(?:work-card|romantic-keepsake-card)[^"]*"[\s\S]*?<\/article>/g) || [];
-  assert.equal(cards.length, 87);
-  assert.equal(expectedRows.length, 87);
+  assert.equal(cards.length, 97);
+  assert.equal(expectedRows.length, 97);
   cards.forEach((card, index) => {
     const pricing = card.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/)?.[0] || "";
     const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-regular-price">.*?<\/dd>)?<\/div>/g)].map((match) => match.slice(1));
