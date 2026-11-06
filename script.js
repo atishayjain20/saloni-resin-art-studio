@@ -525,7 +525,7 @@
     initCatalogueExperience();
     initHeroBanner();
     initPhoneDropdowns();
-    initFestivalGreetings();
+    initDhanterasGreeting();
 
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
@@ -562,16 +562,12 @@
     if (phone.addEventListener) phone.addEventListener("change", sync);
   }
 
-  // Each festival wish shows only on its own dates, India time (UTC+5:30), then hides itself.
-  function initFestivalGreetings(now) {
+  // The Dhanteras wish shows only from 5 to 7 November 2026, India time (UTC+5:30), then hides itself.
+  function initDhanterasGreeting(now) {
+    var greeting = document.getElementById("dhanteras-greeting");
+    if (!greeting) return;
     var time = typeof now === "number" ? now : Date.now();
-    [
-      { id: "dhanteras-greeting", from: Date.UTC(2026, 10, 4, 18, 30), to: Date.UTC(2026, 10, 7, 18, 30) },
-      { id: "diwali-greeting", from: Date.UTC(2026, 10, 7, 18, 30), to: Date.UTC(2026, 10, 9, 18, 30) }
-    ].forEach(function (festival) {
-      var greeting = document.getElementById(festival.id);
-      if (greeting) greeting.hidden = !(time >= festival.from && time < festival.to);
-    });
+    greeting.hidden = !(time >= Date.UTC(2026, 10, 4, 18, 30) && time < Date.UTC(2026, 10, 7, 18, 30));
   }
 
   function initHeroBanner() {
