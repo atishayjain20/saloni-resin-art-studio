@@ -2050,17 +2050,19 @@ test("the page background is a very pale blush token used for the body and the c
 });
 
 test("Dhanteras and Diwali greetings with a marigold garland each show only on their own dates (India time)", () => {
-  const card = (id) => html.match(new RegExp(`<section class="festival-greeting shell" id="${id}" aria-labelledby="${id.replace("-greeting", "")}-title" hidden>[\\s\\S]*?<\/section>`))?.[0] || "";
+  const card = (id) => html.match(new RegExp(`<section class="festival-greeting shell" id="${id}" aria-labelledby="${id}-title" hidden>[\\s\\S]*?<\/section>`))?.[0] || "";
   const dhanteras = card("dhanteras-greeting");
   const diwali = card("diwali-greeting");
   assert.ok(dhanteras && diwali, "both greetings start hidden so they never show without the date check");
-  assert.match(dhanteras, /<h2 id="dhanteras-title">[\s\S]*शुभ धनतेरस[\s\S]*Happy Dhanteras[\s\S]*<\/h2>/);
-  assert.match(diwali, /<h2 id="diwali-title">[\s\S]*शुभ दीपावली[\s\S]*Happy Diwali[\s\S]*<\/h2>/);
+  assert.match(dhanteras, /<h2 id="dhanteras-greeting-title">[\s\S]*शुभ धनतेरस[\s\S]*Happy Dhanteras[\s\S]*<\/h2>/);
+  assert.match(diwali, /<h2 id="diwali-greeting-title">[\s\S]*शुभ दीपावली[\s\S]*Happy Diwali[\s\S]*<\/h2>/);
   [dhanteras, diwali].forEach((markup) => assert.match(markup, /<a class="button button-dark" href="#diwali" data-category-shortcut="diwali">Shop Diwali gifts<\/a>/));
   ["dhanteras-greeting", "diwali-greeting"].forEach((id) => {
     assert.ok(html.indexOf(`id="${id}"`) > html.indexOf('class="hero-banner-custom"'), `${id} sits under the photo carousel`);
     assert.ok(html.indexOf(`id="${id}"`) < html.indexOf('id="catalogue-filters"'));
   });
+  const ids = Array.from(html.matchAll(/\sid="([^"]+)"/g), (match) => match[1]);
+  assert.deepEqual(ids.filter((id, index) => ids.indexOf(id) !== index), [], "every id on the page is unique");
   assert.match(css, /\.festival-greeting::before,\s*\.festival-greeting::after\s*\{[^}]*background:\s*url\("data:image\/svg\+xml/, "a marigold garland runs along the top and bottom");
   const start = script.indexOf("  function initFestivalGreetings(");
   assert.ok(start > 0, "expected initFestivalGreetings");
