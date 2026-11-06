@@ -190,6 +190,50 @@ html:not(.js) .hero-banner-controls {
   justify-content: center;
   margin: 0;
 }
+/* Dhanteras wish: a marigold and mango-leaf garland along the top and bottom edges. */
+.dhanteras-greeting {
+  position: relative;
+  margin-block: .25rem 1rem;
+  padding: 2.75rem 1.25rem 2.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(242, 160, 7, .55);
+  border-radius: 1.25rem;
+  background: linear-gradient(135deg, #fff1cc 0%, #ffe0ec 100%);
+  text-align: center;
+}
+.dhanteras-greeting::before,
+.dhanteras-greeting::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 34px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='34' viewBox='0 0 56 34'%3E%3Cpath d='M0 3 Q14 11 28 3 T56 3' fill='none' stroke='%23b0125b' stroke-width='1.4'/%3E%3Cpath d='M33 6 q7 3 5 13 q-7 -3 -5 -13z' fill='%230e7c7b'/%3E%3Cg transform='translate(15 15)'%3E%3Ccircle r='10' fill='%23f2a007'/%3E%3Ccircle r='10' fill='none' stroke='%23d97a00' stroke-width='2.4' stroke-dasharray='2 2.2'/%3E%3Ccircle r='6.5' fill='%23ffb400'/%3E%3Ccircle r='6.5' fill='none' stroke='%23e08900' stroke-width='1.6' stroke-dasharray='1.6 1.6'/%3E%3Ccircle r='2.6' fill='%23c2410c'/%3E%3C/g%3E%3Cg transform='translate(45 12)'%3E%3Ccircle r='6.5' fill='%23ff8a1f'/%3E%3Ccircle r='6.5' fill='none' stroke='%23d9480f' stroke-width='1.8' stroke-dasharray='1.6 1.8'/%3E%3Ccircle r='2.2' fill='%23b0125b'/%3E%3C/g%3E%3C/svg%3E") repeat-x 0 0 / 56px 34px;
+}
+.dhanteras-greeting::before {
+  top: 0;
+}
+.dhanteras-greeting::after {
+  bottom: 0;
+  transform: scaleY(-1);
+}
+.dhanteras-greeting h2 {
+  margin: 0 0 .5rem;
+  color: var(--ink);
+  font: 500 clamp(1.7rem, 6vw, 2.6rem)/1.05 var(--display);
+}
+.dhanteras-greeting h2 span {
+  display: block;
+  margin-bottom: .2rem;
+  color: var(--rose-ink);
+  font-size: .72em;
+}
+.dhanteras-greeting p {
+  max-width: 42ch;
+  margin: 0 auto 1rem;
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.5;
+}
 .hero-banner-custom a {
   display: inline-flex;
   align-items: center;
