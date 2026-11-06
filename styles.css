@@ -401,6 +401,30 @@ h1 em { color: var(--rose); font-style: italic; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:not(:first-child) dd { font-family: var(--sans); font-size: 0.82rem; font-weight: 800; line-height: 1.35; letter-spacing: normal; white-space: normal; overflow-wrap: anywhere; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dt, :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dd { color: var(--rose-ink); }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing s { color: var(--muted); font-weight: 500; }
+/* Crossed-out regular price, on its own line under today's price. */
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:first-child {
+  flex-wrap: wrap;
+}
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div > dd.product-regular-price {
+  grid-column: 1 / -1;
+  flex-basis: 100%;
+  padding: 0;
+  background: none;
+  color: var(--muted);
+  font: 600 .74rem/1.3 var(--sans);
+  letter-spacing: normal;
+}
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing .product-regular-price span:not(.sr-only) {
+  margin-left: .3rem;
+  color: var(--rose-ink);
+  font-weight: 800;
+}
+.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div > dd.product-regular-price {
+  color: #cdbdae;
+}
+.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing .product-regular-price span:not(.sr-only) {
+  color: var(--premium-gold);
+}
 
 dialog.lightbox-dialog:not([open]) { display: none; }
 dialog.order-dialog:not([open]) { display: none; }
