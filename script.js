@@ -576,11 +576,12 @@
     } catch (error) {}
     // Capture runs before the shop link's own handler, so the catalogue can take focus once the pop-up is closed.
     greeting.addEventListener("click", function (event) {
-      if (event.target === greeting || event.target.closest("[data-category-shortcut]")) greeting.close();
+      var box = greeting.getBoundingClientRect();
+      var outside = event.target === greeting && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom);
+      if (outside || event.target.closest("[data-category-shortcut]")) greeting.close();
     }, true);
     greeting.showModal();
   }
-
 
   function initHeroBanner() {
     var track = document.querySelector("[data-banner-track]");

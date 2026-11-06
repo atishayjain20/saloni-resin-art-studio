@@ -2069,6 +2069,8 @@ test("the Dhanteras wish opens as a pop-up once per visitor, only from 5 to 7 No
     const greeting = {
       open: false,
       showModal() { this.open = true; },
+      getBoundingClientRect: () => ({ left: 20, right: 370, top: 270, bottom: 570 }),
+      closest: () => null,
       close() { this.open = false; (listeners.close || []).forEach((fn) => fn()); },
       addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); }
     };
@@ -2096,6 +2098,8 @@ test("the Dhanteras wish opens as a pop-up once per visitor, only from 5 to 7 No
   shown.listeners.click.forEach((fn) => fn({ target: shopLink }));
   assert.equal(shown.greeting.open, false, "Shop Diwali gifts closes the pop-up");
   const again = run("2026-11-06T09:00:00Z");
-  again.listeners.click.forEach((fn) => fn({ target: again.greeting }));
+  again.listeners.click.forEach((fn) => fn({ target: again.greeting, clientX: 200, clientY: 300 }));
+  assert.equal(again.greeting.open, true, "a tap on blank space inside the card keeps it open");
+  again.listeners.click.forEach((fn) => fn({ target: again.greeting, clientX: 200, clientY: 700 }));
   assert.equal(again.greeting.open, false, "a tap outside the card closes it");
 });
