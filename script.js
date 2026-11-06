@@ -562,12 +562,25 @@
     if (phone.addEventListener) phone.addEventListener("change", sync);
   }
 
-  // The Dhanteras wish shows only from 5 to 7 November 2026, India time (UTC+5:30), then hides itself.
+  // The Dhanteras wish opens as a pop-up once per visitor, only from 5 to 7 November 2026, India time (UTC+5:30).
   function initDhanterasGreeting(now) {
     var greeting = document.getElementById("dhanteras-greeting");
-    if (!greeting) return;
+    if (!greeting || typeof greeting.showModal !== "function") return;
     var time = typeof now === "number" ? now : Date.now();
-    greeting.hidden = !(time >= Date.UTC(2026, 10, 4, 18, 30) && time < Date.UTC(2026, 10, 7, 18, 30));
+    if (!(time >= Date.UTC(2026, 10, 4, 18, 30) && time < Date.UTC(2026, 10, 7, 18, 30))) return;
+    if (document.querySelector("dialog[open]")) return;
+    var key = "saloni-dhanteras-2026";
+    try {
+      if (window.localStorage.getItem(key)) return;
+      window.localStorage.setItem(key, "1");
+    } catch (error) {}
+    // Capture runs before the shop link's own handler, so the catalogue can take focus once the pop-up is closed.
+    greeting.addEventListener("click", function (event) {
+      var box = greeting.getBoundingClientRect();
+      var outside = event.target === greeting && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom);
+      if (outside || event.target.closest("[data-category-shortcut]")) greeting.close();
+    }, true);
+    greeting.showModal();
   }
 
   function initHeroBanner() {

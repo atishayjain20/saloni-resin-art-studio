@@ -192,10 +192,10 @@ html:not(.js) .hero-banner-controls {
 }
 /* Dhanteras wish: a marigold and mango-leaf garland along the top and bottom edges. */
 .dhanteras-greeting {
-  position: relative;
-  margin-block: .25rem 1rem;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
   padding: 2.75rem 1.25rem 2.75rem;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid rgba(242, 160, 7, .55);
   border-radius: 1.25rem;
   background: linear-gradient(135deg, #fff1cc 0%, #ffe0ec 100%);
@@ -211,6 +211,9 @@ html:not(.js) .hero-banner-controls {
 }
 .dhanteras-greeting::before {
   top: 0;
+}
+dialog.dhanteras-greeting::backdrop {
+  background: rgba(42, 14, 31, .72);
 }
 .dhanteras-greeting::after {
   bottom: 0;
