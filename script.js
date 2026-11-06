@@ -525,6 +525,7 @@
     initCatalogueExperience();
     initHeroBanner();
     initPhoneDropdowns();
+    initDhanterasGreeting();
 
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
@@ -559,6 +560,14 @@
     function sync() { dropdowns.forEach(function (details) { details.open = !phone.matches; }); }
     sync();
     if (phone.addEventListener) phone.addEventListener("change", sync);
+  }
+
+  // The Dhanteras wish shows only from 5 to 7 November 2026, India time (UTC+5:30), then hides itself.
+  function initDhanterasGreeting(now) {
+    var greeting = document.getElementById("dhanteras-greeting");
+    if (!greeting) return;
+    var time = typeof now === "number" ? now : Date.now();
+    greeting.hidden = !(time >= Date.UTC(2026, 10, 4, 18, 30) && time < Date.UTC(2026, 10, 7, 18, 30));
   }
 
   function initHeroBanner() {

@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261134">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261135" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261136">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261136" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -2047,4 +2047,29 @@ test("the page background is a very pale blush token used for the body and the c
   assert.ok(link, "the custom-frame link on the page sets its own readable teal");
   ["#6a4a5b", "#b0125b", link[1]].forEach((colour) => assert.ok(contrast(colour, "#ffeaf2") >= 4.5, colour + " on the page"));
   assert.match(css, /\nbody\s*\{[^}]*background:\s*var\(--page\)/);
+});
+
+test("a Dhanteras greeting with a marigold garland shows only from 5 to 7 November 2026 (India time)", () => {
+  const markup = html.match(/<section class="dhanteras-greeting shell" id="dhanteras-greeting" aria-labelledby="dhanteras-title" hidden>[\s\S]*?<\/section>/)?.[0] || "";
+  assert.ok(markup, "the greeting starts hidden so it never shows without the date check");
+  assert.match(markup, /<h2 id="dhanteras-title">[\s\S]*शुभ धनतेरस[\s\S]*Happy Dhanteras[\s\S]*<\/h2>/);
+  assert.match(markup, /<a class="button button-dark" href="#diwali" data-category-shortcut="diwali">Shop Diwali gifts<\/a>/);
+  assert.ok(html.indexOf('id="dhanteras-greeting"') > html.indexOf('class="hero-banner-custom"'), "the greeting sits under the photo carousel");
+  assert.ok(html.indexOf('id="dhanteras-greeting"') < html.indexOf('id="catalogue-filters"'));
+  assert.match(css, /\.dhanteras-greeting::before,\s*\.dhanteras-greeting::after\s*\{[^}]*background:\s*url\("data:image\/svg\+xml/, "a marigold garland runs along the top and bottom");
+  const start = script.indexOf("  function initDhanterasGreeting(");
+  assert.ok(start > 0, "expected initDhanterasGreeting");
+  const source = script.slice(start, script.indexOf("\n  }\n", start) + 4);
+  const shownAt = (iso) => {
+    const greeting = { hidden: true };
+    const context = { document: { getElementById: (id) => (id === "dhanteras-greeting" ? greeting : null) }, Date };
+    vm.createContext(context);
+    vm.runInContext(`${source}\ninitDhanterasGreeting(${Date.parse(iso)});`, context);
+    return !greeting.hidden;
+  };
+  assert.equal(shownAt("2026-11-04T18:29:00Z"), false, "23:59 on 4 Nov in India");
+  assert.equal(shownAt("2026-11-04T18:31:00Z"), true, "00:01 on 5 Nov in India");
+  assert.equal(shownAt("2026-11-06T09:00:00Z"), true, "Dhanteras");
+  assert.equal(shownAt("2026-11-07T18:29:00Z"), true, "23:59 on 7 Nov in India");
+  assert.equal(shownAt("2026-11-07T18:31:00Z"), false, "00:01 on 8 Nov in India");
 });
