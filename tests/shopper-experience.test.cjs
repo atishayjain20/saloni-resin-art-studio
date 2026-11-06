@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261138">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261138" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261139">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261139" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -2049,27 +2049,53 @@ test("the page background is a very pale blush token used for the body and the c
   assert.match(css, /\nbody\s*\{[^}]*background:\s*var\(--page\)/);
 });
 
-test("a Dhanteras greeting with a marigold garland shows only from 5 to 7 November 2026 (India time)", () => {
-  const markup = html.match(/<section class="dhanteras-greeting shell" id="dhanteras-greeting" aria-labelledby="dhanteras-title" hidden>[\s\S]*?<\/section>/)?.[0] || "";
-  assert.ok(markup, "the greeting starts hidden so it never shows without the date check");
+test("the Dhanteras wish opens as a pop-up once per visitor, only from 5 to 7 November 2026 (India time)", () => {
+  const markup = html.match(/<dialog class="dhanteras-greeting" id="dhanteras-greeting" aria-labelledby="dhanteras-title">[\s\S]*?<\/dialog>/)?.[0] || "";
+  assert.ok(markup, "the wish is a closed dialog, so it never shows without the date check");
+  assert.doesNotMatch(html, /<section[^>]+dhanteras-greeting/, "the old in-page card is gone");
+  assert.match(markup, /<form method="dialog"[^>]*>\s*<button class="lightbox-close" type="submit" aria-label="Close Dhanteras wish">/);
   assert.match(markup, /<h2 id="dhanteras-title">[\s\S]*शुभ धनतेरस[\s\S]*Happy Dhanteras[\s\S]*<\/h2>/);
   assert.match(markup, /<a class="button button-dark" href="#diwali" data-category-shortcut="diwali">Shop Diwali gifts<\/a>/);
-  assert.ok(html.indexOf('id="dhanteras-greeting"') > html.indexOf('class="hero-banner-custom"'), "the greeting sits under the photo carousel");
-  assert.ok(html.indexOf('id="dhanteras-greeting"') < html.indexOf('id="catalogue-filters"'));
   assert.match(css, /\.dhanteras-greeting::before,\s*\.dhanteras-greeting::after\s*\{[^}]*background:\s*url\("data:image\/svg\+xml/, "a marigold garland runs along the top and bottom");
+  assert.match(css, /dialog\.dhanteras-greeting::backdrop\s*\{/);
+  assert.doesNotMatch(css.match(/\.dhanteras-greeting\s*\{[^}]*\}/)[0], /position:|display:/, "keeps the dialog's own centring and hiding");
   const start = script.indexOf("  function initDhanterasGreeting(");
   assert.ok(start > 0, "expected initDhanterasGreeting");
   const source = script.slice(start, script.indexOf("\n  }\n", start) + 4);
-  const shownAt = (iso) => {
-    const greeting = { hidden: true };
-    const context = { document: { getElementById: (id) => (id === "dhanteras-greeting" ? greeting : null) }, Date };
+  const run = (iso, { seen = false, otherOpen = false } = {}) => {
+    const listeners = {};
+    const stored = {};
+    if (seen) stored["saloni-dhanteras-2026"] = "1";
+    const greeting = {
+      open: false,
+      showModal() { this.open = true; },
+      close() { this.open = false; (listeners.close || []).forEach((fn) => fn()); },
+      addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); }
+    };
+    const context = {
+      window: { localStorage: { getItem: (k) => stored[k] || null, setItem: (k, v) => { stored[k] = v; } } },
+      document: {
+        getElementById: (id) => (id === "dhanteras-greeting" ? greeting : null),
+        querySelector: (sel) => (sel === "dialog[open]" && otherOpen ? {} : null)
+      },
+      Date
+    };
     vm.createContext(context);
     vm.runInContext(`${source}\ninitDhanterasGreeting(${Date.parse(iso)});`, context);
-    return !greeting.hidden;
+    return { greeting, listeners, stored };
   };
-  assert.equal(shownAt("2026-11-04T18:29:00Z"), false, "23:59 on 4 Nov in India");
-  assert.equal(shownAt("2026-11-04T18:31:00Z"), true, "00:01 on 5 Nov in India");
-  assert.equal(shownAt("2026-11-06T09:00:00Z"), true, "Dhanteras");
-  assert.equal(shownAt("2026-11-07T18:29:00Z"), true, "23:59 on 7 Nov in India");
-  assert.equal(shownAt("2026-11-07T18:31:00Z"), false, "00:01 on 8 Nov in India");
+  assert.equal(run("2026-11-04T18:29:00Z").greeting.open, false, "23:59 on 4 Nov in India");
+  assert.equal(run("2026-11-04T18:31:00Z").greeting.open, true, "00:01 on 5 Nov in India");
+  assert.equal(run("2026-11-07T18:29:00Z").greeting.open, true, "23:59 on 7 Nov in India");
+  assert.equal(run("2026-11-07T18:31:00Z").greeting.open, false, "00:01 on 8 Nov in India");
+  assert.equal(run("2026-11-06T09:00:00Z", { seen: true }).greeting.open, false, "does not come back once seen");
+  assert.equal(run("2026-11-06T09:00:00Z", { otherOpen: true }).greeting.open, false, "never covers a photo or order window that is already open");
+  const shown = run("2026-11-06T09:00:00Z");
+  assert.equal(shown.stored["saloni-dhanteras-2026"], "1", "remembered as soon as it is shown");
+  const shopLink = { closest: (sel) => (sel === "[data-category-shortcut]" ? shopLink : null) };
+  shown.listeners.click.forEach((fn) => fn({ target: shopLink }));
+  assert.equal(shown.greeting.open, false, "Shop Diwali gifts closes the pop-up");
+  const again = run("2026-11-06T09:00:00Z");
+  again.listeners.click.forEach((fn) => fn({ target: again.greeting }));
+  assert.equal(again.greeting.open, false, "a tap outside the card closes it");
 });
