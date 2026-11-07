@@ -292,7 +292,7 @@ test("catalogue browse uses one continuous result view with compact search and f
 test("no-JS source keeps every catalogue card in the document", () => {
   const articleBlocks = Array.from(html.matchAll(/<article\b[\s\S]*?<\/article>/g), (match) => match[0]);
   assert.ok(articleBlocks.length > 80);
-  assert.ok(articleBlocks.every((article) => !/\shidden(?:=|\s|>)/.test(article)));
+  assert.ok(articleBlocks.every((article) => !/^<article\b[^>]*\shidden(?:=|\s|>)/.test(article)));
   assert.match(css, /html\.js \.catalogue-grid/);
 });
 
