@@ -90,6 +90,7 @@ Optional: in the Sheet, **Tools → Notification settings → Any changes** send
 - Spam flood: set `REVIEWS_DISABLED=true` (the page then shows reviews but no form), then set the spam rows to `Hidden`.
 - The 90-day order retention never touches the `Reviews` tab or the review photo folder. Reviews stay until you remove them.
 - Photos of a `Published` review are public by link (`anyone with the link`); the folder itself stays private.
+- Never delete a review row (use `Hidden` or `Removed`), and never move review photos out of the review folder or change `REVIEW_PHOTOS_FOLDER_ID`: the edit trigger only acts on files inside that folder, so a moved photo would stay public by link.
 
 ### Rollback
 
