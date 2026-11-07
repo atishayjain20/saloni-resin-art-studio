@@ -105,7 +105,7 @@ function createStorage(initial = {}) {
   };
 }
 
-function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "" } = {}) {
+function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "", diwaliOffer = false } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
@@ -364,6 +364,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     clearTimeout() {},
     grecaptcha: { ready(callback) { callback(); }, execute() { return Promise.resolve("parent-token"); } },
   };
+  if (diwaliOffer) elements.set("diwali-offer-bar", { id: "diwali-offer-bar", hidden: false });
   const documentObject = {
     documentElement: { classList: { add() {} } },
     body,
@@ -978,6 +979,22 @@ test("cart shows each line price and a live estimated total that follows quantit
   assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹999 + shipping");
   flow.generatedCatalogueButtons[2].dispatch("click");
   assert.equal(flow.catalogueSelectionTotal.textContent, "");
+});
+
+test("while the Diwali offer strip shows, the cart takes the lowest-priced gift of every three off and ships free", () => {
+  const flow = runFlow({ diwaliOffer: true });
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹249 + free shipping (Diwali offer: buy 2, get 1 free)");
+  flow.generatedCatalogueButtons[2].dispatch("click");
+  const quantity = flow.catalogueSelectionItems.children[0].querySelector("input");
+  quantity.value = "2"; quantity.dispatch("change");
+  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹1,248 + free shipping (Diwali offer: ₹249 off, buy 2 get 1 free)");
+  assert.match(whatsappText(flow), /Estimated total: ₹1,248 \+ free shipping \(Diwali offer: ₹249 off, buy 2 get 1 free\)/);
+  quantity.value = "6"; quantity.dispatch("change");
+  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹1,995 + free shipping (Diwali offer: ₹498 off, buy 2 get 1 free)");
+  const plain = runFlow();
+  plain.catalogueButton.dispatch("click");
+  assert.equal(plain.catalogueSelectionTotal.textContent, "Estimated total: ₹249 + shipping", "no offer when the strip is not showing");
 });
 
 test("cart marks price ranges as from-prices and keeps price-on-request items out of the sum", () => {
