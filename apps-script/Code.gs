@@ -60,6 +60,7 @@ var REVIEWS_TAB_NAME = "Reviews";
 var REVIEWS_READY_PROPERTY = "REVIEWS_CONFIGURED";
 var REVIEWS_CACHE_KEY = "reviews-public-v1";
 var REVIEW_PRODUCTS_CACHE_KEY = "review-products-v1";
+var REVIEW_PRODUCTS_FAILED_KEY = "review-products-failed-v1";
 var REVIEW_STATUSES = ["Published", "Hidden", "Removed"];
 var REVIEW_HEADERS = [
   "Review ID", "Received at", "Status", "Rating", "Product ID", "Product name", "First name", "City",
@@ -1038,8 +1039,8 @@ function decodeReviewPhotos_(photos) {
   return { error: "", items: items };
 }
 
-// Walks the JPEG header segments up to the scan. Exif and XMP (APP1) can hold GPS and
-// camera data; a structure that cannot be read to the scan is treated as unsafe.
+// Walks the JPEG header segments up to the scan. Exif and XMP (APP1), Photoshop (APP13) and
+// comment segments can hold GPS, camera or free text; a structure that cannot be read to the scan is treated as unsafe.
 function jpegHasMetadata_(bytes) {
   function at(position) { return (bytes[position] + 256) % 256; }
   var offset = 2;
@@ -1051,10 +1052,11 @@ function jpegHasMetadata_(bytes) {
     if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) { offset += 2; continue; }
     var segmentLength = at(offset + 2) * 256 + at(offset + 3);
     if (segmentLength < 2 || offset + 2 + segmentLength > bytes.length) return true;
+    if (marker === 0xed || marker === 0xfe) return true;
     if (marker === 0xe1) {
       var label = "";
       for (var position = offset + 4; position < offset + 2 + segmentLength && position < offset + 4 + 28; position += 1) label += String.fromCharCode(at(position));
-      if (label.indexOf("Exif") === 0 || label.indexOf("http://ns.adobe.com/xap") === 0) return true;
+      if (label.indexOf("Exif") === 0 || label.indexOf("http://ns.adobe.com/xap") === 0 || label.indexOf("http://ns.adobe.com/xmp/") === 0) return true;
     }
     offset += 2 + segmentLength;
   }
@@ -1073,15 +1075,18 @@ function reviewProducts_() {
   try {
     var cached = cache.get(REVIEW_PRODUCTS_CACHE_KEY);
     if (cached) return JSON.parse(cached);
+    // A recent failure is remembered briefly so a broken list costs one fetch a minute, not one per request.
+    if (cache.get(REVIEW_PRODUCTS_FAILED_KEY)) return null;
   } catch (cacheError) { /* fall through to a fresh fetch */ }
   var products = null;
   try {
     var response = UrlFetchApp.fetch(REVIEW_PRODUCTS_URL, { muteHttpExceptions: true });
     if (response.getResponseCode() === 200) products = parseReviewProducts_(response.getContentText());
   } catch (fetchError) { products = null; }
-  if (products) {
-    try { cache.put(REVIEW_PRODUCTS_CACHE_KEY, JSON.stringify(products), 21600); } catch (putError) { /* the list is still usable */ }
-  }
+  try {
+    if (products) cache.put(REVIEW_PRODUCTS_CACHE_KEY, JSON.stringify(products), 21600);
+    else cache.put(REVIEW_PRODUCTS_FAILED_KEY, "1", 60);
+  } catch (putError) { /* the result is still used for this request */ }
   return products;
 }
 
@@ -1274,6 +1279,8 @@ function onReviewsSheetEdit_(event) {
   var lastRow = range.getLastRow();
   if (lastRow < firstRow || range.getColumn() > statusColumn || range.getLastColumn() < statusColumn) return;
   var photoColumn = REVIEW_HEADERS.indexOf("Photo file IDs") + 1;
+  var folderId = reviewsConfig_(PropertiesService.getScriptProperties());
+  folderId = folderId ? folderId.folderId : "";
   var rows = sheet.getRange(firstRow, 1, lastRow - firstRow + 1, REVIEW_HEADERS.length).getValues();
   var errors = 0;
   rows.forEach(function (row, offset) {
@@ -1283,7 +1290,10 @@ function onReviewsSheetEdit_(event) {
     if (status === "Removed") {
       var remaining = [];
       ids.forEach(function (id) {
-        try { permanentlyDeleteFile_(DriveApp.getFileById(id)); } catch (deleteError) { remaining.push(id); errors += 1; }
+        try {
+          var file = reviewPhotoFile_(id, folderId);
+          if (file) permanentlyDeleteFile_(file); else remaining.push(id);
+        } catch (deleteError) { remaining.push(id); errors += 1; }
       });
       sheet.getRange(firstRow + offset, photoColumn).setValue(remaining.join(","));
       return;
@@ -1291,11 +1301,23 @@ function onReviewsSheetEdit_(event) {
     var visible = status === "Published";
     ids.forEach(function (id) {
       try {
-        DriveApp.getFileById(id).setSharing(visible ? DriveApp.Access.ANYONE_WITH_LINK : DriveApp.Access.PRIVATE, visible ? DriveApp.Permission.VIEW : DriveApp.Permission.NONE);
+        var photoFile = reviewPhotoFile_(id, folderId);
+        if (photoFile) photoFile.setSharing(visible ? DriveApp.Access.ANYONE_WITH_LINK : DriveApp.Access.PRIVATE, visible ? DriveApp.Permission.VIEW : DriveApp.Permission.NONE);
       } catch (sharingError) { errors += 1; }
     });
   });
   if (errors) throw new Error("Review photo update failed.");
+}
+
+// A Sheet cell can be edited by hand, so an ID is acted on only when the file really sits in the review photo folder.
+function reviewPhotoFile_(id, folderId) {
+  if (!folderId) return null;
+  var file = DriveApp.getFileById(id);
+  var parents = file.getParents();
+  while (parents.hasNext()) {
+    if (parents.next().getId() === folderId) return file;
+  }
+  return null;
 }
 
 function setupReviews() {
@@ -1317,12 +1339,41 @@ function setupReviews() {
     if (!sheet) throw new Error("Reviews sheet tab is not configured.");
     ensureReviewsTabSchema_(sheet);
     var statusRule = SpreadsheetApp.newDataValidation().requireValueInList(REVIEW_STATUSES, true).setAllowInvalid(false).build();
-    sheet.getRange(2, REVIEW_HEADERS.indexOf("Status") + 1, Math.max(sheet.getMaxRows() - 1, 1), 1).setDataValidation(statusRule);
-    if (!protectRange_(sheet, 1, REVIEW_HEADERS.length, "Customer reviews: staff-only")) throw new Error("Unable to protect reviews sheet tab.");
+    var statusLetter = String.fromCharCode(64 + REVIEW_HEADERS.indexOf("Status") + 1);
+    sheet.getRange(statusLetter + "2:" + statusLetter).setDataValidation(statusRule);
+    if (!protectReviewsSheet_(sheet, "Customer reviews: staff-only")) throw new Error("Unable to protect reviews sheet tab.");
     installReviewsTrigger_(config.sheetId);
     properties.setProperty(REVIEWS_READY_PROPERTY, "true");
     return { tab: config.tabName, columns: REVIEW_HEADERS.length, trigger: true };
   } finally { lock.releaseLock(); }
+}
+
+// Whole-sheet protection, owner only, so rows added after setup are covered too.
+function protectReviewsSheet_(sheet, description) {
+  if (!sheet.protect) return false;
+  try {
+    var protection = null;
+    if (sheet.getProtections && SpreadsheetApp.ProtectionType && SpreadsheetApp.ProtectionType.SHEET) {
+      var existing = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET) || [];
+      for (var index = 0; index < existing.length; index += 1) {
+        if (existing[index].getDescription && existing[index].getDescription() === description) { protection = existing[index]; break; }
+      }
+    }
+    if (!protection) protection = sheet.protect();
+    if (!protection || !protection.setWarningOnly || !protection.removeEditors || !protection.addEditor) return false;
+    protection.setWarningOnly(false);
+    var owner = Session.getEffectiveUser();
+    if (!owner || !owner.getEmail || !String(owner.getEmail() || "").trim()) return false;
+    var ownerEmail = String(owner.getEmail()).trim().toLowerCase();
+    var editors = protection.getEditors ? protection.getEditors().filter(function (editor) {
+      return !editor || !editor.getEmail || String(editor.getEmail() || "").trim().toLowerCase() !== ownerEmail;
+    }) : [];
+    if (editors.length) protection.removeEditors(editors);
+    protection.addEditor(owner);
+    if (protection.canDomainEdit && protection.canDomainEdit() && protection.setDomainEdit) protection.setDomainEdit(false);
+    if (protection.setDescription) protection.setDescription(description);
+    return true;
+  } catch (error) { return false; }
 }
 
 function installReviewsTrigger_(sheetId) {

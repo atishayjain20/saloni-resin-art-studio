@@ -40,7 +40,7 @@ class FakeRange {
     return this;
   }
   setValue(value) { return this.setValues([[value]]); }
-  setDataValidation(rule) { this.sheet.validations.push({ row: this.row, column: this.column, rule }); return this; }
+  setDataValidation(rule) { this.sheet.validations.push({ row: this.row, column: this.column, a1: this.a1, rule }); return this; }
   protect() {
     if (this.sheet.options.protectFailure) throw new Error("protection failed");
     const protection = { description: "", warningOnly: true, getDescription() { return this.description; }, setRange() {}, setWarningOnly(value) { this.warningOnly = value; }, getEditors: () => [], removeEditors() {}, addEditor() {}, canDomainEdit: () => false, setDescription(value) { this.description = value; } };
@@ -56,7 +56,21 @@ class FakeSheet {
   getLastColumn() { return this.data.reduce((max, row) => Math.max(max, row.length), 0); }
   getMaxRows() { return 100; }
   getProtections() { return this.protections; }
-  getRange(row, column, rows = 1, columns = 1) { return new FakeRange(this, row, column, rows, columns); }
+  getRange(row, column, rows = 1, columns = 1) {
+    if (typeof row === "string") {
+      const match = /^([A-Z])(\d+):([A-Z])$/.exec(row);
+      const range = new FakeRange(this, Number(match[2]), match[1].charCodeAt(0) - 64, this.getMaxRows() - Number(match[2]) + 1, 1);
+      range.a1 = row;
+      return range;
+    }
+    return new FakeRange(this, row, column, rows, columns);
+  }
+  protect() {
+    if (this.options.protectFailure) throw new Error("protection failed");
+    const protection = { sheetLevel: true, description: "", warningOnly: true, getDescription() { return this.description; }, setWarningOnly(value) { this.warningOnly = value; }, getEditors: () => [], removeEditors() {}, addEditor() {}, canDomainEdit: () => false, setDescription(value) { this.description = value; } };
+    this.protections.push(protection);
+    return protection;
+  }
   getDataRange() {
     this.state.dataReads += 1;
     if (this.options.readThrows) throw new Error("sheet read failed");
@@ -73,7 +87,7 @@ class FakeSheet {
 
 function makeRuntime(options = {}) {
   const state = {
-    appendCalls: 0, dataReads: 0, captchaCalls: 0, productFetches: 0, files: [], removed: [], cache: new Map(), cachePuts: 0, cacheRemoves: [],
+    appendCalls: 0, dataReads: 0, captchaCalls: 0, productFetches: 0, files: [], removed: [], cache: new Map(), cachePuts: 0, cacheTtls: {}, cacheRemoves: [],
     triggers: [], triggerCreates: 0, rowDeletes: [], lockCalls: 0, released: 0, templateName: "", template: null, createFileCalls: 0,
     captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "review_submission", score: 0.9 },
   };
@@ -91,10 +105,12 @@ function makeRuntime(options = {}) {
   };
   const fileById = {};
   (options.existingFiles || []).forEach((id) => { fileById[id] = makeFile(id, "existing.jpg", "review-folder"); });
+  (options.foreignFiles || []).forEach((id) => { fileById[id] = makeFile(id, "private-order.jpg", "order-folder"); });
   function makeFile(id, name, folderId) {
     const file = {
       id, name, folderId, sharing: ["ANYONE_WITH_LINK", "VIEW"], trashed: false,
       getId() { return this.id; }, getName() { return this.name; },
+      getParents() { const parents = [{ getId: () => folderId }]; let index = 0; return { hasNext: () => index < parents.length, next: () => parents[index++] }; },
       setSharing(access, permission) { if (options.sharingFailure) throw new Error("sharing failed"); this.sharing = [access, permission]; return this; },
       setTrashed(value) { if (options.trashThrows) throw new Error("trash failed"); this.trashed = value; return this; },
     };
@@ -134,7 +150,7 @@ function makeRuntime(options = {}) {
     PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => properties[key] || "", setProperty: (key, value) => { properties[key] = value; } }) },
     LockService: { getScriptLock: () => ({ tryLock: () => { state.lockCalls += 1; return options.lockAvailable !== false; }, releaseLock: () => { state.released += 1; } }) },
     SpreadsheetApp: {
-      ProtectionType: { RANGE: "RANGE" },
+      ProtectionType: { RANGE: "RANGE", SHEET: "SHEET" },
       openById: () => spreadsheet,
       newDataValidation: () => {
         const rule = {};
@@ -150,7 +166,7 @@ function makeRuntime(options = {}) {
     Drive: { Files: { remove: (id) => { state.removed.push(id); if (options.removeThrows) throw new Error("remove failed"); } } },
     CacheService: { getScriptCache: () => ({
       get: (key) => (state.cache.has(key) ? state.cache.get(key) : null),
-      put: (key, value) => { state.cachePuts += 1; state.cache.set(key, value); },
+      put: (key, value, ttl) => { state.cachePuts += 1; state.cacheTtls[key] = ttl; state.cache.set(key, value); },
       remove: (key) => { state.cacheRemoves.push(key); state.cache.delete(key); },
     }) },
     ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, mime: "", setMimeType(mime) { this.mime = mime; return this; }, getContent() { return this.text; } }) },
@@ -191,10 +207,11 @@ function makeRuntime(options = {}) {
   return { context, state, sheet: reviewsSheet, sheets, rows: reviewsSheet.data, properties, fileById, makeFile };
 }
 
-function makeJpeg({ app1, size } = {}) {
+function makeJpeg({ app1, size, extra = [] } = {}) {
   const segment = (marker, payload) => Buffer.concat([Buffer.from([0xff, marker, (payload.length + 2) >> 8, (payload.length + 2) & 255]), payload]);
   const head = [Buffer.from([0xff, 0xd8]), segment(0xe0, Buffer.from("JFIF\0\x01\x01\0\0\x01\0\x01\0\0", "latin1"))];
   if (app1) head.push(segment(0xe1, Buffer.from(app1, "latin1")));
+  extra.forEach(([marker, payload]) => head.push(segment(marker, Buffer.isBuffer(payload) ? payload : Buffer.from(payload, "latin1"))));
   head.push(segment(0xda, Buffer.from([1, 1, 0, 0, 63, 0])));
   const tail = Buffer.from([0xff, 0xd9]);
   const fixed = Buffer.concat(head).length + tail.length;
@@ -736,13 +753,18 @@ function makeFormRuntime(options = {}) {
   };
   const imageBehaviour = options.image || { width: 4000, height: 3000 };
   class FakeImage {
-    set src(value) { this._src = value; if (imageBehaviour.fail) this.onerror(); else { this.naturalWidth = imageBehaviour.width; this.naturalHeight = imageBehaviour.height; this.onload(); } }
+    set src(value) {
+      this._src = value;
+      const finish = () => { if (imageBehaviour.fail) this.onerror(); else { this.naturalWidth = imageBehaviour.width; this.naturalHeight = imageBehaviour.height; this.onload(); } };
+      if (imageBehaviour.defer) pendingImages.push(finish); else finish();
+    }
   }
-  const base64Of = (bytes) => "A".repeat(Math.ceil(bytes / 3) * 4);
   const encoder = options.encoder || ((quality) => (quality > 0.7 ? 1500000 : 800000));
+  const pendingImages = [];
   const windowObject = {
     crypto: { randomUUID: (() => { let count = 0; return () => "review-attempt-" + (++count) + "-abcdef"; })() },
     MessageChannel: FormChannel, Image: FakeImage,
+    atob: (text) => Buffer.from(text, "base64").toString("binary"), btoa: (text) => Buffer.from(text, "binary").toString("base64"),
     URL: { createObjectURL: () => "blob:original-photo", revokeObjectURL: (url) => revoked.push(url) },
     setTimeout(callback) { timers.push(callback); return timers.length; }, clearTimeout() {},
     top: { postMessage(message, targetOrigin, ports) { parentMessages.push({ message, targetOrigin, port: ports && ports[0] }); } },
@@ -759,7 +781,8 @@ function makeFormRuntime(options = {}) {
           element.toDataURL = (type, quality) => {
             if (options.toDataUrlThrows) throw new Error("tainted");
             element.qualities.push(quality);
-            return (options.notJpeg ? "data:image/png;base64," : "data:image/jpeg;base64,") + base64Of(encoder(quality));
+            if (options.dataUrl) return options.dataUrl(quality);
+            return (options.notJpeg ? "data:image/png;base64," : "data:image/jpeg;base64,") + makeJpeg({ size: Math.max(encoder(quality), 200) }).toString("base64");
           };
         }
       }
@@ -769,7 +792,7 @@ function makeFormRuntime(options = {}) {
   const context = { console, document: documentObject, window: windowObject, google: { script: { run } }, Math, JSON, Date, Array, Object, String, Number, Boolean, RegExp };
   vm.createContext(context);
   vm.runInContext(sourceScript, context, { filename: "ReviewForm.html" });
-  return { elements, fields, form, fieldsets, status, timers, submissions, callbacks, parentMessages, canvases, revoked, previews: elements.get("photo-previews"), fileInput: elements.get("review-photos"), errors };
+  return { imageBehaviour, pendingImages, elements, fields, form, fieldsets, status, timers, submissions, callbacks, parentMessages, canvases, revoked, previews: elements.get("photo-previews"), fileInput: elements.get("review-photos"), errors };
 }
 
 function fillReviewForm(runtime, overrides = {}) {
@@ -968,7 +991,7 @@ test("photos are redrawn on a white canvas, shrunk until at most 1 MB, and the o
   respondReviewCaptcha(runtime, 0);
   const sent = runtime.submissions[0];
   assert.equal(sent.photos.length, 2);
-  sent.photos.forEach((item) => { assert.equal(item.type, "image/jpeg"); assert.match(item.data, /^A+$/); assert.equal(item.data.length, Math.ceil(800000 / 3) * 4); });
+  sent.photos.forEach((item) => { assert.equal(item.type, "image/jpeg"); assert.equal(item.data, makeJpeg({ size: 800000 }).toString("base64")); });
   assert.doesNotMatch(JSON.stringify(sent), /blob:|IMG_0001|shot\.png/);
   const small = makeFormRuntime({ image: { width: 800, height: 600 }, encoder: () => 90000 });
   addPhotos(small, [jpegFile()]);
@@ -1283,4 +1306,160 @@ test("the Reviews page keeps the other form modes and the page chrome untouched"
   assert.match(siteScript, /requestedMode === "partner" \|\| requestedMode === "corporate" \|\| requestedMode === "review"/);
   assert.match(siteScript, /frameState\.mode === "review" \? "review_submission"/);
   assert.doesNotThrow(() => new vm.Script(siteScript));
+});
+
+// ---- review fixes: WebKit canvas output, server hardening, form generation counter ----
+const WEBKIT_JPEG = fs.readFileSync(path.join(__dirname, "fixtures", "webkit-canvas-jpeg.b64"), "utf8").trim();
+const signedBytes = (buffer) => Array.from(buffer).map((byte) => (byte > 127 ? byte - 256 : byte));
+const markersOf = (buffer) => {
+  const found = [];
+  let offset = 2;
+  while (offset + 3 < buffer.length) {
+    const marker = buffer[offset + 1];
+    found.push(marker);
+    if (marker === 0xda || marker === 0xd9) break;
+    offset += 2 + buffer[offset + 2] * 256 + buffer[offset + 3];
+  }
+  return found;
+};
+
+test("B1: the real WebKit canvas JPEG (Exif and Photoshop blocks) is stripped by the form and accepted by the server", () => {
+  const original = Buffer.from(WEBKIT_JPEG, "base64");
+  assert.ok(markersOf(original).includes(0xe1) && markersOf(original).includes(0xed), "fixture is real WebKit output");
+  const server = makeRuntime();
+  assert.equal(server.context.jpegHasMetadata_(signedBytes(original)), true, "the server stays strict");
+  const runtime = makeFormRuntime({ dataUrl: () => "data:image/jpeg;base64," + WEBKIT_JPEG });
+  addPhotos(runtime, [jpegFile()]);
+  assert.equal(runtime.previews.children.length, 1);
+  assert.equal(runtime.errors.length, 0);
+  fillReviewForm(runtime);
+  runtime.form.dispatch("submit", { preventDefault() {} });
+  respondReviewCaptcha(runtime, 0);
+  const sent = Buffer.from(runtime.submissions[0].photos[0].data, "base64");
+  const markers = markersOf(sent);
+  assert.deepEqual(markers.filter((marker) => marker >= 0xe1 && marker <= 0xef || marker === 0xfe), []);
+  assert.ok(markers.includes(0xe0), "JFIF is kept");
+  assert.ok(markers.includes(0xdb) && markers.includes(0xc0) && markers.includes(0xc4) && markers.includes(0xda), "image segments are kept");
+  assert.equal(sent.length, original.length - 76 - 56 - 4 + 0, "only the APP1 and APP13 segments (with their markers) were removed");
+  assert.equal(server.context.jpegHasMetadata_(signedBytes(sent)), false);
+  const accepted = server.context.submitReview(validForm({ photos: [{ type: "image/jpeg", data: runtime.submissions[0].photos[0].data }] }));
+  assert.equal(accepted.ok, true);
+});
+
+test("B1: the form drops APP1 to APP15 and COM segments, keeps the others, and measures the stripped size", () => {
+  const extra = [[0xe2, "ICC_PROFILE\0abc"], [0xe1, Buffer.alloc(60000, 0x41)], [0xe1, Buffer.alloc(60000, 0x42)], [0xed, "Photoshop 3.0\0"], [0xee, "Adobe"], [0xef, "x"], [0xfe, "a comment with a secret"], [0xdb, Buffer.alloc(10, 1)]];
+  const noisy = makeJpeg({ extra, size: 1024 * 1024 + 70000 });
+  assert.ok(noisy.length > 1024 * 1024, "raw bytes are over 1 MB");
+  const runtime = makeFormRuntime({ dataUrl: () => "data:image/jpeg;base64," + noisy.toString("base64") });
+  addPhotos(runtime, [jpegFile()]);
+  assert.equal(runtime.canvases[0].qualities.length, 1, "the stripped size fits, so the first quality is used");
+  fillReviewForm(runtime);
+  runtime.form.dispatch("submit", { preventDefault() {} });
+  respondReviewCaptcha(runtime, 0);
+  const sent = Buffer.from(runtime.submissions[0].photos[0].data, "base64");
+  assert.deepEqual(markersOf(sent).filter((marker) => marker !== 0xdb && marker !== 0xe0 && marker !== 0xda), [], "no APPn beyond APP0 or COM is left");
+  assert.ok(markersOf(sent).includes(0xe0) && markersOf(sent).filter((marker) => marker === 0xdb).length === 1);
+  assert.ok(sent.length <= 1024 * 1024);
+  assert.equal(sent.indexOf(Buffer.from("secret")), -1);
+  const tooBig = makeFormRuntime({ dataUrl: () => "data:image/jpeg;base64," + makeJpeg({ size: 1024 * 1024 + 5 }).toString("base64") });
+  addPhotos(tooBig, [jpegFile()]);
+  assert.equal(tooBig.canvases[0].qualities.length, 3);
+  assert.equal(tooBig.previews.children.length, 0);
+  const garbage = makeFormRuntime({ dataUrl: () => "data:image/jpeg;base64," + Buffer.from("not a jpeg at all").toString("base64") });
+  addPhotos(garbage, [jpegFile()]);
+  assert.ok(garbage.errors.some((error) => error.id === "photos-error"));
+  const truncated = makeFormRuntime({ dataUrl: () => "data:image/jpeg;base64," + Buffer.from([0xff, 0xd8, 0xff, 0xe1, 0xff, 0xff, 1, 2]).toString("base64") });
+  addPhotos(truncated, [jpegFile()]);
+  assert.ok(truncated.errors.some((error) => error.id === "photos-error"));
+});
+
+test("H4: the server also rejects APP13, COM and extended XMP segments", () => {
+  const runtime = makeRuntime();
+  const has = (options) => runtime.context.jpegHasMetadata_(signedBytes(makeJpeg(options)));
+  assert.equal(has({}), false);
+  assert.equal(has({ extra: [[0xe2, "ICC_PROFILE\0abc"]] }), false, "other segments are not the server's business");
+  assert.equal(has({ extra: [[0xed, "Photoshop 3.0\0"]] }), true);
+  assert.equal(has({ extra: [[0xfe, "hello"]] }), true);
+  assert.equal(has({ extra: [[0xe1, "http://ns.adobe.com/xmp/extension/\0abcdef"]] }), true);
+  assert.equal(has({ extra: [[0xe1, "http://ns.adobe.com/xap/1.0/\0<x/>"]] }), true);
+  for (const extra of [[0xed, "Photoshop 3.0\0"], [0xfe, "hello"], [0xe1, "http://ns.adobe.com/xmp/extension/\0abcdef"]]) {
+    const result = makeRuntime().context.submitReview(validForm({ photos: [photo(makeJpeg({ extra: [extra] }))] }));
+    assert.ok(result.errors && result.errors.photos);
+  }
+});
+
+test("H1: the edit trigger only touches files that live in the review photo folder", () => {
+  const rows = [reviewRow({ id: "review-edit-0000010", status: "Hidden", photos: FILE_A + "," + FILE_B })];
+  const hidden = makeRuntime({ rows, existingFiles: [FILE_A], foreignFiles: [FILE_B] });
+  hidden.context.onReviewsSheetEdit_({ range: hidden.sheet.getRange(2, 3) });
+  assert.deepEqual(hidden.fileById[FILE_A].sharing, ["PRIVATE", "NONE"]);
+  assert.deepEqual(hidden.fileById[FILE_B].sharing, ["ANYONE_WITH_LINK", "VIEW"], "a foreign file is never re-shared or made private");
+  const published = makeRuntime({ rows: [reviewRow({ id: "review-edit-0000011", status: "Published", photos: FILE_B })], foreignFiles: [FILE_B] });
+  published.fileById[FILE_B].sharing = ["PRIVATE", "NONE"];
+  published.context.onReviewsSheetEdit_({ range: published.sheet.getRange(2, 3) });
+  assert.deepEqual(published.fileById[FILE_B].sharing, ["PRIVATE", "NONE"], "a foreign file is never made public");
+  const removed = makeRuntime({ rows: [reviewRow({ id: "review-edit-0000012", status: "Removed", photos: FILE_A + "," + FILE_B })], existingFiles: [FILE_A], foreignFiles: [FILE_B] });
+  removed.context.onReviewsSheetEdit_({ range: removed.sheet.getRange(2, 3) });
+  assert.deepEqual(plain(removed.state.removed), [FILE_A], "a foreign file is never deleted");
+  assert.equal(removed.rows[1][9], FILE_B, "the skipped id is left in the cell");
+  const unset = makeRuntime({ rows: [reviewRow({ status: "Removed", photos: FILE_A })], existingFiles: [FILE_A], properties: { REVIEW_PHOTOS_FOLDER_ID: "" } });
+  unset.context.onReviewsSheetEdit_({ range: unset.sheet.getRange(2, 3) });
+  assert.deepEqual(unset.state.removed, [], "without a configured folder nothing can be verified, so nothing is deleted");
+  assert.equal(unset.rows[1][9], FILE_A);
+});
+
+test("H2: setup protects the whole sheet and validates the whole Status column", () => {
+  const runtime = makeRuntime({ noTab: true, activeEmail: "owner@example.com", effectiveEmail: "owner@example.com", properties: { REVIEWS_CONFIGURED: "" } });
+  runtime.context.setupReviews();
+  const sheet = runtime.sheets.Reviews;
+  assert.equal(sheet.protections.length, 1);
+  assert.equal(sheet.protections[0].sheetLevel, true, "sheet.protect() covers rows added later");
+  assert.equal(sheet.protections[0].warningOnly, false);
+  assert.equal(sheet.protections[0].getDescription(), "Customer reviews: staff-only");
+  assert.equal(sheet.validations.length, 1);
+  assert.equal(sheet.validations[0].column, 3);
+  assert.equal(sheet.validations[0].a1, "C2:C", "the dropdown covers every row below the header");
+  runtime.context.setupReviews();
+  assert.equal(sheet.protections.length, 1, "running setup twice keeps one protection");
+});
+
+test("H3: a failing product list is cached for 60 seconds so requests do not refetch it", () => {
+  const runtime = makeRuntime({ productsStatus: 500 });
+  const one = runtime.context.submitReview(validForm({ productId: "catalogue:a.jpg" }));
+  const two = runtime.context.submitReview(validForm({ productId: "catalogue:a.jpg" }));
+  assert.match(one.errors.productId, /unavailable/i);
+  assert.match(two.errors.productId, /unavailable/i);
+  assert.equal(runtime.state.productFetches, 1);
+  assert.equal(runtime.context.reviewProducts_(), null);
+  assert.equal(runtime.state.productFetches, 1);
+  assert.equal(runtime.state.cacheTtls["review-products-failed-v1"], 60);
+  runtime.state.cache.delete("review-products-failed-v1");
+  runtime.context.reviewProducts_();
+  assert.equal(runtime.state.productFetches, 2, "after the failure note expires the list is fetched again");
+  const good = makeRuntime();
+  good.context.reviewProducts_(); good.context.reviewProducts_();
+  assert.equal(good.state.productFetches, 1);
+  assert.equal(good.state.cache.has("review-products-failed-v1"), false);
+});
+
+test("R5: Write another review while photos are preparing cannot leak old photos or break the counter", () => {
+  const runtime = makeFormRuntime();
+  fillReviewForm(runtime);
+  addPhotos(runtime, [jpegFile()]);
+  runtime.form.dispatch("submit", { preventDefault() {} });
+  respondReviewCaptcha(runtime, 0);
+  runtime.callbacks[0].success({ ok: true });
+  runtime.imageBehaviour.defer = true;
+  addPhotos(runtime, [jpegFile(), jpegFile()]);
+  assert.equal(runtime.pendingImages.length, 1);
+  runtime.elements.get("another-button").dispatch("click");
+  runtime.imageBehaviour.defer = false;
+  runtime.pendingImages.splice(0).forEach((finish) => finish());
+  assert.equal(runtime.previews.children.length, 0, "stale callbacks add nothing to the new form");
+  assert.equal(runtime.pendingImages.length, 0, "and the stale chain does not start the next photo");
+  addPhotos(runtime, [jpegFile(), jpegFile(), jpegFile(), jpegFile()]);
+  assert.ok(runtime.errors.some((error) => error.id === "photos-error" && /up to 3 photos/.test(error.textContent)), "the counter is not negative");
+  assert.equal(runtime.previews.children.length, 0);
+  addPhotos(runtime, [jpegFile(), jpegFile(), jpegFile()]);
+  assert.equal(runtime.previews.children.length, 3);
 });
