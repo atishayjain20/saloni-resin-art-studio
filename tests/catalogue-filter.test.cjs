@@ -754,6 +754,30 @@ test("category tab bar marks the tab that matches the applied catalogue type", (
   assert.deepEqual(harness.currentTabs(), ["all"]);
 });
 
+test("in Bestsellers and All the tab follows the section on screen; a chosen category keeps its own tab", () => {
+  const harness = createHarness({ count: 91, includePremium: true, withTabs: true });
+  // Sections stacked 1000px tall; top is where the first one starts on screen.
+  const place = (top) => {
+    harness.sections.forEach((section, index) => { section.getBoundingClientRect = () => ({ top: top + index * 1000, bottom: top + (index + 1) * 1000 }); });
+    harness.windowObject.listeners.scroll();
+  };
+  place(500);
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"], "above the first section");
+  place(-100);
+  assert.deepEqual(harness.currentTabs(), ["diwali"]);
+  place(-1100);
+  assert.deepEqual(harness.currentTabs(), ["couple"]);
+  place(-3100);
+  assert.deepEqual(harness.currentTabs(), ["bestsellers"], "resin art has no tab, so the view's own tab shows");
+  assert.equal(harness.typeFilter.value, "bestsellers", "scrolling never changes the chosen view");
+  harness.tabs.all.dispatch("click");
+  place(-2100);
+  assert.deepEqual(harness.currentTabs(), ["corporate"]);
+  harness.tabs.premium.dispatch("click");
+  place(-100);
+  assert.deepEqual(harness.currentTabs(), ["premium"], "a chosen category keeps its tab while scrolling");
+});
+
 test("the frames shortcut leaves every category tab unmarked", () => {
   const harness = createHarness({ withTabs: true });
   harness.framesShortcut.dispatch("click");
