@@ -819,13 +819,41 @@
       });
     }
 
+    // In Bestsellers and All, the type of the section under the sticky header; "" above the first section.
+    function typeOnScreen() {
+      if (appliedType !== "bestsellers" && appliedType !== "all") return "";
+      var header = document.querySelector ? document.querySelector(".site-header") : null;
+      var line = (header ? header.getBoundingClientRect().bottom : 0) + 8;
+      var found = "";
+      sections.forEach(function (section) {
+        if (section.hidden || typeof section.getBoundingClientRect !== "function") return;
+        var box = section.getBoundingClientRect();
+        if (box.top <= line && box.bottom > line) found = typeFor(cardsForSection(section)[0]);
+      });
+      return found;
+    }
+
+    var currentTab = null;
+
     function syncCategoryTabs() {
       if (!categoryTabs || typeof categoryTabs.forEach !== "function") return;
+      var onScreen = typeOnScreen();
+      var hasTab = Array.prototype.some.call(categoryTabs, function (tab) { return tab.getAttribute("data-category-tab") === onScreen; });
+      var current = hasTab ? onScreen : appliedType;
       categoryTabs.forEach(function (tab) {
-        if (tab.getAttribute("data-category-tab") === appliedType) tab.setAttribute("aria-current", "true");
-        else if (typeof tab.removeAttribute === "function") tab.removeAttribute("aria-current");
+        if (tab.getAttribute("data-category-tab") !== current) {
+          if (typeof tab.removeAttribute === "function") tab.removeAttribute("aria-current");
+          return;
+        }
+        tab.setAttribute("aria-current", "true");
+        // Bring a newly marked tab into view in the sideways-scrolling tab bar.
+        var list = tab.parentNode;
+        if (tab !== currentTab && list && typeof list.scrollTo === "function") list.scrollTo({ left: tab.offsetLeft - (list.clientWidth - tab.offsetWidth) / 2, behavior: "smooth" });
+        currentTab = tab;
       });
     }
+
+    window.addEventListener("scroll", syncCategoryTabs, { passive: true });
 
     function applyFilters() {
       var matchingCards = catalogueCards();
