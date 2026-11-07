@@ -981,7 +981,7 @@ test("cart shows each line price and a live estimated total that follows quantit
   assert.equal(flow.catalogueSelectionTotal.textContent, "");
 });
 
-test("while the Diwali offer strip shows, the cart takes the lowest-priced gift of every three off and ships free", () => {
+test("while the Diwali offer strip shows, one gift in every three is free, always the lowest-priced, and shipping is free", () => {
   const flow = runFlow({ diwaliOffer: true });
   flow.catalogueButton.dispatch("click");
   assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹249 + free shipping (Diwali offer: buy 2, get 1 free)");
@@ -992,6 +992,14 @@ test("while the Diwali offer strip shows, the cart takes the lowest-priced gift 
   assert.match(whatsappText(flow), /Estimated total: ₹1,248 \+ free shipping \(Diwali offer: ₹249 off, buy 2 get 1 free\)/);
   quantity.value = "6"; quantity.dispatch("change");
   assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹1,995 + free shipping (Diwali offer: ₹498 off, buy 2 get 1 free)");
+  const mixed = runFlow({ diwaliOffer: true });
+  mixed.catalogueButton.dispatch("click");
+  mixed.generatedCatalogueButtons[2].dispatch("click");
+  const small = mixed.catalogueSelectionItems.children[0].querySelector("input");
+  small.value = "2"; small.dispatch("change");
+  const big = mixed.catalogueSelectionItems.children[1].querySelector("input");
+  big.value = "3"; big.dispatch("change");
+  assert.equal(mixed.catalogueSelectionTotal.textContent, "Estimated total: ₹3,246 + free shipping (Diwali offer: ₹249 off, buy 2 get 1 free)", "5 gifts: one free, and it is the lowest-priced one");
   const plain = runFlow();
   plain.catalogueButton.dispatch("click");
   assert.equal(plain.catalogueSelectionTotal.textContent, "Estimated total: ₹249 + shipping", "no offer when the strip is not showing");
