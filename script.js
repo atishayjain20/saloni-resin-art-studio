@@ -1964,8 +1964,8 @@
       var rest = priced < items.length ? " (plus price-on-request items)" : "";
       var offerBar = document.getElementById("diwali-offer-bar");
       if (!offerBar || offerBar.hidden) return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum) + " + shipping" + rest;
-      // Diwali buy 2, get 1 free: in every three gifts, from the highest price down, the third is free.
-      var free = units.sort(function (a, b) { return b - a; }).reduce(function (total, amount, index) { return index % 3 === 2 ? total + amount : total; }, 0);
+      // Diwali buy 2, get 1 free: one gift free for every three, and the free ones are the lowest-priced.
+      var free = units.sort(function (a, b) { return a - b; }).slice(0, Math.floor(units.length / 3)).reduce(function (total, amount) { return total + amount; }, 0);
       return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum - free) + " + free shipping (Diwali offer: " + (free ? formatRupees(free) + " off, buy 2 get 1 free)" : "buy 2, get 1 free)") + rest;
     }
 
