@@ -16,7 +16,7 @@ Open `http://localhost:8000` in a browser. Stop the server with `Ctrl-C`.
 
 ```sh
 python3 -m unittest discover -s tests -v
-node --test tests/customizer.test.cjs tests/apps-script.test.cjs tests/order-flow.test.cjs tests/form-flow.test.cjs tests/partner-referral.test.cjs
+node --test tests/customizer.test.cjs tests/apps-script.test.cjs tests/order-flow.test.cjs tests/form-flow.test.cjs tests/partner-referral.test.cjs tests/reviews.test.cjs
 node --check script.js
 node --check customizer.js
 git diff --check
@@ -38,7 +38,7 @@ If GitHub Pages fails after building the site artifact, merge a fresh commit int
 
 ## Google Sheet-only order requests
 
-The published page embeds the HTMLService order form in `apps-script/Form.html`, the Partner Circle page embeds `apps-script/PartnerForm.html`, and the Corporate Gifting page embeds `apps-script/CorporateForm.html`. These pages send a normal `POST` to the configured Apps Script `/exec` URL with `action=seed`, a bounded `mode`, and a JSON `seed`; they do not use Tally, email, payments, accounts, or cross-origin `fetch`. The Apps Script `doGet` and `doPost` handlers only render a bounded order, partner, or corporate template. `submitOrder`, `submitPartnerApplication`, and `submitCorporateEnquiry` are the public write paths, and corporate enquiries write only to the private `Corporate Enquiries` tab.
+The published page embeds the HTMLService order form in `apps-script/Form.html`, the Partner Circle page embeds `apps-script/PartnerForm.html`, the Corporate Gifting page embeds `apps-script/CorporateForm.html`, and the Reviews page embeds `apps-script/ReviewForm.html`. These pages send a normal `POST` to the configured Apps Script `/exec` URL with `action=seed`, a bounded `mode`, and a JSON `seed`; they do not use Tally, email, payments, accounts, or cross-origin `fetch`. The Apps Script `doGet` and `doPost` handlers only render a bounded order, partner, corporate, or review template, with one exception: `doGet?action=reviews` is the only public read endpoint and returns the allowlisted fields of `Published` customer reviews (see Customer reviews). `submitOrder`, `submitPartnerApplication`, `submitCorporateEnquiry`, and `submitReview` are the public write paths, and corporate enquiries write only to the private `Corporate Enquiries` tab.
 
 ### Production setup (studio owner)
 
@@ -62,6 +62,38 @@ Corporate enquiry rows contain only the stated business fields, consent, status,
 The Corporate Gifting page stays at `data-intake-ready="false"` while the published page is ahead of the unchanged production Apps Script. Deploy the compatible Apps Script, run `setupCorporateGifting()`, prove isolated embedded rendering/CAPTCHA/Sheet read-back, and only then flip the page flag to `true` in the same release. Until then, the page does not load an iframe or submit a seed and directs current large-order enquiries to Saloni's phone and Instagram.
 
 For rollback, pause the corporate page/intake with `CORPORATE_FORM_DISABLED=true` and keep a backend that can run the corporate 90-day retention cleanup while any corporate rows remain. Do **not** restore or deploy a backend that lacks corporate retention, and do not delete or overwrite the tab with an older Sheet copy. Keep the retention-capable backend until every corporate row has expired or been deliberately deleted, then re-run the setup/readiness check before re-enabling intake.
+
+## Customer reviews
+
+The Reviews page (`reviews/index.html`) lists customer reviews and, when the backend says intake is open, embeds `apps-script/ReviewForm.html`. A review is about the studio in general (`productId = "studio"`) or one catalogue product. Reviews go live with no pre-approval. Each review may carry up to 3 photos: the form shrinks every photo to a JPEG of at most 1 MB (originals up to 15 MB are accepted for shrinking), the server checks the JPEG signature, size, and that no Exif or XMP data remains, and files go to their own Drive folder.
+
+The product list is `reviews/products.json`. The server reads it from `https://saloniresinart.com/reviews/products.json` (cached 6 hours), so a new catalogue card needs a new entry in that file; `tests/test_site.py` prints the expected JSON when the file drifts from the cards in `index.html`.
+
+### Owner setup
+
+1. In Drive, create a new folder such as "Saloni review photos" and keep its sharing **Restricted**. Never reuse the order folder. Copy the folder ID.
+2. In **Project Settings → Script properties**, add `REVIEW_PHOTOS_FOLDER_ID=<folder id>` and `REVIEWS_DISABLED=true`. Optionally add `REVIEW_DAILY_ACCEPTANCE_CAP` (the code default is 20). Reviews reuse `ORDER_SHEET_ID` and the `CAPTCHA_*` properties; the reCAPTCHA action is `review_submission`.
+3. Paste the new `Code.gs`, add `ReviewForm.html`, save, and note the current deployment version number for rollback.
+4. Run `setupReviews()` once as the deployment owner and allow the permissions. Check that the `Reviews` tab has the 13 columns and a Status dropdown (`Published`, `Hidden`, `Removed`). Setup also installs one edit trigger and only then sets `REVIEWS_CONFIGURED=true`.
+5. Deploy: **Manage deployments → edit the existing deployment → New version**, execute as you, access Anyone. The `/exec` URL does not change.
+6. Open `<exec URL>?action=reviews`. It should show `"ok":true,"intake":"paused"`. After the Pages change is merged, `https://saloniresinart.com/reviews/` shows "No reviews yet" and the paused message.
+7. Short acceptance window: set `REVIEW_DAILY_ACCEPTANCE_CAP=1` and `REVIEWS_DISABLED=false`, then post one test review on a phone (name Test, studio, 5 stars, a photo with location data). Check that it shows on the phone and on a desktop (including iPhone Safari), that the Sheet row is `Published` and holds no phone or email, and that the Drive file is in the review folder and has no location data when downloaded.
+8. Set the test row Status to `Hidden`. Reload the page: it is gone, and the photo link no longer opens in a private window.
+9. Pass: remove the cap property (or set 20) and keep `REVIEWS_DISABLED=false`. Fail: set `REVIEWS_DISABLED=true` and send the result to the developer.
+
+Optional: in the Sheet, **Tools → Notification settings → Any changes** sends an email for each new review.
+
+### Day to day
+
+- Hide a review: set Status to `Hidden`. The page drops it at once (the edit clears the cache) and its photos become private.
+- Removal request: set Status to `Removed`. The photo files are permanently deleted and the Photo file IDs cell is emptied. The row stays for your records.
+- Spam flood: set `REVIEWS_DISABLED=true` (the page then shows reviews but no form), then set the spam rows to `Hidden`.
+- The 90-day order retention never touches the `Reviews` tab or the review photo folder. Reviews stay until you remove them.
+- Photos of a `Published` review are public by link (`anyone with the link`); the folder itself stays private.
+
+### Rollback
+
+Fast: `REVIEWS_DISABLED=true`, and set unwanted rows to `Hidden`. Code: redeploy the previous Apps Script version (the old `doGet` ignores `action=reviews`, so the page shows its calm message) and revert the Pages change. No data is lost. Caveat: photos stay public by link until a row is `Hidden` or `Removed` under a backend that includes the edit trigger.
 
 ## Partner Circle
 

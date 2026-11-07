@@ -1224,7 +1224,7 @@
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
     var requestedMode = embed.getAttribute("data-form-mode");
-    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" ? requestedMode : "order" };
+    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" || requestedMode === "review" ? requestedMode : "order" };
     var corporateIntakeReady = embed.getAttribute("data-intake-ready") === "true";
     var orderDialogEnabled = Boolean(orderDialog && typeof orderDialog.showModal === "function");
     var orderDialogHistoryActive = false;
@@ -1460,7 +1460,7 @@
           window.grecaptcha.ready(function () {
             if (frameState.activeCaptcha !== request) return;
             try {
-              var captchaAction = frameState.mode === "partner" ? "partner_application" : frameState.mode === "corporate" ? "corporate_enquiry" : "order_request";
+              var captchaAction = frameState.mode === "partner" ? "partner_application" : frameState.mode === "corporate" ? "corporate_enquiry" : frameState.mode === "review" ? "review_submission" : "order_request";
               var result = window.grecaptcha.execute(frameState.siteKey, { action: captchaAction });
               if (!result || typeof result.then !== "function") { postCaptchaResult(request, false, ""); return; }
               result.then(function (token) {
@@ -1766,6 +1766,11 @@
         finishOrderFormLoading();
         return;
       }
+      if (data.type === "saloni-review-submitted") {
+        if (frameState.mode !== "review" || !isCurrentFormSource(event.source) || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin) return;
+        loadReviewPage(false);
+        return;
+      }
       if (!isCurrentFormSource(event.source) || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin || data.type !== "saloni-order-captcha-request" || typeof data.attemptId !== "string" || !event.ports || !event.ports[0] || frameState.activeCaptcha) return;
       var request = { attemptId: data.attemptId, port: event.ports[0], timer: null };
       frameState.activeCaptcha = request;
@@ -1773,6 +1778,163 @@
       executeParentCaptcha(request);
     });
 
+    var REVIEWS_UNAVAILABLE = "Reviews could not be loaded right now. Please try again later.";
+    var REVIEW_CONTACT = "<a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a> or call <a href=\"tel:+918209238541\">8209238541</a>";
+    var REVIEW_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    // Public reads use a plain GET with no custom headers, so the browser sends no preflight request.
+    function fetchPublicReviews(done) {
+      var finished = false;
+      var timer = null;
+      function finish(data) {
+        if (finished) return;
+        finished = true;
+        if (timer) window.clearTimeout(timer);
+        done(data);
+      }
+      if (!configured || typeof window.fetch !== "function") { finish(null); return; }
+      timer = window.setTimeout(function () { finish(null); }, 15000);
+      try {
+        window.fetch(orderUrl + "?action=reviews", { credentials: "omit", cache: "no-store" })
+          .then(function (response) { return response.json(); })
+          .then(function (data) { finish(data && data.ok === true && data.summary && Array.isArray(data.reviews) ? data : null); })
+          .catch(function () { finish(null); });
+      } catch (error) { finish(null); }
+    }
+
+    function formatReviewDate(value) {
+      var match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+      var month = match ? Number(match[2]) : 0;
+      return month >= 1 && month <= 12 ? Number(match[3]) + " " + REVIEW_MONTHS[month - 1] + " " + match[1] : "";
+    }
+
+    function reviewText(value, maxLength) {
+      return typeof value === "string" ? value.slice(0, maxLength) : "";
+    }
+
+    function reviewSpan(className, text) {
+      var span = document.createElement("span");
+      span.className = className;
+      span.textContent = text;
+      return span;
+    }
+
+    function reviewPhoto(id, number, label) {
+      if (typeof id !== "string" || !/^[A-Za-z0-9_-]{20,100}$/.test(id)) return null;
+      var link = document.createElement("a");
+      link.href = "https://lh3.googleusercontent.com/d/" + id + "=w1600";
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      var image = document.createElement("img");
+      image.setAttribute("loading", "lazy");
+      image.setAttribute("decoding", "async");
+      image.setAttribute("referrerpolicy", "no-referrer");
+      image.setAttribute("alt", "Customer photo " + number + " for " + label);
+      var failures = 0;
+      image.addEventListener("error", function () {
+        failures += 1;
+        if (failures === 1) {
+          image.src = "https://drive.google.com/thumbnail?id=" + id + "&sz=w800";
+          link.href = "https://drive.google.com/thumbnail?id=" + id + "&sz=w1600";
+        } else if (link.remove) link.remove();
+      });
+      image.src = "https://lh3.googleusercontent.com/d/" + id + "=w800";
+      link.appendChild(image);
+      return link;
+    }
+
+    // Review text is untrusted: every value reaches the page through textContent, never markup.
+    function reviewCard(item) {
+      if (!item || typeof item !== "object") return null;
+      var rating = item.rating;
+      var name = reviewText(item.firstName, 40);
+      if (typeof rating !== "number" || Math.floor(rating) !== rating || rating < 1 || rating > 5 || !name) return null;
+      var city = reviewText(item.city, 60);
+      var productName = reviewText(item.productName, 120);
+      var card = document.createElement("li");
+      card.className = "review-card";
+      var head = document.createElement("div");
+      head.className = "review-head";
+      var stars = reviewSpan("review-stars", "\u2605\u2605\u2605\u2605\u2605".slice(0, rating) + "\u2606\u2606\u2606\u2606\u2606".slice(0, 5 - rating));
+      stars.setAttribute("aria-hidden", "true");
+      head.appendChild(stars);
+      head.appendChild(reviewSpan("sr-only", "Rated " + rating + " out of 5"));
+      head.appendChild(reviewSpan("review-date", formatReviewDate(item.date)));
+      var meta = document.createElement("p");
+      meta.className = "review-meta";
+      meta.appendChild(reviewSpan("review-author", city ? name + ", " + city : name));
+      meta.appendChild(reviewSpan("review-product", productName || "Studio review"));
+      var comment = document.createElement("p");
+      comment.className = "review-comment";
+      comment.textContent = reviewText(item.comment, 2000);
+      card.appendChild(head);
+      card.appendChild(meta);
+      card.appendChild(comment);
+      var photoRow = document.createElement("div");
+      photoRow.className = "review-photos";
+      var photoIds = Array.isArray(item.photos) ? item.photos.slice(0, 3) : [];
+      var shown = 0;
+      photoIds.forEach(function (id) {
+        var photo = reviewPhoto(id, shown + 1, productName || "the studio");
+        if (!photo) return;
+        shown += 1;
+        photoRow.appendChild(photo);
+      });
+      if (shown) card.appendChild(photoRow);
+      return card;
+    }
+
+    function renderReviews(data) {
+      var list = document.getElementById("reviews-list");
+      var summary = document.getElementById("reviews-summary");
+      var statusLine = document.getElementById("reviews-status");
+      if (!list || !statusLine) return;
+      while (list.firstChild) list.removeChild(list.firstChild);
+      var shown = 0;
+      data.reviews.forEach(function (item) {
+        var card = reviewCard(item);
+        if (!card) return;
+        list.appendChild(card);
+        shown += 1;
+      });
+      var count = Number(data.summary.count);
+      var average = Number(data.summary.average);
+      if (summary) {
+        summary.hidden = !(shown && isFinite(count) && count > 0 && isFinite(average));
+        if (!summary.hidden) summary.textContent = average.toFixed(1) + " out of 5 \u00b7 " + count + (count === 1 ? " review" : " reviews");
+      }
+      statusLine.textContent = shown ? "" : "No reviews yet. Be the first to share yours.";
+      statusLine.hidden = Boolean(shown);
+    }
+
+    // The form is loaded only after the backend answers JSON with intake "open"; anything else stays calm.
+    function loadReviewPage(firstLoad) {
+      fetchPublicReviews(function (data) {
+        var statusLine = document.getElementById("reviews-status");
+        if (!data) {
+          if (!firstLoad) return;
+          if (statusLine) { statusLine.textContent = REVIEWS_UNAVAILABLE; statusLine.hidden = false; }
+          var summary = document.getElementById("reviews-summary");
+          if (summary) summary.hidden = true;
+          status.innerHTML = "You can still message " + REVIEW_CONTACT + " to share your review.";
+          status.hidden = false;
+          return;
+        }
+        renderReviews(data);
+        if (!firstLoad) return;
+        if (data.intake === "open") {
+          submitSeed({ sourceKind: "review", sourceId: "review", productName: "", reviewId: requestId() }, false);
+          return;
+        }
+        status.innerHTML = "New reviews are paused right now. You can message " + REVIEW_CONTACT + ".";
+        status.hidden = false;
+      });
+    }
+
+    if (frameState.mode === "review") {
+      loadReviewPage(true);
+      return;
+    }
     if (frameState.mode === "corporate" && !corporateIntakeReady) {
       status.innerHTML = "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
       status.hidden = false;

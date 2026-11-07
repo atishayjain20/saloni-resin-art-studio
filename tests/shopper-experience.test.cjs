@@ -205,15 +205,15 @@ test("focus rings on plum surfaces use cream so they keep 3:1 contrast", () => {
 test("leftover beige colours use the new cream and the phone bar matches the pink header", () => {
   assert.doesNotMatch(css, /#ead6cc|rgba\(247, 240, 231, \.97\)/);
   assert.match(css, /\.customizer-mobile-actions \{[^}]*background:\s*rgba\(255, 246, 233, \.97\)/);
-  ["index.html", "partners/index.html", "corporate-gifting/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html"].forEach((page) => {
+  ["index.html", "partners/index.html", "corporate-gifting/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html", "reviews/index.html"].forEach((page) => {
     const source = fs.readFileSync(path.join(root, page), "utf8");
     assert.match(source, /<meta name="theme-color" content="#fbd3e5">/, page);
   });
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261145">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261145" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261146">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261146" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 

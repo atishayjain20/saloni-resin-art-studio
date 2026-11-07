@@ -1,0 +1,390 @@
+[
+  {
+    "id": "catalogue:diwali-jewel-glow-tealight.jpg",
+    "name": "Jewel Glow Tealight"
+  },
+  {
+    "id": "catalogue:diwali-happy-diwali-glow.webp",
+    "name": "Happy Diwali Glow"
+  },
+  {
+    "id": "catalogue:diwali-shubh-labh-welcome-pair.jpg",
+    "name": "Shubh Labh Welcome Pair"
+  },
+  {
+    "id": "catalogue:diwali-rose-gold-festive-set.jpeg",
+    "name": "Rose & Gold Festive Set"
+  },
+  {
+    "id": "catalogue:diwali-lotus-blue-festive-set.jpeg",
+    "name": "Lotus Blue Festive Set"
+  },
+  {
+    "id": "catalogue:diwali-gold-fleck-lotus-light.jpeg",
+    "name": "Gold-Fleck Lotus Light"
+  },
+  {
+    "id": "catalogue:diwali-pastel-lotus-tealight.jpeg",
+    "name": "Pastel Lotus Tealight"
+  },
+  {
+    "id": "catalogue:diwali-ocean-bloom-pooja-platter.jpg",
+    "name": "Ocean Bloom Pooja Platter"
+  },
+  {
+    "id": "catalogue:diwali-golden-ganesha-pooja-plate.jpg",
+    "name": "Golden Ganesha Pooja Plate"
+  },
+  {
+    "id": "catalogue:diwali-om-mini-tilak-plate.webp",
+    "name": "Om Mini Tilak Plate"
+  },
+  {
+    "id": "catalogue:diwali-lotus-diya-pair.webp",
+    "name": "Lotus Diya Pair"
+  },
+  {
+    "id": "catalogue:diwali-peacock-mini-pooja-thali.webp",
+    "name": "Peacock Mini Pooja Thali"
+  },
+  {
+    "id": "catalogue:diwali-floral-swastik-tealight-set.webp",
+    "name": "Floral Swastik Tealight Set"
+  },
+  {
+    "id": "catalogue:diwali-marigold-petal-holder-concept.webp",
+    "name": "Marigold Petal Holder"
+  },
+  {
+    "id": "catalogue:diwali-ivory-mandala-holder-concept.webp",
+    "name": "Ivory Mandala Holder"
+  },
+  {
+    "id": "catalogue:diwali-ruby-leaf-dish-concept.webp",
+    "name": "Ruby Leaf Dish"
+  },
+  {
+    "id": "catalogue:diwali-saffron-tilak-duo-concept.webp",
+    "name": "Saffron Tilak Duo"
+  },
+  {
+    "id": "catalogue:diwali-pearl-rangoli-accent-concept.webp",
+    "name": "Pearl Rangoli Accent"
+  },
+  {
+    "id": "catalogue:diwali-emerald-led-holder-pair-concept.webp",
+    "name": "Emerald Glow Pair"
+  },
+  {
+    "id": "catalogue:diwali-rose-petal-offering-plate-concept.webp",
+    "name": "Rose Petal Offering Plate"
+  },
+  {
+    "id": "catalogue:diwali-golden-toran-charms-concept.webp",
+    "name": "Golden Toran Charms"
+  },
+  {
+    "id": "catalogue:diwali-lotus-rangoli-duo-concept.webp",
+    "name": "Lotus Rangoli Duo"
+  },
+  {
+    "id": "catalogue:diwali-festive-keepsake-box-concept.webp",
+    "name": "Festive Keepsake Box"
+  },
+  {
+    "id": "catalogue:marriage-ring-platter.webp",
+    "name": "Engagement Ring Platter"
+  },
+  {
+    "id": "catalogue:marriage-couple-nameplate.webp",
+    "name": "Mr & Mrs Name Plate"
+  },
+  {
+    "id": "catalogue:marriage-varmala-frame.webp",
+    "name": "Varmala Keepsake Frame"
+  },
+  {
+    "id": "catalogue:marriage-ring-dish.webp",
+    "name": "Save the Date Ring Dish"
+  },
+  {
+    "id": "catalogue:marriage-invite-frame.webp",
+    "name": "Wedding Card Keepsake"
+  },
+  {
+    "id": "catalogue:marriage-mehendi-platter.webp",
+    "name": "Haldi & Mehendi Platter"
+  },
+  {
+    "id": "catalogue:marriage-jewellery-tray.webp",
+    "name": "Bride's Jewellery Tray"
+  },
+  {
+    "id": "catalogue:marriage-photo-clock.webp",
+    "name": "Engagement Photo Clock"
+  },
+  {
+    "id": "catalogue:marriage-initial-pendant.webp",
+    "name": "Fiancé Initial Pendant"
+  },
+  {
+    "id": "catalogue:marriage-bouquet-block.webp",
+    "name": "Proposal Bouquet Keepsake"
+  },
+  {
+    "id": "catalogue:romantic-us-keychain-pair.webp",
+    "name": "Two keys, one little us"
+  },
+  {
+    "id": "catalogue:romantic-floral-bookmark-set.webp",
+    "name": "Save our page"
+  },
+  {
+    "id": "catalogue:romantic-calendar-coaster.webp",
+    "name": "Our date, every day"
+  },
+  {
+    "id": "catalogue:romantic-first-rose-bracelet.webp",
+    "name": "The first rose, still with me"
+  },
+  {
+    "id": "catalogue:romantic-heart-trinket-tray.webp",
+    "name": "Tiny tray, big feelings"
+  },
+  {
+    "id": "catalogue:romantic-initial-desk-stand.webp",
+    "name": "Your initial. Mine. Ours."
+  },
+  {
+    "id": "catalogue:romantic-botanical-pendant.webp",
+    "name": "A little piece of our season"
+  },
+  {
+    "id": "catalogue:romantic-ocean-memory-tray.webp",
+    "name": "Our place, held in waves"
+  },
+  {
+    "id": "catalogue:studio-rose-hexagon-keepsake.jpeg",
+    "name": "Rose hexagon"
+  },
+  {
+    "id": "catalogue:studio-personalized-photo-clock.jpeg",
+    "name": "Personalized photo clock"
+  },
+  {
+    "id": "catalogue:studio-red-rose-resin-display.jpeg",
+    "name": "Preserved rose display"
+  },
+  {
+    "id": "catalogue:corporate-logo-keychain-concept.webp",
+    "name": "Logo resin keychain"
+  },
+  {
+    "id": "catalogue:corporate-floral-bookmark-concept.webp",
+    "name": "Pressed-flower bookmark"
+  },
+  {
+    "id": "catalogue:corporate-logo-paperweight-concept.webp",
+    "name": "Logo paperweight"
+  },
+  {
+    "id": "catalogue:corporate-desk-nameplate-concept.webp",
+    "name": "Resin desk nameplate"
+  },
+  {
+    "id": "catalogue:corporate-logo-coaster-set-concept.webp",
+    "name": "Branded coaster set"
+  },
+  {
+    "id": "catalogue:corporate-fridge-magnet-concept.webp",
+    "name": "Resin fridge magnet"
+  },
+  {
+    "id": "catalogue:corporate-desk-logo-stand-concept.webp",
+    "name": "Mini resin desk stand"
+  },
+  {
+    "id": "catalogue:corporate-recognition-award-concept.webp",
+    "name": "Recognition resin award"
+  },
+  {
+    "id": "catalogue:corporate-desk-organizer-concept.webp",
+    "name": "Resin desk organiser"
+  },
+  {
+    "id": "catalogue:corporate-business-card-holder-concept.webp",
+    "name": "Resin Business Card Holder"
+  },
+  {
+    "id": "catalogue:corporate-phone-rest-concept.webp",
+    "name": "Resin Phone Rest"
+  },
+  {
+    "id": "catalogue:corporate-pen-cup-concept.webp",
+    "name": "Resin Pen Cup"
+  },
+  {
+    "id": "catalogue:corporate-desk-trinket-tray-concept.webp",
+    "name": "Desk Trinket Tray"
+  },
+  {
+    "id": "catalogue:corporate-lanyard-charm-concept.webp",
+    "name": "Personalised Lanyard Charm"
+  },
+  {
+    "id": "catalogue:corporate-mini-photo-stand-concept.webp",
+    "name": "Mini Photo Stand"
+  },
+  {
+    "id": "catalogue:corporate-bag-tag-concept.webp",
+    "name": "Personalised Bag Tag"
+  },
+  {
+    "id": "catalogue:corporate-desk-clock-concept.webp",
+    "name": "Mini Resin Desk Clock"
+  },
+  {
+    "id": "catalogue:corporate-bookmark-keychain-duo-concept.webp",
+    "name": "Welcome Keepsake Duo"
+  },
+  {
+    "id": "catalogue:corporate-desk-essentials-set-concept.webp",
+    "name": "Desk Essentials Set"
+  },
+  {
+    "id": "catalogue:studio-blue-mantra-frame.jpeg",
+    "name": "Blue and white Namokar mantra frame"
+  },
+  {
+    "id": "catalogue:studio-lilac-symbol-rakhi.jpeg",
+    "name": "Lilac symbol medallion"
+  },
+  {
+    "id": "catalogue:studio-little-brother-rakhi.jpeg",
+    "name": "Little brother keepsake"
+  },
+  {
+    "id": "catalogue:studio-white-mantra-frame.jpeg",
+    "name": "White and gold Namokar mantra frame"
+  },
+  {
+    "id": "catalogue:studio-lilac-scalloped-tray.jpeg",
+    "name": "Lilac scalloped tray"
+  },
+  {
+    "id": "catalogue:studio-floral-square-keepsake.jpeg",
+    "name": "Pressed flower square"
+  },
+  {
+    "id": "catalogue:studio-floral-hexagon-keepsake.jpeg",
+    "name": "Lilac flower hexagon"
+  },
+  {
+    "id": "catalogue:studio-floral-handled-tray.jpeg",
+    "name": "Handled flower tray"
+  },
+  {
+    "id": "catalogue:concept-floral-memory-frame.webp",
+    "name": "Your flowers, held close"
+  },
+  {
+    "id": "catalogue:concept-ocean-clock.webp",
+    "name": "A little blue hour"
+  },
+  {
+    "id": "catalogue:concept-floral-coasters.webp",
+    "name": "Little messages, shared"
+  },
+  {
+    "id": "catalogue:resin-clock.jpg",
+    "name": "Blue hour resin clock"
+  },
+  {
+    "id": "catalogue:resin-message-coasters.jpg",
+    "name": "Personalized message coasters"
+  },
+  {
+    "id": "catalogue:navkar-resin-frame.jpg",
+    "name": "Pearl white Namokar mantra frame"
+  },
+  {
+    "id": "catalogue:personalized-floral-hoop.jpg",
+    "name": "A tiny beginning"
+  },
+  {
+    "id": "catalogue:sunflower-resin-lamp.jpeg",
+    "name": "Sunflower resin lamp"
+  },
+  {
+    "id": "catalogue:sunflower-floral-keepsakes.jpeg",
+    "name": "Sunflower floral keepsakes"
+  },
+  {
+    "id": "catalogue:sunflower-plaque-easel.jpeg",
+    "name": "Personalised sunflower plaque"
+  },
+  {
+    "id": "catalogue:sunflower-plaque-hand.jpeg",
+    "name": "Sunflower plaque in hand"
+  },
+  {
+    "id": "catalogue:sunflower-keepsake-set.jpeg",
+    "name": "Sunflower keepsake set"
+  },
+  {
+    "id": "catalogue:premium-midnight-blue-tiered-set.jpeg",
+    "name": "Midnight blue tiered set"
+  },
+  {
+    "id": "catalogue:premium-ivory-gold-tiered-set.jpeg",
+    "name": "Ivory-gold tiered set"
+  },
+  {
+    "id": "catalogue:premium-champagne-two-tier-set.jpeg",
+    "name": "Champagne two-tier set"
+  },
+  {
+    "id": "catalogue:premium-turquoise-tray-coasters.jpeg",
+    "name": "Turquoise tray and coasters"
+  },
+  {
+    "id": "catalogue:premium-smoky-bronze-tray.jpeg",
+    "name": "Smoky bronze handled tray"
+  },
+  {
+    "id": "catalogue:premium-gemstone-mug-collection.jpeg",
+    "name": "Gemstone mug collection"
+  },
+  {
+    "id": "catalogue:premium-pastel-butterfly-trays.jpeg",
+    "name": "Pastel butterfly trays"
+  },
+  {
+    "id": "catalogue:premium-champagne-white-tray.jpeg",
+    "name": "Champagne-white handled tray"
+  },
+  {
+    "id": "catalogue:premium-silver-icy-blue-tray.jpeg",
+    "name": "Silver icy-blue handled tray"
+  },
+  {
+    "id": "catalogue:premium-ocean-seashell-tray.jpeg",
+    "name": "Ocean seashell tray"
+  },
+  {
+    "id": "catalogue:premium-turquoise-geode-glass-closeup.jpeg",
+    "name": "Turquoise geode glass"
+  },
+  {
+    "id": "catalogue:premium-turquoise-gold-wine-glasses.jpeg",
+    "name": "Turquoise-gold wine glasses"
+  },
+  {
+    "id": "catalogue:premium-turquoise-geode-glass-pair.jpeg",
+    "name": "Turquoise geode glass pair"
+  },
+  {
+    "id": "catalogue:premium-black-gold-glassware-set.jpeg",
+    "name": "Black-gold glassware set"
+  }
+]
