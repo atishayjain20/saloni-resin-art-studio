@@ -523,9 +523,9 @@
     }
 
     initCatalogueExperience();
+    initDiwaliGreeting();
     initHeroBanner();
     initPhoneDropdowns();
-    initDiwaliGreeting();
 
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
@@ -562,12 +562,24 @@
     if (phone.addEventListener) phone.addEventListener("change", sync);
   }
 
-  // On 8 and 9 November 2026, India time (UTC+5:30), the Diwali offer strip shows and the Diwali wish opens once per visitor.
+  // On 8 and 9 November 2026, India time (UTC+5:30), the Diwali offer strip and hero slide show and the Diwali wish opens once per visitor.
   function initDiwaliGreeting(now) {
     var time = typeof now === "number" ? now : Date.now();
     if (!(time >= Date.UTC(2026, 10, 7, 18, 30) && time < Date.UTC(2026, 10, 9, 18, 30))) return;
     var offerBar = document.getElementById("diwali-offer-bar");
     if (offerBar) offerBar.hidden = false;
+    // The Diwali hero slide moves first and shows the offer; slide labels are renumbered to match.
+    var slide = document.getElementById("hero-diwali-slide");
+    if (slide && slide.parentNode) {
+      var offerLabel = slide.querySelector(".hero-slide-offer");
+      if (offerLabel) offerLabel.hidden = false;
+      slide.parentNode.insertBefore(slide, slide.parentNode.firstChild);
+      // The browser keeps the old first slide in view after the move, so start the carousel at Diwali.
+      slide.parentNode.scrollLeft = 0;
+      Array.prototype.forEach.call(slide.parentNode.querySelectorAll(".hero-slide"), function (item, index) {
+        item.setAttribute("aria-label", item.getAttribute("aria-label").replace(/^\d+ of/, (index + 1) + " of"));
+      });
+    }
     var greeting = document.getElementById("diwali-greeting");
     if (!greeting || typeof greeting.showModal !== "function") return;
     if (document.querySelector("dialog[open]")) return;

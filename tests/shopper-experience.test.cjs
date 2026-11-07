@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261144">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261144" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261145">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261145" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -2072,6 +2072,48 @@ test("the page background is a very pale blush token used for the body and the c
   assert.ok(link, "the custom-frame link on the page sets its own readable teal");
   ["#6a4a5b", "#b0125b", link[1]].forEach((colour) => assert.ok(contrast(colour, "#ffeaf2") >= 4.5, colour + " on the page"));
   assert.match(css, /\nbody\s*\{[^}]*background:\s*var\(--page\)/);
+});
+
+test("on 8 and 9 November the Diwali hero slide moves first and shows the offer", () => {
+  const diwaliSlide = bannerSlideHtml()[3];
+  assert.match(diwaliSlide, /id="hero-diwali-slide"/);
+  const offer = diwaliSlide.match(/<p class="hero-slide-offer" hidden>([\s\S]*?)<\/p>/);
+  assert.ok(offer, "the offer label starts hidden");
+  assert.match(offer[1], /Buy 2, get 1 free/);
+  assert.match(offer[1], /free shipping/);
+  assert.doesNotMatch(css.match(/\.hero-slide-offer\s*\{[^}]*\}/)[0], /display:/, "keeps the hidden attribute working");
+  assert.ok(script.indexOf("    initDiwaliGreeting();") < script.indexOf("    initHeroBanner();"), "slides are in order before the carousel reads them");
+  const start = script.indexOf("  function initDiwaliGreeting(");
+  const source = script.slice(start, script.indexOf("\n  }\n", start) + 4);
+  const run = (iso) => {
+    const label = (text) => ({ text, getAttribute() { return this.text; }, setAttribute(_name, value) { this.text = value; } });
+    const slides = [label("1 of 4: Premium"), label("2 of 4: Couple"), label("3 of 4: Corporate"), label("4 of 4: Diwali")];
+    const offerLabel = { hidden: true };
+    const slide = slides[3];
+    slide.querySelector = (sel) => (sel === ".hero-slide-offer" ? offerLabel : null);
+    const track = {
+      scrollLeft: 360,
+      get firstChild() { return slides[0]; },
+      insertBefore(node, before) { slides.splice(slides.indexOf(node), 1); slides.splice(slides.indexOf(before), 0, node); },
+      querySelectorAll: (sel) => (sel === ".hero-slide" ? slides.slice() : []),
+    };
+    slide.parentNode = track;
+    const context = {
+      window: { localStorage: { getItem: () => "1", setItem() {} } },
+      document: { getElementById: (id) => (id === "hero-diwali-slide" ? slide : null), querySelector: () => null },
+      Date,
+    };
+    vm.createContext(context);
+    vm.runInContext(`${source}\ninitDiwaliGreeting(${Date.parse(iso)});`, context);
+    return { labels: slides.map((item) => item.text), offerLabel, track };
+  };
+  const during = run("2026-11-08T09:00:00Z");
+  assert.deepEqual(during.labels, ["1 of 4: Diwali", "2 of 4: Premium", "3 of 4: Couple", "4 of 4: Corporate"]);
+  assert.equal(during.offerLabel.hidden, false);
+  assert.equal(during.track.scrollLeft, 0, "the carousel starts on the Diwali slide");
+  const after = run("2026-11-09T18:31:00Z");
+  assert.deepEqual(after.labels, ["1 of 4: Premium", "2 of 4: Couple", "3 of 4: Corporate", "4 of 4: Diwali"], "back to normal from 10 Nov");
+  assert.equal(after.offerLabel.hidden, true);
 });
 
 test("the Diwali wish and offer replace the Dhanteras pop-up and show only on 8 and 9 November 2026 (India time)", () => {
