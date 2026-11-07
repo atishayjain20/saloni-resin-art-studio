@@ -525,7 +525,7 @@
     initCatalogueExperience();
     initHeroBanner();
     initPhoneDropdowns();
-    initDhanterasGreeting();
+    initDiwaliGreeting();
 
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
@@ -562,14 +562,16 @@
     if (phone.addEventListener) phone.addEventListener("change", sync);
   }
 
-  // The Dhanteras wish opens as a pop-up once per visitor, only from 5 to 7 November 2026, India time (UTC+5:30).
-  function initDhanterasGreeting(now) {
-    var greeting = document.getElementById("dhanteras-greeting");
-    if (!greeting || typeof greeting.showModal !== "function") return;
+  // On 8 and 9 November 2026, India time (UTC+5:30), the Diwali offer strip shows and the Diwali wish opens once per visitor.
+  function initDiwaliGreeting(now) {
     var time = typeof now === "number" ? now : Date.now();
-    if (!(time >= Date.UTC(2026, 10, 4, 18, 30) && time < Date.UTC(2026, 10, 7, 18, 30))) return;
+    if (!(time >= Date.UTC(2026, 10, 7, 18, 30) && time < Date.UTC(2026, 10, 9, 18, 30))) return;
+    var offerBar = document.getElementById("diwali-offer-bar");
+    if (offerBar) offerBar.hidden = false;
+    var greeting = document.getElementById("diwali-greeting");
+    if (!greeting || typeof greeting.showModal !== "function") return;
     if (document.querySelector("dialog[open]")) return;
-    var key = "saloni-dhanteras-2026";
+    var key = "saloni-diwali-2026";
     try {
       if (window.localStorage.getItem(key)) return;
       window.localStorage.setItem(key, "1");
@@ -1920,16 +1922,23 @@
       var sum = 0;
       var priced = 0;
       var anyRange = false;
+      var units = [];
       items.forEach(function (item) {
         var parsed = cataloguePriceFrom(item.price);
         if (!parsed) return;
         priced += 1;
         sum += parsed.amount * bundleQuantity(item);
+        for (var unit = 0; unit < bundleQuantity(item); unit += 1) units.push(parsed.amount);
         if (parsed.isRange) anyRange = true;
       });
       if (!items.length) return "";
       if (!priced) return "Estimated total: price on request";
-      return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum) + " + shipping" + (priced < items.length ? " (plus price-on-request items)" : "");
+      var rest = priced < items.length ? " (plus price-on-request items)" : "";
+      var offerBar = document.getElementById("diwali-offer-bar");
+      if (!offerBar || offerBar.hidden) return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum) + " + shipping" + rest;
+      // Diwali buy 2, get 1 free: in every three gifts, from the highest price down, the third is free.
+      var free = units.sort(function (a, b) { return b - a; }).reduce(function (total, amount, index) { return index % 3 === 2 ? total + amount : total; }, 0);
+      return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum - free) + " + free shipping (Diwali offer: " + (free ? formatRupees(free) + " off, buy 2 get 1 free)" : "buy 2, get 1 free)") + rest;
     }
 
     function catalogueWhatsappHref(items) {
