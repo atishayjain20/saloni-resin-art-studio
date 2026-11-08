@@ -88,10 +88,25 @@ function doPost(event) {
     seed.formMode = mode;
     if (mode === "partner") seed.applicationId = boundedSeed_(parameters.applicationId || seed.applicationId, 80);
     if (mode === "corporate") seed.enquiryId = boundedSeed_(parameters.enquiryId || seed.enquiryId, 80);
-    if (mode === "review") seed.reviewId = boundedSeed_(parameters.reviewId || seed.reviewId, 80);
+    if (mode === "review") {
+      seed.reviewId = boundedSeed_(parameters.reviewId || seed.reviewId, 80);
+      var hint = reviewSeedHint_(parameters.seed);
+      seed.productId = hint.productId;
+      seed.rating = hint.rating;
+    }
     return renderForm_({ seed: seed, mode: mode });
   }
   return renderForm_({ seed: blankSeed_(), mode: mode });
+}
+
+// A product popup can suggest which piece and how many stars the review form starts on; submitReview still validates both.
+function reviewSeedHint_(json) {
+  var raw;
+  try { raw = JSON.parse(String(json || "{}")); } catch (error) { raw = {}; }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) raw = {};
+  var productId = String(raw.productId || "");
+  var rating = String(raw.rating || "");
+  return { productId: /^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productId) ? productId : "", rating: /^[1-5]$/.test(rating) ? rating : "" };
 }
 
 function renderForm_(state) {

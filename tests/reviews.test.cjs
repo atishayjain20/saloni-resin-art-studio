@@ -272,6 +272,22 @@ test("review form renders from the ReviewForm template with the product list and
   assert.equal(paused.state.template.reviewProductsJson, "null");
 });
 
+test("a review seed passes a valid product and rating through to the form and drops anything else", () => {
+  const runtime = makeRuntime();
+  runtime.context.doPost({ parameter: { action: "seed", mode: "review", seed: JSON.stringify({ reviewId: "review-seed-12345", productId: "catalogue:diwali-jewel-glow-tealight.jpg", rating: "4" }) } });
+  const seed = JSON.parse(runtime.state.template.seedJson);
+  assert.equal(seed.productId, "catalogue:diwali-jewel-glow-tealight.jpg");
+  assert.equal(seed.rating, "4");
+  runtime.context.doPost({ parameter: { action: "seed", mode: "review", seed: JSON.stringify({ productId: "<script>alert(1)</script>", rating: "9" }) } });
+  const bad = JSON.parse(runtime.state.template.seedJson);
+  assert.equal(bad.productId, "");
+  assert.equal(bad.rating, "");
+  runtime.context.doPost({ parameter: { action: "seed", mode: "order", seed: JSON.stringify({ productId: "catalogue:diwali-jewel-glow-tealight.jpg", rating: "4" }) } });
+  const order = JSON.parse(runtime.state.template.seedJson);
+  assert.equal(order.productId, undefined);
+  assert.equal(order.rating, undefined);
+});
+
 test("rating, names, comment, contact details and consent are validated", () => {
   const runtime = makeRuntime();
   const errorsFor = (overrides) => runtime.context.validateReview_(runtime.context.collectReview_(validForm(overrides)), {});
@@ -741,7 +757,7 @@ function makeFormRuntime(options = {}) {
   Object.values(fields).forEach((field) => { field.parentNode = { children: [], appendChild(child) { errors.push(child); } }; });
   elements.get("rating-group").appendChild = (child) => { errors.push(child); return child; };
   fields.productId.value = "studio";
-  elements.get("seed-data").textContent = JSON.stringify({ reviewId: "review-seed-123456", channelNonce: "nonce-seed-123456" });
+  elements.get("seed-data").textContent = JSON.stringify(Object.assign({ reviewId: "review-seed-123456", channelNonce: "nonce-seed-123456" }, options.seed));
   elements.get("review-products-data").textContent = options.products === undefined ? JSON.stringify(DEFAULT_PRODUCTS) : JSON.stringify(options.products);
   const status = elements.get("form-status");
   status.setAttribute("tabindex", "-1");
@@ -822,6 +838,18 @@ test("the review form script parses and announces itself to the parent with its 
   const ready = runtime.parentMessages.find((entry) => entry.message.type === "saloni-order-form-ready");
   assert.equal(ready.message.mode, "review");
   assert.equal(ready.targetOrigin, "https://saloniresinart.com");
+});
+
+test("the form starts on the product and rating from the seed only when they are valid", () => {
+  const runtime = makeFormRuntime({ seed: { productId: DEFAULT_PRODUCTS[1].id, rating: "4" } });
+  assert.equal(runtime.fields.productId.value, DEFAULT_PRODUCTS[1].id);
+  assert.equal(runtime.fields.rating.value, "4");
+  const unknown = makeFormRuntime({ seed: { productId: "catalogue:not-a-product.jpg", rating: "7" } });
+  assert.equal(unknown.fields.productId.value, "studio");
+  assert.equal(unknown.fields.rating.value, "");
+  const noList = makeFormRuntime({ products: null, seed: { productId: DEFAULT_PRODUCTS[1].id, rating: "5" } });
+  assert.equal(noList.fields.productId.value, "studio");
+  assert.equal(noList.fields.rating.value, "5");
 });
 
 test("the review form has the specified fields, privacy wording and no unrelated inputs", () => {
@@ -1108,7 +1136,7 @@ function runReviewsPage(options = {}) {
   [embed, frame, status, summary, reviewsStatus, list].forEach((element) => elements.set(element.id, element));
   let response = options.body;
   const windowObject = {
-    location: { href: "https://saloniresinart.com/reviews/" }, matchMedia: () => ({ matches: false }), crypto: { randomUUID: (() => { let n = 0; return () => "request-" + (++n); })() },
+    location: { href: "https://saloniresinart.com/reviews/" + (options.search || ""), search: options.search || "" }, matchMedia: () => ({ matches: false }), crypto: { randomUUID: (() => { let n = 0; return () => "request-" + (++n); })() },
     addEventListener(type, listener) { if (type === "message") this.messageListener = listener; },
     setTimeout: (callback) => { timers.push(callback); return timers.length; }, clearTimeout() {},
     grecaptcha: { ready: (callback) => callback(), execute: (siteKey, request) => { executed.push(request); return Promise.resolve("parent-token"); } },
@@ -1154,6 +1182,18 @@ test("the Reviews page fetches the list without custom headers and seeds the for
   assert.match(seed.reviewId, /^request-\d+$/);
   assert.equal(page.posted[0].children.find((child) => child.name === "mode").value, "review");
   assert.equal(page.posted[0].action, "https://script.google.test/exec");
+});
+
+test("the Reviews page passes a valid product and rating from the address into the form seed", async () => {
+  const page = runReviewsPage({ body: openBody(), search: "?product=catalogue%3Adiwali-jewel-glow-tealight.jpg&rating=4" });
+  await settle();
+  const seed = page.seedOf();
+  assert.equal(seed.productId, "catalogue:diwali-jewel-glow-tealight.jpg");
+  assert.equal(seed.rating, "4");
+  const bad = runReviewsPage({ body: openBody(), search: "?product=%3Cscript%3E&rating=9" });
+  await settle();
+  assert.equal(bad.seedOf().productId, undefined);
+  assert.equal(bad.seedOf().rating, undefined);
 });
 
 test("a single review reads as one review and an empty list invites the first one", async () => {

@@ -1021,7 +1021,16 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 .lightbox-reviews { display: grid; gap: 0.7rem; margin-top: 1.2rem; }
 .lightbox-reviews h3 { margin: 0; font-size: 1.05rem; }
 .lightbox-review-list { display: grid; gap: 0.7rem; margin: 0; padding: 0; list-style: none; }
-.lightbox-reviews-link { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; color: var(--rose-ink); font-weight: 800; }
+.lightbox-rating-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0; color: var(--ink); font-weight: 800; }
+.lightbox-rate { display: grid; gap: 0.35rem; }
+.lightbox-rate-label, .lightbox-rate-hint { margin: 0; }
+.lightbox-rate-label { font-weight: 800; }
+.lightbox-rate-hint { color: var(--muted); font-size: 0.8rem; }
+.lightbox-rate-stars { display: flex; gap: 0.15rem; }
+.lightbox-rate-star { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 0.6rem; color: #947f6b; font-size: 1.9rem; line-height: 1; text-decoration: none; }
+.lightbox-rate-stars:hover .lightbox-rate-star, .lightbox-rate-stars:focus-within .lightbox-rate-star { color: #8a5200; }
+.lightbox-rate-star:hover ~ .lightbox-rate-star, .lightbox-rate-star:focus-visible ~ .lightbox-rate-star { color: #947f6b; }
+.lightbox-rate-star:focus-visible { outline: 3px solid var(--rose-ink); outline-offset: 2px; }
 .sample-review { border-style: dashed; background: #fffaf4; }
 .sample-badge { justify-self: start; margin: 0; padding: 0.2rem 0.6rem; border-radius: 999px; background: #efe4d8; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; }
 .reviews-write { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(320px, 1fr); align-items: start; gap: clamp(2rem, 8vw, 7rem); padding-block: clamp(3rem, 8vw, 6rem); border-top: 1px solid var(--line); }

@@ -43,8 +43,8 @@
     }
   </script>
   <title>Custom Resin Art &amp; Gifts | Saloni Resin Art Studio</title>
-  <link rel="stylesheet" href="styles.css?v=20261149">
-  <script class="site-script" src="script.js?v=20261149" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261150">
+  <script class="site-script" src="script.js?v=20261150" defer></script>
   <script class="customizer-script" src="customizer.js?v=20261031" defer></script>
 </head>
 <body>
@@ -1050,8 +1050,19 @@
         </figcaption>
         <section class="lightbox-reviews" id="lightbox-reviews" aria-labelledby="lightbox-reviews-title" hidden>
           <h3 id="lightbox-reviews-title">Reviews</h3>
+          <p class="lightbox-rating-summary" id="lightbox-rating-summary" hidden></p>
           <ul class="lightbox-review-list" id="lightbox-review-list"></ul>
-          <a class="lightbox-reviews-link" href="reviews/#write">Write a review <span aria-hidden="true">↘</span></a>
+          <div class="lightbox-rate" id="lightbox-rate" hidden>
+            <p class="lightbox-rate-label" id="lightbox-rate-label">Rate this piece</p>
+            <div class="lightbox-rate-stars" role="group" aria-labelledby="lightbox-rate-label">
+            <a class="lightbox-rate-star" href="reviews/#write" data-rate="1" aria-label="Rate 1 out of 5 stars and write a review">★</a>
+            <a class="lightbox-rate-star" href="reviews/#write" data-rate="2" aria-label="Rate 2 out of 5 stars and write a review">★</a>
+            <a class="lightbox-rate-star" href="reviews/#write" data-rate="3" aria-label="Rate 3 out of 5 stars and write a review">★</a>
+            <a class="lightbox-rate-star" href="reviews/#write" data-rate="4" aria-label="Rate 4 out of 5 stars and write a review">★</a>
+            <a class="lightbox-rate-star" href="reviews/#write" data-rate="5" aria-label="Rate 5 out of 5 stars and write a review">★</a>
+            </div>
+            <p class="lightbox-rate-hint">Tap a star, then tell us more on the Reviews page.</p>
+          </div>
         </section>
         <details class="lightbox-care">
           <summary>Resin care tips</summary>
