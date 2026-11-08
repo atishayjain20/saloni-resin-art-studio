@@ -15,7 +15,11 @@ var DEFAULT_CORPORATE_DAILY_ACCEPTANCE_CAP = 20;
 var PARTNER_APPLICATION_CAPTCHA_ACTION = "partner_application";
 var CORPORATE_ENQUIRY_CAPTCHA_ACTION = "corporate_enquiry";
 var REVIEW_CAPTCHA_ACTION = "review_submission";
+var RATING_CAPTCHA_ACTION = "product_rating";
 var DEFAULT_REVIEW_DAILY_ACCEPTANCE_CAP = 20;
+var DEFAULT_RATING_DAILY_ACCEPTANCE_CAP = 100;
+var DEFAULT_RATING_PRODUCT_DAILY_CAP = 10;
+var QUICK_RATING_NOTE = "Quick rating from a product popup";
 var MAX_REVIEW_PHOTO_BYTES = 1024 * 1024;
 var MAX_REVIEW_PHOTOS = 3;
 var REVIEW_PRODUCTS_URL = "https://saloniresinart.com/reviews/products.json";
@@ -83,6 +87,7 @@ function doPost(event) {
   var parameters = event && event.parameter ? event.parameter : {};
   var action = String(parameters.action || "");
   var mode = boundedMode_(parameters.mode);
+  if (action === "rate") return ContentService.createTextOutput(JSON.stringify(submitQuickRating_(parameters))).setMimeType(ContentService.MimeType.JSON);
   if (action === "seed") {
     var seed = parseSeed_(parameters.seed);
     seed.formMode = mode;
@@ -891,6 +896,54 @@ function setupCorporateGifting() {
   } finally { lock.releaseLock(); }
 }
 
+// A star tapped in a product popup: no name, comment or photos, so it only counts toward that product's rating.
+function submitQuickRating_(parameters) {
+  var properties = PropertiesService.getScriptProperties();
+  if (isTrue_(properties.getProperty("REVIEWS_DISABLED"))) return { ok: false, error: "paused" };
+  if (!reviewsConfig_(properties) || !reviewsReady_(properties)) return { ok: false, error: "unavailable" };
+  var payload = {
+    ratingId: stringValue_(parameters.ratingId).trim(), productId: stringValue_(parameters.productId).trim(),
+    rating: stringValue_(parameters.rating).trim(), captchaToken: stringValue_(parameters.captchaToken)
+  };
+  if (!/^[A-Za-z0-9_-]{12,80}$/.test(payload.ratingId) || !/^[1-5]$/.test(payload.rating)) return { ok: false, error: "invalid" };
+  var products = reviewProducts_();
+  if (!products || !Object.prototype.hasOwnProperty.call(products, payload.productId)) return { ok: false, error: "invalid" };
+  if (!verifyCaptcha_(payload.captchaToken, properties, RATING_CAPTCHA_ACTION).ok) return { ok: false, error: "captcha" };
+  try {
+    return storeQuickRating_(payload, products[payload.productId], properties);
+  } catch (error) {
+    return { ok: false, error: "unavailable" };
+  }
+}
+
+function storeQuickRating_(payload, productName, properties) {
+  var fingerprint = digestHex_(JSON.stringify({ kind: "quick-rating", ratingId: payload.ratingId, productId: payload.productId, rating: payload.rating }));
+  // A short wait: a busy moment should cost a rating, never delay an order waiting on the same lock.
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return { ok: false, error: "busy" };
+  try {
+    var sheet = openReviewsTab_(properties, true);
+    ensureReviewsTabSchema_(sheet, false);
+    var existing = findReview_(sheet, payload.ratingId);
+    if (existing) return existing.fingerprint === fingerprint ? { ok: true, rating: Number(payload.rating) } : { ok: false, error: "conflict" };
+    if (dailyRowCount_(sheet, true) >= dailyCap_(properties, "RATING_DAILY_ACCEPTANCE_CAP", DEFAULT_RATING_DAILY_ACCEPTANCE_CAP)) return { ok: false, error: "cap" };
+    if (dailyRowCount_(sheet, true, payload.productId) >= dailyCap_(properties, "RATING_PRODUCT_DAILY_CAP", DEFAULT_RATING_PRODUCT_DAILY_CAP)) return { ok: false, error: "cap" };
+    sheet.appendRow([
+      neutralizeForSheet_(payload.ratingId), new Date(), "Published", Number(payload.rating),
+      neutralizeForSheet_(payload.productId), neutralizeForSheet_(productName), "", "", "", "", false, fingerprint, QUICK_RATING_NOTE
+    ]);
+    clearReviewsCache_();
+    return { ok: true, rating: Number(payload.rating) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// A row with no first name and no comment is a quick rating; written reviews always have both.
+function isQuickRatingRow_(row) {
+  return !String(row[6] == null ? "" : row[6]).trim() && !String(row[8] == null ? "" : row[8]).trim();
+}
+
 function submitReview(form) {
   var properties = PropertiesService.getScriptProperties();
   if (isTrue_(properties.getProperty("REVIEWS_DISABLED"))) {
@@ -1167,16 +1220,26 @@ function findReview_(sheet, reviewId) {
 }
 
 function reviewDailyCapReached_(sheet, properties) {
-  var configured = Number(properties.getProperty("REVIEW_DAILY_ACCEPTANCE_CAP"));
-  var cap = Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_REVIEW_DAILY_ACCEPTANCE_CAP;
+  return dailyRowCount_(sheet, false) >= dailyCap_(properties, "REVIEW_DAILY_ACCEPTANCE_CAP", DEFAULT_REVIEW_DAILY_ACCEPTANCE_CAP);
+}
+
+function dailyCap_(properties, key, fallback) {
+  var configured = Number(properties.getProperty(key));
+  return Number.isInteger(configured) && configured > 0 ? configured : fallback;
+}
+
+// Written reviews and quick ratings each have their own daily cap; quick ratings also have one per product.
+function dailyRowCount_(sheet, quickRatings, productId) {
   var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   var values = sheet.getDataRange().getValues();
   var count = 0;
   for (var index = 1; index < values.length; index += 1) {
     var received = values[index][1];
+    if (isQuickRatingRow_(values[index]) !== quickRatings) continue;
+    if (productId && String(values[index][4]) !== productId) continue;
     if (received && Utilities.formatDate(new Date(received), Session.getScriptTimeZone(), "yyyy-MM-dd") === today) count += 1;
   }
-  return count >= cap;
+  return count;
 }
 
 function reviewsConfig_(properties) {
@@ -1243,7 +1306,7 @@ function publicReviews_() {
   }
   return {
     ok: true, intake: ready && !isTrue_(properties.getProperty("REVIEWS_DISABLED")) ? "open" : "paused",
-    summary: data.summary, reviews: data.reviews
+    summary: data.summary, reviews: data.reviews, ratings: data.ratings || {}
   };
 }
 
@@ -1254,12 +1317,20 @@ function publishedReviews_(properties) {
   var values = sheet.getDataRange().getValues();
   var published = [];
   var total = 0;
+  var ratings = {};
   for (var index = 1; index < values.length; index += 1) {
     var row = values[index];
     if (String(row[2]) !== "Published") continue;
     var rating = Number(row[3]);
     var receivedAt = retentionDate_(row[1]);
     if (!Number.isInteger(rating) || rating < 1 || rating > 5 || !receivedAt) continue;
+    var productId = String(row[4]);
+    if (/^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productId)) {
+      if (!Object.prototype.hasOwnProperty.call(ratings, productId)) ratings[productId] = [0, 0];
+      ratings[productId][0] += rating;
+      ratings[productId][1] += 1;
+    }
+    if (isQuickRatingRow_(row)) continue;
     total += rating;
     published.push({
       order: index, at: receivedAt.getTime(),
@@ -1273,7 +1344,8 @@ function publishedReviews_(properties) {
   published.sort(function (left, right) { return right.at - left.at || right.order - left.order; });
   return {
     summary: { count: published.length, average: published.length ? Math.round(total / published.length * 10) / 10 : 0 },
-    reviews: published.slice(0, 50).map(function (item) { return item.review; })
+    reviews: published.slice(0, 50).map(function (item) { return item.review; }),
+    ratings: ratings
   };
 }
 

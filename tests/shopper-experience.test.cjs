@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261150">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261150" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261151">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261151" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -974,7 +974,7 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(trigger.focused, undefined);
 });
 
-function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true, sample = null, feed = undefined } = {}) {
+function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true, sample = null, feed = undefined, rateResponse = { ok: true, rating: 4 }, stored = null, captcha = true, rateReject = false } = {}) {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
   const makeElement = (extra = {}) => Object.assign({
@@ -1064,9 +1064,11 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     docElements["lightbox-rating-summary"] = children(makeElement({ hidden: true }));
     Object.defineProperty(docElements["lightbox-rating-summary"], "firstChild", { get() { return this.children[0] || null; } });
     docElements["lightbox-rating-summary"].removeChild = function (child) { this.children.splice(this.children.indexOf(child), 1); return child; };
-    docElements["lightbox-rate"] = makeElement({ hidden: true });
-    const rateLinks = [1, 2, 3, 4, 5].map((value) => makeElement({ attributes: { "data-rate": String(value), href: "reviews/#write" } }));
-    docElements["lightbox-rate"].querySelectorAll = (selector) => (selector === "[data-rate]" ? rateLinks : []);
+    docElements["lightbox-rate"] = makeElement({ hidden: true, attributes: { "data-captcha-site-key": "site-key" } });
+    const rateButtons = [1, 2, 3, 4, 5].map((value) => makeElement({ disabled: false, attributes: { "data-rate": String(value) } }));
+    docElements["lightbox-rate"].querySelectorAll = (selector) => (selector === "[data-rate]" ? rateButtons : []);
+    docElements["lightbox-rate-status"] = makeElement();
+    docElements["lightbox-tell-more"] = makeElement({ attributes: { href: "reviews/#write" } });
     docElements["lightbox-review-list"] = list;
     if (feed !== undefined) docElements["order-form-embed"] = makeElement({ attributes: { "data-order-form-url": "https://script.google.test/exec" } });
   }
@@ -1079,7 +1081,18 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
   if (feed !== undefined) {
     windowObject.setTimeout = () => 1;
     windowObject.clearTimeout = () => {};
-    windowObject.fetch = (url, init) => { fetchCalls.push({ url, init }); return feed === "fail" ? Promise.reject(new Error("network")) : Promise.resolve({ json: () => Promise.resolve(feed) }); };
+    windowObject.fetch = (url, init) => {
+      fetchCalls.push({ url, init });
+      if (init && init.method === "POST") return rateReject ? Promise.reject(new Error("network")) : Promise.resolve({ json: () => Promise.resolve(rateResponse) });
+      return feed === "fail" ? Promise.reject(new Error("network")) : Promise.resolve({ json: () => Promise.resolve(feed) });
+    };
+  }
+  const storage = new Map(stored ? [["saloni-product-ratings", JSON.stringify(stored)]] : []);
+  if (reviewsMode) {
+    windowObject.localStorage = { getItem: (key) => (storage.has(key) ? storage.get(key) : null), setItem: (key, value) => storage.set(key, String(value)) };
+    let uuid = 0;
+    windowObject.crypto = { randomUUID: () => "rating-0000-1111-222" + (uuid += 1) };
+    if (captcha) windowObject.grecaptcha = { ready: (callback) => callback(), execute: (key, options) => { fetchCalls.push({ captcha: key, action: options.action }); return Promise.resolve("captcha-token"); } };
   }
   vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
   const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
@@ -1089,7 +1102,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     docElements["lightbox-stage"].listeners.pointerdown({ clientX: 200, clientY: 100 });
     docElements["lightbox-stage"].listeners.pointerup({ clientX: 200 + dx, clientY: 100 + dy });
   };
-  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe, trigger, cardImage, fetchCalls };
+  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe, trigger, cardImage, fetchCalls, storage, windowObject };
 }
 
 const textOf = (node) => (node.children && node.children.length ? node.children.map(textOf).join(" ") : String(node.textContent || ""));
@@ -1121,11 +1134,69 @@ test("the product popup still offers the rating stars when the card has no sampl
   assert.equal(h.docElements["lightbox-reviews-title"].textContent, "Reviews");
 });
 
-test("each rating star in the product popup opens the Reviews page with this product and that rating", () => {
+const emptyFeed = { ok: true, intake: "open", summary: { count: 0, average: 0 }, reviews: [], ratings: {} };
+const rateStar = (h, value) => h.docElements["lightbox-rate"].querySelectorAll("[data-rate]")[value - 1].listeners.click({ preventDefault() {} });
+
+test("the product popup offers Tell us more for this product, and the stars are buttons, not links", () => {
   const h = galleryHarness({ sample: "A lovely sample line for this piece." });
   h.open();
-  const links = h.docElements["lightbox-rate"].querySelectorAll("[data-rate]");
-  assert.deepEqual(links.map((link) => link.attributes.href), [1, 2, 3, 4, 5].map((value) => "reviews/?product=catalogue%3Asample-gift.jpg&rating=" + value + "#write"));
+  const buttons = h.docElements["lightbox-rate"].querySelectorAll("[data-rate]");
+  assert.ok(buttons.every((button) => button.attributes.href === undefined && button.disabled === false));
+  assert.equal(h.docElements["lightbox-tell-more"].attributes.href, "reviews/?product=catalogue%3Asample-gift.jpg#write");
+});
+
+test("tapping a star saves the rating from the popup with a captcha token and thanks the shopper", async () => {
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed });
+  h.open();
+  await settleAll();
+  rateStar(h, 4);
+  assert.equal(h.docElements["lightbox-rate-status"].textContent, "Saving your rating…");
+  await settleAll();
+  const captchaCall = h.fetchCalls.find((call) => call.captcha);
+  assert.deepEqual(captchaCall, { captcha: "site-key", action: "product_rating" });
+  const post = h.fetchCalls.find((call) => call.init && call.init.method === "POST");
+  assert.equal(post.url, "https://script.google.test/exec");
+  assert.equal(post.init.credentials, "omit");
+  assert.equal(post.init.headers["Content-Type"], "application/x-www-form-urlencoded");
+  assert.equal(post.init.body, "action=rate&productId=catalogue%3Asample-gift.jpg&rating=4&ratingId=rating-0000-1111-2221&captchaToken=captcha-token");
+  assert.equal(h.docElements["lightbox-rate-status"].focused, true);
+  assert.equal(h.docElements["lightbox-rate-status"].textContent, "Thanks! You rated this 4 out of 5 stars.");
+  const buttons = h.docElements["lightbox-rate"].querySelectorAll("[data-rate]");
+  assert.deepEqual(buttons.map((button) => button.disabled), [true, true, true, true, true]);
+  assert.deepEqual(buttons.map((button) => button.attributes["aria-pressed"]), ["true", "true", "true", "true", "false"]);
+  assert.equal(h.docElements["lightbox-tell-more"].attributes.href, "reviews/?product=catalogue%3Asample-gift.jpg&rating=4#write");
+  assert.deepEqual(JSON.parse(h.storage.get("saloni-product-ratings")), { "catalogue:sample-gift.jpg": 4 });
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "★★★★☆ 4.0 out of 5 · 1 rating");
+});
+
+test("a product already rated in this browser shows the saved rating and cannot be rated again", async () => {
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, stored: { "catalogue:sample-gift.jpg": 5 } });
+  h.open();
+  await settleAll();
+  assert.equal(h.docElements["lightbox-rate-status"].textContent, "You rated this 5 out of 5 stars. Thank you!");
+  const buttons = h.docElements["lightbox-rate"].querySelectorAll("[data-rate]");
+  assert.ok(buttons.every((button) => button.disabled));
+  rateStar(h, 2);
+  await settleAll();
+  assert.equal(h.fetchCalls.filter((call) => call.init && call.init.method === "POST").length, 0);
+  assert.equal(h.docElements["lightbox-tell-more"].attributes.href, "reviews/?product=catalogue%3Asample-gift.jpg&rating=5#write");
+});
+
+test("a rating that cannot be saved explains why and lets the shopper try again", async () => {
+  const failed = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, rateResponse: { ok: false, error: "captcha" } });
+  failed.open();
+  await settleAll();
+  rateStar(failed, 3);
+  await settleAll();
+  assert.equal(failed.docElements["lightbox-rate-status"].textContent, "Your rating could not be saved. Please try again.");
+  assert.ok(failed.docElements["lightbox-rate"].querySelectorAll("[data-rate]").every((button) => !button.disabled));
+  assert.equal(failed.storage.has("saloni-product-ratings"), false);
+  const paused = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, rateResponse: { ok: false, error: "paused" } });
+  paused.open();
+  await settleAll();
+  rateStar(paused, 3);
+  await settleAll();
+  assert.equal(paused.docElements["lightbox-rate-status"].textContent, "Ratings are paused right now. Please try again later.");
 });
 
 test("the product popup shows the average star rating from real reviews of that product only", async () => {
@@ -1137,8 +1208,32 @@ test("the product popup shows the average star rating from real reviews of that 
   await settleAll();
   const summary = h.docElements["lightbox-rating-summary"];
   assert.equal(summary.hidden, false);
-  assert.equal(textOf(summary), "★★★★★ 4.5 out of 5 · 2 reviews");
+  assert.equal(textOf(summary), "★★★★★ 4.5 out of 5 · 2 ratings");
   assert.equal(summary.children[0].attributes["aria-hidden"], "true");
+});
+
+test("a retry after a network failure reuses the same rating ID so the server counts it once", async () => {
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, rateReject: true });
+  h.open();
+  await settleAll();
+  rateStar(h, 5);
+  await settleAll();
+  rateStar(h, 5);
+  await settleAll();
+  rateStar(h, 3);
+  await settleAll();
+  const ids = h.fetchCalls.filter((call) => call.init && call.init.method === "POST").map((call) => /ratingId=([^&]+)/.exec(call.init.body)[1]);
+  assert.equal(ids.length, 3);
+  assert.equal(ids[0], ids[1]);
+  assert.notEqual(ids[2], ids[0]);
+});
+
+test("the popup average uses the feed's per-product rating totals, which include quick ratings", async () => {
+  const feed = { ok: true, intake: "open", summary: { count: 1, average: 5 }, reviews: [{ id: "r-a", rating: 5, productId: "catalogue:sample-gift.jpg", productName: "Sample gift", firstName: "Asha", city: "", comment: "Nice.", date: "2026-11-08", photos: [] }], ratings: { "catalogue:sample-gift.jpg": [12, 3], "catalogue:other-gift.jpg": [1, 1] } };
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed });
+  h.open();
+  await settleAll();
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "★★★★☆ 4.0 out of 5 · 3 ratings");
 });
 
 test("the product popup adds real reviews for that product only, above the sample, and fetches the feed once", async () => {

@@ -288,6 +288,94 @@ test("a review seed passes a valid product and rating through to the form and dr
   assert.equal(order.rating, undefined);
 });
 
+const RATING_CAPTCHA = { success: true, hostname: "saloniresinart.com", action: "product_rating", score: 0.9 };
+const rate = (runtime, overrides = {}) => JSON.parse(runtime.context.doPost({ parameter: Object.assign({ action: "rate", productId: DEFAULT_PRODUCTS[0].id, rating: "4", ratingId: "rating-abcdef123456", captchaToken: "token" }, overrides) }).getContent());
+
+test("a quick rating from a product popup is saved as a Published rating-only row", () => {
+  const runtime = makeRuntime({ captchaResponse: RATING_CAPTCHA });
+  runtime.state.cache.set("reviews-public-v1", "{}");
+  assert.deepEqual(rate(runtime), { ok: true, rating: 4 });
+  const row = runtime.rows.at(-1);
+  assert.equal(row[0], "rating-abcdef123456");
+  assert.equal(row[2], "Published");
+  assert.equal(row[3], 4);
+  assert.equal(row[4], DEFAULT_PRODUCTS[0].id);
+  assert.equal(row[5], DEFAULT_PRODUCTS[0].name);
+  assert.deepEqual(plain(row.slice(6, 11)), ["", "", "", "", false]);
+  assert.match(row[11], /^[0-9a-f]{64}$/);
+  assert.equal(row[12], "Quick rating from a product popup");
+  assert.equal(runtime.state.captchaCalls, 1);
+  assert.ok(runtime.state.cacheRemoves.includes("reviews-public-v1"));
+  assert.equal(runtime.state.released, runtime.state.lockCalls);
+});
+
+test("a quick rating needs a known product, a 1 to 5 rating, a rating ID and a passing captcha", () => {
+  const runtime = makeRuntime({ captchaResponse: RATING_CAPTCHA });
+  assert.deepEqual(rate(runtime, { productId: "studio" }), { ok: false, error: "invalid" });
+  assert.deepEqual(rate(runtime, { productId: "catalogue:not-in-the-list.jpg" }), { ok: false, error: "invalid" });
+  assert.deepEqual(rate(runtime, { rating: "6" }), { ok: false, error: "invalid" });
+  assert.deepEqual(rate(runtime, { rating: "4.5" }), { ok: false, error: "invalid" });
+  assert.deepEqual(rate(runtime, { ratingId: "short" }), { ok: false, error: "invalid" });
+  assert.equal(runtime.state.captchaCalls, 0);
+  const reviewToken = makeRuntime();
+  assert.deepEqual(rate(reviewToken), { ok: false, error: "captcha" });
+  const lowScore = makeRuntime({ captchaResponse: Object.assign({}, RATING_CAPTCHA, { score: 0.1 }) });
+  assert.deepEqual(rate(lowScore), { ok: false, error: "captcha" });
+  assert.equal(runtime.rows.length + reviewToken.rows.length + lowScore.rows.length, 3);
+});
+
+test("quick ratings stop with the reviews switch, before setup, at their own daily cap and when busy", () => {
+  assert.deepEqual(rate(makeRuntime({ captchaResponse: RATING_CAPTCHA, properties: { REVIEWS_DISABLED: "true" } })), { ok: false, error: "paused" });
+  assert.deepEqual(rate(makeRuntime({ captchaResponse: RATING_CAPTCHA, properties: { REVIEWS_CONFIGURED: "" } })), { ok: false, error: "unavailable" });
+  const today = new Date();
+  const quick = (index) => reviewRow({ id: "rating-cap-" + String(index).padStart(8, "0"), at: today, productId: DEFAULT_PRODUCTS[0].id, firstName: "", city: "", comment: "", consent: false, notes: "Quick rating from a product popup" });
+  const capped = makeRuntime({ captchaResponse: RATING_CAPTCHA, properties: { RATING_DAILY_ACCEPTANCE_CAP: "2" }, rows: [quick(1), quick(2)] });
+  assert.deepEqual(rate(capped), { ok: false, error: "cap" });
+  assert.equal(capped.rows.length, 3);
+  assert.equal(makeRuntime().context.DEFAULT_RATING_DAILY_ACCEPTANCE_CAP, 100);
+  assert.deepEqual(rate(makeRuntime({ captchaResponse: RATING_CAPTCHA, lockAvailable: false })), { ok: false, error: "busy" });
+  const manyReviews = Array.from({ length: 20 }, (_, index) => reviewRow({ id: "review-cap-" + String(index).padStart(6, "0"), at: today }));
+  assert.equal(rate(makeRuntime({ captchaResponse: RATING_CAPTCHA, rows: manyReviews })).ok, true, "written reviews do not use up the rating cap");
+  const ratingsOnly = Array.from({ length: 25 }, (_, index) => quick(index));
+  assert.equal(makeRuntime({ rows: ratingsOnly }).context.submitReview(validForm()).ok, true, "quick ratings do not use up the review cap");
+});
+
+test("one product takes at most 10 quick ratings a day by default, and the limit can be changed", () => {
+  const today = new Date();
+  const quick = (index, productId) => reviewRow({ id: "rating-prod-" + String(index).padStart(8, "0"), at: today, productId, firstName: "", city: "", comment: "", consent: false, notes: "Quick rating from a product popup" });
+  const ten = Array.from({ length: 10 }, (_, index) => quick(index, DEFAULT_PRODUCTS[0].id));
+  const full = makeRuntime({ captchaResponse: RATING_CAPTCHA, rows: ten });
+  assert.deepEqual(rate(full), { ok: false, error: "cap" });
+  assert.equal(rate(full, { productId: DEFAULT_PRODUCTS[1].id }).ok, true, "another product still takes ratings");
+  const yesterday = Array.from({ length: 10 }, (_, index) => reviewRow({ id: "rating-old-" + String(index).padStart(8, "0"), at: new Date(today.getTime() - 2 * 86400000), productId: DEFAULT_PRODUCTS[0].id, firstName: "", city: "", comment: "", consent: false }));
+  assert.equal(rate(makeRuntime({ captchaResponse: RATING_CAPTCHA, rows: yesterday })).ok, true);
+  assert.deepEqual(rate(makeRuntime({ captchaResponse: RATING_CAPTCHA, properties: { RATING_PRODUCT_DAILY_CAP: "2" }, rows: ten.slice(0, 2) })), { ok: false, error: "cap" });
+  assert.equal(makeRuntime().context.DEFAULT_RATING_PRODUCT_DAILY_CAP, 10);
+});
+
+test("the same quick rating sent twice is saved once, and a changed rating under the same ID conflicts", () => {
+  const runtime = makeRuntime({ captchaResponse: RATING_CAPTCHA });
+  assert.equal(rate(runtime).ok, true);
+  assert.deepEqual(rate(runtime), { ok: true, rating: 4 });
+  assert.equal(runtime.rows.length, 2);
+  assert.deepEqual(rate(runtime, { rating: "2" }), { ok: false, error: "conflict" });
+  assert.equal(runtime.rows.length, 2);
+});
+
+test("the public feed counts quick ratings per product but lists only written reviews", () => {
+  const quick = (id, rating, status = "Published") => reviewRow({ id, rating, status, productId: DEFAULT_PRODUCTS[0].id, firstName: "", city: "", comment: "", consent: false, notes: "Quick rating from a product popup" });
+  const rows = [
+    reviewRow({ id: "review-written-001", rating: 5, productId: DEFAULT_PRODUCTS[0].id, productName: DEFAULT_PRODUCTS[0].name }),
+    quick("rating-quick-000001", 3), quick("rating-quick-000002", 4), quick("rating-hidden-00001", 1, "Hidden"),
+    reviewRow({ id: "review-studio-001", rating: 4 }),
+  ];
+  const runtime = makeRuntime({ rows });
+  const body = JSON.parse(runtime.context.doGet({ parameter: { action: "reviews" } }).getContent());
+  assert.deepEqual(body.reviews.map((review) => review.id).sort(), ["review-studio-001", "review-written-001"]);
+  assert.deepEqual(body.summary, { count: 2, average: 4.5 });
+  assert.deepEqual(plain(body.ratings), { [DEFAULT_PRODUCTS[0].id]: [12, 3] });
+});
+
 test("rating, names, comment, contact details and consent are validated", () => {
   const runtime = makeRuntime();
   const errorsFor = (overrides) => runtime.context.validateReview_(runtime.context.collectReview_(validForm(overrides)), {});
@@ -545,7 +633,7 @@ test("the public read endpoint returns only exact Published rows with an allowli
   assert.equal(result.reviews[0].date, "2026-11-06", "dates use the Asia/Kolkata day");
   assert.deepEqual(result.reviews[0].photos, [FILE_A], "invalid photo IDs are dropped");
   assert.deepEqual(result.reviews[1].photos, [FILE_A, FILE_B]);
-  assert.deepEqual(Object.keys(result).sort(), ["intake", "ok", "reviews", "summary"]);
+  assert.deepEqual(Object.keys(result).sort(), ["intake", "ok", "ratings", "reviews", "summary"]);
   const text = JSON.stringify(result);
   assert.doesNotMatch(text, /fp-secret|private staff note|consent/i);
 });
@@ -597,7 +685,7 @@ test("read failures and an unconfigured backend fail closed", () => {
   assert.deepEqual(read(missingTab), { ok: false });
   const unconfigured = makeRuntime({ properties: { REVIEWS_CONFIGURED: "" }, rows: [reviewRow()] });
   const result = read(unconfigured);
-  assert.deepEqual(result, { ok: true, intake: "paused", summary: { count: 0, average: 0 }, reviews: [] });
+  assert.deepEqual(result, { ok: true, intake: "paused", summary: { count: 0, average: 0 }, reviews: [], ratings: {} });
   assert.equal(unconfigured.state.dataReads, 0);
   const response = makeRuntime({ rows: [reviewRow()] }).context.doGet({ parameter: { action: "reviews" } });
   assert.equal(response.mime, "JSON");
