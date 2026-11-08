@@ -1027,9 +1027,9 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 .lightbox-rate-label { font-weight: 800; }
 .lightbox-rate-hint { color: var(--muted); font-size: 0.8rem; }
 .lightbox-rate-stars { display: flex; gap: 0.15rem; }
-.lightbox-rate-star { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 0.6rem; color: #c9b8a6; font-size: 1.9rem; line-height: 1; text-decoration: none; }
+.lightbox-rate-star { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 0.6rem; color: #947f6b; font-size: 1.9rem; line-height: 1; text-decoration: none; }
 .lightbox-rate-stars:hover .lightbox-rate-star, .lightbox-rate-stars:focus-within .lightbox-rate-star { color: #8a5200; }
-.lightbox-rate-star:hover ~ .lightbox-rate-star, .lightbox-rate-star:focus-visible ~ .lightbox-rate-star { color: #c9b8a6; }
+.lightbox-rate-star:hover ~ .lightbox-rate-star, .lightbox-rate-star:focus-visible ~ .lightbox-rate-star { color: #947f6b; }
 .lightbox-rate-star:focus-visible { outline: 3px solid var(--rose-ink); outline-offset: 2px; }
 .sample-review { border-style: dashed; background: #fffaf4; }
 .sample-badge { justify-self: start; margin: 0; padding: 0.2rem 0.6rem; border-radius: 999px; background: #efe4d8; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; }
