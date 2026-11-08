@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261148">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261148" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261149">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261149" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -1060,6 +1060,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     Object.defineProperty(list, "firstChild", { get() { return this.children[0] || null; } });
     list.removeChild = function (child) { this.children.splice(this.children.indexOf(child), 1); child.parentNode = null; return child; };
     docElements["lightbox-reviews"] = makeElement({ hidden: true });
+    docElements["lightbox-reviews-title"] = makeElement({ textContent: "Reviews" });
     docElements["lightbox-review-list"] = list;
     if (feed !== undefined) docElements["order-form-embed"] = makeElement({ attributes: { "data-order-form-url": "https://script.google.test/exec" } });
   }
@@ -1097,7 +1098,8 @@ test("the product popup shows the card's labelled sample review and nothing else
   assert.equal(items.length, 1);
   assert.equal(items[0].className, "review-card sample-review");
   assert.equal(items[0].children[0].className, "sample-badge");
-  assert.equal(items[0].children[0].textContent, "Sample review · written by the studio");
+  assert.equal(items[0].children[0].textContent, "From the studio");
+  assert.equal(h.docElements["lightbox-reviews-title"].textContent, "What we love about it");
   assert.equal(items[0].children[1].className, "review-comment");
   assert.equal(items[0].children[1].textContent, "The golden flecks catch the candle light beautifully.");
   assert.equal(h.fetchCalls.length, 0);
@@ -1120,6 +1122,7 @@ test("the product popup adds real reviews for that product only, above the sampl
   assert.equal(h.fetchCalls.length, 1);
   assert.equal(h.fetchCalls[0].url, "https://script.google.test/exec?action=reviews");
   assert.deepEqual(items.map((item) => item.className), ["review-card", "review-card sample-review"]);
+  assert.equal(h.docElements["lightbox-reviews-title"].textContent, "Reviews");
   assert.match(textOf(items[0]), /Asha/);
   assert.doesNotMatch(textOf(h.docElements["lightbox-review-list"]), /Ravi/);
   h.lightbox.close();
