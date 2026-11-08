@@ -263,6 +263,7 @@
     var lightboxIncluded = document.getElementById("lightbox-included");
     var lightboxReviews = document.getElementById("lightbox-reviews");
     var lightboxReviewList = document.getElementById("lightbox-review-list");
+    var lightboxReviewsTitle = document.getElementById("lightbox-reviews-title");
     var reviewsEmbed = document.getElementById("order-form-embed");
     var productReviewsUrl = reviewsEmbed ? reviewsEmbed.getAttribute("data-order-form-url") || "" : "";
     var productReviewsData = null;
@@ -407,7 +408,7 @@
         return match ? "catalogue:" + match[1] : "";
       }
 
-      // Real reviews for this piece come first; the card's sample review is always labelled as written by the studio.
+      // Real reviews for this piece come first; the card's sample is always tagged as the studio's own note.
       function renderProductReviews(item) {
         if (!lightboxReviews || !lightboxReviewList) return;
         productReviewsItem = item;
@@ -427,7 +428,7 @@
           sampleCard.className = "review-card sample-review";
           var badge = document.createElement("p");
           badge.className = "sample-badge";
-          badge.textContent = "Sample review · written by the studio";
+          badge.textContent = "From the studio";
           var comment = document.createElement("p");
           comment.className = "review-comment";
           comment.textContent = sample;
@@ -436,6 +437,7 @@
           lightboxReviewList.appendChild(sampleCard);
           shown += 1;
         }
+        if (lightboxReviewsTitle) lightboxReviewsTitle.textContent = shown > (sample ? 1 : 0) ? "Reviews" : "What we love about it";
         lightboxReviews.hidden = !shown;
         if (productReviewsData || productReviewsLoading || !productReviewsUrl) return;
         productReviewsLoading = true;
