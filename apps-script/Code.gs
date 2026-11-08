@@ -1,9 +1,10 @@
 /**
  * Google Apps Script web app for the static site's order-request iframe.
  *
- * The web app intentionally has no public read/list endpoint. doGet and doPost
- * only render a bounded order, partner, or corporate form; public writes stay in the three
- * validated submission functions below.
+ * The web app has one public read endpoint: doGet?action=reviews returns the
+ * allowlisted fields of Published customer reviews and nothing else. Otherwise doGet
+ * and doPost only render a bounded order, partner, corporate, or review form; public
+ * writes stay in the four validated submission functions below.
  */
 
 var MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -13,6 +14,11 @@ var DEFAULT_PARTNER_DAILY_ACCEPTANCE_CAP = 20;
 var DEFAULT_CORPORATE_DAILY_ACCEPTANCE_CAP = 20;
 var PARTNER_APPLICATION_CAPTCHA_ACTION = "partner_application";
 var CORPORATE_ENQUIRY_CAPTCHA_ACTION = "corporate_enquiry";
+var REVIEW_CAPTCHA_ACTION = "review_submission";
+var DEFAULT_REVIEW_DAILY_ACCEPTANCE_CAP = 20;
+var MAX_REVIEW_PHOTO_BYTES = 1024 * 1024;
+var MAX_REVIEW_PHOTOS = 3;
+var REVIEW_PRODUCTS_URL = "https://saloniresinart.com/reviews/products.json";
 var ORDER_CAPTCHA_ACTION = "order_request";
 var RETENTION_DAYS = 90;
 var RETENTION_MILLISECONDS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -50,6 +56,16 @@ var CORPORATE_ENQUIRY_HEADERS = [
   "Enquiry type", "Occasion", "Approximate quantity", "Budget range", "Required date", "Delivery scope",
   "Brief", "Privacy accepted", "Status", "Staff notes", "Payload fingerprint"
 ];
+var REVIEWS_TAB_NAME = "Reviews";
+var REVIEWS_READY_PROPERTY = "REVIEWS_CONFIGURED";
+var REVIEWS_CACHE_KEY = "reviews-public-v1";
+var REVIEW_PRODUCTS_CACHE_KEY = "review-products-v1";
+var REVIEW_PRODUCTS_FAILED_KEY = "review-products-failed-v1";
+var REVIEW_STATUSES = ["Published", "Hidden", "Removed"];
+var REVIEW_HEADERS = [
+  "Review ID", "Received at", "Status", "Rating", "Product ID", "Product name", "First name", "City",
+  "Comment", "Photo file IDs", "Public consent", "Payload fingerprint", "Staff notes"
+];
 var PARTNER_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,31}$/;
 var PARTNER_PROGRAM_READY_PROPERTY = "PARTNER_PROGRAM_CONFIGURED";
 var CORPORATE_PROGRAM_READY_PROPERTY = "CORPORATE_PROGRAM_CONFIGURED";
@@ -59,6 +75,7 @@ var DELIVERY_STATUSES = ["New", "Confirmed", "In production", "Shipped", "Delive
 
 function doGet(event) {
   var parameters = event && event.parameter ? event.parameter : {};
+  if (parameters.action === "reviews") return publicReviewsResponse_();
   return renderForm_({ seed: blankSeed_(), mode: boundedMode_(parameters.mode) });
 }
 
@@ -71,6 +88,7 @@ function doPost(event) {
     seed.formMode = mode;
     if (mode === "partner") seed.applicationId = boundedSeed_(parameters.applicationId || seed.applicationId, 80);
     if (mode === "corporate") seed.enquiryId = boundedSeed_(parameters.enquiryId || seed.enquiryId, 80);
+    if (mode === "review") seed.reviewId = boundedSeed_(parameters.reviewId || seed.reviewId, 80);
     return renderForm_({ seed: seed, mode: mode });
   }
   return renderForm_({ seed: blankSeed_(), mode: mode });
@@ -83,20 +101,25 @@ function renderForm_(state) {
   var mode = boundedMode_(state && state.mode);
   var seed = (state && state.seed) || blankSeed_();
   seed.formMode = mode;
-  var templateName = mode === "partner" ? "PartnerForm" : mode === "corporate" ? "CorporateForm" : "Form";
+  var templateName = mode === "partner" ? "PartnerForm" : mode === "corporate" ? "CorporateForm" : mode === "review" ? "ReviewForm" : "Form";
   var template = HtmlService.createTemplateFromFile(templateName);
   template.seedJson = escapeSeedJson_(JSON.stringify(seed));
   template.captchaSiteKeyJson = escapeSeedJson_(JSON.stringify(siteKey));
   template.captchaEnabledJson = captchaEnabled ? "true" : "false";
   template.formModeJson = escapeSeedJson_(JSON.stringify(mode));
+  if (mode === "review") {
+    var products = reviewProducts_();
+    template.reviewProductsJson = escapeSeedJson_(JSON.stringify(products ? Object.keys(products).map(function (id) { return { id: id, name: products[id] }; }) : null));
+    template.reviewsPausedJson = isTrue_(properties.getProperty("REVIEWS_DISABLED")) || !reviewsReady_(properties) ? "true" : "false";
+  }
   return template.evaluate()
-    .setTitle(mode === "partner" ? "Saloni Resin Art partner application" : mode === "corporate" ? "Saloni Resin Art organisation enquiry" : "Saloni Resin Art Studio order request")
+    .setTitle(mode === "partner" ? "Saloni Resin Art partner application" : mode === "corporate" ? "Saloni Resin Art organisation enquiry" : mode === "review" ? "Saloni Resin Art customer review" : "Saloni Resin Art Studio order request")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function boundedMode_(value) {
   var mode = String(value || "").toLowerCase();
-  return mode === "partner" || mode === "corporate" ? mode : "order";
+  return mode === "partner" || mode === "corporate" || mode === "review" ? mode : "order";
 }
 
 function purgeExpiredOrders_() {
@@ -851,6 +874,515 @@ function setupCorporateGifting() {
     if (properties.setProperty) properties.setProperty(CORPORATE_PROGRAM_READY_PROPERTY, "true");
     return { tab: config.tabName, columns: CORPORATE_ENQUIRY_HEADERS.length };
   } finally { lock.releaseLock(); }
+}
+
+function submitReview(form) {
+  var properties = PropertiesService.getScriptProperties();
+  if (isTrue_(properties.getProperty("REVIEWS_DISABLED"))) {
+    return validationFailure_({ form: "New reviews are paused right now. Please contact Saloni directly." });
+  }
+  var config = reviewsConfig_(properties);
+  if (!config || !reviewsReady_(properties)) throw new Error("Unable to post the review.");
+  var payload = collectReview_(form || {});
+  var products = payload.productId === "studio" ? {} : reviewProducts_();
+  var errors = validateReview_(payload, products);
+  var decoded = { error: "", items: [] };
+  if (!errors.photos) {
+    decoded = decodeReviewPhotos_(payload.photos);
+    if (decoded.error) errors.photos = decoded.error;
+  }
+  if (Object.keys(errors).length) return validationFailure_(errors);
+  var captcha = verifyCaptcha_(payload.captchaToken, properties, REVIEW_CAPTCHA_ACTION);
+  if (!captcha.ok) return validationFailure_({ captcha: captcha.error });
+  try {
+    return storeReview_(payload, products, decoded.items, config, properties);
+  } catch (error) {
+    throw new Error("Unable to post the review.");
+  }
+}
+
+// Drive files are created outside the shared lock so a slow upload never blocks orders.
+function storeReview_(payload, products, photos, config, properties) {
+  var fingerprint = reviewFingerprint_(payload, photos.map(function (photo) { return photo.digest; }));
+  var sheet = openReviewsTab_(properties, true);
+  ensureReviewsTabSchema_(sheet, false);
+  var replay = reviewReplay_(sheet, payload.reviewId, fingerprint);
+  if (replay) return replay;
+  if (reviewDailyCapReached_(sheet, properties)) return reviewCapFailure_();
+  var files = createReviewPhotoFiles_(payload.reviewId, photos, config, properties);
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    trashFiles_(files);
+    throw new Error("Unable to confirm review.");
+  }
+  var result;
+  try {
+    result = appendReview_(sheet, payload, fingerprint, payload.productId === "studio" ? "" : products[payload.productId], files, properties);
+  } finally {
+    lock.releaseLock();
+  }
+  if (result.ok) clearReviewsCache_();
+  return result;
+}
+
+function appendReview_(sheet, payload, fingerprint, productName, files, properties) {
+  try {
+    var replay = reviewReplay_(sheet, payload.reviewId, fingerprint);
+    if (replay) {
+      trashFiles_(files);
+      return replay;
+    }
+    if (reviewDailyCapReached_(sheet, properties)) {
+      trashFiles_(files);
+      return reviewCapFailure_();
+    }
+  } catch (checkError) {
+    trashFiles_(files);
+    throw checkError;
+  }
+  var receivedAt = new Date();
+  var row = [
+    neutralizeForSheet_(payload.reviewId), receivedAt, "Published", Number(payload.rating),
+    neutralizeForSheet_(payload.productId), neutralizeForSheet_(productName), neutralizeForSheet_(reviewFirstName_(payload)),
+    neutralizeForSheet_(payload.city), neutralizeForSheet_(payload.comment),
+    neutralizeForSheet_(files.map(function (file) { return file.getId(); }).join(",")), true,
+    neutralizeForSheet_(fingerprint), ""
+  ];
+  try {
+    sheet.appendRow(row);
+  } catch (appendError) {
+    // appendRow can persist a row and still throw. Reconcile before touching the files
+    // so a saved review never loses its photos.
+    var afterAppend;
+    try { afterAppend = findReview_(sheet, payload.reviewId); }
+    catch (reconciliationError) { throw new Error("Unable to confirm review."); }
+    if (afterAppend && afterAppend.fingerprint === fingerprint) return reviewReceipt_(payload.reviewId, afterAppend.receivedAt);
+    trashFiles_(files);
+    if (afterAppend) return reviewConflict_();
+    throw appendError;
+  }
+  return reviewReceipt_(payload.reviewId, receivedAt.toISOString());
+}
+
+function reviewReplay_(sheet, reviewId, fingerprint) {
+  var existing = findReview_(sheet, reviewId);
+  if (!existing) return null;
+  return existing.fingerprint === fingerprint ? reviewReceipt_(reviewId, existing.receivedAt) : reviewConflict_();
+}
+
+function reviewReceipt_(reviewId, receivedAt) {
+  return { ok: true, reviewId: reviewId, receivedAt: receivedAt, status: "Published" };
+}
+
+function reviewConflict_() {
+  return validationFailure_({ reviewId: "Review ID conflict: these details differ from the saved review. Write another review." });
+}
+
+function reviewCapFailure_() {
+  return validationFailure_({ form: "The studio's daily review limit has been reached. Please try again tomorrow." });
+}
+
+function collectReview_(form) {
+  var photos = Array.isArray(form.photos) ? form.photos.slice(0, MAX_REVIEW_PHOTOS + 1) : [];
+  return {
+    reviewId: stringValue_(form.reviewId).trim(), productId: stringValue_(form.productId).trim(), rating: stringValue_(form.rating).trim(),
+    firstName: stringValue_(form.firstName).trim(), city: stringValue_(form.city).trim(), comment: stringValue_(form.comment).trim(),
+    publicConsent: isTrue_(form.publicConsent), captchaToken: stringValue_(form.captchaToken),
+    photos: photos.map(function (photo) { return { type: stringValue_(photo && photo.type), data: stringValue_(photo && photo.data) }; })
+  };
+}
+
+function reviewFirstName_(payload) {
+  return payload.firstName.split(/\s+/)[0];
+}
+
+function reviewTextHasContact_(text) {
+  return /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/.test(text) || /(?:\d[\s\-().]*){10,}/.test(text) || /https?:\/\/|www\./i.test(text);
+}
+
+function validateReview_(payload, products) {
+  var errors = {};
+  if (!/^[A-Za-z0-9_-]{12,80}$/.test(payload.reviewId)) errors.reviewId = "Please reload the form and try again.";
+  if (!/^[1-5]$/.test(payload.rating)) errors.rating = "Choose a rating from 1 to 5 stars.";
+  if (payload.productId !== "studio") {
+    if (!products) errors.productId = "The product list is unavailable right now; choose The studio in general or try later.";
+    else if (!Object.prototype.hasOwnProperty.call(products, payload.productId)) errors.productId = "Choose The studio in general or a product from the list.";
+  }
+  if (payload.firstName.length < 2 || payload.firstName.length > 40 || /[0-9@]/.test(payload.firstName) || !validCustomerName_(reviewFirstName_(payload)) || reviewTextHasContact_(payload.firstName)) {
+    errors.firstName = "Enter your first name, 2 to 40 letters, without numbers or @.";
+  }
+  if (payload.city && (payload.city.length > 60 || /[0-9@]/.test(payload.city) || reviewTextHasContact_(payload.city))) {
+    errors.city = "Enter a city name without numbers or @, or leave it blank.";
+  }
+  if (payload.comment.length < 10 || payload.comment.length > 800) errors.comment = "Write 10 to 800 characters.";
+  else if (reviewTextHasContact_(payload.comment)) errors.comment = "Please remove phone numbers, emails and web links from your review.";
+  if (payload.publicConsent !== true) errors.publicConsent = "Agree to show your review publicly to post it.";
+  var maxBase64 = Math.ceil(MAX_REVIEW_PHOTO_BYTES / 3) * 4;
+  if (payload.photos.length > MAX_REVIEW_PHOTOS) errors.photos = "Add up to " + MAX_REVIEW_PHOTOS + " photos.";
+  else if (payload.photos.some(function (photo) { return photo.type !== "image/jpeg" || !photo.data || photo.data.length > maxBase64 || !/^[A-Za-z0-9+\/]+={0,2}$/.test(photo.data); })) {
+    errors.photos = "This photo could not be accepted. Choose another photo or post without photos.";
+  }
+  return errors;
+}
+
+function decodeReviewPhotos_(photos) {
+  var items = [];
+  for (var index = 0; index < photos.length; index += 1) {
+    var bytes;
+    try { bytes = Utilities.base64Decode(photos[index].data); }
+    catch (decodeError) { return { error: "This photo could not be accepted. Choose another photo or post without photos.", items: [] }; }
+    if (!bytes.length || bytes.length > MAX_REVIEW_PHOTO_BYTES) return { error: "Each photo must be 1 MB or smaller.", items: [] };
+    if (!hasImageSignature_(bytes, "image/jpeg")) return { error: "This photo could not be accepted. Choose another photo or post without photos.", items: [] };
+    if (jpegHasMetadata_(bytes)) return { error: "Photos must not contain location or camera data. Choose the photo again.", items: [] };
+    items.push({ bytes: bytes, digest: digestHex_(bytes) });
+  }
+  return { error: "", items: items };
+}
+
+// Walks the JPEG header segments up to the scan. Exif and XMP (APP1), Photoshop (APP13) and
+// comment segments can hold GPS, camera or free text; a structure that cannot be read to the scan is treated as unsafe.
+function jpegHasMetadata_(bytes) {
+  function at(position) { return (bytes[position] + 256) % 256; }
+  var offset = 2;
+  while (offset + 3 < bytes.length) {
+    if (at(offset) !== 0xff) return true;
+    var marker = at(offset + 1);
+    if (marker === 0xff) { offset += 1; continue; }
+    if (marker === 0xd9 || marker === 0xda) return false;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) { offset += 2; continue; }
+    var segmentLength = at(offset + 2) * 256 + at(offset + 3);
+    if (segmentLength < 2 || offset + 2 + segmentLength > bytes.length) return true;
+    if (marker === 0xed || marker === 0xfe) return true;
+    if (marker === 0xe1) {
+      var label = "";
+      for (var position = offset + 4; position < offset + 2 + segmentLength && position < offset + 4 + 28; position += 1) label += String.fromCharCode(at(position));
+      if (label.indexOf("Exif") === 0 || label.indexOf("http://ns.adobe.com/xap") === 0 || label.indexOf("http://ns.adobe.com/xmp/") === 0) return true;
+    }
+    offset += 2 + segmentLength;
+  }
+  return true;
+}
+
+function reviewFingerprint_(payload, photoDigests) {
+  return digestHex_(JSON.stringify({
+    reviewId: payload.reviewId, productId: payload.productId, rating: payload.rating, firstName: reviewFirstName_(payload),
+    city: payload.city, comment: payload.comment, publicConsent: payload.publicConsent, photoDigests: photoDigests
+  }));
+}
+
+function reviewProducts_() {
+  var cache = CacheService.getScriptCache();
+  try {
+    var cached = cache.get(REVIEW_PRODUCTS_CACHE_KEY);
+    if (cached) return JSON.parse(cached);
+    // A recent failure is remembered briefly so a broken list costs one fetch a minute, not one per request.
+    if (cache.get(REVIEW_PRODUCTS_FAILED_KEY)) return null;
+  } catch (cacheError) { /* fall through to a fresh fetch */ }
+  var products = null;
+  try {
+    var response = UrlFetchApp.fetch(REVIEW_PRODUCTS_URL, { muteHttpExceptions: true });
+    if (response.getResponseCode() === 200) products = parseReviewProducts_(response.getContentText());
+  } catch (fetchError) { products = null; }
+  try {
+    if (products) cache.put(REVIEW_PRODUCTS_CACHE_KEY, JSON.stringify(products), 21600);
+    else cache.put(REVIEW_PRODUCTS_FAILED_KEY, "1", 60);
+  } catch (putError) { /* the result is still used for this request */ }
+  return products;
+}
+
+function parseReviewProducts_(text) {
+  var list;
+  try { list = JSON.parse(String(text || "")); } catch (parseError) { return null; }
+  if (!Array.isArray(list) || !list.length || list.length > 300) return null;
+  var products = {};
+  for (var index = 0; index < list.length; index += 1) {
+    var item = list[index];
+    if (!item || typeof item !== "object" || typeof item.id !== "string" || typeof item.name !== "string") return null;
+    var name = item.name.trim();
+    if (!/^catalogue:[A-Za-z0-9_.\/-]{1,150}$/.test(item.id) || !name || name.length > 120 || Object.prototype.hasOwnProperty.call(products, item.id)) return null;
+    products[item.id] = name;
+  }
+  return products;
+}
+
+function createReviewPhotoFiles_(reviewId, photos, config, properties) {
+  if (!photos.length) return [];
+  var orderFolderId = String(properties.getProperty("ORDER_DRIVE_FOLDER_ID") || "").trim();
+  if (!config.folderId || config.folderId === orderFolderId) throw new Error("Review photo folder is not configured.");
+  var folder = DriveApp.getFolderById(config.folderId);
+  if (folder.getSharingAccess && folder.getSharingAccess() !== DriveApp.Access.PRIVATE) throw new Error("Review photo folder is not restricted.");
+  var files = [];
+  try {
+    photos.forEach(function (photo, index) {
+      var file = folder.createFile(Utilities.newBlob(photo.bytes, "image/jpeg", "review-" + reviewId + "-" + (index + 1) + ".jpg"));
+      files.push(file);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    });
+  } catch (error) {
+    trashFiles_(files);
+    throw error;
+  }
+  return files;
+}
+
+// Best effort: a file that cannot be trashed is logged, never reported as a failed review.
+function trashFiles_(files) {
+  var failed = 0;
+  files.forEach(function (file) {
+    try { file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE); } catch (sharingError) { /* trashing still follows */ }
+    try { file.setTrashed(true); } catch (trashError) { failed += 1; }
+  });
+  if (failed) console.error(JSON.stringify({ reviewFilesNotTrashed: failed }));
+  return failed === 0;
+}
+
+function findReview_(sheet, reviewId) {
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+  var match = null;
+  for (var index = 1; index < values.length; index += 1) {
+    if (String(values[index][0]) !== reviewId) continue;
+    if (match) throw new Error("Review ID is duplicated.");
+    match = {
+      fingerprint: String(values[index][11] || ""),
+      receivedAt: values[index][1] instanceof Date ? values[index][1].toISOString() : String(values[index][1])
+    };
+  }
+  return match;
+}
+
+function reviewDailyCapReached_(sheet, properties) {
+  var configured = Number(properties.getProperty("REVIEW_DAILY_ACCEPTANCE_CAP"));
+  var cap = Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_REVIEW_DAILY_ACCEPTANCE_CAP;
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  var values = sheet.getDataRange().getValues();
+  var count = 0;
+  for (var index = 1; index < values.length; index += 1) {
+    var received = values[index][1];
+    if (received && Utilities.formatDate(new Date(received), Session.getScriptTimeZone(), "yyyy-MM-dd") === today) count += 1;
+  }
+  return count >= cap;
+}
+
+function reviewsConfig_(properties) {
+  var sheetId = String(properties.getProperty("ORDER_SHEET_ID") || "").trim();
+  return sheetId ? { sheetId: sheetId, tabName: REVIEWS_TAB_NAME, folderId: String(properties.getProperty("REVIEW_PHOTOS_FOLDER_ID") || "").trim() } : null;
+}
+
+function reviewsReady_(properties) {
+  return Boolean(reviewsConfig_(properties) && isTrue_(properties.getProperty(REVIEWS_READY_PROPERTY)));
+}
+
+function openReviewsTab_(properties, required) {
+  var config = reviewsConfig_(properties);
+  if (!config) {
+    if (required) throw new Error("Reviews sheet is not configured.");
+    return null;
+  }
+  var sheet = SpreadsheetApp.openById(config.sheetId).getSheetByName(config.tabName);
+  if (!sheet && required) throw new Error("Reviews sheet tab is not configured.");
+  return sheet || null;
+}
+
+function ensureReviewsTabSchema_(sheet, allowCreate) {
+  if (sheet.getLastRow() === 0) {
+    if (allowCreate === false) throw new Error("Reviews sheet schema is not ready.");
+    sheet.getRange(1, 1, 1, REVIEW_HEADERS.length).setValues([REVIEW_HEADERS]);
+    return true;
+  }
+  var columns = Number(sheet.getLastColumn && sheet.getLastColumn()) || REVIEW_HEADERS.length;
+  if (columns !== REVIEW_HEADERS.length) throw new Error("Reviews sheet schema does not match the allowlist.");
+  var existing = sheet.getRange(1, 1, 1, REVIEW_HEADERS.length).getValues()[0].map(String);
+  if (existing.join("\u001f") !== REVIEW_HEADERS.join("\u001f")) throw new Error("Reviews sheet schema does not match the allowlist.");
+  return false;
+}
+
+function clearReviewsCache_() {
+  try { CacheService.getScriptCache().remove(REVIEWS_CACHE_KEY); } catch (cacheError) { /* the cache expires on its own */ }
+}
+
+function publicReviewsResponse_() {
+  var body;
+  try { body = publicReviews_(); } catch (error) { body = { ok: false }; }
+  return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Intake is read live on every request; only the review list is cached.
+function publicReviews_() {
+  var properties = PropertiesService.getScriptProperties();
+  var ready = reviewsReady_(properties);
+  var data = { summary: { count: 0, average: 0 }, reviews: [] };
+  if (ready) {
+    var cache = CacheService.getScriptCache();
+    var cached = null;
+    try { cached = JSON.parse(cache.get(REVIEWS_CACHE_KEY) || "null"); } catch (cacheError) { cached = null; }
+    if (cached && cached.summary && Array.isArray(cached.reviews)) {
+      data = cached;
+    } else {
+      data = publishedReviews_(properties);
+      var json = JSON.stringify(data);
+      if (json.length <= 95000) {
+        try { cache.put(REVIEWS_CACHE_KEY, json, 300); } catch (putError) { /* the list is still served */ }
+      }
+    }
+  }
+  return {
+    ok: true, intake: ready && !isTrue_(properties.getProperty("REVIEWS_DISABLED")) ? "open" : "paused",
+    summary: data.summary, reviews: data.reviews
+  };
+}
+
+// Only rows whose Status is exactly "Published" are public; every other value fails closed.
+function publishedReviews_(properties) {
+  var sheet = openReviewsTab_(properties, true);
+  ensureReviewsTabSchema_(sheet, false);
+  var values = sheet.getDataRange().getValues();
+  var published = [];
+  var total = 0;
+  for (var index = 1; index < values.length; index += 1) {
+    var row = values[index];
+    if (String(row[2]) !== "Published") continue;
+    var rating = Number(row[3]);
+    var receivedAt = retentionDate_(row[1]);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5 || !receivedAt) continue;
+    total += rating;
+    published.push({
+      order: index, at: receivedAt.getTime(),
+      review: {
+        id: String(row[0]), rating: rating, productId: String(row[4]), productName: String(row[5]), firstName: String(row[6]),
+        city: String(row[7]), comment: String(row[8]), date: Utilities.formatDate(receivedAt, "Asia/Kolkata", "yyyy-MM-dd"),
+        photos: reviewPhotoIds_(row[9])
+      }
+    });
+  }
+  published.sort(function (left, right) { return right.at - left.at || right.order - left.order; });
+  return {
+    summary: { count: published.length, average: published.length ? Math.round(total / published.length * 10) / 10 : 0 },
+    reviews: published.slice(0, 50).map(function (item) { return item.review; })
+  };
+}
+
+function reviewPhotoIds_(value) {
+  return String(value == null ? "" : value).split(",").map(function (id) { return id.trim(); })
+    .filter(function (id) { return /^[A-Za-z0-9_-]{20,100}$/.test(id); }).slice(0, MAX_REVIEW_PHOTOS);
+}
+
+// Installable edit trigger: keeps the public list and photo sharing in step with Status.
+function onReviewsSheetEdit_(event) {
+  var range = event && event.range;
+  if (!range || !range.getSheet) return;
+  var sheet = range.getSheet();
+  if (sheet.getName() !== REVIEWS_TAB_NAME) return;
+  clearReviewsCache_();
+  var statusColumn = REVIEW_HEADERS.indexOf("Status") + 1;
+  var firstRow = Math.max(range.getRow(), 2);
+  var lastRow = range.getLastRow();
+  if (lastRow < firstRow || range.getColumn() > statusColumn || range.getLastColumn() < statusColumn) return;
+  var photoColumn = REVIEW_HEADERS.indexOf("Photo file IDs") + 1;
+  var folderId = reviewsConfig_(PropertiesService.getScriptProperties());
+  folderId = folderId ? folderId.folderId : "";
+  var rows = sheet.getRange(firstRow, 1, lastRow - firstRow + 1, REVIEW_HEADERS.length).getValues();
+  var errors = 0;
+  rows.forEach(function (row, offset) {
+    var status = String(row[statusColumn - 1]);
+    var ids = reviewPhotoIds_(row[photoColumn - 1]);
+    if (!ids.length) return;
+    if (status === "Removed") {
+      var remaining = [];
+      ids.forEach(function (id) {
+        try {
+          var file = reviewPhotoFile_(id, folderId);
+          if (file) permanentlyDeleteFile_(file); else remaining.push(id);
+        } catch (deleteError) { remaining.push(id); errors += 1; }
+      });
+      sheet.getRange(firstRow + offset, photoColumn).setValue(remaining.join(","));
+      return;
+    }
+    var visible = status === "Published";
+    ids.forEach(function (id) {
+      try {
+        var photoFile = reviewPhotoFile_(id, folderId);
+        if (photoFile) photoFile.setSharing(visible ? DriveApp.Access.ANYONE_WITH_LINK : DriveApp.Access.PRIVATE, visible ? DriveApp.Permission.VIEW : DriveApp.Permission.NONE);
+      } catch (sharingError) { errors += 1; }
+    });
+  });
+  if (errors) throw new Error("Review photo update failed.");
+}
+
+// A Sheet cell can be edited by hand, so an ID is acted on only when the file really sits in the review photo folder.
+function reviewPhotoFile_(id, folderId) {
+  if (!folderId) return null;
+  var file = DriveApp.getFileById(id);
+  var parents = file.getParents();
+  while (parents.hasNext()) {
+    if (parents.next().getId() === folderId) return file;
+  }
+  return null;
+}
+
+function setupReviews() {
+  var activeEmail = String(Session.getActiveUser().getEmail() || "").trim();
+  var effectiveEmail = String(Session.getEffectiveUser().getEmail() || "").trim();
+  if (!activeEmail || activeEmail.toLowerCase() !== effectiveEmail.toLowerCase()) throw new Error("Run this setup as the deployment owner.");
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to start reviews setup.");
+  try {
+    var properties = PropertiesService.getScriptProperties();
+    var config = reviewsConfig_(properties);
+    if (!config) throw new Error("Reviews sheet is not configured.");
+    var orderFolderId = String(properties.getProperty("ORDER_DRIVE_FOLDER_ID") || "").trim();
+    if (!config.folderId || config.folderId === orderFolderId) throw new Error("REVIEW_PHOTOS_FOLDER_ID must name a folder that is not the order folder.");
+    if (DriveApp.getFolderById(config.folderId).getSharingAccess() !== DriveApp.Access.PRIVATE) throw new Error("Review photo folder is not restricted.");
+    var spreadsheet = SpreadsheetApp.openById(config.sheetId);
+    var sheet = spreadsheet.getSheetByName(config.tabName);
+    if (!sheet && spreadsheet.insertSheet) sheet = spreadsheet.insertSheet(config.tabName);
+    if (!sheet) throw new Error("Reviews sheet tab is not configured.");
+    ensureReviewsTabSchema_(sheet);
+    var statusRule = SpreadsheetApp.newDataValidation().requireValueInList(REVIEW_STATUSES, true).setAllowInvalid(false).build();
+    var statusLetter = String.fromCharCode(64 + REVIEW_HEADERS.indexOf("Status") + 1);
+    sheet.getRange(statusLetter + "2:" + statusLetter).setDataValidation(statusRule);
+    if (!protectReviewsSheet_(sheet, "Customer reviews: staff-only")) throw new Error("Unable to protect reviews sheet tab.");
+    installReviewsTrigger_(config.sheetId);
+    properties.setProperty(REVIEWS_READY_PROPERTY, "true");
+    return { tab: config.tabName, columns: REVIEW_HEADERS.length, trigger: true };
+  } finally { lock.releaseLock(); }
+}
+
+// Whole-sheet protection, owner only, so rows added after setup are covered too.
+function protectReviewsSheet_(sheet, description) {
+  if (!sheet.protect) return false;
+  try {
+    var protection = null;
+    if (sheet.getProtections && SpreadsheetApp.ProtectionType && SpreadsheetApp.ProtectionType.SHEET) {
+      var existing = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET) || [];
+      for (var index = 0; index < existing.length; index += 1) {
+        if (existing[index].getDescription && existing[index].getDescription() === description) { protection = existing[index]; break; }
+      }
+    }
+    if (!protection) protection = sheet.protect();
+    if (!protection || !protection.setWarningOnly || !protection.removeEditors || !protection.addEditor) return false;
+    protection.setWarningOnly(false);
+    var owner = Session.getEffectiveUser();
+    if (!owner || !owner.getEmail || !String(owner.getEmail() || "").trim()) return false;
+    var ownerEmail = String(owner.getEmail()).trim().toLowerCase();
+    var editors = protection.getEditors ? protection.getEditors().filter(function (editor) {
+      return !editor || !editor.getEmail || String(editor.getEmail() || "").trim().toLowerCase() !== ownerEmail;
+    }) : [];
+    if (editors.length) protection.removeEditors(editors);
+    protection.addEditor(owner);
+    if (protection.canDomainEdit && protection.canDomainEdit() && protection.setDomainEdit) protection.setDomainEdit(false);
+    if (protection.setDescription) protection.setDescription(description);
+    return true;
+  } catch (error) { return false; }
+}
+
+function installReviewsTrigger_(sheetId) {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var index = 0; index < triggers.length; index += 1) {
+    if (triggers[index].getHandlerFunction() === "onReviewsSheetEdit_") return false;
+  }
+  ScriptApp.newTrigger("onReviewsSheetEdit_").forSpreadsheet(sheetId).onEdit().create();
+  return true;
 }
 
 function collectApplication_(form) {
@@ -1730,6 +2262,7 @@ function parseSeed_(json) {
     bundleItems: boundedBundleItems_(seed.bundleItems),
     applicationId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.applicationId || "")) ? String(seed.applicationId) : "",
     enquiryId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.enquiryId || "")) ? String(seed.enquiryId) : Utilities.getUuid(),
+    reviewId: /^[A-Za-z0-9_-]{12,80}$/.test(String(seed.reviewId || "")) ? String(seed.reviewId) : Utilities.getUuid(),
     formMode: boundedMode_(seed.formMode),
     channelNonce: /^[A-Za-z0-9_-]{16,128}$/.test(String(seed.channelNonce || "")) ? String(seed.channelNonce) : ""
   };

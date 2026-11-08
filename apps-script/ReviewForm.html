@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Write a review</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; background: #fffaf4; color: #2b2020; }
+    * { box-sizing: border-box; } body { margin: 0; padding: 1rem; background: #fffaf4; } main { max-width: 760px; margin: 0 auto; }
+    .skip-link { position: absolute; left: .8rem; top: .5rem; padding: .45rem .7rem; background: #2b2020; color: #fffaf4; transform: translateY(-160%); } .skip-link:focus { transform: translateY(0); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    h1 { margin: 0 0 .45rem; font: 700 clamp(1.6rem, 4vw, 2.3rem)/1.1 Georgia, serif; }.intro, .privacy, .hint, .status, .field-error { font-size: .88rem; line-height: 1.5; }.intro { margin: 0 0 1rem; color: #5d4947; }
+    form { display: grid; gap: 1rem; } fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fff; } legend { padding: 0 .35rem; font-weight: 700; }.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; margin-top: .85rem; }.stack { display: grid; gap: .85rem; }
+    label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; } input, select, textarea, button { font: inherit; } input:not([type="radio"]):not([type="checkbox"]), select, textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; } textarea { min-height: 7rem; resize: vertical; } input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
+    .rating-group { padding: .6rem .8rem .8rem; }.stars { display: flex; flex-wrap: wrap; gap: .5rem; }.stars label { display: inline-flex; align-items: center; gap: .35rem; min-height: 2.65rem; padding: .3rem .75rem; border: 1px solid #bca8a0; border-radius: 999px; background: #fff; cursor: pointer; }.stars input { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: #b24b60; }.stars .star { color: #b86f00; }
+    .consent { grid-template-columns: auto 1fr; align-items: start; gap: .6rem; font-weight: 500; line-height: 1.5; }.consent input { width: 1.2rem; height: 1.2rem; margin: .15rem 0 0; accent-color: #b24b60; }
+    .photo-previews { display: flex; flex-wrap: wrap; gap: .7rem; margin: .8rem 0 0; padding: 0; list-style: none; }.photo-previews li { display: grid; gap: .35rem; justify-items: start; }.photo-previews img { display: block; width: 6.5rem; height: 6.5rem; object-fit: cover; border: 1px solid #dccbc1; border-radius: .6rem; background: #fffaf4; }.photo-previews button { min-height: 2.2rem; padding: .3rem .8rem; border: 1px solid #bca8a0; border-radius: 999px; background: #fff; color: #2b2020; font-size: .78rem; font-weight: 650; cursor: pointer; }
+    .field-error { margin: 0; color: #a41f33; } [hidden] { display: none !important; }.actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; } .actions button { min-height: 2.8rem; padding: .7rem 1rem; border: 1px solid #2b2020; border-radius: 999px; background: #2b2020; color: #fffaf4; font-weight: 750; cursor: pointer; } .actions button:disabled { cursor: wait; opacity: .6; }.status { min-height: 1.4rem; margin: 0; }.status.error { color: #a41f33; }.status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }.hint { margin: .5rem 0 0; color: #5d4947; }.privacy { margin: 0; padding: .75rem; border-left: 3px solid #c77d8b; color: #5d4947; }.privacy a { color: inherit; font-weight: 700; }
+    @media (max-width: 560px) { body { padding: .7rem; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <a class="skip-link" href="#review-form">Skip to review form</a>
+  <h1>Share your review</h1>
+  <p class="intro">Tell others about your Saloni resin art. Your review appears on the Reviews page as soon as you post it.</p>
+  <p id="paused-message" class="status" role="status" hidden>New reviews are paused right now. You can message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or call <a href="tel:+918209238541">8209238541</a>.</p>
+  <form id="review-form" novalidate>
+    <fieldset><legend>Your review</legend>
+      <div class="stack">
+        <label for="product-id">What is your review about? <select id="product-id" name="productId"><option value="studio">The studio in general</option></select></label>
+        <p id="product-hint" class="hint" hidden>The product list is unavailable right now. You can still review the studio in general.</p>
+        <fieldset id="rating-group" class="rating-group"><legend>Rating</legend>
+          <div class="stars">
+            <label for="rating-1"><input id="rating-1" type="radio" name="rating" value="1"> 1 <span class="star" aria-hidden="true">★</span><span class="sr-only">star</span></label>
+            <label for="rating-2"><input id="rating-2" type="radio" name="rating" value="2"> 2 <span class="star" aria-hidden="true">★</span><span class="sr-only">stars</span></label>
+            <label for="rating-3"><input id="rating-3" type="radio" name="rating" value="3"> 3 <span class="star" aria-hidden="true">★</span><span class="sr-only">stars</span></label>
+            <label for="rating-4"><input id="rating-4" type="radio" name="rating" value="4"> 4 <span class="star" aria-hidden="true">★</span><span class="sr-only">stars</span></label>
+            <label for="rating-5"><input id="rating-5" type="radio" name="rating" value="5"> 5 <span class="star" aria-hidden="true">★</span><span class="sr-only">stars</span></label>
+          </div>
+        </fieldset>
+      </div>
+      <div class="grid">
+        <label for="first-name">First name (shown publicly) <input id="first-name" name="firstName" maxlength="40" autocomplete="given-name" required></label>
+        <label for="city">City (optional) <input id="city" name="city" maxlength="60" autocomplete="address-level2"></label>
+      </div>
+      <label for="comment">Your review <textarea id="comment" name="comment" maxlength="800" required placeholder="What did you order, and how did it feel to receive it?"></textarea></label>
+      <p class="hint">Do not include phone numbers, emails, addresses, or photos of other people without their permission. Location data is removed from photos.</p>
+    </fieldset>
+    <fieldset><legend>Photos (optional)</legend>
+      <label for="review-photos">Add up to 3 photos (JPG or PNG) <input id="review-photos" name="photos" type="file" accept="image/jpeg,image/png" multiple></label>
+      <ul id="photo-previews" class="photo-previews" aria-label="Selected photos"></ul>
+    </fieldset>
+    <fieldset><legend>Show my review</legend>
+      <label class="consent" for="public-consent"><input id="public-consent" name="publicConsent" type="checkbox" value="true" required><span>I agree that my first name, optional city, rating, comment and photos will be shown publicly on saloniresinart.com. Reviews stay until removed. To remove yours, message @saloniresin_art_studio on Instagram or call 8209238541.</span></label>
+    </fieldset>
+    <input id="review-id" name="reviewId" type="hidden">
+    <input id="captcha-token" name="captchaToken" type="hidden">
+    <p id="form-status" class="status" role="status" aria-live="polite" tabindex="-1"></p>
+    <div class="actions"><button id="submit-button" type="submit">Post review</button><button id="another-button" type="button" hidden>Write another review</button></div>
+    <p class="privacy">Reviews are public on the Reviews page. To remove yours, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
+  </form>
+</main>
+<script id="seed-data" type="application/json"><?!= seedJson ?></script>
+<script id="review-products-data" type="application/json"><?!= reviewProductsJson ?></script>
+<script>
+(function () {
+  "use strict";
+  var seed = JSON.parse(document.getElementById("seed-data").textContent || "{}");
+  var products = JSON.parse(document.getElementById("review-products-data").textContent || "null");
+  var reviewsPaused = <?!= reviewsPausedJson ?>;
+  var captchaEnabled = <?!= captchaEnabledJson ?>;
+  var captchaSiteKey = <?!= captchaSiteKeyJson ?>;
+  var form = document.getElementById("review-form");
+  var status = document.getElementById("form-status");
+  var submitButton = document.getElementById("submit-button");
+  var anotherButton = document.getElementById("another-button");
+  var pausedMessage = document.getElementById("paused-message");
+  var productSelect = document.getElementById("product-id");
+  var productHint = document.getElementById("product-hint");
+  var ratingGroup = document.getElementById("rating-group");
+  var fileInput = document.getElementById("review-photos");
+  var previews = document.getElementById("photo-previews");
+  var active = false; var currentAttempt = null; var uncertainAttempt = null; var timeoutId = null;
+  var photos = []; var preparing = 0; var generation = 0;
+  var PARENT_ORIGIN = "https://saloniresinart.com";
+  var MAX_PHOTOS = 3;
+  var MAX_SOURCE_BYTES = 15 * 1024 * 1024;
+  var MAX_PHOTO_BYTES = 1024 * 1024;
+  var MAX_SIDE = 1600;
+  var QUALITIES = [0.85, 0.72, 0.6];
+  var JPEG_PREFIX = "data:image/jpeg;base64,";
+  var PHOTO_ERROR = "This photo could not be prepared; try another photo or post without photos";
+  var BUSINESS_FIELDS = ["reviewId", "productId", "rating", "firstName", "city", "comment"];
+  function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
+  function snapshot() {
+    var payload = {};
+    BUSINESS_FIELDS.forEach(function (field) { payload[field] = value(field); });
+    payload.publicConsent = Boolean(form.elements.publicConsent && form.elements.publicConsent.checked);
+    payload.photos = photos.map(function (photo) { return { type: "image/jpeg", data: photo.data }; });
+    return payload;
+  }
+  function samePayload(first, second) { return JSON.stringify(first) === JSON.stringify(second); }
+  function setStatus(message, kind) { status.textContent = message || ""; status.className = "status" + (kind ? " " + kind : ""); }
+  function fieldInput(field) {
+    var input = form.elements[field];
+    if (input && !input.setAttribute && input[0]) input = input[0];
+    return input;
+  }
+  function setError(field, message) {
+    var input = fieldInput(field);
+    if (!input) return;
+    var host = field === "rating" ? ratingGroup : input.parentNode;
+    input.setAttribute("aria-invalid", "true");
+    var ids = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+    if (ids.indexOf(field + "-error") === -1) ids.push(field + "-error");
+    input.setAttribute("aria-describedby", ids.join(" "));
+    var error = document.getElementById(field + "-error");
+    if (!error) { error = document.createElement("p"); error.id = field + "-error"; error.className = "field-error"; host.appendChild(error); }
+    error.textContent = message;
+  }
+  function clearErrors() {
+    Array.prototype.forEach.call(form.querySelectorAll("[aria-invalid]"), function (input) {
+      input.removeAttribute("aria-invalid");
+      var ids = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (id) { return id && id !== input.name + "-error"; });
+      if (ids.length) input.setAttribute("aria-describedby", ids.join(" ")); else input.removeAttribute("aria-describedby");
+    });
+    Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); });
+  }
+  function focusError(errors) {
+    var field = errors && Object.keys(errors)[0];
+    var input = field && fieldInput(field);
+    if (input && input.focus) input.focus(); else { status.setAttribute("tabindex", "-1"); status.focus(); }
+  }
+  function newId() { if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID(); return "review-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10); }
+  function hasContact(text) { return /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/.test(text) || /(?:\d[\s\-().]*){10,}/.test(text) || /https?:\/\/|www\./i.test(text); }
+  function valid() {
+    var errors = {};
+    var name = value("firstName").trim(); var city = value("city").trim(); var comment = value("comment").trim();
+    if (!/^[1-5]$/.test(value("rating"))) errors.rating = "Choose a rating from 1 to 5 stars.";
+    if (name.length < 2 || name.length > 40 || /[0-9@]/.test(name) || hasContact(name)) errors.firstName = "Enter your first name, 2 to 40 letters, without numbers or @.";
+    if (city && (city.length > 60 || /[0-9@]/.test(city) || hasContact(city))) errors.city = "Enter a city name without numbers or @, or leave it blank.";
+    if (comment.length < 10 || comment.length > 800) errors.comment = "Write 10 to 800 characters.";
+    else if (hasContact(comment)) errors.comment = "Please remove phone numbers, emails and web links from your review.";
+    if (!form.elements.publicConsent.checked) errors.publicConsent = "Agree to show your review publicly to post it.";
+    return errors;
+  }
+  function current(attempt) { return currentAttempt === attempt && active; }
+  function restore(attempt) { if (attempt && !current(attempt)) return; active = false; submitButton.disabled = false; if (timeoutId) window.clearTimeout(timeoutId); timeoutId = null; if (attempt && attempt.port && attempt.port.close) attempt.port.close(); }
+  function captcha(attempt, done) {
+    if (!captchaEnabled || !captchaSiteKey || !seed.channelNonce || !window.MessageChannel || !window.top || window.top === window) { done(null); return; }
+    try {
+      var channel = new window.MessageChannel();
+      attempt.port = channel.port1;
+      channel.port1.onmessage = function (event) {
+        var data = event && event.data || {};
+        if (!current(attempt) || data.type !== "saloni-order-captcha-response" || data.nonce !== seed.channelNonce || data.attemptId !== attempt.id) return;
+        done(data.ok === true && typeof data.token === "string" ? data.token : null);
+      };
+      window.top.postMessage({ type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: attempt.id, mode: "review" }, PARENT_ORIGIN, [channel.port2]);
+    } catch (error) { done(null); }
+  }
+  function showConflict() { anotherButton.hidden = false; setStatus("These entries changed while an earlier review was still being confirmed. To protect the original review, it was not resent with a different ID or payload. Choose Write another review to post the changed details.", "error"); status.focus(); }
+  function uncertain(attempt) { if (!attempt.sent) return; attempt.uncertain = true; uncertainAttempt = attempt; if (!samePayload(snapshot(), attempt.payload)) showConflict(); else { setStatus("We could not confirm the review yet. Your entries are still here; check them and try again.", "error"); status.focus(); } }
+  function notifyParent() {
+    if (!seed.channelNonce || !window.top || window.top === window) return;
+    try { window.top.postMessage({ type: "saloni-review-submitted", nonce: seed.channelNonce }, PARENT_ORIGIN); } catch (error) {}
+  }
+  function success(attempt) {
+    if (!current(attempt)) return;
+    restore(attempt); uncertainAttempt = null;
+    Array.prototype.forEach.call(form.querySelectorAll("fieldset, #submit-button"), function (element) { element.hidden = true; });
+    anotherButton.hidden = false;
+    setStatus("Thank you, " + attempt.payload.firstName.trim().split(/\s+/)[0] + ". Your review is now on the page.", "success");
+    status.focus();
+    notifyParent();
+  }
+  function renderPhotos() {
+    while (previews.firstChild) previews.removeChild(previews.firstChild);
+    photos.forEach(function (photo, index) {
+      var item = document.createElement("li");
+      var image = document.createElement("img");
+      image.src = photo.preview; image.alt = "Selected photo " + (index + 1);
+      var remove = document.createElement("button");
+      remove.type = "button"; remove.textContent = "Remove"; remove.setAttribute("aria-label", "Remove photo " + (index + 1));
+      remove.addEventListener("click", function () { photos = photos.filter(function (candidate) { return candidate !== photo; }); renderPhotos(); });
+      item.appendChild(image); item.appendChild(remove); previews.appendChild(item);
+    });
+  }
+  // Safari adds Exif and Photoshop blocks to canvas JPEGs. Drop every APP1-APP15 and comment segment, keep the rest.
+  // Takes and returns a binary string; returns null when the JPEG structure cannot be read to the scan.
+  function stripJpegMetadata(binary) {
+    if (binary.charCodeAt(0) !== 0xff || binary.charCodeAt(1) !== 0xd8) return null;
+    var out = binary.slice(0, 2);
+    var offset = 2;
+    while (offset + 1 < binary.length) {
+      if (binary.charCodeAt(offset) !== 0xff) return null;
+      var marker = binary.charCodeAt(offset + 1);
+      if (marker === 0xff) { offset += 1; continue; }
+      if (marker === 0xda || marker === 0xd9) return out + binary.slice(offset);
+      if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) { out += binary.slice(offset, offset + 2); offset += 2; continue; }
+      if (offset + 3 >= binary.length) return null;
+      var end = offset + 2 + binary.charCodeAt(offset + 2) * 256 + binary.charCodeAt(offset + 3);
+      if (end > binary.length || end < offset + 4) return null;
+      if (!((marker >= 0xe1 && marker <= 0xef) || marker === 0xfe)) out += binary.slice(offset, end);
+      offset = end;
+    }
+    return null;
+  }
+  // The original file is never sent: every photo is redrawn on a white canvas and re-encoded as a JPEG of at most 1 MB.
+  function preparePhoto(file, done) {
+    if (!file || (file.type !== "image/jpeg" && file.type !== "image/png")) { done("Choose JPG or PNG photos only."); return; }
+    if (file.size > MAX_SOURCE_BYTES) { done("Each photo must be 15 MB or smaller."); return; }
+    var url = "";
+    function release() { try { if (url && window.URL && window.URL.revokeObjectURL) window.URL.revokeObjectURL(url); } catch (error) {} }
+    try {
+      url = window.URL.createObjectURL(file);
+      var image = new window.Image();
+      image.onload = function () {
+        release();
+        try {
+          var width = image.naturalWidth || image.width; var height = image.naturalHeight || image.height;
+          if (!width || !height) { done(PHOTO_ERROR); return; }
+          var scale = Math.min(1, MAX_SIDE / Math.max(width, height));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale));
+          var context = canvas.getContext("2d");
+          context.fillStyle = "#fff"; context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          for (var index = 0; index < QUALITIES.length; index += 1) {
+            var dataUrl = canvas.toDataURL("image/jpeg", QUALITIES[index]);
+            if (typeof dataUrl !== "string" || dataUrl.indexOf(JPEG_PREFIX) !== 0) break;
+            var clean = stripJpegMetadata(window.atob(dataUrl.slice(JPEG_PREFIX.length)));
+            if (clean === null) break;
+            if (clean.length <= MAX_PHOTO_BYTES) { done("", { data: window.btoa(clean), preview: dataUrl }); return; }
+          }
+          done(PHOTO_ERROR);
+        } catch (error) { done(PHOTO_ERROR); }
+      };
+      image.onerror = function () { release(); done(PHOTO_ERROR); };
+      image.src = url;
+    } catch (error) { release(); done(PHOTO_ERROR); }
+  }
+  fileInput.addEventListener("change", function () {
+    var files = Array.prototype.slice.call(fileInput.files || []);
+    fileInput.value = "";
+    if (!files.length) return;
+    clearErrors();
+    var batch = generation;
+    if (photos.length + preparing + files.length > MAX_PHOTOS) { setError("photos", "You can add up to " + MAX_PHOTOS + " photos."); return; }
+    preparing += files.length;
+    function next(index) {
+      if (index >= files.length) return;
+      preparePhoto(files[index], function (error, prepared) {
+        if (batch !== generation) return;
+        preparing -= 1;
+        if (error) setError("photos", error); else photos.push(prepared);
+        renderPhotos();
+        next(index + 1);
+      });
+    }
+    next(0);
+  });
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (active) return;
+    clearErrors();
+    if (preparing > 0) { setStatus("Your photos are still being prepared. Please try again in a moment.", "error"); status.focus(); return; }
+    var errors = valid();
+    if (Object.keys(errors).length) { Object.keys(errors).forEach(function (field) { setError(field, errors[field]); }); setStatus("Please correct the highlighted fields and try again.", "error"); focusError(errors); return; }
+    var requestedPayload = snapshot();
+    if (uncertainAttempt && !samePayload(requestedPayload, uncertainAttempt.payload)) { showConflict(); return; }
+    var retryingUncertain = Boolean(uncertainAttempt);
+    var attempt = { id: newId(), payload: retryingUncertain ? JSON.parse(JSON.stringify(uncertainAttempt.payload)) : requestedPayload, port: null, sent: false, uncertain: false };
+    currentAttempt = attempt; active = true; submitButton.disabled = true; setStatus("Checking the review…", "");
+    timeoutId = window.setTimeout(function () {
+      if (!current(attempt)) return;
+      restore(attempt); uncertain(attempt);
+      if (!attempt.sent) { setStatus("Unable to verify the review yet. Your entries are still here; please try again.", "error"); status.focus(); }
+    }, 30000);
+    captcha(attempt, function (token) {
+      if (!current(attempt)) return;
+      if (!token) { restore(attempt); setStatus("Captcha verification is required. Please try again.", "error"); status.focus(); return; }
+      if (retryingUncertain) uncertainAttempt = attempt;
+      var request = JSON.parse(JSON.stringify(attempt.payload));
+      request.captchaToken = token;
+      attempt.sent = true;
+      try {
+        google.script.run.withSuccessHandler(function (result) {
+          if (!current(attempt)) return;
+          if (result && result.ok === true) success(attempt);
+          else {
+            restore(attempt);
+            var resultErrors = result && result.errors || { form: "Please correct the highlighted fields and try again." };
+            Object.keys(resultErrors).forEach(function (field) { setError(field, resultErrors[field]); });
+            setStatus(resultErrors.form || "Please correct the highlighted fields and try again.", "error");
+            focusError(resultErrors);
+          }
+        }).withFailureHandler(function () {
+          if (!current(attempt)) return;
+          restore(attempt); uncertain(attempt);
+          if (!attempt.uncertain) setStatus("We were unable to post the review. Your entries are still here; please try again.", "error");
+          status.focus();
+        }).submitReview(request);
+      } catch (error) {
+        restore(attempt); uncertain(attempt);
+        if (!attempt.uncertain) setStatus("We were unable to post the review. Your entries are still here; please try again.", "error");
+        status.focus();
+      }
+    });
+  });
+  anotherButton.addEventListener("click", function () {
+    uncertainAttempt = null; currentAttempt = null; photos = []; preparing = 0; generation += 1; renderPhotos();
+    form.reset(); form.elements.reviewId.value = newId();
+    Array.prototype.forEach.call(form.querySelectorAll("fieldset, #submit-button"), function (element) { element.hidden = false; });
+    anotherButton.hidden = true; clearErrors(); setStatus("", "");
+  });
+  if (captchaEnabled && captchaSiteKey && seed.channelNonce && window.top && window.top !== window) { try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey, mode: "review" }, PARENT_ORIGIN); } catch (error) {} }
+  if (reviewsPaused) {
+    form.hidden = true; pausedMessage.hidden = false;
+    return;
+  }
+  if (products && products.length) {
+    var group = document.createElement("optgroup");
+    group.label = "Products";
+    products.forEach(function (item) {
+      if (!item || typeof item.id !== "string" || typeof item.name !== "string") return;
+      var option = document.createElement("option");
+      option.value = item.id; option.textContent = item.name;
+      group.appendChild(option);
+    });
+    productSelect.appendChild(group);
+  } else productHint.hidden = false;
+  form.elements.reviewId.value = seed.reviewId || newId();
+}());
+</script>
+</body>
+</html>

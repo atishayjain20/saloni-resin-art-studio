@@ -630,6 +630,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "https://saloniresinart.com/namokar-mantra-frames/",
             "https://saloniresinart.com/partners/",
             "https://saloniresinart.com/corporate-gifting/",
+            "https://saloniresinart.com/reviews/",
         ]
         self.assertEqual([url.findtext("sm:loc", namespaces=namespace) for url in urls], expected_urls)
         self.assertEqual(len(urls), len(expected_urls))
@@ -1254,7 +1255,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(touch[16:20], "big"), 180)
         style_version = re.search(r'href="styles\.css\?v=(\d+)"', self.html).group(1)
         script_version = re.search(r'src="script\.js\?v=(\d+)"', self.html).group(1)
-        for page, prefix in (("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"), ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../")):
+        for page, prefix in (("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"), ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../"), ("reviews/index.html", "../")):
             with self.subTest(page=page):
                 source = (ROOT / page).read_text(encoding="utf-8")
                 self.assertIn('<meta name="theme-color" content="#fbd3e5">', source)
@@ -2095,6 +2096,134 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn('state.paintMode', script)
         self.assertIn('function updateFramePresetLabels', script)
         self.assertNotIn('canonical', customizer.lower())
+
+
+class CatalogueCardParser(HTMLParser):
+    """Collects each work or romantic card's first photo and title, in page order."""
+
+    def __init__(self):
+        super().__init__()
+        self.cards = []
+        self.depth = []
+        self.current = None
+        self.title_tag = None
+        self.in_figcaption = False
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        classes = (attributes.get("class") or "").split()
+        if self.current is not None and tag not in MarkupTreeParser.VOID_ELEMENTS:
+            self.depth.append(tag)
+        if self.current is None and ("work-card" in classes or "romantic-keepsake-card" in classes):
+            self.current = {"src": None, "title": None}
+            self.depth = [tag]
+            return
+        if self.current is None:
+            return
+        if tag == "img" and self.current["src"] is None and attributes.get("src"):
+            self.current["src"] = attributes["src"]
+        if tag == "figcaption":
+            self.in_figcaption = True
+        elif self.in_figcaption and self.current["title"] is None and tag in ("strong", "h3"):
+            self.title_tag = tag
+
+    def handle_data(self, data):
+        if self.title_tag and self.current is not None and self.current["title"] is None:
+            self.current["title"] = data.strip()
+
+    def handle_endtag(self, tag):
+        if self.current is None:
+            return
+        if tag == self.title_tag:
+            self.title_tag = None
+        if tag == "figcaption":
+            self.in_figcaption = False
+        if self.depth:
+            self.depth.pop()
+        if not self.depth:
+            if self.current["src"] and self.current["title"]:
+                self.cards.append(self.current)
+            self.current = None
+
+
+def catalogue_products(html):
+    parser = CatalogueCardParser()
+    parser.feed(html)
+    return [{"id": "catalogue:" + re.sub(r"^assets/", "", card["src"]), "name": card["title"]} for card in parser.cards]
+
+
+class ReviewsPageContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.home = (ROOT / "index.html").read_text(encoding="utf-8")
+        cls.page_path = ROOT / "reviews" / "index.html"
+        cls.page = cls.page_path.read_text(encoding="utf-8") if cls.page_path.exists() else ""
+
+    def test_reviews_page_has_canonical_seo_and_the_required_regions(self):
+        self.assertTrue(self.page, "reviews/index.html must exist")
+        self.assertIn('<link rel="canonical" href="https://saloniresinart.com/reviews/">', self.page)
+        self.assertIn('<meta property="og:url" content="https://saloniresinart.com/reviews/">', self.page)
+        self.assertRegex(self.page, r"<title>Customer reviews[^<]*Saloni Resin Art Studio</title>")
+        self.assertIn('<h1', self.page)
+        self.assertIn("Customer reviews", self.page)
+        self.assertRegex(self.page, r'id="reviews-summary"[^>]*hidden')
+        self.assertRegex(self.page, r'id="reviews-status"[^>]*role="status"[^>]*aria-live="polite"')
+        self.assertRegex(self.page, r'<ul[^>]*id="reviews-list"')
+        self.assertRegex(self.page, r'<section[^>]*id="write"')
+        self.assertRegex(self.page, r'id="order-form-embed"[^>]*data-form-mode="review"')
+        self.assertIn('id="order-form-status"', self.page)
+        self.assertRegex(self.page, r'<iframe[^>]*id="order-form-frame"[^>]*hidden')
+        self.assertIn(
+            'data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"',
+            self.page,
+        )
+        self.assertNotIn("data-intake-ready", self.page, "the page opens the form only when the backend answers intake open")
+        self.assertIn("Loading reviews", self.page)
+        self.assertIn('<a class="skip-link" href="#main-content">', self.page)
+        self.assertIn('<main id="main-content" tabindex="-1">', self.page)
+        self.assertIn('href="../styles.css?v=', self.page)
+        self.assertIn('src="../script.js?v=', self.page)
+        self.assertNotRegex(self.page, r"aggregateRating|application/ld\+json")
+
+    def test_every_page_links_to_reviews_from_the_footer_and_the_primary_nav_is_unchanged(self):
+        for page, href in (("index.html", "reviews/"), ("corporate-gifting/index.html", "../reviews/"), ("partners/index.html", "../reviews/"), ("resin-photo-frames/index.html", "../reviews/"), ("namokar-mantra-frames/index.html", "../reviews/"), ("reviews/index.html", "../reviews/")):
+            with self.subTest(page=page):
+                source = (ROOT / page).read_text(encoding="utf-8")
+                footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', source)
+                self.assertIsNotNone(footer)
+                self.assertIn(f'<a href="{href}">Reviews</a>', footer.group(1))
+                header = re.search(r'<header class="site-header">([\s\S]*?)</header>', source)
+                self.assertIsNotNone(header)
+                if page != "reviews/index.html":
+                    self.assertNotIn(">Reviews<", header.group(1))
+
+    def test_privacy_details_name_public_reviews_and_keep_the_order_retention_wording(self):
+        details = re.search(r'<details class="privacy-details" id="privacy-details">([\s\S]*?)</details>', self.home)
+        self.assertIsNotNone(details)
+        self.assertIn(
+            "Customer reviews (first name, optional city, rating, comment and photos) are public on the Reviews page and are kept until removed; ask for removal through @saloniresin_art_studio or 8209238541.",
+            details.group(1),
+        )
+        self.assertIn("Customer requests and uploaded images are scheduled for deletion after 90 days.", details.group(1))
+
+    def test_review_product_list_matches_the_catalogue_cards_in_page_order(self):
+        path = ROOT / "reviews" / "products.json"
+        self.assertTrue(path.exists(), "reviews/products.json must exist")
+        actual = json.loads(path.read_text(encoding="utf-8"))
+        expected = catalogue_products(self.home)
+        ids = [item["id"] for item in expected]
+        self.assertGreater(len(expected), 20)
+        self.assertEqual(len(ids), len(set(ids)), "catalogue card photos must be unique to be reviewable")
+        self.assertEqual(
+            actual,
+            expected,
+            "reviews/products.json is out of step with index.html. Expected:\n" + json.dumps(expected, indent=2, ensure_ascii=False),
+        )
+        for item in actual:
+            self.assertEqual(set(item), {"id", "name"})
+            self.assertRegex(item["id"], r"^catalogue:[A-Za-z0-9_./-]{1,150}$")
+            self.assertTrue(0 < len(item["name"]) <= 120)
+        self.assertLessEqual(len(actual), 300)
 
 
 if __name__ == "__main__":
