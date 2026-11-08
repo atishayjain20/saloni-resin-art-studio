@@ -1,4 +1,5 @@
 from html.parser import HTMLParser
+import html
 import math
 from pathlib import Path
 import json
@@ -2205,6 +2206,31 @@ class ReviewsPageContractTests(unittest.TestCase):
             details.group(1),
         )
         self.assertIn("Customer requests and uploaded images are scheduled for deletion after 90 days.", details.group(1))
+
+    def test_sample_reviews_cover_every_product_once_and_are_clearly_labelled(self):
+        section = re.search(r'<section class="sample-reviews shell" id="sample-reviews"[^>]*>([\s\S]*?)</section>', self.page)
+        self.assertIsNotNone(section, "the Reviews page needs a sample reviews section")
+        body = section.group(1)
+        self.assertLess(self.page.index('id="reviews-list"'), self.page.index('id="sample-reviews"'))
+        self.assertLess(self.page.index('id="sample-reviews"'), self.page.index('id="write"'))
+        self.assertIn("Sample reviews", body)
+        self.assertIn("written by Saloni's studio", body)
+        self.assertIn("not from customers", body)
+        self.assertIn("not counted in the rating", body)
+        cards = re.findall(r'<li class="review-card sample-review" data-product-id="([^"]+)">([\s\S]*?)</li>', body)
+        products = json.loads((ROOT / "reviews" / "products.json").read_text(encoding="utf-8"))
+        product_ids = [item["id"] for item in products]
+        card_ids = [card_id for card_id, _ in cards]
+        self.assertEqual(sorted(card_id for card_id in card_ids if card_id != "studio"), sorted(product_ids))
+        self.assertGreaterEqual(card_ids.count("studio"), 1)
+        names = {item["id"]: item["name"] for item in products}
+        for card_id, card in cards:
+            with self.subTest(card=card_id):
+                self.assertIn('<p class="sample-badge">Sample review · written by the studio</p>', card)
+                self.assertIn(html.escape(names.get(card_id, "Studio review"), quote=False), card)
+                self.assertRegex(card, r'<p class="review-comment">[^<]{20,}</p>')
+        self.assertNotRegex(body, "[\u2605\u2606]", "samples carry no star rating")
+        self.assertEqual(len(set(re.findall(r'<p class="review-comment">([^<]+)</p>', body))), len(cards), "each sample is written for its own piece")
 
     def test_review_product_list_matches_the_catalogue_cards_in_page_order(self):
         path = ROOT / "reviews" / "products.json"
