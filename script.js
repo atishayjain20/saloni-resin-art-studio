@@ -264,6 +264,8 @@
     var lightboxReviews = document.getElementById("lightbox-reviews");
     var lightboxReviewList = document.getElementById("lightbox-review-list");
     var lightboxReviewsTitle = document.getElementById("lightbox-reviews-title");
+    var lightboxRatingSummary = document.getElementById("lightbox-rating-summary");
+    var lightboxRate = document.getElementById("lightbox-rate");
     var reviewsEmbed = document.getElementById("order-form-embed");
     var productReviewsUrl = reviewsEmbed ? reviewsEmbed.getAttribute("data-order-form-url") || "" : "";
     var productReviewsData = null;
@@ -408,6 +410,19 @@
         return match ? "catalogue:" + match[1] : "";
       }
 
+      // The average covers this product's real reviews only; studio notes never count.
+      function renderProductRating(average, count) {
+        if (!lightboxRatingSummary) return;
+        while (lightboxRatingSummary.firstChild) lightboxRatingSummary.removeChild(lightboxRatingSummary.firstChild);
+        lightboxRatingSummary.hidden = !count;
+        if (!count) return;
+        var filled = Math.round(average);
+        var stars = reviewSpan("review-stars", "\u2605\u2605\u2605\u2605\u2605".slice(0, filled) + "\u2606\u2606\u2606\u2606\u2606".slice(0, 5 - filled));
+        stars.setAttribute("aria-hidden", "true");
+        lightboxRatingSummary.appendChild(stars);
+        lightboxRatingSummary.appendChild(reviewSpan("lightbox-rating-text", average.toFixed(1) + " out of 5 · " + count + (count === 1 ? " review" : " reviews")));
+      }
+
       // Real reviews for this piece come first; the card's sample is always tagged as the studio's own note.
       function renderProductReviews(item) {
         if (!lightboxReviews || !lightboxReviewList) return;
@@ -415,13 +430,25 @@
         while (lightboxReviewList.firstChild) lightboxReviewList.removeChild(lightboxReviewList.firstChild);
         var productId = catalogueProductId(item);
         var shown = 0;
+        var ratingTotal = 0;
+        var ratingCount = 0;
         if (productReviewsData && productId) productReviewsData.reviews.forEach(function (review) {
-          if (shown >= 5 || !review || review.productId !== productId) return;
+          if (!review || review.productId !== productId) return;
           var card = reviewCard(review);
           if (!card) return;
+          ratingTotal += review.rating;
+          ratingCount += 1;
+          if (shown >= 5) return;
           lightboxReviewList.appendChild(card);
           shown += 1;
         });
+        renderProductRating(ratingCount ? ratingTotal / ratingCount : 0, ratingCount);
+        if (lightboxRate) {
+          lightboxRate.hidden = !productId;
+          Array.prototype.forEach.call(lightboxRate.querySelectorAll("[data-rate]"), function (link) {
+            link.setAttribute("href", "reviews/?product=" + encodeURIComponent(productId) + "&rating=" + link.getAttribute("data-rate") + "#write");
+          });
+        }
         var sample = item.card && typeof item.card.getAttribute === "function" ? item.card.getAttribute("data-sample-review") || "" : "";
         if (sample) {
           var sampleCard = document.createElement("li");
@@ -437,8 +464,8 @@
           lightboxReviewList.appendChild(sampleCard);
           shown += 1;
         }
-        if (lightboxReviewsTitle) lightboxReviewsTitle.textContent = shown > (sample ? 1 : 0) ? "Reviews" : "What we love about it";
-        lightboxReviews.hidden = !shown;
+        if (lightboxReviewsTitle) lightboxReviewsTitle.textContent = shown > (sample ? 1 : 0) || !sample ? "Reviews" : "What we love about it";
+        lightboxReviews.hidden = !shown && !productId;
         if (productReviewsData || productReviewsLoading || !productReviewsUrl) return;
         productReviewsLoading = true;
         fetchPublicReviews(productReviewsUrl, function (data) {
@@ -1964,6 +1991,13 @@
     }
 
     // The form is loaded only after the backend answers JSON with intake "open"; anything else stays calm.
+    // A product popup star links here with ?product=...&rating=...; both are re-checked before they reach the form.
+    function reviewQueryValue(name) {
+      var match = new RegExp("[?&]" + name + "=([^&#]*)").exec(String(window.location && window.location.search || ""));
+      if (!match) return "";
+      try { return decodeURIComponent(match[1].replace(/\+/g, " ")); } catch (error) { return ""; }
+    }
+
     function loadReviewPage(firstLoad) {
       fetchPublicReviews(orderUrl, function (data) {
         var statusLine = document.getElementById("reviews-status");
@@ -1979,7 +2013,12 @@
         renderReviews(data);
         if (!firstLoad) return;
         if (data.intake === "open") {
-          submitSeed({ sourceKind: "review", sourceId: "review", productName: "", reviewId: requestId() }, false);
+          var reviewSeed = { sourceKind: "review", sourceId: "review", productName: "", reviewId: requestId() };
+          var productHint = reviewQueryValue("product");
+          var ratingHint = reviewQueryValue("rating");
+          if (/^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productHint)) reviewSeed.productId = productHint;
+          if (/^[1-5]$/.test(ratingHint)) reviewSeed.rating = ratingHint;
+          submitSeed(reviewSeed, false);
           return;
         }
         status.innerHTML = "New reviews are paused right now. You can message " + REVIEW_CONTACT + ".";

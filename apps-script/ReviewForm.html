@@ -332,6 +332,8 @@
     });
     productSelect.appendChild(group);
   } else productHint.hidden = false;
+  if (products && products.some(function (item) { return item && item.id === seed.productId; })) productSelect.value = seed.productId;
+  if (/^[1-5]$/.test(String(seed.rating || ""))) form.elements.rating.value = String(seed.rating);
   form.elements.reviewId.value = seed.reviewId || newId();
 }());
 </script>

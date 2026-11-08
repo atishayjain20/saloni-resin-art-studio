@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261149">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261149" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261150">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261150" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -1061,6 +1061,12 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     list.removeChild = function (child) { this.children.splice(this.children.indexOf(child), 1); child.parentNode = null; return child; };
     docElements["lightbox-reviews"] = makeElement({ hidden: true });
     docElements["lightbox-reviews-title"] = makeElement({ textContent: "Reviews" });
+    docElements["lightbox-rating-summary"] = children(makeElement({ hidden: true }));
+    Object.defineProperty(docElements["lightbox-rating-summary"], "firstChild", { get() { return this.children[0] || null; } });
+    docElements["lightbox-rating-summary"].removeChild = function (child) { this.children.splice(this.children.indexOf(child), 1); return child; };
+    docElements["lightbox-rate"] = makeElement({ hidden: true });
+    const rateLinks = [1, 2, 3, 4, 5].map((value) => makeElement({ attributes: { "data-rate": String(value), href: "reviews/#write" } }));
+    docElements["lightbox-rate"].querySelectorAll = (selector) => (selector === "[data-rate]" ? rateLinks : []);
     docElements["lightbox-review-list"] = list;
     if (feed !== undefined) docElements["order-form-embed"] = makeElement({ attributes: { "data-order-form-url": "https://script.google.test/exec" } });
   }
@@ -1105,11 +1111,34 @@ test("the product popup shows the card's labelled sample review and nothing else
   assert.equal(h.fetchCalls.length, 0);
 });
 
-test("the product popup hides the reviews region when the card has no sample and there are no reviews", () => {
+test("the product popup still offers the rating stars when the card has no sample and there are no reviews", () => {
   const h = galleryHarness({ sample: "" });
   h.open();
-  assert.equal(h.docElements["lightbox-reviews"].hidden, true);
+  assert.equal(h.docElements["lightbox-reviews"].hidden, false);
   assert.equal(h.docElements["lightbox-review-list"].children.length, 0);
+  assert.equal(h.docElements["lightbox-rate"].hidden, false);
+  assert.equal(h.docElements["lightbox-rating-summary"].hidden, true);
+  assert.equal(h.docElements["lightbox-reviews-title"].textContent, "Reviews");
+});
+
+test("each rating star in the product popup opens the Reviews page with this product and that rating", () => {
+  const h = galleryHarness({ sample: "A lovely sample line for this piece." });
+  h.open();
+  const links = h.docElements["lightbox-rate"].querySelectorAll("[data-rate]");
+  assert.deepEqual(links.map((link) => link.attributes.href), [1, 2, 3, 4, 5].map((value) => "reviews/?product=catalogue%3Asample-gift.jpg&rating=" + value + "#write"));
+});
+
+test("the product popup shows the average star rating from real reviews of that product only", async () => {
+  const review = (productId, rating, firstName) => ({ id: "r-" + firstName, rating, productId, productName: "Sample gift", firstName, city: "", comment: "Nice.", date: "2026-11-08", photos: [] });
+  const feed = { ok: true, intake: "open", summary: { count: 3, average: 3.7 }, reviews: [review("catalogue:sample-gift.jpg", 5, "Asha"), review("catalogue:sample-gift.jpg", 4, "Meera"), review("catalogue:other-gift.jpg", 1, "Ravi")] };
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed });
+  h.open();
+  assert.equal(h.docElements["lightbox-rating-summary"].hidden, true);
+  await settleAll();
+  const summary = h.docElements["lightbox-rating-summary"];
+  assert.equal(summary.hidden, false);
+  assert.equal(textOf(summary), "★★★★★ 4.5 out of 5 · 2 reviews");
+  assert.equal(summary.children[0].attributes["aria-hidden"], "true");
 });
 
 test("the product popup adds real reviews for that product only, above the sample, and fetches the feed once", async () => {
