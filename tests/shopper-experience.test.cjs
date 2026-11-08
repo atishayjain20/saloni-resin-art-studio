@@ -212,8 +212,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261147">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261147" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261148">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261148" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -974,7 +974,7 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(trigger.focused, undefined);
 });
 
-function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true } = {}) {
+function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true, sample = null, feed = undefined } = {}) {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
   const makeElement = (extra = {}) => Object.assign({
@@ -995,6 +995,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
   const requestButton = makeElement({ clicked: 0, click() { this.clicked += 1; }, attributes: { "data-order-prefill": "sample" } });
   const paras = (paragraphs || ["Rich colour and golden flecks", "one holder · tealight not included · shown palette or custom colours"]).map((textContent) => ({ textContent }));
   const card = makeElement({
+    attributes: sample ? { "data-sample-review": sample } : {},
     querySelector(selector) {
       if (selector === "figcaption strong") return { textContent: "Sample gift" };
       if (selector === "[data-order-prefill]") return withRequest ? requestButton : null;
@@ -1052,12 +1053,27 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     "sample-card": targetCard,
     order: makeElement(),
   }, gallery);
+  const reviewsMode = sample !== null || feed !== undefined;
+  const fetchCalls = [];
+  if (reviewsMode) {
+    const list = children(makeElement());
+    Object.defineProperty(list, "firstChild", { get() { return this.children[0] || null; } });
+    list.removeChild = function (child) { this.children.splice(this.children.indexOf(child), 1); child.parentNode = null; return child; };
+    docElements["lightbox-reviews"] = makeElement({ hidden: true });
+    docElements["lightbox-review-list"] = list;
+    if (feed !== undefined) docElements["order-form-embed"] = makeElement({ attributes: { "data-order-form-url": "https://script.google.test/exec" } });
+  }
   const documentObject = {
     getElementById(id) { return docElements[id] || null; },
     querySelectorAll(selector) { return selector === "[data-lightbox-trigger]" ? (heroTarget ? [heroTrigger] : [trigger]) : []; },
   };
-  if (cardPhotos) documentObject.createElement = (tagName) => children(makeElement({ tagName }));
+  if (cardPhotos || reviewsMode) documentObject.createElement = (tagName) => children(makeElement({ tagName }));
   const windowObject = { setTimeout(callback) { callback(); } };
+  if (feed !== undefined) {
+    windowObject.setTimeout = () => 1;
+    windowObject.clearTimeout = () => {};
+    windowObject.fetch = (url, init) => { fetchCalls.push({ url, init }); return feed === "fail" ? Promise.reject(new Error("network")) : Promise.resolve({ json: () => Promise.resolve(feed) }); };
+  }
   vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
   const click = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} };
   const open = () => (heroTarget ? heroTrigger : trigger).listeners.click(click);
@@ -1066,8 +1082,60 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     docElements["lightbox-stage"].listeners.pointerdown({ clientX: 200, clientY: 100 });
     docElements["lightbox-stage"].listeners.pointerup({ clientX: 200 + dx, clientY: 100 + dy });
   };
-  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe, trigger, cardImage };
+  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe, trigger, cardImage, fetchCalls };
 }
+
+const textOf = (node) => (node.children && node.children.length ? node.children.map(textOf).join(" ") : String(node.textContent || ""));
+const settleAll = async () => { for (let index = 0; index < 6; index += 1) await new Promise((resolve) => setImmediate(resolve)); };
+
+test("the product popup shows the card's labelled sample review and nothing else when there is no feed", () => {
+  const h = galleryHarness({ sample: "The golden flecks catch the candle light beautifully." });
+  h.open();
+  const region = h.docElements["lightbox-reviews"];
+  const items = h.docElements["lightbox-review-list"].children;
+  assert.equal(region.hidden, false);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].className, "review-card sample-review");
+  assert.equal(items[0].children[0].className, "sample-badge");
+  assert.equal(items[0].children[0].textContent, "Sample review · written by the studio");
+  assert.equal(items[0].children[1].className, "review-comment");
+  assert.equal(items[0].children[1].textContent, "The golden flecks catch the candle light beautifully.");
+  assert.equal(h.fetchCalls.length, 0);
+});
+
+test("the product popup hides the reviews region when the card has no sample and there are no reviews", () => {
+  const h = galleryHarness({ sample: "" });
+  h.open();
+  assert.equal(h.docElements["lightbox-reviews"].hidden, true);
+  assert.equal(h.docElements["lightbox-review-list"].children.length, 0);
+});
+
+test("the product popup adds real reviews for that product only, above the sample, and fetches the feed once", async () => {
+  const review = (productId, firstName) => ({ id: "r-" + firstName, rating: 5, productId, productName: "Sample gift", firstName, city: "", comment: firstName + " loved it.", date: "2026-11-08", photos: [] });
+  const feed = { ok: true, intake: "open", summary: { count: 2, average: 5 }, reviews: [review("catalogue:sample-gift.jpg", "Asha"), review("catalogue:other-gift.jpg", "Ravi")] };
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed });
+  h.open();
+  await settleAll();
+  const items = h.docElements["lightbox-review-list"].children;
+  assert.equal(h.fetchCalls.length, 1);
+  assert.equal(h.fetchCalls[0].url, "https://script.google.test/exec?action=reviews");
+  assert.deepEqual(items.map((item) => item.className), ["review-card", "review-card sample-review"]);
+  assert.match(textOf(items[0]), /Asha/);
+  assert.doesNotMatch(textOf(h.docElements["lightbox-review-list"]), /Ravi/);
+  h.lightbox.close();
+  h.open();
+  await settleAll();
+  assert.equal(h.fetchCalls.length, 1);
+  assert.equal(h.docElements["lightbox-review-list"].children.length, 2);
+});
+
+test("a failing review feed still leaves the sample in the product popup", async () => {
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: "fail" });
+  h.open();
+  await settleAll();
+  assert.equal(h.docElements["lightbox-reviews"].hidden, false);
+  assert.deepEqual(h.docElements["lightbox-review-list"].children.map((item) => item.className), ["review-card sample-review"]);
+});
 
 test("lightbox gallery steps through the card photo and its extra images", () => {
   const h = galleryHarness({ colours: "teal styled" });

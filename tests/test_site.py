@@ -2207,30 +2207,32 @@ class ReviewsPageContractTests(unittest.TestCase):
         )
         self.assertIn("Customer requests and uploaded images are scheduled for deletion after 90 days.", details.group(1))
 
-    def test_sample_reviews_cover_every_product_once_and_are_clearly_labelled(self):
-        section = re.search(r'<section class="sample-reviews shell" id="sample-reviews"[^>]*>([\s\S]*?)</section>', self.page)
-        self.assertIsNotNone(section, "the Reviews page needs a sample reviews section")
-        body = section.group(1)
-        self.assertLess(self.page.index('id="reviews-list"'), self.page.index('id="sample-reviews"'))
-        self.assertLess(self.page.index('id="sample-reviews"'), self.page.index('id="write"'))
-        self.assertIn("Sample reviews", body)
-        self.assertIn("written by Saloni's studio", body)
-        self.assertIn("not from customers", body)
-        self.assertIn("not counted in the rating", body)
-        cards = re.findall(r'<li class="review-card sample-review" data-product-id="([^"]+)">([\s\S]*?)</li>', body)
+    def test_sample_reviews_live_on_each_product_card_not_on_the_reviews_page(self):
+        self.assertNotIn('id="sample-reviews"', self.page)
+        self.assertNotIn("sample-review", self.page)
         products = json.loads((ROOT / "reviews" / "products.json").read_text(encoding="utf-8"))
-        product_ids = [item["id"] for item in products]
-        card_ids = [card_id for card_id, _ in cards]
-        self.assertEqual(sorted(card_id for card_id in card_ids if card_id != "studio"), sorted(product_ids))
-        self.assertGreaterEqual(card_ids.count("studio"), 1)
-        names = {item["id"]: item["name"] for item in products}
-        for card_id, card in cards:
-            with self.subTest(card=card_id):
-                self.assertIn('<p class="sample-badge">Sample review · written by the studio</p>', card)
-                self.assertIn(html.escape(names.get(card_id, "Studio review"), quote=False), card)
-                self.assertRegex(card, r'<p class="review-comment">[^<]{20,}</p>')
-        self.assertNotRegex(body, "[\u2605\u2606]", "samples carry no star rating")
-        self.assertEqual(len(set(re.findall(r'<p class="review-comment">([^<]+)</p>', body))), len(cards), "each sample is written for its own piece")
+        samples = {}
+        for article in re.findall(r"<article\b[^>]*>[\s\S]*?</article>", self.home):
+            trigger = re.search(r'<a class="lightbox-trigger"[^>]*href="assets/([^"?]+)', article)
+            sample = re.search(r'^<article\b[^>]*\sdata-sample-review="([^"]+)"', article)
+            if trigger and sample:
+                samples["catalogue:" + trigger.group(1)] = html.unescape(sample.group(1))
+        self.assertEqual(sorted(samples), sorted(item["id"] for item in products))
+        self.assertEqual(len(set(samples.values())), len(samples), "each sample is written for its own piece")
+        for product_id, text in samples.items():
+            with self.subTest(product=product_id):
+                self.assertGreaterEqual(len(text), 20)
+                self.assertNotRegex(text, "[\u2605\u2606<>]")
+        self.assertEqual(self.home.count("data-sample-review="), len(products))
+
+    def test_product_popup_has_a_hidden_reviews_region_with_a_link_to_write_one(self):
+        dialog = re.search(r'<dialog class="lightbox-dialog"[\s\S]*?</dialog>', self.home)
+        self.assertIsNotNone(dialog)
+        region = re.search(r'<section class="lightbox-reviews" id="lightbox-reviews" aria-labelledby="lightbox-reviews-title" hidden>([\s\S]*?)</section>', dialog.group(0))
+        self.assertIsNotNone(region, "the product popup needs a hidden reviews region")
+        self.assertIn('<h3 id="lightbox-reviews-title">Reviews</h3>', region.group(1))
+        self.assertIn('<ul class="lightbox-review-list" id="lightbox-review-list"></ul>', region.group(1))
+        self.assertIn('href="reviews/#write"', region.group(1))
 
     def test_review_product_list_matches_the_catalogue_cards_in_page_order(self):
         path = ROOT / "reviews" / "products.json"
