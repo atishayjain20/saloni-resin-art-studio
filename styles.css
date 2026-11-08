@@ -1027,9 +1027,14 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 .lightbox-rate-label { font-weight: 800; }
 .lightbox-rate-hint { color: var(--muted); font-size: 0.8rem; }
 .lightbox-rate-stars { display: flex; gap: 0.15rem; }
-.lightbox-rate-star { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 0.6rem; color: #947f6b; font-size: 1.9rem; line-height: 1; text-decoration: none; }
-.lightbox-rate-stars:hover .lightbox-rate-star, .lightbox-rate-stars:focus-within .lightbox-rate-star { color: #8a5200; }
-.lightbox-rate-star:hover ~ .lightbox-rate-star, .lightbox-rate-star:focus-visible ~ .lightbox-rate-star { color: #947f6b; }
+.lightbox-rate-star { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 0.6rem; background: none; color: #947f6b; font: inherit; font-size: 1.9rem; line-height: 1; cursor: pointer; }
+.lightbox-rate-star[aria-pressed="true"], .lightbox-rate-stars:hover .lightbox-rate-star:not(:disabled), .lightbox-rate-stars:focus-within .lightbox-rate-star:not(:disabled) { color: #8a5200; }
+.lightbox-rate-star:not(:disabled):hover ~ .lightbox-rate-star:not(:disabled), .lightbox-rate-star:not(:disabled):focus-visible ~ .lightbox-rate-star:not(:disabled) { color: #947f6b; }
+.lightbox-rate-star:disabled { cursor: default; }
+.lightbox-rate-star[aria-pressed="true"]:disabled { opacity: 1; }
+.lightbox-rate-status { margin: 0; min-height: 1.2em; font-weight: 700; }
+.lightbox-rate-status:empty { display: none; }
+.lightbox-tell-more { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; color: var(--rose-ink); font-weight: 800; }
 .lightbox-rate-star:focus-visible { outline: 3px solid var(--rose-ink); outline-offset: 2px; }
 .sample-review { border-style: dashed; background: #fffaf4; }
 .sample-badge { justify-self: start; margin: 0; padding: 0.2rem 0.6rem; border-radius: 999px; background: #efe4d8; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; }

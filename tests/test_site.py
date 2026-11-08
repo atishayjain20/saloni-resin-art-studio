@@ -2233,10 +2233,15 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertIn('<h3 id="lightbox-reviews-title">Reviews</h3>', region.group(1))
         self.assertIn('<ul class="lightbox-review-list" id="lightbox-review-list"></ul>', region.group(1))
         self.assertIn('<p class="lightbox-rating-summary" id="lightbox-rating-summary" hidden></p>', region.group(1))
-        rate = re.search(r'<div class="lightbox-rate" id="lightbox-rate" hidden>([\s\S]*?)<p class="lightbox-rate-hint">Tap a star, then tell us more on the Reviews page\.</p>', region.group(1))
+        rate = re.search(r'<div class="lightbox-rate" id="lightbox-rate" data-captcha-site-key="(6L[A-Za-z0-9_-]{38})" hidden>([\s\S]*?)</p>\s*</div>', region.group(1))
         self.assertIsNotNone(rate, "the popup needs a hidden rate-this-piece block")
-        stars = re.findall(r'<a class="lightbox-rate-star" href="reviews/#write" data-rate="([1-5])" aria-label="Rate \1 out of 5 stars and write a review">', rate.group(1))
+        stars = re.findall(r'<button class="lightbox-rate-star" type="button" data-rate="([1-5])" aria-pressed="false" aria-label="Rate \1 out of 5 stars">', rate.group(2))
         self.assertEqual(stars, ["1", "2", "3", "4", "5"])
+        self.assertIn('<p class="lightbox-rate-status" id="lightbox-rate-status" role="status" aria-live="polite"></p>', rate.group(2))
+        self.assertIn('<a class="lightbox-tell-more" id="lightbox-tell-more" href="reviews/#write">Tell us more', rate.group(2))
+        self.assertIn('protected by reCAPTCHA', rate.group(2))
+        self.assertIn('https://policies.google.com/privacy', rate.group(2))
+        self.assertIn('https://policies.google.com/terms', rate.group(2))
 
     def test_review_product_list_matches_the_catalogue_cards_in_page_order(self):
         path = ROOT / "reviews" / "products.json"
