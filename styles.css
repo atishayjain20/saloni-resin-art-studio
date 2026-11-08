@@ -1018,14 +1018,10 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 .review-photos { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .review-photos a { display: block; width: 5.5rem; height: 5.5rem; overflow: hidden; border: 1px solid var(--line); border-radius: 0.7rem; background: #fffaf4; }
 .review-photos img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.sample-reviews { display: grid; gap: 0.9rem; padding-block: clamp(2rem, 5vw, 4rem); border-top: 1px solid var(--line); }
-.sample-reviews .eyebrow, .sample-reviews h2 { margin: 0; }
-.sample-reviews h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1; }
-.sample-reviews-note { max-width: 60ch; margin: 0; color: var(--muted); font-size: 0.88rem; line-height: 1.55; }
-.sample-group { border: 1px solid var(--line); border-radius: 1rem; background: var(--paper); }
-.sample-group summary { min-height: 44px; padding: 0.8rem 1.1rem; cursor: pointer; font-weight: 800; }
-.sample-group summary span { color: var(--muted); font-weight: 500; }
-.sample-group .reviews-list { padding: 0 1rem 1rem; }
+.lightbox-reviews { display: grid; gap: 0.7rem; margin-top: 1.2rem; }
+.lightbox-reviews h3 { margin: 0; font-size: 1.05rem; }
+.lightbox-review-list { display: grid; gap: 0.7rem; margin: 0; padding: 0; list-style: none; }
+.lightbox-reviews-link { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; color: var(--rose-ink); font-weight: 800; }
 .sample-review { border-style: dashed; background: #fffaf4; }
 .sample-badge { justify-self: start; margin: 0; padding: 0.2rem 0.6rem; border-radius: 999px; background: #efe4d8; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; }
 .reviews-write { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(320px, 1fr); align-items: start; gap: clamp(2rem, 8vw, 7rem); padding-block: clamp(3rem, 8vw, 6rem); border-top: 1px solid var(--line); }
