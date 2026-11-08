@@ -2237,7 +2237,7 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertIsNotNone(rate, "the popup needs a hidden rate-this-piece block")
         stars = re.findall(r'<button class="lightbox-rate-star" type="button" data-rate="([1-5])" aria-pressed="false" aria-label="Rate \1 out of 5 stars">', rate.group(2))
         self.assertEqual(stars, ["1", "2", "3", "4", "5"])
-        self.assertIn('<p class="lightbox-rate-status" id="lightbox-rate-status" role="status" aria-live="polite"></p>', rate.group(2))
+        self.assertIn('<p class="lightbox-rate-status" id="lightbox-rate-status" role="status" aria-live="polite" tabindex="-1"></p>', rate.group(2))
         self.assertIn('<a class="lightbox-tell-more" id="lightbox-tell-more" href="reviews/#write">Tell us more', rate.group(2))
         self.assertIn('protected by reCAPTCHA', rate.group(2))
         self.assertIn('https://policies.google.com/privacy', rate.group(2))

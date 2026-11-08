@@ -274,6 +274,7 @@
     var ratedThisVisit = {};
     var ratingAdjustments = {};
     var ratingRequest = null;
+    var pendingRatingIds = {};
     var ratingMessage = null;
     var reviewsEmbed = document.getElementById("order-form-embed");
     var productReviewsUrl = reviewsEmbed ? reviewsEmbed.getAttribute("data-order-form-url") || "" : "";
@@ -458,7 +459,7 @@
         if (!lightboxRate) return;
         lightboxRate.hidden = !productId;
         var saved = productId ? savedRating(productId) : 0;
-        var busy = Boolean(ratingRequest && ratingRequest.productId === productId);
+        var busy = Boolean(ratingRequest);
         Array.prototype.forEach.call(rateButtons, function (button) {
           var value = Number(button.getAttribute("data-rate"));
           button.disabled = Boolean(saved) || busy;
@@ -501,11 +502,16 @@
         ratingRequest = request;
         ratingMessage = { productId: productId, text: "Saving your rating…" };
         renderRateState(productId);
-        var ratingId = window.crypto && typeof window.crypto.randomUUID === "function" ? window.crypto.randomUUID() : "rating-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+        if (lightboxRateStatus && typeof lightboxRateStatus.focus === "function") lightboxRateStatus.focus({ preventScroll: true });
+        // A retry after a timeout or network error reuses the ID, so the server's replay check counts it once.
+        var pendingKey = productId + ":" + value;
+        var ratingId = pendingRatingIds[pendingKey] || (window.crypto && typeof window.crypto.randomUUID === "function" ? window.crypto.randomUUID() : "rating-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10));
+        pendingRatingIds[pendingKey] = ratingId;
         var timer = window.setTimeout(function () { finish(false, ""); }, 20000);
-        function finish(ok, error) {
+        function finish(ok, error, answered) {
           if (ratingRequest !== request) return;
           ratingRequest = null;
+          if (answered) delete pendingRatingIds[pendingKey];
           if (window.clearTimeout) window.clearTimeout(timer);
           if (ok) {
             rememberRating(productId, value);
@@ -527,7 +533,7 @@
               body: "action=rate&productId=" + encodeURIComponent(productId) + "&rating=" + value + "&ratingId=" + encodeURIComponent(ratingId) + "&captchaToken=" + encodeURIComponent(token)
             })
               .then(function (response) { return response.json(); })
-              .then(function (data) { finish(Boolean(data && data.ok === true), data && data.error); })
+              .then(function (data) { finish(Boolean(data && data.ok === true), data && data.error, Boolean(data && typeof data === "object")); })
               .catch(function () { finish(false, ""); });
           } catch (error) { finish(false, ""); }
         });

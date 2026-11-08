@@ -340,6 +340,19 @@ test("quick ratings stop with the reviews switch, before setup, at their own dai
   assert.equal(makeRuntime({ rows: ratingsOnly }).context.submitReview(validForm()).ok, true, "quick ratings do not use up the review cap");
 });
 
+test("one product takes at most 10 quick ratings a day by default, and the limit can be changed", () => {
+  const today = new Date();
+  const quick = (index, productId) => reviewRow({ id: "rating-prod-" + String(index).padStart(8, "0"), at: today, productId, firstName: "", city: "", comment: "", consent: false, notes: "Quick rating from a product popup" });
+  const ten = Array.from({ length: 10 }, (_, index) => quick(index, DEFAULT_PRODUCTS[0].id));
+  const full = makeRuntime({ captchaResponse: RATING_CAPTCHA, rows: ten });
+  assert.deepEqual(rate(full), { ok: false, error: "cap" });
+  assert.equal(rate(full, { productId: DEFAULT_PRODUCTS[1].id }).ok, true, "another product still takes ratings");
+  const yesterday = Array.from({ length: 10 }, (_, index) => reviewRow({ id: "rating-old-" + String(index).padStart(8, "0"), at: new Date(today.getTime() - 2 * 86400000), productId: DEFAULT_PRODUCTS[0].id, firstName: "", city: "", comment: "", consent: false }));
+  assert.equal(rate(makeRuntime({ captchaResponse: RATING_CAPTCHA, rows: yesterday })).ok, true);
+  assert.deepEqual(rate(makeRuntime({ captchaResponse: RATING_CAPTCHA, properties: { RATING_PRODUCT_DAILY_CAP: "2" }, rows: ten.slice(0, 2) })), { ok: false, error: "cap" });
+  assert.equal(makeRuntime().context.DEFAULT_RATING_PRODUCT_DAILY_CAP, 10);
+});
+
 test("the same quick rating sent twice is saved once, and a changed rating under the same ID conflicts", () => {
   const runtime = makeRuntime({ captchaResponse: RATING_CAPTCHA });
   assert.equal(rate(runtime).ok, true);

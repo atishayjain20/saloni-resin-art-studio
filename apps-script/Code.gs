@@ -18,6 +18,7 @@ var REVIEW_CAPTCHA_ACTION = "review_submission";
 var RATING_CAPTCHA_ACTION = "product_rating";
 var DEFAULT_REVIEW_DAILY_ACCEPTANCE_CAP = 20;
 var DEFAULT_RATING_DAILY_ACCEPTANCE_CAP = 100;
+var DEFAULT_RATING_PRODUCT_DAILY_CAP = 10;
 var QUICK_RATING_NOTE = "Quick rating from a product popup";
 var MAX_REVIEW_PHOTO_BYTES = 1024 * 1024;
 var MAX_REVIEW_PHOTOS = 3;
@@ -917,14 +918,16 @@ function submitQuickRating_(parameters) {
 
 function storeQuickRating_(payload, productName, properties) {
   var fingerprint = digestHex_(JSON.stringify({ kind: "quick-rating", ratingId: payload.ratingId, productId: payload.productId, rating: payload.rating }));
+  // A short wait: a busy moment should cost a rating, never delay an order waiting on the same lock.
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) return { ok: false, error: "busy" };
+  if (!lock.tryLock(3000)) return { ok: false, error: "busy" };
   try {
     var sheet = openReviewsTab_(properties, true);
     ensureReviewsTabSchema_(sheet, false);
     var existing = findReview_(sheet, payload.ratingId);
     if (existing) return existing.fingerprint === fingerprint ? { ok: true, rating: Number(payload.rating) } : { ok: false, error: "conflict" };
     if (dailyRowCount_(sheet, true) >= dailyCap_(properties, "RATING_DAILY_ACCEPTANCE_CAP", DEFAULT_RATING_DAILY_ACCEPTANCE_CAP)) return { ok: false, error: "cap" };
+    if (dailyRowCount_(sheet, true, payload.productId) >= dailyCap_(properties, "RATING_PRODUCT_DAILY_CAP", DEFAULT_RATING_PRODUCT_DAILY_CAP)) return { ok: false, error: "cap" };
     sheet.appendRow([
       neutralizeForSheet_(payload.ratingId), new Date(), "Published", Number(payload.rating),
       neutralizeForSheet_(payload.productId), neutralizeForSheet_(productName), "", "", "", "", false, fingerprint, QUICK_RATING_NOTE
@@ -1225,14 +1228,15 @@ function dailyCap_(properties, key, fallback) {
   return Number.isInteger(configured) && configured > 0 ? configured : fallback;
 }
 
-// Written reviews and quick ratings each have their own daily cap.
-function dailyRowCount_(sheet, quickRatings) {
+// Written reviews and quick ratings each have their own daily cap; quick ratings also have one per product.
+function dailyRowCount_(sheet, quickRatings, productId) {
   var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
   var values = sheet.getDataRange().getValues();
   var count = 0;
   for (var index = 1; index < values.length; index += 1) {
     var received = values[index][1];
     if (isQuickRatingRow_(values[index]) !== quickRatings) continue;
+    if (productId && String(values[index][4]) !== productId) continue;
     if (received && Utilities.formatDate(new Date(received), Session.getScriptTimeZone(), "yyyy-MM-dd") === today) count += 1;
   }
   return count;

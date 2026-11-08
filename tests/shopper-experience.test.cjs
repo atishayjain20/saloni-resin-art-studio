@@ -974,7 +974,7 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(trigger.focused, undefined);
 });
 
-function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true, sample = null, feed = undefined, rateResponse = { ok: true, rating: 4 }, stored = null, captcha = true } = {}) {
+function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true, sample = null, feed = undefined, rateResponse = { ok: true, rating: 4 }, stored = null, captcha = true, rateReject = false } = {}) {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
   const makeElement = (extra = {}) => Object.assign({
@@ -1083,14 +1083,15 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     windowObject.clearTimeout = () => {};
     windowObject.fetch = (url, init) => {
       fetchCalls.push({ url, init });
-      if (init && init.method === "POST") return Promise.resolve({ json: () => Promise.resolve(rateResponse) });
+      if (init && init.method === "POST") return rateReject ? Promise.reject(new Error("network")) : Promise.resolve({ json: () => Promise.resolve(rateResponse) });
       return feed === "fail" ? Promise.reject(new Error("network")) : Promise.resolve({ json: () => Promise.resolve(feed) });
     };
   }
   const storage = new Map(stored ? [["saloni-product-ratings", JSON.stringify(stored)]] : []);
   if (reviewsMode) {
     windowObject.localStorage = { getItem: (key) => (storage.has(key) ? storage.get(key) : null), setItem: (key, value) => storage.set(key, String(value)) };
-    windowObject.crypto = { randomUUID: () => "rating-0000-1111-2222" };
+    let uuid = 0;
+    windowObject.crypto = { randomUUID: () => "rating-0000-1111-222" + (uuid += 1) };
     if (captcha) windowObject.grecaptcha = { ready: (callback) => callback(), execute: (key, options) => { fetchCalls.push({ captcha: key, action: options.action }); return Promise.resolve("captcha-token"); } };
   }
   vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: windowObject });
@@ -1157,7 +1158,8 @@ test("tapping a star saves the rating from the popup with a captcha token and th
   assert.equal(post.url, "https://script.google.test/exec");
   assert.equal(post.init.credentials, "omit");
   assert.equal(post.init.headers["Content-Type"], "application/x-www-form-urlencoded");
-  assert.equal(post.init.body, "action=rate&productId=catalogue%3Asample-gift.jpg&rating=4&ratingId=rating-0000-1111-2222&captchaToken=captcha-token");
+  assert.equal(post.init.body, "action=rate&productId=catalogue%3Asample-gift.jpg&rating=4&ratingId=rating-0000-1111-2221&captchaToken=captcha-token");
+  assert.equal(h.docElements["lightbox-rate-status"].focused, true);
   assert.equal(h.docElements["lightbox-rate-status"].textContent, "Thanks! You rated this 4 out of 5 stars.");
   const buttons = h.docElements["lightbox-rate"].querySelectorAll("[data-rate]");
   assert.deepEqual(buttons.map((button) => button.disabled), [true, true, true, true, true]);
@@ -1208,6 +1210,22 @@ test("the product popup shows the average star rating from real reviews of that 
   assert.equal(summary.hidden, false);
   assert.equal(textOf(summary), "★★★★★ 4.5 out of 5 · 2 ratings");
   assert.equal(summary.children[0].attributes["aria-hidden"], "true");
+});
+
+test("a retry after a network failure reuses the same rating ID so the server counts it once", async () => {
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, rateReject: true });
+  h.open();
+  await settleAll();
+  rateStar(h, 5);
+  await settleAll();
+  rateStar(h, 5);
+  await settleAll();
+  rateStar(h, 3);
+  await settleAll();
+  const ids = h.fetchCalls.filter((call) => call.init && call.init.method === "POST").map((call) => /ratingId=([^&]+)/.exec(call.init.body)[1]);
+  assert.equal(ids.length, 3);
+  assert.equal(ids[0], ids[1]);
+  assert.notEqual(ids[2], ids[0]);
 });
 
 test("the popup average uses the feed's per-product rating totals, which include quick ratings", async () => {
