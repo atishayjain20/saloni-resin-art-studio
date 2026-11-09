@@ -2164,7 +2164,12 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertTrue(self.page, "reviews/index.html must exist")
         self.assertIn('<link rel="canonical" href="https://saloniresinart.com/reviews/">', self.page)
         self.assertIn('<meta property="og:url" content="https://saloniresinart.com/reviews/">', self.page)
-        self.assertRegex(self.page, r"<title>Customer reviews[^<]*Saloni Resin Art Studio</title>")
+        self.assertRegex(self.page, r"<title>Write a review \| Saloni Resin Art Studio</title>")
+        for stale in ("Customer reviews", "Read what customers say", "Words from people", 'id="write-title"'):
+            self.assertNotIn(stale, self.page)
+        self.assertIn('<meta name="description" content="Share a review of your Saloni resin art or the studio.">', self.page)
+        self.assertEqual(self.page.count("<h2"), 0, "the h1 is the only heading")
+        self.assertRegex(self.page, r'<section[^>]*id="write"[^>]*aria-labelledby="reviews-title"')
         self.assertIn('<h1', self.page)
         self.assertRegex(self.page, r'<h1 id="reviews-title">Write a review</h1>')
         for gone in ("reviews-summary", "reviews-status", "reviews-list", "reviews-list-section", "Loading reviews", "appears on this page as soon as you post it"):

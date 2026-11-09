@@ -1225,29 +1225,29 @@ test("a tap while the warmed reCAPTCHA script is still loading waits for it, the
   assert.deepEqual(JSON.parse(h.storage.get("saloni-product-ratings")), { "catalogue:sample-gift.jpg": 5 });
 });
 
-test("a reCAPTCHA script that is already on the page and already loaded still lets the rating through", async () => {
-  const existing = { addEventListener() {}, src: "https://www.google.com/recaptcha/api.js?render=site-key" };
-  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, captcha: false, existingScript: existing });
-  h.windowObject.grecaptcha = { ready: (callback) => callback(), execute: () => Promise.resolve("ready-token") };
-  h.open();
+test("a reCAPTCHA script that is already on the page is reused: run at once if ready, else wait for its load event", async () => {
+  const tag = () => ({ listeners: {}, addEventListener(type, listener) { this.listeners[type] = listener; }, src: "https://www.google.com/recaptcha/api.js?render=site-key" });
+  const ready = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, captcha: false, existingScript: tag() });
+  ready.windowObject.grecaptcha = { ready: (callback) => callback(), execute: () => Promise.resolve("ready-token") };
+  ready.open();
   await settleAll();
-  rateStar(h, 2);
+  rateStar(ready, 2);
   await settleAll();
-  assert.equal(h.headScripts.length, 0);
-  assert.match(h.fetchCalls.find((call) => call.init && call.init.method === "POST").init.body, /captchaToken=ready-token$/);
-  // A tag that finished loading before reCAPTCHA appeared is found by polling, not by a load event that never comes.
-  const late = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, captcha: false, existingScript: existing });
-  const polls = [];
-  late.windowObject.setTimeout = (callback) => { polls.push(callback); return polls.length; };
-  late.open();
+  assert.equal(ready.headScripts.length, 0, "no second script tag");
+  assert.match(ready.fetchCalls.find((call) => call.init && call.init.method === "POST").init.body, /captchaToken=ready-token$/);
+  const existing = tag();
+  const waiting = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, captcha: false, existingScript: existing });
+  waiting.open();
   await settleAll();
-  rateStar(late, 2);
+  rateStar(waiting, 2);
   await settleAll();
-  assert.equal(late.fetchCalls.filter((call) => call.init && call.init.method === "POST").length, 0);
-  late.windowObject.grecaptcha = { ready: (callback) => callback(), execute: () => Promise.resolve("polled-token") };
-  polls.splice(0).forEach((callback) => callback());
+  assert.equal(waiting.headScripts.length, 0, "the page's own tag is reused");
+  assert.equal(waiting.fetchCalls.filter((call) => call.init && call.init.method === "POST").length, 0, "nothing is sent before the tag loads");
+  waiting.windowObject.grecaptcha = { ready: (callback) => callback(), execute: () => Promise.resolve("loaded-token") };
+  existing.listeners.load();
   await settleAll();
-  assert.match(late.fetchCalls.find((call) => call.init && call.init.method === "POST").init.body, /captchaToken=polled-token$/);
+  assert.match(waiting.fetchCalls.find((call) => call.init && call.init.method === "POST").init.body, /captchaToken=loaded-token$/);
+  assert.doesNotMatch(script.slice(script.indexOf("function loadRatingCaptcha"), script.indexOf("function withRatingCaptcha")), /poll|setTimeout/, "no polling loop");
 });
 
 test("a reCAPTCHA script that cannot load undoes the stars and says the rating was not saved", async () => {

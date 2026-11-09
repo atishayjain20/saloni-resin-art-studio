@@ -1042,13 +1042,11 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 .sample-review { border-style: dashed; background: #fffaf4; }
 .sample-badge { justify-self: start; margin: 0; padding: 0.2rem 0.6rem; border-radius: 999px; background: #efe4d8; color: var(--cocoa); font-size: 0.72rem; font-weight: 800; }
 .reviews-write { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(320px, 1fr); align-items: start; gap: clamp(2rem, 8vw, 7rem); padding-block: clamp(3rem, 8vw, 6rem); border-top: 1px solid var(--line); }
-.reviews-write h2 { max-width: 10ch; margin: 0.4rem 0 1rem; font-size: clamp(2.4rem, 5vw, 4rem); line-height: 0.98; }
 .reviews-write-copy > p:not(.eyebrow) { max-width: 38ch; color: var(--muted); font-size: 0.84rem; line-height: 1.55; }
 .reviews-write .order-form-panel iframe { min-height: 1180px; }
 @media (max-width: 620px) {
   .reviews-write { display: block; padding-block: 3rem; }
   .reviews-write-copy { margin-bottom: 1.6rem; }
-  .reviews-write h2 { max-width: 12ch; }
   .reviews-write .order-form-panel iframe { min-height: 1650px; }
 }
 

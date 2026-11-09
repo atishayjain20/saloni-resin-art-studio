@@ -961,6 +961,8 @@ test("the review form has the specified fields and no consent checkbox, consent 
   assert.match(formHtml, /type="file"[^>]*accept="image\/jpeg,image\/png"[^>]*multiple/);
   assert.doesNotMatch(formHtml, /publicConsent|public-consent|<input[^>]*type="checkbox"|class="consent"|I agree that|Reviews stay until removed|Show my review/);
   assert.doesNotMatch(formHtml, /class="intro"|Tell others about your Saloni resin art|appears on the Reviews page/);
+  assert.match(formHtml, /Reviews are public on the home page\./);
+  assert.doesNotMatch(formHtml, /public on the Reviews page|saloni-review-submitted|notifyParent/);
   assert.doesNotMatch(formHtml, /Do not include phone numbers|Location data is removed/);
   assert.match(formHtml, /Post review/);
   assert.match(formHtml, /Write another review/);
@@ -1012,19 +1014,17 @@ test("a valid review is sent with the parent captcha token and the exact payload
   assert.deepEqual(runtime.submissions[0], { reviewId: "review-seed-123456", productId: "studio", rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", photos: [], captchaToken: "captcha-token" });
 });
 
-test("review success thanks the first name, posts a pinned-origin message and offers another review", () => {
+test("review success thanks the first name, says where the review shows and offers another review", () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
   runtime.form.dispatch("submit", { preventDefault() {} });
   respondReviewCaptcha(runtime, 0);
   runtime.callbacks[0].success({ ok: true, reviewId: "review-seed-123456", receivedAt: "now", status: "Published" });
-  assert.equal(runtime.status.textContent, "Thank you, Asha. Your review is now on the page.");
+  assert.equal(runtime.status.textContent, "Thank you, Asha. Your review now shows on the home page of saloniresinart.com.");
   assert.equal(runtime.status.className, "status success");
   assert.equal(runtime.fieldsets.every((fieldset) => fieldset.hidden), true);
   assert.equal(runtime.elements.get("another-button").hidden, false);
-  const done = runtime.parentMessages.find((entry) => entry.message.type === "saloni-review-submitted");
-  assert.deepEqual(plain(done.message), { type: "saloni-review-submitted", nonce: "nonce-seed-123456" });
-  assert.equal(done.targetOrigin, "https://saloniresinart.com");
+  assert.equal(runtime.parentMessages.some((entry) => entry.message.type === "saloni-review-submitted"), false, "the parent no longer listens, so nothing is posted");
   runtime.elements.get("another-button").dispatch("click");
   assert.notEqual(runtime.fields.reviewId.value, "review-seed-123456");
   assert.equal(runtime.status.textContent, "");
@@ -1470,7 +1470,7 @@ test("a review announced by the pinned form triggers no feed fetch and no second
   listener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce, siteKey: "site-key" }, ports: [] });
   listener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-review-submitted", nonce }, ports: [] });
   await settle();
-  assert.equal(page.fetchCalls.length, 0, "the write page has no list to reload");
+  assert.equal(page.fetchCalls.length, 0, "an old form that still announces a review changes nothing");
   assert.equal(page.posted.length, 1, "the success message in the iframe is not replaced");
 });
 

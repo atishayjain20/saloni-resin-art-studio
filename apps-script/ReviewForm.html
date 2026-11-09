@@ -53,7 +53,7 @@
     <input id="captcha-token" name="captchaToken" type="hidden">
     <p id="form-status" class="status" role="status" aria-live="polite" tabindex="-1"></p>
     <div class="actions"><button id="submit-button" type="submit">Post review</button><button id="another-button" type="button" hidden>Write another review</button></div>
-    <p class="privacy">Reviews are public on the Reviews page. To remove yours, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
+    <p class="privacy">Reviews are public on the home page. To remove yours, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
   </form>
 </main>
 <script id="seed-data" type="application/json"><?!= seedJson ?></script>
@@ -155,18 +155,13 @@
   }
   function showConflict() { anotherButton.hidden = false; setStatus("These entries changed while an earlier review was still being confirmed. To protect the original review, it was not resent with a different ID or payload. Choose Write another review to post the changed details.", "error"); status.focus(); }
   function uncertain(attempt) { if (!attempt.sent) return; attempt.uncertain = true; uncertainAttempt = attempt; if (!samePayload(snapshot(), attempt.payload)) showConflict(); else { setStatus("We could not confirm the review yet. Your entries are still here; check them and try again.", "error"); status.focus(); } }
-  function notifyParent() {
-    if (!seed.channelNonce || !window.top || window.top === window) return;
-    try { window.top.postMessage({ type: "saloni-review-submitted", nonce: seed.channelNonce }, PARENT_ORIGIN); } catch (error) {}
-  }
   function success(attempt) {
     if (!current(attempt)) return;
     restore(attempt); uncertainAttempt = null;
     Array.prototype.forEach.call(form.querySelectorAll("fieldset, #submit-button"), function (element) { element.hidden = true; });
     anotherButton.hidden = false;
-    setStatus("Thank you, " + attempt.payload.firstName.trim().split(/\s+/)[0] + ". Your review is now on the page.", "success");
+    setStatus("Thank you, " + attempt.payload.firstName.trim().split(/\s+/)[0] + ". Your review now shows on the home page of saloniresinart.com.", "success");
     status.focus();
-    notifyParent();
   }
   function renderPhotos() {
     while (previews.firstChild) previews.removeChild(previews.firstChild);

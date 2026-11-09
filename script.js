@@ -546,17 +546,7 @@
           script.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(ratingSiteKey);
           script.async = true;
           document.head.appendChild(script);
-          return;
         }
-        // A script tag that already finished loading will not fire load again, so look for grecaptcha for a few seconds.
-        var checks = 0;
-        (function poll() {
-          if (!ratingCaptchaLoading) return;
-          if (window.grecaptcha && window.grecaptcha.ready) { settle(true); return; }
-          checks += 1;
-          if (checks > 50) { settle(false); return; }
-          window.setTimeout(poll, 100);
-        })();
       }
 
       function withRatingCaptcha(done) {
