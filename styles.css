@@ -1025,6 +1025,7 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 .lightbox-reviews h3 { margin: 0; font-size: 1.05rem; }
 .lightbox-review-list { display: grid; gap: 0.7rem; margin: 0; padding: 0; list-style: none; }
 .lightbox-rating-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0; color: var(--ink); font-weight: 800; }
+.lightbox-caption .lightbox-rating-summary { justify-content: center; }
 .lightbox-rate { display: grid; gap: 0.35rem; }
 .lightbox-rate-label, .lightbox-rate-hint { margin: 0; }
 .lightbox-rate-label { font-weight: 800; }
