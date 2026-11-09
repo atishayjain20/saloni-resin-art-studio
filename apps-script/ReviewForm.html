@@ -321,6 +321,7 @@
   } else productHint.hidden = false;
   if (products && products.some(function (item) { return item && item.id === seed.productId; })) productSelect.value = seed.productId;
   if (/^[1-5]$/.test(String(seed.rating || ""))) form.elements.rating.value = String(seed.rating);
+  if (typeof seed.firstName === "string") form.elements.firstName.value = seed.firstName;
   form.elements.reviewId.value = seed.reviewId || newId();
 }());
 </script>

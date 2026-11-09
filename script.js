@@ -2185,12 +2185,20 @@
       try { return decodeURIComponent(match[1].replace(/\+/g, " ")); } catch (error) { return ""; }
     }
 
+    var REPEAT_PROFILE_STORAGE_KEY = "saloniRepeatProfile";
+    var REPEAT_PROFILE_VERSION = 1;
+    var REPEAT_PROFILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
     if (frameState.mode === "review") {
       var reviewSeed = { sourceKind: "review", sourceId: "review", productName: "", reviewId: requestId() };
       var productHint = reviewQueryValue("product");
       var ratingHint = reviewQueryValue("rating");
       if (/^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productHint)) reviewSeed.productId = productHint;
       if (/^[1-5]$/.test(ratingHint)) reviewSeed.rating = ratingHint;
+      // A shopper who ordered on this device starts with their first name filled in; they can still change it.
+      var savedProfile = readRepeatProfile();
+      var savedFirstName = savedProfile ? savedProfile.customerName.split(/\s+/)[0] : "";
+      if (savedFirstName.length >= 2 && savedFirstName.length <= 40 && !/[0-9@<>]/.test(savedFirstName)) reviewSeed.firstName = savedFirstName;
       submitSeed(reviewSeed, false);
       return;
     }
@@ -2211,9 +2219,6 @@
     var selectedCatalogueItems = [];
     var catalogueButtons = [];
     var CATALOGUE_CART_STORAGE_KEY = "saloniCatalogueCart";
-    var REPEAT_PROFILE_STORAGE_KEY = "saloniRepeatProfile";
-    var REPEAT_PROFILE_VERSION = 1;
-    var REPEAT_PROFILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
     var catalogueCartExpiresAt = 0;
 
     function catalogueCartStorage() {
