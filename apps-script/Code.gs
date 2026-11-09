@@ -1013,7 +1013,7 @@ function appendReview_(sheet, payload, fingerprint, productName, files, properti
     neutralizeForSheet_(payload.reviewId), receivedAt, "Published", Number(payload.rating),
     neutralizeForSheet_(payload.productId), neutralizeForSheet_(productName), neutralizeForSheet_(reviewFirstName_(payload)),
     neutralizeForSheet_(payload.city), neutralizeForSheet_(payload.comment),
-    neutralizeForSheet_(files.map(function (file) { return file.getId(); }).join(",")), true,
+    neutralizeForSheet_(files.map(function (file) { return file.getId(); }).join(",")), payload.publicConsent === true,
     neutralizeForSheet_(fingerprint), ""
   ];
   try {
@@ -1084,7 +1084,6 @@ function validateReview_(payload, products) {
   }
   if (payload.comment.length < 10 || payload.comment.length > 800) errors.comment = "Write 10 to 800 characters.";
   else if (reviewTextHasContact_(payload.comment)) errors.comment = "Please remove phone numbers, emails and web links from your review.";
-  if (payload.publicConsent !== true) errors.publicConsent = "Agree to show your review publicly to post it.";
   var maxBase64 = Math.ceil(MAX_REVIEW_PHOTO_BYTES / 3) * 4;
   if (payload.photos.length > MAX_REVIEW_PHOTOS) errors.photos = "Add up to " + MAX_REVIEW_PHOTOS + " photos.";
   else if (payload.photos.some(function (photo) { return photo.type !== "image/jpeg" || !photo.data || photo.data.length > maxBase64 || !/^[A-Za-z0-9+\/]+={0,2}$/.test(photo.data); })) {

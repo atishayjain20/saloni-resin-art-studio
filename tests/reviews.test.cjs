@@ -376,7 +376,7 @@ test("the public feed counts quick ratings per product but lists only written re
   assert.deepEqual(plain(body.ratings), { [DEFAULT_PRODUCTS[0].id]: [12, 3] });
 });
 
-test("rating, names, comment, contact details and consent are validated", () => {
+test("rating, names, comment and contact details are validated, and a review without consent is accepted", () => {
   const runtime = makeRuntime();
   const errorsFor = (overrides) => runtime.context.validateReview_(runtime.context.collectReview_(validForm(overrides)), {});
   for (const rating of ["0", "6", "4.5", "x", "", "11"]) assert.ok(errorsFor({ rating }).rating, "rating " + rating);
@@ -403,8 +403,8 @@ test("rating, names, comment, contact details and consent are validated", () => 
   assert.ok(errorsFor({ comment: "See https://example.com for more" }).comment);
   assert.ok(errorsFor({ comment: "See www.example.com for more" }).comment);
   assert.equal(errorsFor({ comment: "I paid 1200 rupees for a 12 inch frame." }).comment, undefined);
-  assert.ok(errorsFor({ publicConsent: false }).publicConsent);
-  assert.ok(errorsFor({ publicConsent: undefined }).publicConsent);
+  assert.equal(errorsFor({ publicConsent: false }).publicConsent, undefined);
+  assert.equal(errorsFor({ publicConsent: undefined }).publicConsent, undefined);
   assert.ok(errorsFor({ reviewId: "short" }).reviewId);
   assert.equal(errorsFor({}).firstName, undefined);
   assert.deepEqual(Object.keys(errorsFor({})), []);
@@ -607,6 +607,17 @@ test("a stored review row has the fixed shape and records consent, status and fi
   assert.equal(result.receivedAt, row[1].toISOString());
   assert.equal(runtime.state.lockCalls, 1);
   assert.equal(runtime.state.released, 1);
+});
+
+test("a review sent without the consent field is accepted and stored with Public consent false", () => {
+  const runtime = makeRuntime();
+  const form = validForm();
+  delete form.publicConsent;
+  const result = runtime.context.submitReview(form);
+  assert.ok(result && result.ok !== false, JSON.stringify(plain(result)));
+  assert.equal(runtime.rows.length, 2);
+  assert.equal(runtime.rows[1][2], "Published");
+  assert.equal(runtime.rows[1][10], false);
 });
 
 const FILE_A = "fileAAAAAAAAAAAAAAAAAAAAA1";
@@ -827,13 +838,13 @@ function makeFormRuntime(options = {}) {
     .replace(/<\?!= captchaSiteKeyJson \?>/g, JSON.stringify("site-key"));
   const ids = ["seed-data", "review-products-data", "form-status", "submit-button", "another-button", "paused-message", "product-id", "product-hint", "rating-group", "review-photos", "photo-previews", "review-form"];
   const elements = new Map(ids.map((id) => [id, new FormElement(id)]));
-  const fields = { productId: elements.get("product-id"), rating: new FormElement("rating"), firstName: new FormElement("first-name", "firstName"), city: new FormElement("city", "city"), comment: new FormElement("comment", "comment"), publicConsent: new FormElement("public-consent", "publicConsent"), reviewId: new FormElement("review-id", "reviewId"), captchaToken: new FormElement("captcha-token", "captchaToken"), photos: elements.get("review-photos") };
+  const fields = { productId: elements.get("product-id"), rating: new FormElement("rating"), firstName: new FormElement("first-name", "firstName"), city: new FormElement("city", "city"), comment: new FormElement("comment", "comment"), reviewId: new FormElement("review-id", "reviewId"), captchaToken: new FormElement("captcha-token", "captchaToken"), photos: elements.get("review-photos") };
   fields.productId.name = "productId"; fields.photos.name = "photos"; fields.rating.name = "rating";
   fields.rating.setAttribute = fields.rating.setAttribute.bind(fields.rating);
   ["product-hint", "paused-message", "another-button"].forEach((id) => { elements.get(id).hidden = true; });
   const form = elements.get("review-form");
   form.elements = fields;
-  const fieldsets = [new FormElement("details"), new FormElement("photos-fieldset"), new FormElement("consent-fieldset")];
+  const fieldsets = [new FormElement("details"), new FormElement("photos-fieldset")];
   const errors = [];
   form.querySelectorAll = (selector) => {
     if (selector === "[aria-invalid]") return Object.values(fields).filter((field) => field.getAttribute("aria-invalid"));
@@ -841,7 +852,7 @@ function makeFormRuntime(options = {}) {
     if (selector === "fieldset, #submit-button") return fieldsets.concat([elements.get("submit-button")]);
     return [];
   };
-  form.reset = () => { ["productId", "rating", "firstName", "city", "comment"].forEach((name) => { fields[name].value = name === "productId" ? "studio" : ""; }); fields.publicConsent.checked = false; };
+  form.reset = () => { ["productId", "rating", "firstName", "city", "comment"].forEach((name) => { fields[name].value = name === "productId" ? "studio" : ""; }); };
   Object.values(fields).forEach((field) => { field.parentNode = { children: [], appendChild(child) { errors.push(child); } }; });
   elements.get("rating-group").appendChild = (child) => { errors.push(child); return child; };
   fields.productId.value = "studio";
@@ -902,7 +913,6 @@ function makeFormRuntime(options = {}) {
 function fillReviewForm(runtime, overrides = {}) {
   const values = Object.assign({ rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", productId: "studio" }, overrides);
   Object.keys(values).forEach((name) => { runtime.fields[name].value = values[name]; });
-  runtime.fields.publicConsent.checked = overrides.publicConsent !== false;
 }
 function respondReviewCaptcha(runtime, index, overrides = {}) {
   const request = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request")[index];
@@ -940,8 +950,8 @@ test("the form starts on the product and rating from the seed only when they are
   assert.equal(noList.fields.rating.value, "5");
 });
 
-test("the review form has the specified fields, privacy wording and no unrelated inputs", () => {
-  for (const name of ["productId", "rating", "firstName", "city", "comment", "publicConsent", "reviewId", "captchaToken", "photos"]) assert.match(formHtml, new RegExp('name="' + name + '"'));
+test("the review form has the specified fields and no consent checkbox, consent text or intro", () => {
+  for (const name of ["productId", "rating", "firstName", "city", "comment", "reviewId", "captchaToken", "photos"]) assert.match(formHtml, new RegExp('name="' + name + '"'));
   assert.equal((formHtml.match(/type="radio" name="rating"/g) || []).length, 5);
   assert.match(formHtml, /<option value="studio">The studio in general<\/option>/);
   assert.match(formHtml, /name="firstName" maxlength="40" autocomplete="given-name"/);
@@ -949,7 +959,10 @@ test("the review form has the specified fields, privacy wording and no unrelated
   assert.match(formHtml, /name="city" maxlength="60"/);
   assert.match(formHtml, /name="comment" maxlength="800"/);
   assert.match(formHtml, /type="file"[^>]*accept="image\/jpeg,image\/png"[^>]*multiple/);
-  assert.match(formHtml, /I agree that my first name, optional city, rating, comment and photos will be shown publicly on saloniresinart\.com\. Reviews stay until removed\. To remove yours, message @saloniresin_art_studio on Instagram or call 8209238541\./);
+  assert.doesNotMatch(formHtml, /publicConsent|public-consent|<input[^>]*type="checkbox"|class="consent"|I agree that|Reviews stay until removed|Show my review/);
+  assert.doesNotMatch(formHtml, /class="intro"|Tell others about your Saloni resin art|appears on the Reviews page/);
+  assert.match(formHtml, /Reviews are public on the home page\./);
+  assert.doesNotMatch(formHtml, /public on the Reviews page|saloni-review-submitted|notifyParent/);
   assert.doesNotMatch(formHtml, /Do not include phone numbers|Location data is removed/);
   assert.match(formHtml, /Post review/);
   assert.match(formHtml, /Write another review/);
@@ -973,13 +986,13 @@ test("product choices come from the server list through text nodes, with a hint 
   assert.match(formHtml, /New reviews are paused right now\./);
 });
 
-test("the form checks the rating, names, comment, contact details and consent before sending", () => {
+test("the form checks the rating, names, comment and contact details before sending", () => {
   const runtime = makeFormRuntime();
-  fillReviewForm(runtime, { rating: "", firstName: "A1", city: "Ajmer 305001", comment: "short", publicConsent: false });
+  fillReviewForm(runtime, { rating: "", firstName: "A1", city: "Ajmer 305001", comment: "short" });
   runtime.form.dispatch("submit", { preventDefault() {} });
   assert.equal(runtime.submissions.length, 0);
   assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 0);
-  assert.deepEqual(runtime.errors.map((error) => error.id).sort(), ["city-error", "comment-error", "firstName-error", "publicConsent-error", "rating-error"]);
+  assert.deepEqual(runtime.errors.map((error) => error.id).sort(), ["city-error", "comment-error", "firstName-error", "rating-error"]);
   for (const comment of ["Mail me at asha@example.com please", "Call 820 923 8541 for details", "Visit www.example.com now"]) {
     const again = makeFormRuntime();
     fillReviewForm(again, { comment });
@@ -998,22 +1011,20 @@ test("a valid review is sent with the parent captcha token and the exact payload
   assert.equal(request.message.nonce, "nonce-seed-123456");
   respondReviewCaptcha(runtime, 0);
   assert.equal(runtime.submissions.length, 1);
-  assert.deepEqual(runtime.submissions[0], { reviewId: "review-seed-123456", productId: "studio", rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", publicConsent: true, photos: [], captchaToken: "captcha-token" });
+  assert.deepEqual(runtime.submissions[0], { reviewId: "review-seed-123456", productId: "studio", rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", photos: [], captchaToken: "captcha-token" });
 });
 
-test("review success thanks the first name, posts a pinned-origin message and offers another review", () => {
+test("review success thanks the first name, says where the review shows and offers another review", () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
   runtime.form.dispatch("submit", { preventDefault() {} });
   respondReviewCaptcha(runtime, 0);
   runtime.callbacks[0].success({ ok: true, reviewId: "review-seed-123456", receivedAt: "now", status: "Published" });
-  assert.equal(runtime.status.textContent, "Thank you, Asha. Your review is now on the page.");
+  assert.equal(runtime.status.textContent, "Thank you, Asha. Your review now shows on the home page of saloniresinart.com.");
   assert.equal(runtime.status.className, "status success");
   assert.equal(runtime.fieldsets.every((fieldset) => fieldset.hidden), true);
   assert.equal(runtime.elements.get("another-button").hidden, false);
-  const done = runtime.parentMessages.find((entry) => entry.message.type === "saloni-review-submitted");
-  assert.deepEqual(plain(done.message), { type: "saloni-review-submitted", nonce: "nonce-seed-123456" });
-  assert.equal(done.targetOrigin, "https://saloniresinart.com");
+  assert.equal(runtime.parentMessages.some((entry) => entry.message.type === "saloni-review-submitted"), false, "the parent no longer listens, so nothing is posted");
   runtime.elements.get("another-button").dispatch("click");
   assert.notEqual(runtime.fields.reviewId.value, "review-seed-123456");
   assert.equal(runtime.status.textContent, "");
@@ -1213,7 +1224,7 @@ function runReviewsPage(options = {}) {
   const posted = []; const fetchCalls = []; const timers = []; const executed = [];
   const elements = new Map();
   const embed = new DomNode("div", "order-form-embed", true);
-  embed.attributes["data-form-mode"] = "review";
+  if (!options.home) embed.attributes["data-form-mode"] = "review";
   embed.attributes["data-order-form-url"] = options.configured === false ? "https://script.google.test/REPLACE_WITH_ID/exec" : "https://script.google.test/exec";
   const frame = new DomNode("iframe", "order-form-frame", true); frame.name = "order-frame"; frame.hidden = true;
   frame.parentNode = { replaceChild(next, previous) { elements.set(next.id, next); next.parentNode = this; previous.parentNode = null; } };
@@ -1221,14 +1232,20 @@ function runReviewsPage(options = {}) {
   const summary = new DomNode("p", "reviews-summary"); summary.hidden = true;
   const reviewsStatus = new DomNode("p", "reviews-status"); reviewsStatus.textContent = "Loading reviews…";
   const list = new DomNode("ul", "reviews-list");
-  [embed, frame, status, summary, reviewsStatus, list].forEach((element) => elements.set(element.id, element));
+  const section = new DomNode("section", "customer-reviews");
+  // Only the home page has the reviews section; the write page has none.
+  (options.home ? [embed, frame, status, summary, reviewsStatus, list, section] : [embed, frame, status]).forEach((element) => elements.set(element.id, element));
   let response = options.body;
   const windowObject = {
-    location: { href: "https://saloniresinart.com/reviews/" + (options.search || ""), search: options.search || "" }, matchMedia: () => ({ matches: false }), crypto: { randomUUID: (() => { let n = 0; return () => "request-" + (++n); })() },
+    location: { href: "https://saloniresinart.com/" + (options.home ? "" : "reviews/") + (options.search || ""), search: options.search || "" }, matchMedia: () => ({ matches: false }), crypto: { randomUUID: (() => { let n = 0; return () => "request-" + (++n); })() },
     addEventListener(type, listener) { if (type === "message") this.messageListener = listener; },
     setTimeout: (callback) => { timers.push(callback); return timers.length; }, clearTimeout() {},
     grecaptcha: { ready: (callback) => callback(), execute: (siteKey, request) => { executed.push(request); return Promise.resolve("parent-token"); } },
   };
+  const observers = [];
+  if (options.observer) {
+    windowObject.IntersectionObserver = class { constructor(callback, init) { this.callback = callback; this.init = init; this.targets = []; this.disconnected = false; observers.push(this); } observe(target) { this.targets.push(target); } unobserve() {} disconnect() { this.disconnected = true; } };
+  }
   if (!options.noFetch) {
     windowObject.fetch = (url, init) => {
       fetchCalls.push({ url, init });
@@ -1244,62 +1261,109 @@ function runReviewsPage(options = {}) {
     querySelectorAll: () => [], querySelector: () => null,
     createElement(tag) { const node = new DomNode(tag, "", false); if (tag === "form") node.submit = () => posted.push(node); return node; },
   };
-  const context = { console, document: documentObject, window: windowObject, URL, IntersectionObserver: undefined, Date, Math };
+  const context = { console, document: documentObject, window: windowObject, URL, IntersectionObserver: windowObject.IntersectionObserver, Date, Math };
   vm.createContext(context);
   vm.runInContext(siteScript, context, { filename: "script.js" });
   documentObject.ready();
   const seedOf = () => JSON.parse(posted.at(-1).children.find((child) => child.name === "seed").value);
-  return { elements, status, summary, reviewsStatus, list, posted, fetchCalls, timers, executed, windowObject, seedOf, setResponse: (value) => { response = value; }, frame: () => elements.get("order-form-frame") };
+  return { elements, status, summary, reviewsStatus, list, section, observers, posted, fetchCalls, timers, executed, windowObject, seedOf, setResponse: (value) => { response = value; }, frame: () => elements.get("order-form-frame") };
 }
 const openBody = (reviews = [sampleReview()], extra = {}) => Object.assign({ ok: true, intake: "open", summary: { count: reviews.length, average: 4 }, reviews }, extra);
 
-test("the Reviews page fetches the list without custom headers and seeds the form only when intake is open", async () => {
-  const page = runReviewsPage({ body: openBody([sampleReview(), sampleReview({ id: "review-sample-0002", rating: 5 })], { summary: { count: 2, average: 4.5 } }) });
+test("the Reviews page seeds the review form at once, without reading the feed first", () => {
+  const page = runReviewsPage({ body: openBody() });
+  assert.equal(page.fetchCalls.length, 0, "no feed fetch before or after the form starts");
+  assert.equal(page.posted.length, 1, "the form is seeded in the same turn the page starts");
+  const seed = page.seedOf();
+  assert.equal(seed.sourceKind, "review");
+  assert.equal(seed.formMode, "review");
+  assert.equal(seed.productName, "");
+  assert.match(seed.reviewId, /^request-\d+$/);
+  assert.equal(page.posted[0].children.find((child) => child.name === "mode").value, "review");
+  assert.equal(page.posted[0].action, "https://script.google.test/exec");
+  assert.equal(page.list.children.length, 0, "the write page no longer renders a review list");
+});
+
+test("the Reviews page passes a valid product and rating from the address into the form seed", () => {
+  const page = runReviewsPage({ search: "?product=catalogue%3Adiwali-jewel-glow-tealight.jpg&rating=4" });
+  const seed = page.seedOf();
+  assert.equal(seed.productId, "catalogue:diwali-jewel-glow-tealight.jpg");
+  assert.equal(seed.rating, "4");
+  const bad = runReviewsPage({ search: "?product=%3Cscript%3E&rating=9" });
+  assert.equal(bad.seedOf().productId, undefined);
+  assert.equal(bad.seedOf().rating, undefined);
+  const dotted = runReviewsPage({ search: "?product=catalogue%3Aa%2Fb&rating=0" });
+  assert.equal(dotted.seedOf().productId, undefined);
+  assert.equal(dotted.seedOf().rating, undefined);
+});
+
+test("the Reviews page with an unconfigured backend shows the calm not-configured message and no form", () => {
+  const page = runReviewsPage({ configured: false });
+  assert.equal(page.posted.length, 0);
+  assert.equal(page.fetchCalls.length, 0);
+  assert.equal(page.frame().hidden, true);
+  assert.equal(page.status.hidden, false);
+  assert.match(page.status.textContent, /not configured for this preview yet/);
+  assert.match(page.status.innerHTML, /href="tel:\+918209238541"/);
+});
+
+test("the Reviews page seeds the form even when the feed would say intake is paused; the form shows its own paused message", async () => {
+  const page = runReviewsPage({ body: openBody([sampleReview()], { intake: "paused" }) });
+  await settle();
+  assert.equal(page.posted.length, 1);
+  assert.equal(page.fetchCalls.length, 0);
+  assert.equal(page.list.children.length, 0);
+  assert.match(formHtml, /id="paused-message"[^>]*hidden/);
+});
+
+test("the home page reads the feed without custom headers only when the reviews section nears the viewport", async () => {
+  const page = runReviewsPage({ home: true, observer: true, body: openBody([sampleReview(), sampleReview({ id: "review-sample-0002", rating: 5 })], { summary: { count: 2, average: 4.5 } }) });
+  await settle();
+  assert.equal(page.fetchCalls.length, 0, "nothing is fetched before the section is near");
+  const observer = page.observers.find((item) => item.targets.includes(page.section));
+  assert.ok(observer, "the reviews section is observed");
+  assert.match(observer.init.rootMargin, /^600px/);
+  observer.callback([{ isIntersecting: false }], observer);
+  await settle();
+  assert.equal(page.fetchCalls.length, 0, "an entry that is not intersecting does not load");
+  observer.callback([{ isIntersecting: true }], observer);
   await settle();
   assert.equal(page.fetchCalls.length, 1);
   assert.equal(page.fetchCalls[0].url, "https://script.google.test/exec?action=reviews");
   assert.deepEqual(plain(page.fetchCalls[0].init), { credentials: "omit", cache: "no-store" });
+  assert.equal(observer.disconnected, true);
+  observer.callback([{ isIntersecting: true }], observer);
+  await settle();
+  assert.equal(page.fetchCalls.length, 1, "the feed is read once");
   assert.equal(page.list.children.length, 2);
   assert.equal(page.summary.hidden, false);
   assert.equal(page.summary.textContent, "4.5 out of 5 · 2 reviews");
   assert.equal(page.reviewsStatus.hidden, true);
-  assert.equal(page.posted.length, 1);
-  const seed = page.seedOf();
-  assert.equal(seed.sourceKind, "review");
-  assert.equal(seed.formMode, "review");
-  assert.match(seed.reviewId, /^request-\d+$/);
-  assert.equal(page.posted[0].children.find((child) => child.name === "mode").value, "review");
-  assert.equal(page.posted[0].action, "https://script.google.test/exec");
+  assert.equal(page.posted.length, 0, "the home page does not seed the review form");
 });
 
-test("the Reviews page passes a valid product and rating from the address into the form seed", async () => {
-  const page = runReviewsPage({ body: openBody(), search: "?product=catalogue%3Adiwali-jewel-glow-tealight.jpg&rating=4" });
+test("the home page reads the feed at once when IntersectionObserver is missing", async () => {
+  const page = runReviewsPage({ home: true, body: openBody() });
   await settle();
-  const seed = page.seedOf();
-  assert.equal(seed.productId, "catalogue:diwali-jewel-glow-tealight.jpg");
-  assert.equal(seed.rating, "4");
-  const bad = runReviewsPage({ body: openBody(), search: "?product=%3Cscript%3E&rating=9" });
-  await settle();
-  assert.equal(bad.seedOf().productId, undefined);
-  assert.equal(bad.seedOf().rating, undefined);
+  assert.equal(page.fetchCalls.length, 1);
+  assert.equal(page.list.children.length, 1);
 });
 
 test("a single review reads as one review and an empty list invites the first one", async () => {
-  const one = runReviewsPage({ body: openBody([sampleReview()], { summary: { count: 1, average: 4 } }) });
+  const one = runReviewsPage({ home: true, body: openBody([sampleReview()], { summary: { count: 1, average: 4 } }) });
   await settle();
   assert.equal(one.summary.textContent, "4.0 out of 5 · 1 review");
-  const empty = runReviewsPage({ body: openBody([], { summary: { count: 0, average: 0 } }) });
+  const empty = runReviewsPage({ home: true, body: openBody([], { summary: { count: 0, average: 0 } }) });
   await settle();
   assert.equal(empty.reviewsStatus.textContent, "No reviews yet. Be the first to share yours.");
   assert.equal(empty.reviewsStatus.hidden, false);
   assert.equal(empty.summary.hidden, true);
   assert.equal(empty.list.children.length, 0);
-  assert.equal(empty.posted.length, 1, "an empty list still opens the form when intake is open");
 });
 
 test("review cards show stars, name, product, date and comment as text only", async () => {
   const hostile = "<img src=x onerror=alert(1)> line one\nline two";
-  const page = runReviewsPage({ body: openBody([sampleReview({ comment: hostile, firstName: "<b>Asha</b>", city: "Ajmer", productId: "catalogue:resin-clock.jpg", productName: "Blue hour resin clock", date: "2026-11-08" }), sampleReview({ id: "review-sample-0002", city: "", productName: "", rating: 5, date: "2026-01-02" })]) });
+  const page = runReviewsPage({ home: true, body: openBody([sampleReview({ comment: hostile, firstName: "<b>Asha</b>", city: "Ajmer", productId: "catalogue:resin-clock.jpg", productName: "Blue hour resin clock", date: "2026-11-08" }), sampleReview({ id: "review-sample-0002", city: "", productName: "", rating: 5, date: "2026-01-02" })]) });
   await settle();
   const [first, second] = page.list.children;
   assert.equal(first.tag, "li");
@@ -1320,7 +1384,7 @@ test("review cards show stars, name, product, date and comment as text only", as
 });
 
 test("malformed review items are skipped and bad photo IDs are dropped", async () => {
-  const page = runReviewsPage({ body: openBody([
+  const page = runReviewsPage({ home: true, body: openBody([
     sampleReview({ photos: ["bad id with spaces", "short", PHOTO_ONE, "../../etc/passwd", "x".repeat(101), 42, null] }),
     sampleReview({ id: "review-bad-rating", rating: 9 }),
     sampleReview({ id: "review-bad-rating2", rating: "5" }),
@@ -1336,7 +1400,7 @@ test("malformed review items are skipped and bad photo IDs are dropped", async (
 });
 
 test("review photos use the googleusercontent URL, then the Drive thumbnail, then are removed", async () => {
-  const page = runReviewsPage({ body: openBody([sampleReview({ productId: "catalogue:resin-clock.jpg", productName: "Blue hour resin clock", photos: [PHOTO_ONE] })]) });
+  const page = runReviewsPage({ home: true, body: openBody([sampleReview({ productId: "catalogue:resin-clock.jpg", productName: "Blue hour resin clock", photos: [PHOTO_ONE] })]) });
   await settle();
   const image = findAll(page.list, (item) => item.tag === "img")[0];
   assert.equal(image.src, "https://lh3.googleusercontent.com/d/" + PHOTO_ONE + "=w800");
@@ -1350,28 +1414,26 @@ test("review photos use the googleusercontent URL, then the Drive thumbnail, the
   assert.equal(link.href, "https://drive.google.com/thumbnail?id=" + PHOTO_ONE + "&sz=w1600");
   image.dispatch("error");
   assert.equal(link.removed, true);
-  const studio = runReviewsPage({ body: openBody([sampleReview({ photos: [PHOTO_ONE] })]) });
+  const studio = runReviewsPage({ home: true, body: openBody([sampleReview({ photos: [PHOTO_ONE] })]) });
   await settle();
   assert.equal(findAll(studio.list, (item) => item.tag === "img")[0].getAttribute("alt"), "Customer photo 1 for the studio");
 });
 
-test("an unreadable, failing or missing backend shows a calm message and never loads the form", async () => {
+test("on the home page an unreadable, failing or missing feed shows a calm message and no list", async () => {
   const variants = [
     { nonJson: true }, { body: { ok: false } }, { body: null }, { body: { ok: true, reviews: "x" } }, { body: "<html>" }, { fetchRejects: true }, { noFetch: true },
     { body: openBody(), configured: false },
   ];
   for (const options of variants) {
-    const page = runReviewsPage(options);
+    const page = runReviewsPage(Object.assign({ home: true }, options));
     await settle();
     assert.equal(page.reviewsStatus.textContent, CALM, JSON.stringify(Object.keys(options)));
     assert.equal(page.reviewsStatus.hidden, false);
     assert.equal(page.posted.length, 0, "no form seed");
-    assert.equal(page.frame().hidden, true, "no iframe shown");
     assert.equal(page.summary.hidden, true);
-    assert.match(page.status.textContent, /8209238541/);
-    assert.match(page.status.innerHTML, /href="tel:\+918209238541"/);
+    assert.equal(page.list.children.length, 0);
   }
-  const hanging = runReviewsPage({ hang: true });
+  const hanging = runReviewsPage({ home: true, hang: true });
   await settle();
   assert.equal(hanging.timers.length > 0, true);
   hanging.timers.forEach((timer) => timer());
@@ -1379,19 +1441,15 @@ test("an unreadable, failing or missing backend shows a calm message and never l
   assert.equal(hanging.posted.length, 0);
 });
 
-test("paused intake shows the reviews and a calm paused message without an iframe", async () => {
-  const page = runReviewsPage({ body: openBody([sampleReview()], { intake: "paused" }) });
+test("the home page still lists reviews when the feed says new reviews are paused", async () => {
+  const page = runReviewsPage({ home: true, body: openBody([sampleReview()], { intake: "paused" }) });
   await settle();
   assert.equal(page.list.children.length, 1);
   assert.equal(page.posted.length, 0);
-  assert.equal(page.frame().hidden, true);
-  assert.match(page.status.textContent, /New reviews are paused right now\. You can message @saloniresin_art_studio or call 8209238541\./);
-  assert.equal(page.status.hidden, false);
 });
 
 test("the review form uses the review_submission captcha action through the pinned sender", async () => {
-  const page = runReviewsPage({ body: openBody() });
-  await settle();
+  const page = runReviewsPage({});
   const nonce = page.seedOf().channelNonce;
   const frame = page.frame();
   page.windowObject.messageListener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce, siteKey: "site-key", mode: "review" }, ports: [] });
@@ -1404,35 +1462,23 @@ test("the review form uses the review_submission captcha action through the pinn
   assert.equal(sent[0].attemptId, "attempt-1");
 });
 
-test("only the pinned form can announce a new review, and then the list reloads without reseeding", async () => {
-  const page = runReviewsPage({ body: openBody() });
-  await settle();
+test("a review announced by the pinned form triggers no feed fetch and no second seed", async () => {
+  const page = runReviewsPage({});
   const nonce = page.seedOf().channelNonce;
   const frame = page.frame();
   const listener = page.windowObject.messageListener;
-  const fresh = openBody([sampleReview({ id: "review-fresh-0001", firstName: "Meera" }), sampleReview()], { summary: { count: 2, average: 4 } });
-  const submitted = (overrides = {}) => Object.assign({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-review-submitted", nonce }, ports: [] }, overrides);
-  page.setResponse(fresh);
-  listener(submitted());
-  await settle();
-  assert.equal(page.fetchCalls.length, 1, "a message before the form announced itself is ignored");
   listener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce, siteKey: "site-key" }, ports: [] });
-  listener(submitted({ source: {} }));
-  listener(submitted({ origin: "https://evil.example" }));
-  listener(submitted({ origin: "null" }));
-  listener(submitted({ data: { type: "saloni-review-submitted", nonce: "other-nonce" } }));
+  listener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-review-submitted", nonce }, ports: [] });
   await settle();
-  assert.equal(page.fetchCalls.length, 1, "unpinned, wrong-origin and wrong-nonce messages are ignored");
-  listener(submitted());
-  await settle();
-  assert.equal(page.fetchCalls.length, 2);
-  assert.equal(page.list.children.length, 2);
+  assert.equal(page.fetchCalls.length, 0, "an old form that still announces a review changes nothing");
   assert.equal(page.posted.length, 1, "the success message in the iframe is not replaced");
 });
 
 test("the Reviews page keeps the other form modes and the page chrome untouched", () => {
   assert.match(siteScript, /requestedMode === "partner" \|\| requestedMode === "corporate" \|\| requestedMode === "review"/);
   assert.match(siteScript, /frameState\.mode === "review" \? "review_submission"/);
+  assert.doesNotMatch(siteScript, /loadReviewPage|REVIEW_CONTACT|saloni-review-submitted/, "the review-page list and its reload are gone");
+  assert.match(siteScript, /\n  function renderReviews\(data\)/, "the list renderer is shared at the top level");
   assert.doesNotThrow(() => new vm.Script(siteScript));
 });
 
