@@ -950,7 +950,7 @@ test("the review form has the specified fields, privacy wording and no unrelated
   assert.match(formHtml, /name="comment" maxlength="800"/);
   assert.match(formHtml, /type="file"[^>]*accept="image\/jpeg,image\/png"[^>]*multiple/);
   assert.match(formHtml, /I agree that my first name, optional city, rating, comment and photos will be shown publicly on saloniresinart\.com\. Reviews stay until removed\. To remove yours, message @saloniresin_art_studio on Instagram or call 8209238541\./);
-  assert.match(formHtml, /Do not include phone numbers, emails, addresses, or photos of other people without their permission\. Location data is removed from photos\./);
+  assert.doesNotMatch(formHtml, /Do not include phone numbers|Location data is removed/);
   assert.match(formHtml, /Post review/);
   assert.match(formHtml, /Write another review/);
   assert.doesNotMatch(formHtml, /name="(phone|email)"|localStorage|sessionStorage|innerHTML/);
