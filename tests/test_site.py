@@ -804,7 +804,7 @@ class StaticSiteContractTests(unittest.TestCase):
         hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html)
         self.assertIsNotNone(hero)
         slides = re.findall(r'<article class="hero-slide[^"]*"[\s\S]*?</article>', hero.group(0))
-        self.assertEqual(len(slides), 4)
+        self.assertEqual(len(slides), 5)
         for slide_index, slide in enumerate(slides):
             images = re.findall(r'<img\b[^>]*>', slide)
             self.assertEqual(len(images), 3)
@@ -831,7 +831,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn('class="hero-intro"', self.html)
         hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html).group(0)
         self.assertNotRegex(hero, r'<h2|class="eyebrow"')
-        self.assertEqual(len(re.findall(r'>Shop now</a>', hero)), 4)
+        self.assertEqual(len(re.findall(r'>Shop now</a>', hero)), 5)
         self.assertNotIn("Thoughtful custom resin frames, resin art, and personalized gifts from Ajmer, Rajasthan", self.html)
 
     def test_romantic_keepsake_highlight_contract(self):
@@ -931,7 +931,7 @@ class StaticSiteContractTests(unittest.TestCase):
         hero_html = hero.group(0)
         self.assertNotIn('hero-actions', hero_html)
         self.assertNotIn('data-browse-all', hero_html)
-        self.assertEqual(len(re.findall(r'data-category-shortcut=', hero_html)), 4)
+        self.assertEqual(len(re.findall(r'data-category-shortcut=', hero_html)), 5)
         self.assertEqual(len(re.findall(r'data-customizer-open', hero_html)), 1)
         self.assertNotIn('Browse gifts by type or budget', hero_html)
         self.assertNotIn('Request a custom gift', hero_html)
@@ -2166,20 +2166,23 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertIn('<meta property="og:url" content="https://saloniresinart.com/reviews/">', self.page)
         self.assertRegex(self.page, r"<title>Customer reviews[^<]*Saloni Resin Art Studio</title>")
         self.assertIn('<h1', self.page)
-        self.assertIn("Customer reviews", self.page)
-        self.assertRegex(self.page, r'id="reviews-summary"[^>]*hidden')
-        self.assertRegex(self.page, r'id="reviews-status"[^>]*role="status"[^>]*aria-live="polite"')
-        self.assertRegex(self.page, r'<ul[^>]*id="reviews-list"')
+        self.assertRegex(self.page, r'<h1 id="reviews-title">Write a review</h1>')
+        for gone in ("reviews-summary", "reviews-status", "reviews-list", "reviews-list-section", "Loading reviews", "appears on this page as soon as you post it"):
+            self.assertNotIn(gone, self.page)
+        self.assertNotIn('class="button button-dark" href="#write"', self.page, "the hero no longer repeats the write button")
         self.assertRegex(self.page, r'<section[^>]*id="write"')
+        self.assertIn('<link rel="preconnect" href="https://script.google.com">', self.page)
+        self.assertIn('<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>', self.page)
         self.assertRegex(self.page, r'id="order-form-embed"[^>]*data-form-mode="review"')
         self.assertIn('id="order-form-status"', self.page)
         self.assertRegex(self.page, r'<iframe[^>]*id="order-form-frame"[^>]*hidden')
+        self.assertNotRegex(self.page, r'<iframe[^>]*loading="lazy"')
         self.assertIn(
             'data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"',
             self.page,
         )
         self.assertNotIn("data-intake-ready", self.page, "the page opens the form only when the backend answers intake open")
-        self.assertIn("Loading reviews", self.page)
+        self.assertIn("Loading the review form…", self.page)
         self.assertIn('<a class="skip-link" href="#main-content">', self.page)
         self.assertIn('<main id="main-content" tabindex="-1">', self.page)
         self.assertIn('href="../styles.css?v=', self.page)
@@ -2187,7 +2190,7 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertNotRegex(self.page, r"aggregateRating|application/ld\+json")
 
     def test_every_page_links_to_reviews_from_the_footer_and_the_primary_nav_is_unchanged(self):
-        for page, href in (("index.html", "reviews/"), ("corporate-gifting/index.html", "../reviews/"), ("partners/index.html", "../reviews/"), ("resin-photo-frames/index.html", "../reviews/"), ("namokar-mantra-frames/index.html", "../reviews/"), ("reviews/index.html", "../reviews/")):
+        for page, href in (("index.html", "#customer-reviews"), ("corporate-gifting/index.html", "../#customer-reviews"), ("partners/index.html", "../#customer-reviews"), ("resin-photo-frames/index.html", "../#customer-reviews"), ("namokar-mantra-frames/index.html", "../#customer-reviews"), ("reviews/index.html", "../#customer-reviews")):
             with self.subTest(page=page):
                 source = (ROOT / page).read_text(encoding="utf-8")
                 footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', source)
@@ -2197,6 +2200,20 @@ class ReviewsPageContractTests(unittest.TestCase):
                 self.assertIsNotNone(header)
                 if page != "reviews/index.html":
                     self.assertNotIn(">Reviews<", header.group(1))
+
+    def test_home_page_shows_the_reviews_just_before_the_footer(self):
+        section = re.search(r'<section class="home-reviews shell" id="customer-reviews" aria-labelledby="home-reviews-title">([\s\S]*?)</section>', self.home)
+        self.assertIsNotNone(section, "the home page needs the customer reviews section")
+        body = section.group(1)
+        self.assertIn('<h2 id="home-reviews-title">Customer reviews</h2>', body)
+        self.assertRegex(body, r'<p id="reviews-summary" class="reviews-summary" hidden></p>')
+        self.assertRegex(body, r'<p id="reviews-status" class="reviews-status" role="status" aria-live="polite">Loading reviews…</p>')
+        self.assertRegex(body, r'<ul id="reviews-list" class="reviews-list"></ul>')
+        self.assertIn('<a class="button button-dark" href="reviews/#write">Write a review', body)
+        self.assertEqual(self.home.count('id="reviews-list"'), 1)
+        self.assertLess(self.home.index('id="customer-reviews"'), self.home.index('<footer'))
+        self.assertRegex(self.home[self.home.index('id="customer-reviews"'):], r'^[\s\S]*?</section>\s*</main>')
+        self.assertLess(self.home.index('</main>', self.home.index('id="customer-reviews"')), self.home.index('<footer'))
 
     def test_privacy_details_name_public_reviews_and_keep_the_order_retention_wording(self):
         details = re.search(r'<details class="privacy-details" id="privacy-details">([\s\S]*?)</details>', self.home)

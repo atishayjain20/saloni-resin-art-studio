@@ -10,11 +10,10 @@
     * { box-sizing: border-box; } body { margin: 0; padding: 1rem; background: #fffaf4; } main { max-width: 760px; margin: 0 auto; }
     .skip-link { position: absolute; left: .8rem; top: .5rem; padding: .45rem .7rem; background: #2b2020; color: #fffaf4; transform: translateY(-160%); } .skip-link:focus { transform: translateY(0); }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-    h1 { margin: 0 0 .45rem; font: 700 clamp(1.6rem, 4vw, 2.3rem)/1.1 Georgia, serif; }.intro, .privacy, .hint, .status, .field-error { font-size: .88rem; line-height: 1.5; }.intro { margin: 0 0 1rem; color: #5d4947; }
+    h1 { margin: 0 0 .45rem; font: 700 clamp(1.6rem, 4vw, 2.3rem)/1.1 Georgia, serif; }.privacy, .hint, .status, .field-error { font-size: .88rem; line-height: 1.5; }
     form { display: grid; gap: 1rem; } fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fff; } legend { padding: 0 .35rem; font-weight: 700; }.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; margin-top: .85rem; }.stack { display: grid; gap: .85rem; }
     label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; } input, select, textarea, button { font: inherit; } input:not([type="radio"]):not([type="checkbox"]), select, textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; } textarea { min-height: 7rem; resize: vertical; } input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
     .rating-group { padding: .6rem .8rem .8rem; }.stars { display: flex; flex-wrap: wrap; gap: .5rem; }.stars label { display: inline-flex; align-items: center; gap: .35rem; min-height: 2.65rem; padding: .3rem .75rem; border: 1px solid #bca8a0; border-radius: 999px; background: #fff; cursor: pointer; }.stars input { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: #b24b60; }.stars .star { color: #b86f00; }
-    .consent { grid-template-columns: auto 1fr; align-items: start; gap: .6rem; font-weight: 500; line-height: 1.5; }.consent input { width: 1.2rem; height: 1.2rem; margin: .15rem 0 0; accent-color: #b24b60; }
     .photo-previews { display: flex; flex-wrap: wrap; gap: .7rem; margin: .8rem 0 0; padding: 0; list-style: none; }.photo-previews li { display: grid; gap: .35rem; justify-items: start; }.photo-previews img { display: block; width: 6.5rem; height: 6.5rem; object-fit: cover; border: 1px solid #dccbc1; border-radius: .6rem; background: #fffaf4; }.photo-previews button { min-height: 2.2rem; padding: .3rem .8rem; border: 1px solid #bca8a0; border-radius: 999px; background: #fff; color: #2b2020; font-size: .78rem; font-weight: 650; cursor: pointer; }
     .field-error { margin: 0; color: #a41f33; } [hidden] { display: none !important; }.actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; } .actions button { min-height: 2.8rem; padding: .7rem 1rem; border: 1px solid #2b2020; border-radius: 999px; background: #2b2020; color: #fffaf4; font-weight: 750; cursor: pointer; } .actions button:disabled { cursor: wait; opacity: .6; }.status { min-height: 1.4rem; margin: 0; }.status.error { color: #a41f33; }.status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }.hint { margin: .5rem 0 0; color: #5d4947; }.privacy { margin: 0; padding: .75rem; border-left: 3px solid #c77d8b; color: #5d4947; }.privacy a { color: inherit; font-weight: 700; }
     @media (max-width: 560px) { body { padding: .7rem; } .grid { grid-template-columns: 1fr; } }
@@ -24,7 +23,6 @@
 <main>
   <a class="skip-link" href="#review-form">Skip to review form</a>
   <h1>Share your review</h1>
-  <p class="intro">Tell others about your Saloni resin art. Your review appears on the Reviews page as soon as you post it.</p>
   <p id="paused-message" class="status" role="status" hidden>New reviews are paused right now. You can message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or call <a href="tel:+918209238541">8209238541</a>.</p>
   <form id="review-form" novalidate>
     <fieldset><legend>Your review</legend>
@@ -50,9 +48,6 @@
     <fieldset><legend>Photos (optional)</legend>
       <label for="review-photos">Add up to 3 photos (JPG or PNG) <input id="review-photos" name="photos" type="file" accept="image/jpeg,image/png" multiple></label>
       <ul id="photo-previews" class="photo-previews" aria-label="Selected photos"></ul>
-    </fieldset>
-    <fieldset><legend>Show my review</legend>
-      <label class="consent" for="public-consent"><input id="public-consent" name="publicConsent" type="checkbox" value="true" required><span>I agree that my first name, optional city, rating, comment and photos will be shown publicly on saloniresinart.com. Reviews stay until removed. To remove yours, message @saloniresin_art_studio on Instagram or call 8209238541.</span></label>
     </fieldset>
     <input id="review-id" name="reviewId" type="hidden">
     <input id="captcha-token" name="captchaToken" type="hidden">
@@ -96,7 +91,6 @@
   function snapshot() {
     var payload = {};
     BUSINESS_FIELDS.forEach(function (field) { payload[field] = value(field); });
-    payload.publicConsent = Boolean(form.elements.publicConsent && form.elements.publicConsent.checked);
     payload.photos = photos.map(function (photo) { return { type: "image/jpeg", data: photo.data }; });
     return payload;
   }
@@ -142,7 +136,6 @@
     if (city && (city.length > 60 || /[0-9@]/.test(city) || hasContact(city))) errors.city = "Enter a city name without numbers or @, or leave it blank.";
     if (comment.length < 10 || comment.length > 800) errors.comment = "Write 10 to 800 characters.";
     else if (hasContact(comment)) errors.comment = "Please remove phone numbers, emails and web links from your review.";
-    if (!form.elements.publicConsent.checked) errors.publicConsent = "Agree to show your review publicly to post it.";
     return errors;
   }
   function current(attempt) { return currentAttempt === attempt && active; }

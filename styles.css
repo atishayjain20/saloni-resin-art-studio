@@ -1004,7 +1004,10 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 .reviews-hero h1 { max-width: 14ch; margin: 0; font-size: clamp(2.6rem, 7vw, 5rem); line-height: 0.98; }
 .reviews-intro { max-width: 44ch; margin: 0; color: var(--muted); }
 .reviews-summary { margin: 0; color: var(--ink); font: 500 clamp(1.2rem, 3vw, 1.6rem)/1.2 var(--display); }
-.reviews-list-section { padding-block: 0 clamp(2rem, 5vw, 4rem); }
+.home-reviews { display: grid; justify-items: start; gap: 0.9rem; padding-block: clamp(3rem, 8vw, 5rem); scroll-margin-top: var(--sticky-offset); }
+.home-reviews .eyebrow, .home-reviews h2 { margin: 0; }
+.home-reviews .reviews-list { justify-self: stretch; width: 100%; }
+.home-reviews .reviews-status { margin: 0; }
 .reviews-status { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
 .reviews-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: 1rem; margin: 0; padding: 0; list-style: none; }
 .review-card { display: grid; align-content: start; gap: 0.7rem; min-width: 0; padding: 1.1rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--paper); }

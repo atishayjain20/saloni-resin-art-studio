@@ -184,6 +184,31 @@
     } catch (error) { finish(null); }
   }
 
+  var REVIEWS_UNAVAILABLE = "Reviews could not be loaded right now. Please try again later.";
+
+  function renderReviews(data) {
+    var list = document.getElementById("reviews-list");
+    var summary = document.getElementById("reviews-summary");
+    var statusLine = document.getElementById("reviews-status");
+    if (!list || !statusLine) return;
+    while (list.firstChild) list.removeChild(list.firstChild);
+    var shown = 0;
+    data.reviews.forEach(function (item) {
+      var card = reviewCard(item);
+      if (!card) return;
+      list.appendChild(card);
+      shown += 1;
+    });
+    var count = Number(data.summary.count);
+    var average = Number(data.summary.average);
+    if (summary) {
+      summary.hidden = !(shown && isFinite(count) && count > 0 && isFinite(average));
+      if (!summary.hidden) summary.textContent = average.toFixed(1) + " out of 5 \u00b7 " + count + (count === 1 ? " review" : " reviews");
+    }
+    statusLine.textContent = shown ? "" : "No reviews yet. Be the first to share yours.";
+    statusLine.hidden = Boolean(shown);
+  }
+
   document.documentElement.classList.add("js");
 
   function initializePage() {
@@ -274,13 +299,33 @@
     var ratedThisVisit = {};
     var ratingAdjustments = {};
     var ratingRequest = null;
+    var ratingCaptchaWarmed = false;
+    var ratingCaptchaLoading = false;
+    var ratingCaptchaWaiters = [];
     var pendingRatingIds = {};
     var ratingMessage = null;
     var reviewsEmbed = document.getElementById("order-form-embed");
     var productReviewsUrl = reviewsEmbed ? reviewsEmbed.getAttribute("data-order-form-url") || "" : "";
     var productReviewsData = null;
+    var productReviewsFailed = false;
     var productReviewsLoading = false;
+    var productReviewsWaiting = false;
+    var productReviewsWaiters = [];
     var productReviewsItem = null;
+    // One read of the public feed serves the home reviews and the product popup. done gets the feed, or null if it could not be read.
+    function loadReviewsFeed(done) {
+      if (productReviewsData) { done(productReviewsFailed ? null : productReviewsData); return; }
+      productReviewsWaiters.push(done);
+      if (productReviewsLoading) return;
+      productReviewsLoading = true;
+      fetchPublicReviews(productReviewsUrl, function (data) {
+        productReviewsFailed = !data;
+        productReviewsData = data || { reviews: [] };
+        var waiters = productReviewsWaiters;
+        productReviewsWaiters = [];
+        waiters.forEach(function (waiter) { waiter(data); });
+      });
+    }
     var lightboxTriggers = document.querySelectorAll("[data-lightbox-trigger]");
     var lastTrigger = null;
     var lightboxItems = [];
@@ -455,52 +500,85 @@
       }
 
       // One rating per product per browser; Tell us more carries the chosen stars to the Reviews page.
+      // While a rating is being sent the chosen stars already show as given, so the shopper does not wait for the server.
       function renderRateState(productId) {
         if (!lightboxRate) return;
         lightboxRate.hidden = !productId;
         var saved = productId ? savedRating(productId) : 0;
+        var shown = saved || (ratingRequest && ratingRequest.productId === productId ? ratingRequest.value : 0);
         var busy = Boolean(ratingRequest);
         Array.prototype.forEach.call(rateButtons, function (button) {
           var value = Number(button.getAttribute("data-rate"));
           button.disabled = Boolean(saved) || busy;
-          button.setAttribute("aria-pressed", saved && value <= saved ? "true" : "false");
+          button.setAttribute("aria-pressed", shown && value <= shown ? "true" : "false");
         });
         if (lightboxRateStatus) {
           var message = ratingMessage && ratingMessage.productId === productId ? ratingMessage.text : "";
           lightboxRateStatus.textContent = message || (saved ? "You rated this " + saved + " out of 5 stars. Thank you!" : "");
         }
-        if (lightboxTellMore) lightboxTellMore.setAttribute("href", "reviews/?product=" + encodeURIComponent(productId) + (saved ? "&rating=" + saved : "") + "#write");
+        if (lightboxTellMore) lightboxTellMore.setAttribute("href", "reviews/?product=" + encodeURIComponent(productId) + (shown ? "&rating=" + shown : "") + "#write");
+        if (productId && !saved && !ratingCaptchaWarmed && productReviewsUrl && ratingSiteKey && typeof window.fetch === "function") {
+          ratingCaptchaWarmed = true;
+          loadRatingCaptcha(null);
+        }
+      }
+
+      // Loads the reCAPTCHA script without running it. done(true) once grecaptcha.ready can be used, done(false) if the script cannot load.
+      function loadRatingCaptcha(done) {
+        if (window.grecaptcha && window.grecaptcha.ready) { if (done) done(true); return; }
+        if (!ratingSiteKey) { if (done) done(false); return; }
+        if (done) ratingCaptchaWaiters.push(done);
+        if (ratingCaptchaLoading) return;
+        ratingCaptchaLoading = true;
+        var existing = document.querySelector ? document.querySelector('script[src*="recaptcha/api.js"]') : null;
+        var script = existing || document.createElement("script");
+        function settle(ok) {
+          if (!ratingCaptchaLoading) return;
+          ratingCaptchaLoading = false;
+          if (!ok && !existing && script.parentNode && script.parentNode.removeChild) script.parentNode.removeChild(script);
+          var waiters = ratingCaptchaWaiters;
+          ratingCaptchaWaiters = [];
+          waiters.forEach(function (waiter) { waiter(ok); });
+        }
+        script.addEventListener("load", function () { settle(Boolean(window.grecaptcha && window.grecaptcha.ready)); });
+        script.addEventListener("error", function () { settle(false); });
+        if (!existing) {
+          script.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(ratingSiteKey);
+          script.async = true;
+          document.head.appendChild(script);
+          return;
+        }
+        // A script tag that already finished loading will not fire load again, so look for grecaptcha for a few seconds.
+        var checks = 0;
+        (function poll() {
+          if (!ratingCaptchaLoading) return;
+          if (window.grecaptcha && window.grecaptcha.ready) { settle(true); return; }
+          checks += 1;
+          if (checks > 50) { settle(false); return; }
+          window.setTimeout(poll, 100);
+        })();
       }
 
       function withRatingCaptcha(done) {
         var finished = false;
         function finish(token) { if (finished) return; finished = true; done(typeof token === "string" ? token : ""); }
-        function run() {
+        loadRatingCaptcha(function (ready) {
+          if (!ready) { finish(""); return; }
           try {
             window.grecaptcha.ready(function () {
               try { window.grecaptcha.execute(ratingSiteKey, { action: "product_rating" }).then(finish, function () { finish(""); }); } catch (error) { finish(""); }
             });
           } catch (error) { finish(""); }
-        }
-        if (!ratingSiteKey) { finish(""); return; }
-        if (window.grecaptcha && window.grecaptcha.ready) { run(); return; }
-        var existing = document.querySelector ? document.querySelector('script[src*="recaptcha/api.js"]') : null;
-        var script = existing || document.createElement("script");
-        script.addEventListener("load", function () { if (window.grecaptcha && window.grecaptcha.ready) run(); else finish(""); });
-        script.addEventListener("error", function () { finish(""); });
-        if (!existing) {
-          script.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(ratingSiteKey);
-          script.async = true;
-          document.head.appendChild(script);
-        }
+        });
       }
 
       function submitQuickRating(value) {
         var productId = productReviewsItem ? catalogueProductId(productReviewsItem) : "";
         if (!productId || ratingRequest || savedRating(productId) || !productReviewsUrl || typeof window.fetch !== "function") return;
-        var request = { productId: productId };
+        var request = { productId: productId, value: value };
         ratingRequest = request;
-        ratingMessage = { productId: productId, text: "Saving your rating…" };
+        // The chosen stars and the thanks show at once; the rating is sent in the background and undone if it fails.
+        ratingMessage = { productId: productId, text: "Thanks! You rated this " + value + " out of 5 stars." };
         renderRateState(productId);
         if (lightboxRateStatus && typeof lightboxRateStatus.focus === "function") lightboxRateStatus.focus({ preventScroll: true });
         // A retry after a timeout or network error reuses the ID, so the server's replay check counts it once.
@@ -519,7 +597,6 @@
               var adjustment = ratingAdjustments[productId] || [0, 0];
               ratingAdjustments[productId] = [adjustment[0] + value, adjustment[1] + 1];
             }
-            ratingMessage = { productId: productId, text: "Thanks! You rated this " + value + " out of 5 stars." };
           } else {
             ratingMessage = { productId: productId, text: error === "paused" ? "Ratings are paused right now. Please try again later." : error === "cap" ? "We have had a lot of ratings today. Please try again tomorrow." : "Your rating could not be saved. Please try again." };
           }
@@ -594,10 +671,10 @@
         }
         if (lightboxReviewsTitle) lightboxReviewsTitle.textContent = shown > (sample ? 1 : 0) || !sample ? "Reviews" : "What we love about it";
         lightboxReviews.hidden = !shown && !productId;
-        if (productReviewsData || productReviewsLoading || !productReviewsUrl) return;
-        productReviewsLoading = true;
-        fetchPublicReviews(productReviewsUrl, function (data) {
-          productReviewsData = data || { reviews: [] };
+        if (productReviewsData || productReviewsWaiting || !productReviewsUrl) return;
+        productReviewsWaiting = true;
+        loadReviewsFeed(function () {
+          productReviewsWaiting = false;
           if (lightbox.open && productReviewsItem) renderProductReviews(productReviewsItem);
         });
       }
@@ -833,6 +910,30 @@
           openLightbox(trigger, trigger);
         });
       });
+    }
+
+    // The home page lists the reviews at the bottom; the feed is read when that section nears the screen.
+    var homeReviewsList = document.getElementById("reviews-list");
+    var homeReviewsStatus = document.getElementById("reviews-status");
+    if (homeReviewsList && homeReviewsStatus) {
+      var loadHomeReviews = function () {
+        loadReviewsFeed(function (data) {
+          if (data) { renderReviews(data); return; }
+          var homeReviewsSummary = document.getElementById("reviews-summary");
+          if (homeReviewsSummary) homeReviewsSummary.hidden = true;
+          homeReviewsStatus.textContent = REVIEWS_UNAVAILABLE;
+          homeReviewsStatus.hidden = false;
+        });
+      };
+      var homeReviewsSection = document.getElementById("customer-reviews") || homeReviewsList;
+      if ("IntersectionObserver" in window) {
+        var homeReviewsObserver = new IntersectionObserver(function (entries) {
+          if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
+          homeReviewsObserver.disconnect();
+          loadHomeReviews();
+        }, { rootMargin: "600px 0px" });
+        homeReviewsObserver.observe(homeReviewsSection);
+      } else loadHomeReviews();
     }
 
     initCatalogueExperience();
@@ -2079,11 +2180,6 @@
         finishOrderFormLoading();
         return;
       }
-      if (data.type === "saloni-review-submitted") {
-        if (frameState.mode !== "review" || !isCurrentFormSource(event.source) || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin) return;
-        loadReviewPage(false);
-        return;
-      }
       if (!isCurrentFormSource(event.source) || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin || data.type !== "saloni-order-captcha-request" || typeof data.attemptId !== "string" || !event.ports || !event.ports[0] || frameState.activeCaptcha) return;
       var request = { attemptId: data.attemptId, port: event.ports[0], timer: null };
       frameState.activeCaptcha = request;
@@ -2091,34 +2187,7 @@
       executeParentCaptcha(request);
     });
 
-    var REVIEWS_UNAVAILABLE = "Reviews could not be loaded right now. Please try again later.";
-    var REVIEW_CONTACT = "<a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a> or call <a href=\"tel:+918209238541\">8209238541</a>";
-
-
-    function renderReviews(data) {
-      var list = document.getElementById("reviews-list");
-      var summary = document.getElementById("reviews-summary");
-      var statusLine = document.getElementById("reviews-status");
-      if (!list || !statusLine) return;
-      while (list.firstChild) list.removeChild(list.firstChild);
-      var shown = 0;
-      data.reviews.forEach(function (item) {
-        var card = reviewCard(item);
-        if (!card) return;
-        list.appendChild(card);
-        shown += 1;
-      });
-      var count = Number(data.summary.count);
-      var average = Number(data.summary.average);
-      if (summary) {
-        summary.hidden = !(shown && isFinite(count) && count > 0 && isFinite(average));
-        if (!summary.hidden) summary.textContent = average.toFixed(1) + " out of 5 \u00b7 " + count + (count === 1 ? " review" : " reviews");
-      }
-      statusLine.textContent = shown ? "" : "No reviews yet. Be the first to share yours.";
-      statusLine.hidden = Boolean(shown);
-    }
-
-    // The form is loaded only after the backend answers JSON with intake "open"; anything else stays calm.
+    // The review form is seeded at once; the form itself shows its paused message when new reviews are off.
     // A product popup star links here with ?product=...&rating=...; both are re-checked before they reach the form.
     function reviewQueryValue(name) {
       var match = new RegExp("[?&]" + name + "=([^&#]*)").exec(String(window.location && window.location.search || ""));
@@ -2126,36 +2195,13 @@
       try { return decodeURIComponent(match[1].replace(/\+/g, " ")); } catch (error) { return ""; }
     }
 
-    function loadReviewPage(firstLoad) {
-      fetchPublicReviews(orderUrl, function (data) {
-        var statusLine = document.getElementById("reviews-status");
-        if (!data) {
-          if (!firstLoad) return;
-          if (statusLine) { statusLine.textContent = REVIEWS_UNAVAILABLE; statusLine.hidden = false; }
-          var summary = document.getElementById("reviews-summary");
-          if (summary) summary.hidden = true;
-          status.innerHTML = "You can still message " + REVIEW_CONTACT + " to share your review.";
-          status.hidden = false;
-          return;
-        }
-        renderReviews(data);
-        if (!firstLoad) return;
-        if (data.intake === "open") {
-          var reviewSeed = { sourceKind: "review", sourceId: "review", productName: "", reviewId: requestId() };
-          var productHint = reviewQueryValue("product");
-          var ratingHint = reviewQueryValue("rating");
-          if (/^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productHint)) reviewSeed.productId = productHint;
-          if (/^[1-5]$/.test(ratingHint)) reviewSeed.rating = ratingHint;
-          submitSeed(reviewSeed, false);
-          return;
-        }
-        status.innerHTML = "New reviews are paused right now. You can message " + REVIEW_CONTACT + ".";
-        status.hidden = false;
-      });
-    }
-
     if (frameState.mode === "review") {
-      loadReviewPage(true);
+      var reviewSeed = { sourceKind: "review", sourceId: "review", productName: "", reviewId: requestId() };
+      var productHint = reviewQueryValue("product");
+      var ratingHint = reviewQueryValue("rating");
+      if (/^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productHint)) reviewSeed.productId = productHint;
+      if (/^[1-5]$/.test(ratingHint)) reviewSeed.rating = ratingHint;
+      submitSeed(reviewSeed, false);
       return;
     }
     if (frameState.mode === "corporate" && !corporateIntakeReady) {
