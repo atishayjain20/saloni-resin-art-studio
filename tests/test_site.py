@@ -2219,7 +2219,7 @@ class ReviewsPageContractTests(unittest.TestCase):
         details = re.search(r'<details class="privacy-details" id="privacy-details">([\s\S]*?)</details>', self.home)
         self.assertIsNotNone(details)
         self.assertIn(
-            "Customer reviews (first name, optional city, rating, comment and photos) are public on the Reviews page and are kept until removed; ask for removal through @saloniresin_art_studio or 8209238541.",
+            "Customer reviews (first name, optional city, rating, comment and photos) are public on the home page and are kept until removed; ask for removal through @saloniresin_art_studio or 8209238541.",
             details.group(1),
         )
         self.assertIn("Customer requests and uploaded images are scheduled for deletion after 90 days.", details.group(1))
