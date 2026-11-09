@@ -288,6 +288,22 @@ test("a review seed passes a valid product and rating through to the form and dr
   assert.equal(order.rating, undefined);
 });
 
+test("a review seed passes a plain first name through to the form and drops anything else", () => {
+  const runtime = makeRuntime();
+  const nameOf = (firstName) => {
+    runtime.context.doPost({ parameter: { action: "seed", mode: "review", seed: JSON.stringify({ firstName }) } });
+    return JSON.parse(runtime.state.template.seedJson).firstName;
+  };
+  assert.equal(nameOf(" Asha "), "Asha");
+  assert.equal(nameOf("Mary-Jane"), "Mary-Jane");
+  assert.equal(nameOf("A"), "");
+  assert.equal(nameOf("asha@mail.com"), "");
+  assert.equal(nameOf("Asha1"), "");
+  assert.equal(nameOf("<b>Asha</b>"), "");
+  assert.equal(nameOf("x".repeat(41)), "");
+  assert.equal(nameOf(42), "");
+});
+
 const RATING_CAPTCHA = { success: true, hostname: "saloniresinart.com", action: "product_rating", score: 0.9 };
 const rate = (runtime, overrides = {}) => JSON.parse(runtime.context.doPost({ parameter: Object.assign({ action: "rate", productId: DEFAULT_PRODUCTS[0].id, rating: "4", ratingId: "rating-abcdef123456", captchaToken: "token" }, overrides) }).getContent());
 
@@ -945,6 +961,9 @@ test("the form starts on the product and rating from the seed only when they are
   const unknown = makeFormRuntime({ seed: { productId: "catalogue:not-a-product.jpg", rating: "7" } });
   assert.equal(unknown.fields.productId.value, "studio");
   assert.equal(unknown.fields.rating.value, "");
+  assert.equal(runtime.fields.firstName.value, "");
+  const named = makeFormRuntime({ seed: { firstName: "Asha" } });
+  assert.equal(named.fields.firstName.value, "Asha");
   const noList = makeFormRuntime({ products: null, seed: { productId: DEFAULT_PRODUCTS[1].id, rating: "5" } });
   assert.equal(noList.fields.productId.value, "studio");
   assert.equal(noList.fields.rating.value, "5");
@@ -1242,6 +1261,10 @@ function runReviewsPage(options = {}) {
     setTimeout: (callback) => { timers.push(callback); return timers.length; }, clearTimeout() {},
     grecaptcha: { ready: (callback) => callback(), execute: (siteKey, request) => { executed.push(request); return Promise.resolve("parent-token"); } },
   };
+  if (options.storage) {
+    const store = Object.assign({}, options.storage);
+    windowObject.localStorage = { getItem: (key) => (Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null), setItem: (key, value) => { store[key] = String(value); }, removeItem: (key) => { delete store[key]; } };
+  }
   const observers = [];
   if (options.observer) {
     windowObject.IntersectionObserver = class { constructor(callback, init) { this.callback = callback; this.init = init; this.targets = []; this.disconnected = false; observers.push(this); } observe(target) { this.targets.push(target); } unobserve() {} disconnect() { this.disconnected = true; } };
@@ -1295,6 +1318,17 @@ test("the Reviews page passes a valid product and rating from the address into t
   const dotted = runReviewsPage({ search: "?product=catalogue%3Aa%2Fb&rating=0" });
   assert.equal(dotted.seedOf().productId, undefined);
   assert.equal(dotted.seedOf().rating, undefined);
+});
+
+const repeatProfile = (customerName, expiresAt = Date.now() + 24 * 60 * 60 * 1000) => ({ saloniRepeatProfile: JSON.stringify({ version: 1, expiresAt, profile: { customerName, phone: "98765 43210", fulfillment: "pickup", pin: "305001" } }) });
+
+test("the Reviews page fills the first name from the saved order details, and only a valid one", () => {
+  assert.equal(runReviewsPage({ storage: repeatProfile("  Asha Sharma ") }).seedOf().firstName, "Asha");
+  assert.equal(runReviewsPage().seedOf().firstName, undefined);
+  assert.equal(runReviewsPage({ storage: repeatProfile("Asha Sharma", Date.now() - 1000) }).seedOf().firstName, undefined);
+  assert.equal(runReviewsPage({ storage: repeatProfile("A Sharma") }).seedOf().firstName, undefined);
+  assert.equal(runReviewsPage({ storage: repeatProfile("asha@mail.com") }).seedOf().firstName, undefined);
+  assert.equal(runReviewsPage({ storage: { saloniRepeatProfile: "not json" } }).seedOf().firstName, undefined);
 });
 
 test("the Reviews page with an unconfigured backend shows the calm not-configured message and no form", () => {

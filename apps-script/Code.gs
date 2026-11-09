@@ -98,20 +98,25 @@ function doPost(event) {
       var hint = reviewSeedHint_(parameters.seed);
       seed.productId = hint.productId;
       seed.rating = hint.rating;
+      seed.firstName = hint.firstName;
     }
     return renderForm_({ seed: seed, mode: mode });
   }
   return renderForm_({ seed: blankSeed_(), mode: mode });
 }
 
-// A product popup can suggest which piece and how many stars the review form starts on; submitReview still validates both.
+// A product popup can suggest which piece and how many stars the review form starts on, and saved order details a first name; submitReview still validates all three.
 function reviewSeedHint_(json) {
   var raw;
   try { raw = JSON.parse(String(json || "{}")); } catch (error) { raw = {}; }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) raw = {};
   var productId = String(raw.productId || "");
   var rating = String(raw.rating || "");
-  return { productId: /^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productId) ? productId : "", rating: /^[1-5]$/.test(rating) ? rating : "" };
+  var firstName = typeof raw.firstName === "string" ? raw.firstName.trim() : "";
+  return {
+    productId: /^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productId) ? productId : "", rating: /^[1-5]$/.test(rating) ? rating : "",
+    firstName: firstName.length >= 2 && firstName.length <= 40 && !/[0-9@<>]/.test(firstName) ? firstName : ""
+  };
 }
 
 function renderForm_(state) {
