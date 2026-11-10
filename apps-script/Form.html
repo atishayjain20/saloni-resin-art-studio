@@ -146,7 +146,7 @@
 
     <fieldset>
       <legend>Optional reference image</legend>
-      <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+      <label for="reference-image">JPG or PNG, one photo (large photos are shrunk automatically) <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
       <div id="reference-image-preview-wrap" hidden>
         <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
       </div>
@@ -160,7 +160,6 @@
 
     <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
     <input id="bundle-source-ids" name="bundleSourceIds" type="hidden">
-    <input id="captcha-token" name="captchaToken" type="hidden">
     <p id="form-status" class="status" role="status" aria-live="polite"></p>
     <div class="actions">
       <button id="submit-button" type="submit">Send request</button>
@@ -178,8 +177,6 @@
 (function () {
   "use strict";
   var seed = JSON.parse(document.getElementById("seed-data").textContent || "{}");
-  var captchaEnabled = <?!= captchaEnabledJson ?>;
-  var captchaSiteKey = <?!= captchaSiteKeyJson ?>;
   var form = document.getElementById("order-form");
   var formElement = form;
   var status = document.getElementById("form-status");
@@ -218,6 +215,11 @@
   var PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
   var PREVIEW_FILENAMES = { "image/jpeg": "saloni-customizer-preview.jpg", "image/png": "saloni-customizer-preview.png" };
   function previewFilename(type) { return PREVIEW_FILENAMES[String(type || "").toLowerCase()] || ""; }
+  var REFERENCE_MAX_BYTES = 1536 * 1024;
+  var REFERENCE_KEEP_BYTES = 700 * 1024;
+  var REFERENCE_MAX_SIDE = 1600;
+  var REFERENCE_TOO_LARGE = "This image is too large to send. Please choose a smaller photo or screenshot (under 1.5 MB).";
+  var referencePreparing = false;
   var previewExpected = false;
   var previewResolved = true;
   var previewPending = false;
@@ -746,24 +748,123 @@
       previewFailure("The customizer preview is unavailable in this browser.");
     }
   }
+  function isJpegOrPng(file) {
+    return ["image/jpeg", "image/png"].indexOf(String(file.type || "").toLowerCase()) !== -1 || /\.(jpe?g|png)$/i.test(String(file.name || ""));
+  }
+  function setReferencePreparing(on) {
+    referencePreparing = on;
+    submitButton.disabled = on || active;
+  }
+  function clearReferenceFile() {
+    try { referenceImage.value = ""; } catch (error) {}
+    try { referenceImage.files = []; } catch (error) {}
+  }
+  function showAttachedReference(file) {
+    revokePreviewObjectUrl();
+    var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+    if (urlApi && typeof urlApi.createObjectURL === "function") {
+      previewObjectUrl = urlApi.createObjectURL(file);
+      referenceImagePreview.setAttribute("src", previewObjectUrl);
+      referenceImagePreviewWrap.hidden = false;
+    }
+    referenceImagePreview.setAttribute("alt", "Attached reference image");
+    setReferenceImageStatus("Reference image attached.");
+  }
+  function decodeReferenceImage(file) {
+    var bitmapApi = window.createImageBitmap || (typeof createImageBitmap !== "undefined" ? createImageBitmap : null);
+    if (typeof bitmapApi === "function") return bitmapApi.call(window, file);
+    return new Promise(function (resolve, reject) {
+      var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+      var ImageCtor = window.Image || (typeof Image !== "undefined" ? Image : null);
+      if (!urlApi || typeof urlApi.createObjectURL !== "function" || !ImageCtor) { reject(new Error("Image decoding is unavailable")); return; }
+      var url = urlApi.createObjectURL(file);
+      var image = new ImageCtor();
+      image.onload = function () { try { urlApi.revokeObjectURL(url); } catch (error) {} resolve(image); };
+      image.onerror = function () { try { urlApi.revokeObjectURL(url); } catch (error) {} reject(new Error("The image could not be decoded")); };
+      image.src = url;
+    });
+  }
+  function shrinkReferenceImage(file) {
+    return decodeReferenceImage(file).then(function (source) {
+      try {
+        var sourceWidth = source.naturalWidth || source.width;
+        var sourceHeight = source.naturalHeight || source.height;
+        if (!(sourceWidth > 0 && sourceHeight > 0)) throw new Error("The image has no size");
+        var scale = Math.min(1, REFERENCE_MAX_SIDE / Math.max(sourceWidth, sourceHeight));
+        var width = Math.max(1, Math.round(sourceWidth * scale));
+        var height = Math.max(1, Math.round(sourceHeight * scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        var context = canvas.getContext && canvas.getContext("2d");
+        if (!context || typeof canvas.toBlob !== "function") throw new Error("Canvas is unavailable");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, width, height);
+        context.drawImage(source, 0, 0, width, height);
+      } finally {
+        if (typeof source.close === "function") { try { source.close(); } catch (error) {} }
+      }
+      return new Promise(function (resolve, reject) {
+        canvas.toBlob(function (blob) { if (blob) resolve(blob); else reject(new Error("The image could not be exported")); }, "image/jpeg", 0.82);
+      });
+    }).then(function (blob) {
+      if (!blob.size || blob.size > REFERENCE_MAX_BYTES) throw new Error("The shrunk image is still too large");
+      var FileCtor = window.File || (typeof File !== "undefined" ? File : null);
+      var DataTransferCtor = window.DataTransfer || (typeof DataTransfer !== "undefined" ? DataTransfer : null);
+      if (!FileCtor || !DataTransferCtor) throw new Error("This browser cannot attach the shrunk image");
+      var name = (String(file.name || "").replace(/\.[^.\/\\]*$/, "") || "reference-image") + ".jpg";
+      return { file: new FileCtor([blob], name, { type: "image/jpeg" }), transfer: new DataTransferCtor() };
+    });
+  }
+  function assignShrunkReference(shrunk) {
+    var transfer = shrunk.transfer;
+    if (!transfer.items || typeof transfer.items.add !== "function") throw new Error("DataTransfer is unavailable");
+    transfer.items.add(shrunk.file);
+    referenceImage.files = transfer.files;
+    var assigned = referenceImage.files && referenceImage.files[0];
+    if (!assigned || assigned.name !== shrunk.file.name || String(assigned.type || "").toLowerCase() !== "image/jpeg" || assigned.size !== shrunk.file.size) {
+      throw new Error("The shrunk image could not be assigned");
+    }
+    return assigned;
+  }
+  function prepareReferenceImage(file) {
+    var generation = attachmentGeneration;
+    setReferencePreparing(true);
+    setReferenceImageStatus("Preparing your image…");
+    var finish = function (shrunk) {
+      if (generation !== attachmentGeneration) return;
+      setReferencePreparing(false);
+      var assigned = null;
+      try { assigned = shrunk ? assignShrunkReference(shrunk) : null; } catch (error) {}
+      if (!assigned && file.size <= REFERENCE_MAX_BYTES && referenceImage.files && referenceImage.files[0] === file) assigned = file;
+      if (assigned) showAttachedReference(assigned);
+      else {
+        clearReferenceFile();
+        revokePreviewObjectUrl();
+        if (referenceImagePreviewWrap) referenceImagePreviewWrap.hidden = true;
+        previewCanRetry = previewExpected;
+        setReferenceImageStatus(REFERENCE_TOO_LARGE, "error");
+      }
+      updateReferenceImageActions();
+    };
+    var started;
+    try { started = shrinkReferenceImage(file); } catch (error) { started = Promise.reject(error); }
+    started.then(finish, function () { finish(null); });
+  }
   function handleReferenceImageChange() {
     attachmentGeneration += 1;
     closePreviewAttempt();
     previewResolved = true;
     previewCanRetry = false;
     previewCanContinue = false;
+    setReferencePreparing(false);
     revokePreviewObjectUrl();
     if (referenceImagePreviewWrap) referenceImagePreviewWrap.hidden = true;
     var file = referenceImage.files && referenceImage.files[0];
-    if (file) {
-      var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
-      if (urlApi && typeof urlApi.createObjectURL === "function") {
-        previewObjectUrl = urlApi.createObjectURL(file);
-        referenceImagePreview.setAttribute("src", previewObjectUrl);
-        referenceImagePreviewWrap.hidden = false;
-      }
-      referenceImagePreview.setAttribute("alt", "Attached reference image");
-      setReferenceImageStatus("Reference image attached.");
+    if (file && (file.size > REFERENCE_KEEP_BYTES || !isJpegOrPng(file))) {
+      prepareReferenceImage(file);
+    } else if (file) {
+      showAttachedReference(file);
     } else {
       setReferenceImageStatus(previewExpected ? "Reference image removed. You can retry the customizer preview." : "No reference image attached.");
       previewCanRetry = previewExpected;
@@ -823,33 +924,16 @@
     }
     updateReferenceImageActions();
   }
-  function getCaptchaToken(attempt, done) {
-    if (!captchaEnabled || !captchaSiteKey || !seed.channelNonce || !window.MessageChannel || !window.top || window.top === window) { done(null); return; }
-    var channel;
-    try {
-      channel = new window.MessageChannel();
-      attempt.port = channel.port1;
-      attempt.tokenDone = false;
-      channel.port1.onmessage = function (event) {
-        var data = event && event.data || {};
-        if (attempt.tokenDone || !isCurrent(attempt) || data.type !== "saloni-order-captcha-response" || data.nonce !== seed.channelNonce || data.attemptId !== attempt.id) return;
-        attempt.tokenDone = true;
-        done(data.ok === true && typeof data.token === "string" ? data.token : null);
-      };
-      window.top.postMessage({ type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: attempt.id }, PARENT_ORIGIN, [channel.port2]);
-    } catch (error) { done(null); }
-  }
   function isCurrent(attempt) { return currentAttempt === attempt && active; }
   function restoreSubmitState(attempt) {
     if (attempt && currentAttempt !== attempt) return;
     active = false;
     submitButton.disabled = false;
-    if (currentAttempt && currentAttempt.port && currentAttempt.port.close) currentAttempt.port.close();
     if (timeoutId) window.clearTimeout(timeoutId);
     timeoutId = null;
   }
   function focusFirstError(errors) {
-    var first = errors && Object.keys(errors).filter(function (field) { return field !== "form" && field !== "captcha"; })[0];
+    var first = errors && Object.keys(errors).filter(function (field) { return field !== "form"; })[0];
     var firstInput = first && fieldInput(first);
     if (firstInput && firstInput.focus) { revealField(firstInput); firstInput.focus(); return; }
     if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
@@ -857,8 +941,8 @@
   function showFailure(message, errors, attempt) {
     if (attempt && !isCurrent(attempt)) return;
     restoreSubmitState(attempt); clearErrors();
-    if (errors) Object.keys(errors).forEach(function (field) { if (field !== "form" && field !== "captcha") setError(field, errors[field]); });
-    var general = errors && (errors.form || errors.captcha);
+    if (errors) Object.keys(errors).forEach(function (field) { if (field !== "form") setError(field, errors[field]); });
+    var general = errors && errors.form;
     setStatus(general || message, "error");
     focusFirstError(errors);
   }
@@ -868,7 +952,7 @@
     resetPreviewState();
     previewExpected = false;
     previewResolved = true;
-    form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = true; });
+    form.querySelectorAll("fieldset, #submit-button").forEach(function (element) { element.hidden = true; });
     if (moreDetails) moreDetails.hidden = true;
     anotherButton.hidden = false;
     var referralMessage = result.referralCode ? " Referral code accepted: " + result.referralCode + "." : " No partner credit was recorded for this request.";
@@ -968,7 +1052,8 @@
     if (file && file.size !== 0) {
       var fileName = String(file.name || "").toLowerCase();
       var fileType = String(file.type || "").toLowerCase();
-      if (file.size > 5 * 1024 * 1024) errors.referenceImage = "The reference image must be 5 MB or smaller.";
+      var isPreviewFile = /^saloni-customizer-preview\.(jpg|png)$/.test(fileName);
+      if (file.size > (isPreviewFile ? PREVIEW_MAX_BYTES : REFERENCE_MAX_BYTES)) errors.referenceImage = REFERENCE_TOO_LARGE;
       else if (["image/jpeg", "image/png"].indexOf(fileType) === -1 && !/\.(jpe?g|png)$/.test(fileName)) errors.referenceImage = "Attach one JPG or PNG image.";
     }
     return errors;
@@ -1006,6 +1091,7 @@
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;
+    if (referencePreparing) { setStatus("Preparing your image… please try again in a moment.", ""); return; }
     if (isBundle()) updateBundleScalars(true);
     else if (!dimensionsRequired()) fillBlankSizeParts();
     clearErrors();
@@ -1019,41 +1105,35 @@
       showFailure("Please correct the highlighted fields and try again.", validationErrors);
       return;
     }
-    var attempt = { id: newRequestId(), port: null, tokenDone: false };
+    var attempt = { id: newRequestId() };
     currentAttempt = attempt;
     active = true;
     submitButton.disabled = true;
-    setStatus("Checking the request…", "");
+    var attachedFile = referenceImage.files && referenceImage.files[0];
+    setStatus(attachedFile && /^saloni-customizer-preview\.(jpg|png)$/.test(attachedFile.name) ? "Sending your request and design preview…" : "Sending your request…", "");
     timeoutId = window.setTimeout(function () {
       if (!isCurrent(attempt)) return;
       attempt.stillSending = true;
       setStatus("Still sending – please keep this window open. Your request is on its way and usually finishes within a minute.", "");
       if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
     }, 30000);
-    getCaptchaToken(attempt, function (token) {
-      if (!isCurrent(attempt)) return;
-      if (!token) { showFailure("We could not verify this request. Please try again.", { captcha: "Captcha verification is required." }, attempt); return; }
-      form.elements.captchaToken.value = token;
-      var attachedFile = referenceImage.files && referenceImage.files[0];
-      if (!attempt.stillSending) setStatus(attachedFile && /^saloni-customizer-preview\.(jpg|png)$/.test(attachedFile.name) ? "Sending your request and design preview…" : "Sending your request…", "");
-      try {
-        google.script.run.withSuccessHandler(function (result) {
-          if (!isCurrent(attempt)) return;
-          if (result && result.ok === true) showSuccess(result, attempt); else showFailure("Please correct the highlighted fields and try again.", result && result.errors, attempt);
-        }).withFailureHandler(function () {
-          if (!isCurrent(attempt)) return;
-          showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
-        }).submitOrder(formElement);
-      } catch (error) {
-        if (isCurrent(attempt)) showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
-      }
-    });
+    try {
+      google.script.run.withSuccessHandler(function (result) {
+        if (!isCurrent(attempt)) return;
+        if (result && result.ok === true) showSuccess(result, attempt); else showFailure("Please correct the highlighted fields and try again.", result && result.errors, attempt);
+      }).withFailureHandler(function () {
+        if (!isCurrent(attempt)) return;
+        showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
+      }).submitOrder(formElement);
+    } catch (error) {
+      if (isCurrent(attempt)) showFailure("We were unable to confirm the request. Your entries are still here; please try again.", null, attempt);
+    }
   });
   anotherButton.addEventListener("click", function () {
     var wasCustomizerRequest = isCustomizerOrderRequest();
     resetPreviewState();
     form.reset();
-    form.querySelectorAll("fieldset, #submit-button, #captcha-token").forEach(function (element) { element.hidden = false; });
+    form.querySelectorAll("fieldset, #submit-button").forEach(function (element) { element.hidden = false; });
     anotherButton.hidden = true; clearErrors(); setStatus("", "");
     if (moreDetails) { moreDetails.hidden = false; moreDetails.open = false; }
     applySeed(seed);
@@ -1071,7 +1151,7 @@
     window.addEventListener("pageshow", handlePageShow);
   }
   if (seed.channelNonce && window.top && window.top !== window) {
-    try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: captchaSiteKey || "" }, PARENT_ORIGIN); } catch (error) {}
+    try { window.top.postMessage({ type: "saloni-order-form-ready", nonce: seed.channelNonce }, PARENT_ORIGIN); } catch (error) {}
   }
 }());
 </script>

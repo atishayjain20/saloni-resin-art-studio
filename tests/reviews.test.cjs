@@ -232,6 +232,11 @@ function reviewRow(overrides = {}) {
   return [v.id, v.at, v.status, v.rating, v.productId, v.productName, v.firstName, v.city, v.comment, v.photos, v.consent, v.fingerprint, v.notes];
 }
 
+test("a review with no captcha token is still refused", () => {
+  const runtime = makeRuntime();
+  assert.match(runtime.context.submitReview(validForm({ captchaToken: "" })).errors.captcha, /Captcha/);
+});
+
 test("review mode, captcha action and kill switch are bounded", () => {
   const runtime = makeRuntime();
   assert.equal(runtime.context.boundedMode_("review"), "review");

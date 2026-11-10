@@ -5,22 +5,19 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "apps-script", "Form.html"), "utf8");
-const formSource = html.match(/<script>\n([\s\S]*?)\n<\/script>/)[1]
-  .replace(/<\?!= captchaEnabledJson \?>/g, "true")
-  .replace(/<\?!= captchaSiteKeyJson \?>/g, JSON.stringify("site-key"));
-const formSourceWithoutCaptchaSiteKey = formSource.replace('var captchaSiteKey = "site-key";', 'var captchaSiteKey = "";');
+const formSource = html.match(/<script>\n([\s\S]*?)\n<\/script>/)[1];
 
 test("targets the top-level studio page rather than the immediate parent frame", () => {
   assert.match(formSource, /window\.top\.postMessage/);
   assert.doesNotMatch(formSource, /window\.parent\.postMessage/);
 });
 
-test("announces a seeded embedded form even when CAPTCHA has no site key", () => {
-  const runtime = makeFormRuntime({ captchaSiteKey: "" });
+test("announces a seeded embedded form without any CAPTCHA site key", () => {
+  const runtime = makeFormRuntime();
   const ready = runtime.parentMessages.find((entry) => entry.message.type === "saloni-order-form-ready");
   assert.ok(ready);
   assert.equal(ready.message.nonce, "nonce-seed-123456");
-  assert.equal(ready.message.siteKey, "");
+  assert.equal(Object.hasOwn(ready.message, "siteKey"), false);
 });
 
 test("customizer handoff copy does not ask customers to download or reattach a preview", () => {
@@ -145,7 +142,6 @@ test("bundle form renders every selected item and rebuilds authoritative quantit
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   assert.equal(runtime.fields.quantity.value, "9");
   assert.equal(runtime.fields.productName.value, "Four + 3 more");
@@ -230,7 +226,6 @@ test("after a successful send More details is hidden and Start another brings it
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
   assert.equal(details.hidden, true);
@@ -265,7 +260,6 @@ test("More details opens for a field error and starts open only for seeded optio
   fillValid(serverError.fields);
   serverError.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(serverError, 0);
   await Promise.resolve();
   assert.equal(serverError.elements.get("more-details").open, false);
   serverError.callbacks[0].success({ ok: false, errors: { referralCode: "Enter a valid referral code or clear this field." } });
@@ -442,7 +436,7 @@ test("embedded preview requires the exact customizer source and an explicit true
     assert.equal(previewRequests(runtime).length, 0);
     fillValid(runtime.fields);
     runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-    assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 1);
+    assert.equal(runtime.submissions.length, 1);
   }
   assert.equal(previewRequests(makeFormRuntime({ sourceKind: "CUSTOMIZER", previewExpected: true })).length, 0);
 });
@@ -454,7 +448,6 @@ test("quote shipping accepts a blank address when PIN is valid", async () => {
   runtime.fields.pin.value = "305001";
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   assert.equal(runtime.submissions.length, 1);
 });
@@ -471,7 +464,6 @@ test("quote pickup keeps PIN visible and validates it", async () => {
   runtime.fields.pin.value = "305001";
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   assert.equal(runtime.submissions.length, 1);
 });
@@ -483,7 +475,6 @@ test("legacy pickup keeps PIN hidden and optional", async () => {
   assert.equal(runtime.elements.get("pin-field").hidden, true);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   assert.equal(runtime.submissions.length, 1);
 });
@@ -495,8 +486,7 @@ test("customizer quote accepts blank address with valid contact, PIN, and dimens
   runtime.fields.pin.value = "305001";
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 1);
-  respondToken(runtime, 0);
+  assert.equal(runtime.submissions.length, 1);
   await Promise.resolve();
   assert.equal(runtime.submissions.length, 1);
 });
@@ -507,7 +497,7 @@ test("customizer quote still rejects missing dimensions", () => {
   runtime.fields.heightFeet.value = "";
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   assert.equal(runtime.submissions.length, 0);
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 0);
+  assert.equal(runtime.submissions.length, 0);
   assert.match(runtime.status.textContent, /correct/i);
   assert.match(runtime.fields.heightFeet.getAttribute("aria-describedby"), /heightFeet-error/);
 });
@@ -565,7 +555,6 @@ function submitForm(runtime) { runtime.elements.get("order-form").dispatch("subm
 async function submitAndSend(runtime) {
   submitForm(runtime);
   await Promise.resolve();
-  if (runtime.parentMessages.some((entry) => entry.message.type === "saloni-order-captcha-request")) { respondToken(runtime, 0); await Promise.resolve(); }
 }
 const SIZE_ITEMS = [
   { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 1 },
@@ -827,8 +816,8 @@ class FakeMessageChannel {
   }
 }
 
-function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "captcha-token", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
+function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
+  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
@@ -839,7 +828,7 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
     quantity: elements.get("quantity"), heightFeet: elements.get("height-feet"), heightInchesPart: elements.get("height-inches-part"), widthFeet: elements.get("width-feet"), widthInchesPart: elements.get("width-inches-part"),
     designDetails: elements.get("design-details"), customerName: elements.get("customer-name"), phone: elements.get("phone"), email: elements.get("email"), fulfillment: elements.get("fulfillment"),
     shippingAddress: elements.get("shipping-address"), city: elements.get("city"), state: elements.get("state"), pin: elements.get("pin"), requestedDate: elements.get("requested-date"),
-    referenceImage: elements.get("reference-image"), captchaToken: elements.get("captcha-token"), referralCode: elements.get("referral-code"), bundleSourceIds: elements.get("bundle-source-ids"),
+    referenceImage: elements.get("reference-image"), referralCode: elements.get("referral-code"), bundleSourceIds: elements.get("bundle-source-ids"),
   };
   const moreDetails = elements.get("more-details");
   moreDetails.open = false;
@@ -859,7 +848,7 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
       const attached = (element) => element.parentNode && element.parentNode.children && element.parentNode.children.includes(element);
       return errors.concat(created.filter((element) => element.className === "field-error" && !errors.includes(element) && attached(element)));
     }
-    if (selector === "fieldset, #submit-button, #captcha-token") return [elements.get("submit-button"), elements.get("captcha-token")];
+    if (selector === "fieldset, #submit-button") return [elements.get("submit-button")];
     return [];
   };
   form.reset = () => Object.values(fields).forEach((field) => { field.value = ""; field.files = []; });
@@ -888,6 +877,22 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
     constructor() { this.items = { add: (file) => { this._file = file; } }; }
     get files() { return this._file ? [this._file] : []; }
   }
+  const imaging = { bitmapSize: { width: 4000, height: 3000 }, decodeError: false, noToBlob: false, jpegBytes: 120000, canvases: [], bitmapsClosed: 0 };
+  class FakeCanvas {
+    constructor() {
+      this.width = 0; this.height = 0;
+      this.calls = [];
+      const calls = this.calls;
+      this.context = {
+        set fillStyle(value) { calls.push(["fillStyle", value]); },
+        fillRect(...args) { calls.push(["fillRect", ...args]); },
+        drawImage(...args) { calls.push(["drawImage", ...args.slice(1)]); },
+      };
+      if (!imaging.noToBlob) this.toBlob = (callback, type, quality) => { this.exported = { type, quality }; callback(new Blob([new Uint8Array(imaging.jpegBytes)], { type })); };
+      imaging.canvases.push(this);
+    }
+    getContext() { return this.context; }
+  }
   let objectUrlCounter = 0;
   const objectUrls = { created: [], revoked: [] };
   const pageListeners = {};
@@ -903,12 +908,17 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
     DataTransfer: supportsDataTransfer ? FakeDataTransfer : undefined,
     URL: { createObjectURL() { const url = "blob:test-" + (++objectUrlCounter); objectUrls.created.push(url); return url; }, revokeObjectURL(url) { objectUrls.revoked.push(url); } },
     addEventListener(type, listener) { pageListeners[type] = listener; },
+    createImageBitmap() {
+      if (imaging.decodeError) return Promise.reject(new Error("decode failed"));
+      return Promise.resolve({ width: imaging.bitmapSize.width, height: imaging.bitmapSize.height, close() { imaging.bitmapsClosed += 1; } });
+    },
   };
   windowObject.google = { script: { run } };
   windowObject.top = windowObject.parent;
   const documentObject = {
     getElementById(id) { return elements.get(id) || errors.find((error) => error.id === id) || created.find((element) => element.id === id) || null; },
     createElement(tag) {
+      if (tag === "canvas") return new FakeCanvas();
       const element = new FakeElement(tag); element.className = ""; element.name = "";
       created.push(element);
       element.remove = () => {
@@ -928,9 +938,9 @@ function makeFormRuntime({ captcha = "ready", captchaSiteKey = "site-key", timeo
     File: FakeFile, Blob, DataTransfer: supportsDataTransfer ? FakeDataTransfer : undefined, URL: windowObject.URL,
   };
   vm.createContext(context);
-  vm.runInContext(captchaSiteKey ? formSource : formSourceWithoutCaptchaSiteKey, context, { filename: "Form.html" });
+  vm.runInContext(formSource, context, { filename: "Form.html" });
   elements.get("submit-button").dispatch("click");
-  return { elements, fields, errors, status, timers, timerDelays, clearedTimers, submissions, callbacks, lookupCallbacks, parentMessages, windowObject, objectUrls, pageListeners };
+  return { imaging, elements, fields, errors, status, timers, timerDelays, clearedTimers, submissions, callbacks, lookupCallbacks, parentMessages, windowObject, objectUrls, pageListeners };
 }
 
 function fillValid(fields) {
@@ -940,11 +950,6 @@ function fillValid(fields) {
   Object.assign(fields.widthFeet, { value: "4" }); Object.assign(fields.widthInchesPart, { value: "0" });
   Object.assign(fields.designDetails, { value: "Blue and gold" }); Object.assign(fields.customerName, { value: "A Customer" });
   Object.assign(fields.phone, { value: "8209238541" }); Object.assign(fields.fulfillment, { value: "pickup" }); Object.assign(fields.pin, { value: "305001" });
-}
-
-function respondToken(runtime, index, token = "captcha-token") {
-  const request = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request")[index];
-  request.port.postMessage({ type: "saloni-order-captcha-response", nonce: request.message.nonce, attemptId: request.message.attemptId, ok: true, token });
 }
 
 function previewRequests(runtime) {
@@ -998,7 +1003,6 @@ test("preview from the older PNG site is still accepted with a matching .png fil
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   assert.equal(runtime.status.textContent, "Sending your request and design preview…");
 });
@@ -1074,14 +1078,14 @@ test("failed automatic attachment offers explicit continuation and gates submit 
   const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 0);
+  assert.equal(runtime.submissions.length, 0);
   runtime.timers[0]();
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 0);
+  assert.equal(runtime.submissions.length, 0);
   runtime.elements.get("continue-without-preview").dispatch("click");
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 1);
+  assert.equal(runtime.submissions.length, 1);
 });
 
 test("unsupported DataTransfer retains the draft and exposes retry or continuation", () => {
@@ -1093,14 +1097,13 @@ test("unsupported DataTransfer retains the draft and exposes retry or continuati
   assert.match(runtime.elements.get("reference-image-status").textContent, /cannot attach/);
 });
 
-test("assigned generated file and fields survive CAPTCHA and server failures", async () => {
+test("assigned generated file and fields survive server failures", async () => {
   const tokenFailure = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
   respondPreview(tokenFailure, 0, { blob: jpegBlob() });
   fillValid(tokenFailure.fields);
   tokenFailure.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
   const generated = tokenFailure.fields.referenceImage.files[0];
-  respondToken(tokenFailure, 0, "");
   assert.equal(tokenFailure.fields.referenceImage.files[0], generated);
   assert.equal(tokenFailure.fields.productName.value, "Test frame");
 
@@ -1110,7 +1113,6 @@ test("assigned generated file and fields survive CAPTCHA and server failures", a
   serverFailure.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
   const serverGenerated = serverFailure.fields.referenceImage.files[0];
-  respondToken(serverFailure, 0);
   await Promise.resolve();
   serverFailure.callbacks[0].success({ ok: false, errors: { form: "The daily request limit has been reached." } });
   assert.equal(serverFailure.fields.referenceImage.files[0], serverGenerated);
@@ -1124,7 +1126,6 @@ test("success and reset revoke the preview URL without reusing the old preview i
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
   assert.equal(runtime.objectUrls.revoked.length, 1);
@@ -1149,7 +1150,6 @@ test("always saves repeat details after a successful request and never after a f
   fillValid(failed.fields);
   failed.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(failed, 0);
   await Promise.resolve();
   failed.callbacks[0].failure(new Error("server failure"));
   assert.equal(failed.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile").length, 0);
@@ -1158,7 +1158,6 @@ test("always saves repeat details after a successful request and never after a f
   fillValid(checked.fields);
   checked.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(checked, 0);
   await Promise.resolve();
   checked.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
   const save = checked.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile");
@@ -1205,8 +1204,7 @@ test("BFCache preserves an attached preview and allows submission after restore"
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 1);
-  respondToken(runtime, 0);
+  assert.equal(runtime.submissions.length, 1);
   await Promise.resolve();
   assert.equal(runtime.submissions.length, 1);
 });
@@ -1225,7 +1223,7 @@ test("BFCache exposes preview recovery and permits explicit continuation after r
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 1);
+  assert.equal(runtime.submissions.length, 1);
 });
 
 test("catalogue and general forms do not request an embedded preview", () => {
@@ -1255,13 +1253,12 @@ test("late success completes and late failure restores the original attempt afte
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   runtime.timers[0]();
   assert.match(runtime.status.textContent, /Still sending.*keep this window open.*within a minute/i);
   assert.equal(runtime.elements.get("submit-button").disabled, true);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 1);
+  assert.equal(runtime.submissions.length, 1);
   runtime.callbacks[0].success({ ok: true, requestId: "late", receivedAt: "late" });
   assert.match(runtime.status.textContent, /Request received/);
   assert.equal(runtime.elements.get("another-button").hidden, false);
@@ -1270,7 +1267,6 @@ test("late success completes and late failure restores the original attempt afte
   fillValid(failed.fields);
   failed.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(failed, 0);
   await Promise.resolve();
   failed.timers[0]();
   failed.callbacks[0].failure(new Error("network"));
@@ -1281,8 +1277,8 @@ test("late success completes and late failure restores the original attempt afte
   assert.equal(failed.fields.phone.value, "8209238541");
 });
 
-test("stalled CAPTCHA shows an advisory while general server errors remain readable", async () => {
-  const stalled = makeFormRuntime({ captcha: "stalled" });
+test("a pending send shows the still-sending advisory while general server errors remain readable", async () => {
+  const stalled = makeFormRuntime();
   fillValid(stalled.fields);
   stalled.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   stalled.timers[0]();
@@ -1293,30 +1289,27 @@ test("stalled CAPTCHA shows an advisory while general server errors remain reada
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   runtime.callbacks[0].success({ ok: false, errors: { form: "The daily request limit has been reached." } });
   assert.match(runtime.status.textContent, /daily request limit/);
 });
 
-test("uses the exact parent origin and preserves the draft and attachment after token failure", async () => {
+test("an order is sent straight to the server with no CAPTCHA request, and the draft and attachment survive a failure", async () => {
   const runtime = makeFormRuntime();
   fillValid(runtime.fields);
   const file = { name: "reference.png", type: "image/png", size: 10 };
   runtime.fields.referenceImage.files = [file];
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  const first = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request")[0];
-  assert.equal(first.targetOrigin, "https://saloniresinart.com");
-  first.port.postMessage({ type: "saloni-order-captcha-response", nonce: first.message.nonce, attemptId: first.message.attemptId, ok: false });
-  assert.match(runtime.status.textContent, /Captcha verification is required/);
-  assert.equal(runtime.fields.productName.value, "Test frame");
-  assert.equal(runtime.fields.referenceImage.files[0], file);
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  respondToken(runtime, 1);
-  await Promise.resolve();
   assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.status.textContent, "Sending your request\u2026");
+  assert.equal(runtime.parentMessages.some((entry) => entry.message.type === "saloni-order-captcha-request"), false);
+  assert.equal(runtime.submissions[0], runtime.elements.get("order-form"));
+  assert.equal(Object.hasOwn(runtime.fields, "captchaToken"), false);
+  assert.equal(runtime.timerDelays[0], 30000);
+  runtime.callbacks[0].failure(new Error("network"));
+  assert.match(runtime.status.textContent, /unable to confirm/i);
+  assert.equal(runtime.elements.get("submit-button").disabled, false);
+  assert.equal(runtime.fields.productName.value, "Test frame");
   assert.equal(runtime.fields.referenceImage.files[0], file);
 });
 
@@ -1335,15 +1328,11 @@ test("client validation blocks invalid normalized dimensions and associates the 
   assert.match(runtime.fields.productName.getAttribute("aria-describedby"), /productName-error/);
 });
 
-test("submit status goes from checking to sending, then still sending at 30 seconds", async () => {
+test("submit status goes straight to sending, then still sending at 30 seconds", async () => {
   const runtime = makeFormRuntime();
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.status.textContent, "Checking the request…");
   assert.equal(runtime.timerDelays[0], 30000);
-  await Promise.resolve();
-  respondToken(runtime, 0);
-  await Promise.resolve();
   assert.equal(runtime.status.textContent, "Sending your request…");
   assert.equal(runtime.callbacks.length, 1);
   runtime.timers[0]();
@@ -1358,11 +1347,8 @@ test("customizer order mentions the design preview while sending and accepts the
   respondPreview(runtime, 0, { blob: jpegBlob() });
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.status.textContent, "Checking the request…");
-  await Promise.resolve();
-  respondToken(runtime, 0);
-  await Promise.resolve();
   assert.equal(runtime.status.textContent, "Sending your request and design preview…");
+  assert.equal(runtime.submissions.length, 1);
 });
 
 test("a shopper's own PNG reference upload is still sent with the plain sending text", async () => {
@@ -1371,23 +1357,203 @@ test("a shopper's own PNG reference upload is still sent with the plain sending 
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  respondToken(runtime, 0);
   await Promise.resolve();
   assert.equal(runtime.status.textContent, "Sending your request…");
   assert.equal(runtime.submissions.length, 1);
   assert.equal(runtime.fields.referenceImage.files[0].type, "image/png");
 });
 
-test("a slow captcha keeps the still-sending text when the token arrives late", async () => {
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+const PREVIEW_LIMIT = 5 * 1024 * 1024;
+const REFERENCE_TOO_LARGE = "This image is too large to send. Please choose a smaller photo or screenshot (under 1.5 MB).";
+const largePng = (name = "wall photo.png", size = 4 * 1024 * 1024) => new File([pngBlob(size)], name, { type: "image/png" });
+
+test("a large PNG reference is replaced by a JPEG of at most 1600 px named after the original", async () => {
   const runtime = makeFormRuntime();
+  runtime.fields.referenceImage.files = [largePng()];
+  runtime.fields.referenceImage.dispatch("change");
+  await settle();
+  const assigned = runtime.fields.referenceImage.files[0];
+  assert.equal(assigned.name, "wall photo.jpg");
+  assert.equal(assigned.type, "image/jpeg");
+  assert.equal(assigned.size, runtime.imaging.jpegBytes);
+  const canvas = runtime.imaging.canvases[0];
+  assert.deepEqual([canvas.width, canvas.height], [1600, 1200]);
+  assert.deepEqual(canvas.exported, { type: "image/jpeg", quality: 0.82 });
+  assert.equal(runtime.imaging.bitmapsClosed, 1);
+  assert.equal(runtime.elements.get("reference-image-status").textContent, "Reference image attached.");
+  assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, false);
+});
+
+test("a large reference that is already small in pixels is not upscaled", async () => {
+  const runtime = makeFormRuntime();
+  runtime.imaging.bitmapSize = { width: 900, height: 600 };
+  runtime.fields.referenceImage.files = [largePng()];
+  runtime.fields.referenceImage.dispatch("change");
+  await settle();
+  assert.deepEqual([runtime.imaging.canvases[0].width, runtime.imaging.canvases[0].height], [900, 600]);
+});
+
+test("a small JPEG or PNG reference is kept unchanged without decoding", async () => {
+  const runtime = makeFormRuntime();
+  const small = new File([jpegBlob(600 * 1024)], "small.jpg", { type: "image/jpeg" });
+  runtime.fields.referenceImage.files = [small];
+  runtime.fields.referenceImage.dispatch("change");
+  await settle();
+  assert.equal(runtime.fields.referenceImage.files[0], small);
+  assert.equal(runtime.imaging.canvases.length, 0);
+  assert.equal(runtime.elements.get("reference-image-status").textContent, "Reference image attached.");
+  assert.equal(runtime.elements.get("submit-button").disabled, false);
+});
+
+test("shrinking fills the canvas white before drawing so PNG transparency does not turn black", async () => {
+  const runtime = makeFormRuntime();
+  runtime.fields.referenceImage.files = [largePng()];
+  runtime.fields.referenceImage.dispatch("change");
+  await settle();
+  const names = runtime.imaging.canvases[0].calls.map((call) => call[0]);
+  assert.deepEqual(names, ["fillStyle", "fillRect", "drawImage"]);
+  assert.equal(runtime.imaging.canvases[0].calls[0][1], "#ffffff");
+  assert.deepEqual(runtime.imaging.canvases[0].calls[1].slice(1), [0, 0, 1600, 1200]);
+});
+
+test("Send stays disabled with a preparing message while the image shrinks and comes back after", async () => {
+  const runtime = makeFormRuntime();
+  runtime.fields.referenceImage.files = [largePng()];
+  runtime.fields.referenceImage.dispatch("change");
+  assert.equal(runtime.elements.get("submit-button").disabled, true);
+  assert.equal(runtime.elements.get("reference-image-status").textContent, "Preparing your image…");
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  assert.equal(runtime.submissions.length, 0);
+  await settle();
+  assert.equal(runtime.elements.get("submit-button").disabled, false);
+});
+
+test("an image that cannot be shrunk is cleared with the too-large message and Send is re-enabled", async () => {
+  const failures = [
+    (runtime) => { runtime.imaging.decodeError = true; },
+    (runtime) => { runtime.imaging.noToBlob = true; },
+    (runtime) => { runtime.imaging.jpegBytes = 1.6 * 1024 * 1024; },
+  ];
+  for (const arrange of failures) {
+    const runtime = makeFormRuntime();
+    arrange(runtime);
+    runtime.fields.referenceImage.files = [largePng()];
+    runtime.fields.referenceImage.dispatch("change");
+    await settle();
+    assert.equal(runtime.fields.referenceImage.files.length, 0);
+    assert.equal(runtime.elements.get("reference-image-status").textContent, REFERENCE_TOO_LARGE);
+    assert.match(runtime.elements.get("reference-image-status").className, /error/);
+    assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, true);
+    assert.equal(runtime.elements.get("submit-button").disabled, false);
+  }
+  const noTransfer = makeFormRuntime({ supportsDataTransfer: false });
+  noTransfer.fields.referenceImage.files = [largePng()];
+  noTransfer.fields.referenceImage.dispatch("change");
+  await settle();
+  assert.equal(noTransfer.fields.referenceImage.files.length, 0);
+  assert.equal(noTransfer.elements.get("reference-image-status").textContent, REFERENCE_TOO_LARGE);
+});
+
+test("when shrinking fails but the original is within 1.5 MB, the original stays attached", async () => {
+  const failures = [
+    (runtime) => { runtime.imaging.decodeError = true; },
+    (runtime) => { runtime.imaging.noToBlob = true; },
+    (runtime) => { runtime.imaging.jpegBytes = 1.6 * 1024 * 1024; },
+  ];
+  for (const arrange of failures) {
+    const runtime = makeFormRuntime();
+    arrange(runtime);
+    const original = largePng("mid.png", 1000 * 1024);
+    runtime.fields.referenceImage.files = [original];
+    runtime.fields.referenceImage.dispatch("change");
+    await settle();
+    assert.equal(runtime.fields.referenceImage.files[0], original);
+    assert.equal(runtime.elements.get("reference-image-status").textContent, "Reference image attached.");
+    assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, false);
+    assert.equal(runtime.elements.get("submit-button").disabled, false);
+  }
+  const noTransfer = makeFormRuntime({ supportsDataTransfer: false });
+  const kept = largePng("mid.png", 1000 * 1024);
+  noTransfer.fields.referenceImage.files = [kept];
+  noTransfer.fields.referenceImage.dispatch("change");
+  await settle();
+  assert.equal(noTransfer.fields.referenceImage.files[0], kept);
+});
+
+test("the decoded image is closed even when the canvas is unavailable", async () => {
+  const runtime = makeFormRuntime();
+  runtime.imaging.noToBlob = true;
+  runtime.fields.referenceImage.files = [largePng()];
+  runtime.fields.referenceImage.dispatch("change");
+  await settle();
+  assert.equal(runtime.imaging.bitmapsClosed, 1);
+  const empty = makeFormRuntime();
+  empty.imaging.bitmapSize = { width: 0, height: 0 };
+  empty.fields.referenceImage.files = [largePng()];
+  empty.fields.referenceImage.dispatch("change");
+  await settle();
+  assert.equal(empty.imaging.bitmapsClosed, 1);
+});
+
+test("a newer file choice wins over a slower shrink of the previous one", async () => {
+  const runtime = makeFormRuntime();
+  runtime.fields.referenceImage.files = [largePng()];
+  runtime.fields.referenceImage.dispatch("change");
+  runtime.fields.referenceImage.files = [];
+  runtime.fields.referenceImage.dispatch("change");
+  await settle();
+  assert.equal(runtime.fields.referenceImage.files.length, 0);
+  assert.equal(runtime.elements.get("reference-image-status").textContent, "No reference image attached.");
+  assert.equal(runtime.elements.get("submit-button").disabled, false);
+});
+
+test("submit blocks an attached file over 1.5 MB and never calls submitOrder", async () => {
+  const runtime = makeFormRuntime();
+  fillValid(runtime.fields);
+  runtime.fields.referenceImage.files = [{ name: "big.jpg", type: "image/jpeg", size: 1536 * 1024 + 1 }];
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  assert.equal(runtime.submissions.length, 0);
+  assert.equal(runtime.submissions.length, 0);
+  assert.ok(runtime.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE));
+  const atLimit = makeFormRuntime();
+  fillValid(atLimit.fields);
+  atLimit.fields.referenceImage.files = [{ name: "ok.jpg", type: "image/jpeg", size: 1536 * 1024 }];
+  atLimit.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(atLimit.submissions.length, 1);
+});
+
+test("the customizer preview is attached as is and not shrunk", async () => {
+  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
+  respondPreview(runtime, 0, { blob: jpegBlob(1000 * 1024) });
+  await settle();
+  const assigned = runtime.fields.referenceImage.files[0];
+  assert.equal(assigned.name, "saloni-customizer-preview.jpg");
+  assert.equal(assigned.size, 1000 * 1024);
+  assert.equal(runtime.imaging.canvases.length, 0);
+  assert.equal(runtime.elements.get("submit-button").disabled, false);
+});
+
+test("a 1.6 MB customizer PNG preview is still submitted, but over 5 MB is blocked", async () => {
+  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
+  respondPreview(runtime, 0, { blob: pngBlob(1.6 * 1024 * 1024) });
+  assert.equal(runtime.fields.referenceImage.files[0].name, "saloni-customizer-preview.png");
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
-  runtime.timers[0]();
-  const stillSending = runtime.status.textContent;
-  assert.match(stillSending, /^Still sending/);
-  respondToken(runtime, 0);
   await Promise.resolve();
-  assert.equal(runtime.callbacks.length, 1);
-  assert.equal(runtime.status.textContent, stillSending);
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE), false);
+
+  const oversized = makeFormRuntime();
+  fillValid(oversized.fields);
+  oversized.fields.referenceImage.files = [{ name: "saloni-customizer-preview.png", type: "image/png", size: PREVIEW_LIMIT + 1 }];
+  oversized.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  assert.equal(oversized.submissions.length, 0);
+  assert.ok(oversized.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE));
 });
