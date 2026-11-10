@@ -71,6 +71,8 @@ var REVIEW_HEADERS = [
   "Comment", "Photo file IDs", "Public consent", "Payload fingerprint", "Staff notes"
 ];
 var PARTNER_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,31}$/;
+var PARTNER_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+var PARTNER_REFERRAL_LINK_BASE = "https://saloniresinart.com/?ref=";
 var PARTNER_PROGRAM_READY_PROPERTY = "PARTNER_PROGRAM_CONFIGURED";
 var CORPORATE_PROGRAM_READY_PROPERTY = "CORPORATE_PROGRAM_CONFIGURED";
 var COMMISSION_STATUSES = ["Pending", "Eligible", "Approved", "Paid", "Void"];
@@ -725,7 +727,7 @@ function submitPartnerApplication(form) {
     var existing = findApplication_(sheet, payload.applicationId);
     if (existing) {
       if (existing.fingerprint !== fingerprint) return validationFailure_({ applicationId: "Application ID conflict: these details differ from the saved application." });
-      return { ok: true, applicationId: payload.applicationId, receivedAt: existing.receivedAt };
+      return partnerApplicationReceipt_(properties, payload, existing.receivedAt, existing.status, existing.partnerId);
     }
     if (partnerDailyCapReached_(sheet, properties)) return validationFailure_({ form: "The studio's partner application limit has been reached. Please try again tomorrow." });
     var receivedAt = new Date();
@@ -740,11 +742,11 @@ function submitPartnerApplication(form) {
       sheet.appendRow(row);
     } catch (appendError) {
       var afterAppend = findApplication_(sheet, payload.applicationId);
-      if (afterAppend && afterAppend.fingerprint === fingerprint) return { ok: true, applicationId: payload.applicationId, receivedAt: afterAppend.receivedAt };
+      if (afterAppend && afterAppend.fingerprint === fingerprint) return partnerApplicationReceipt_(properties, payload, afterAppend.receivedAt, afterAppend.status, afterAppend.partnerId);
       if (afterAppend) return validationFailure_({ applicationId: "Application ID conflict: these details differ from the saved application." });
       throw appendError;
     }
-    return { ok: true, applicationId: payload.applicationId, receivedAt: receivedAt.toISOString() };
+    return partnerApplicationReceipt_(properties, payload, receivedAt.toISOString(), "Pending", "");
   } catch (error) {
     throw new Error("Unable to receive the partner application.");
   } finally {
@@ -1518,6 +1520,8 @@ function findApplication_(sheet, applicationId) {
   for (var index = 1; index < values.length; index += 1) {
     if (String(values[index][0]) === applicationId) return {
       fingerprint: String(values[index][15] || ""),
+      status: String(values[index][12] || ""),
+      partnerId: String(values[index][16] || ""),
       receivedAt: values[index][1] instanceof Date ? values[index][1].toISOString() : String(values[index][1])
     };
   }
@@ -1535,6 +1539,58 @@ function partnerDailyCapReached_(sheet, properties) {
     if (received && Utilities.formatDate(new Date(received), Session.getScriptTimeZone(), "yyyy-MM-dd") === today) count += 1;
   }
   return count >= cap;
+}
+
+// Runs inside the caller's script lock. A failure never loses the stored application: the receipt simply has no link.
+function partnerApplicationReceipt_(properties, payload, receivedAt, status, partnerId) {
+  var receipt = { ok: true, applicationId: payload.applicationId, receivedAt: receivedAt };
+  var code = "";
+  try {
+    if (status === "Pending") code = autoApprovePartner_(properties, payload);
+    else if (status === "Approved" && partnerId) code = partnerCodeForId_(properties, partnerId);
+  } catch (error) {
+    code = "";
+  }
+  if (code) {
+    receipt.referralCode = code;
+    receipt.referralLink = PARTNER_REFERRAL_LINK_BASE + encodeURIComponent(code);
+  }
+  return receipt;
+}
+
+function partnerCodeForId_(properties, partnerId) {
+  var partners = openPartnerTab_(properties, "PARTNERS_SHEET_TAB", "Partners");
+  ensurePartnerTabSchema_(partners, PARTNER_HEADERS);
+  var values = partners.getDataRange().getValues();
+  var index = headerIndex_(values[0].map(String));
+  for (var i = 1; i < values.length; i += 1) {
+    if (String(values[i][index["Partner ID"]]) === partnerId) {
+      var code = String(values[i][index["Referral code"]] || "").toUpperCase();
+      return PARTNER_CODE_PATTERN.test(code) ? code : "";
+    }
+  }
+  return "";
+}
+
+function autoApprovePartner_(properties, payload) {
+  var partnerId = "partner-" + payload.applicationId;
+  var code = partnerCodeForId_(properties, partnerId);
+  if (!code) {
+    var partners = openPartnerTab_(properties, "PARTNERS_SHEET_TAB", "Partners");
+    var values = partners.getDataRange().getValues();
+    var index = headerIndex_(values[0].map(String));
+    var taken = {};
+    for (var i = 1; i < values.length; i += 1) taken[String(values[i][index["Referral code"]]).toUpperCase()] = true;
+    var base = String(payload.businessName || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) ||
+      String(payload.applicantName || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "PARTNER";
+    for (var attempt = 0; attempt < 5 && !code; attempt += 1) {
+      var suffix = "";
+      for (var position = 0; position < 4; position += 1) suffix += PARTNER_CODE_ALPHABET.charAt(Math.floor(Math.random() * PARTNER_CODE_ALPHABET.length));
+      if (!taken[base + suffix]) code = base + suffix;
+    }
+    if (!code) throw new Error("Unable to generate a unique referral code.");
+  }
+  return approvePartnerLocked_(payload.applicationId, { referralCode: code, rate: 0.1, reviewNotes: "Auto-approved on application" }).code;
 }
 
 function setupPartnerProgram() {
@@ -1612,64 +1668,69 @@ function approvePartner_(applicationId, partnerFields) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error("Unable to approve partner.");
   try {
-    var properties = PropertiesService.getScriptProperties();
-    var applications = openPartnerTab_(properties, "PARTNER_APPLICATIONS_SHEET_TAB", "Partner Applications");
-    var partners = openPartnerTab_(properties, "PARTNERS_SHEET_TAB", "Partners");
-    ensurePartnerTabSchema_(applications, PARTNER_APPLICATION_HEADERS);
-    ensurePartnerTabSchema_(partners, PARTNER_HEADERS);
-    var values = applications.getDataRange().getValues();
-    var index = headerIndex_(values[0].map(String));
-    var matches = [];
-    for (var i = 1; i < values.length; i += 1) if (String(values[i][index["Application ID"]]) === String(applicationId)) matches.push({ row: i + 1, values: values[i] });
-    if (matches.length !== 1) throw new Error(matches.length ? "Partner application ID is duplicated." : "Partner application was not found.");
-    var found = matches[0];
-    var fields = partnerFields || {};
-    var code = normalizeReferralCode_(fields.referralCode);
-    var partnerId = "partner-" + String(applicationId);
-    var displayName = String(found.values[index["Business name"]] || found.values[index["Applicant name"]] || "").trim();
-    var rate = Number(fields.rate == null ? 0.1 : fields.rate);
-    if (!PARTNER_CODE_PATTERN.test(code) || !displayName || !isFinite(rate) || rate < 0 || rate > 1) throw new Error("Partner approval values are not valid.");
-    var partnerValues = partners.getDataRange().getValues();
-    var partnerIndex = headerIndex_(partnerValues[0].map(String));
-    var partnerMatches = [];
-    for (var rowIndex = 1; rowIndex < partnerValues.length; rowIndex += 1) {
-      var candidate = partnerValues[rowIndex];
-      if (String(candidate[partnerIndex["Partner ID"]]) === partnerId || String(candidate[partnerIndex["Referral code"]]).toUpperCase() === code) partnerMatches.push({ row: rowIndex + 1, values: candidate });
-    }
-    if (partnerMatches.length > 1) throw new Error("Partner ID or referral code is duplicated.");
-    var intended = [neutralizeForSheet_(partnerId), neutralizeForSheet_(code), neutralizeForSheet_(displayName), neutralizeForSheet_(String(found.values[index["Applicant name"]] || "")), neutralizeForSheet_(String(found.values[index.Category] || "")), neutralizeForSheet_(String(found.values[index["City / service area"]] || "")), neutralizeForSheet_(String(found.values[index["Phone / WhatsApp"]] || "")), neutralizeForSheet_(String(found.values[index.Email] || "")), neutralizeForSheet_(String(found.values[index["Instagram / website"]] || "")), rate];
-    var existingPartner = partnerMatches.length ? partnerMatches[0].values : null;
-    if (existingPartner && !partnerApprovalMatches_(existingPartner, intended, partnerIndex)) throw new Error("Existing partner approval conflicts with the requested fields.");
-    var approvedAt = existingPartner && retentionDate_(existingPartner[partnerIndex["Approved at"]]) || new Date();
-    if (!existingPartner) {
-      var partnerRow = [neutralizeForSheet_(partnerId), neutralizeForSheet_(code), neutralizeForSheet_(displayName), neutralizeForSheet_(found.values[index["Applicant name"]]),
-        neutralizeForSheet_(found.values[index.Category]), neutralizeForSheet_(found.values[index["City / service area"]]), neutralizeForSheet_(found.values[index["Phone / WhatsApp"]]), neutralizeForSheet_(found.values[index.Email]),
-        neutralizeForSheet_(found.values[index["Instagram / website"]]), rate, "Active", approvedAt, "https://saloniresinart.com/?ref=" + encodeURIComponent(code), neutralizeForSheet_(fields.staffNotes || ""), ""];
-      try {
-        partners.appendRow(partnerRow);
-      } catch (appendError) {
-        var afterValues = partners.getDataRange().getValues();
-        var afterMatches = afterValues.slice(1).filter(function (candidate) { return String(candidate[partnerIndex["Partner ID"]]) === partnerId && String(candidate[partnerIndex["Referral code"]]).toUpperCase() === code; });
-        if (afterMatches.length !== 1 || !partnerApprovalMatches_(afterMatches[0], intended, partnerIndex)) throw appendError;
-        existingPartner = afterMatches[0];
-        approvedAt = retentionDate_(existingPartner[partnerIndex["Approved at"]]) || approvedAt;
-      }
-    }
-    var currentStatus = String(found.values[index.Status] || "");
-    var currentPartnerId = String(found.values[index["Partner ID"]] || "");
-    if (currentStatus === "Approved" && currentPartnerId && currentPartnerId !== partnerId) throw new Error("Application is already linked to another partner.");
-    var applicationUpdated = found.values.slice().map(function (value) { return typeof value === "string" ? neutralizeForSheet_(value) : value; });
-    applicationUpdated[index.Status] = "Approved";
-    applicationUpdated[index["Review notes"]] = currentStatus === "Approved" ? applicationUpdated[index["Review notes"]] : neutralizeForSheet_(fields.reviewNotes || "");
-    applicationUpdated[index["Reviewed at"]] = currentStatus === "Approved" && retentionDate_(applicationUpdated[index["Reviewed at"]]) || approvedAt;
-    applicationUpdated[index["Partner ID"]] = neutralizeForSheet_(partnerId);
-    applications.getRange(found.row, 1, 1, PARTNER_APPLICATION_HEADERS.length).setValues([applicationUpdated]);
-    var verifiedApplication = applications.getDataRange().getValues()[found.row - 1];
-    if (!verifiedApplication || String(verifiedApplication[index.Status]) !== "Approved" || String(verifiedApplication[index["Partner ID"]]) !== String(applicationUpdated[index["Partner ID"]])) throw new Error("Partner approval link could not be verified.");
-    return { partnerId: partnerId, code: code };
+    return approvePartnerLocked_(applicationId, partnerFields);
   } finally {
     lock.releaseLock();
   }
+}
+
+// The caller must already hold the script lock (approvePartner_ and submitPartnerApplication both do).
+function approvePartnerLocked_(applicationId, partnerFields) {
+  var properties = PropertiesService.getScriptProperties();
+  var applications = openPartnerTab_(properties, "PARTNER_APPLICATIONS_SHEET_TAB", "Partner Applications");
+  var partners = openPartnerTab_(properties, "PARTNERS_SHEET_TAB", "Partners");
+  ensurePartnerTabSchema_(applications, PARTNER_APPLICATION_HEADERS);
+  ensurePartnerTabSchema_(partners, PARTNER_HEADERS);
+  var values = applications.getDataRange().getValues();
+  var index = headerIndex_(values[0].map(String));
+  var matches = [];
+  for (var i = 1; i < values.length; i += 1) if (String(values[i][index["Application ID"]]) === String(applicationId)) matches.push({ row: i + 1, values: values[i] });
+  if (matches.length !== 1) throw new Error(matches.length ? "Partner application ID is duplicated." : "Partner application was not found.");
+  var found = matches[0];
+  var fields = partnerFields || {};
+  var code = normalizeReferralCode_(fields.referralCode);
+  var partnerId = "partner-" + String(applicationId);
+  var displayName = String(found.values[index["Business name"]] || found.values[index["Applicant name"]] || "").trim();
+  var rate = Number(fields.rate == null ? 0.1 : fields.rate);
+  if (!PARTNER_CODE_PATTERN.test(code) || !displayName || !isFinite(rate) || rate < 0 || rate > 1) throw new Error("Partner approval values are not valid.");
+  var partnerValues = partners.getDataRange().getValues();
+  var partnerIndex = headerIndex_(partnerValues[0].map(String));
+  var partnerMatches = [];
+  for (var rowIndex = 1; rowIndex < partnerValues.length; rowIndex += 1) {
+    var candidate = partnerValues[rowIndex];
+    if (String(candidate[partnerIndex["Partner ID"]]) === partnerId || String(candidate[partnerIndex["Referral code"]]).toUpperCase() === code) partnerMatches.push({ row: rowIndex + 1, values: candidate });
+  }
+  if (partnerMatches.length > 1) throw new Error("Partner ID or referral code is duplicated.");
+  var intended = [neutralizeForSheet_(partnerId), neutralizeForSheet_(code), neutralizeForSheet_(displayName), neutralizeForSheet_(String(found.values[index["Applicant name"]] || "")), neutralizeForSheet_(String(found.values[index.Category] || "")), neutralizeForSheet_(String(found.values[index["City / service area"]] || "")), neutralizeForSheet_(String(found.values[index["Phone / WhatsApp"]] || "")), neutralizeForSheet_(String(found.values[index.Email] || "")), neutralizeForSheet_(String(found.values[index["Instagram / website"]] || "")), rate];
+  var existingPartner = partnerMatches.length ? partnerMatches[0].values : null;
+  if (existingPartner && !partnerApprovalMatches_(existingPartner, intended, partnerIndex)) throw new Error("Existing partner approval conflicts with the requested fields.");
+  var approvedAt = existingPartner && retentionDate_(existingPartner[partnerIndex["Approved at"]]) || new Date();
+  if (!existingPartner) {
+    var partnerRow = [neutralizeForSheet_(partnerId), neutralizeForSheet_(code), neutralizeForSheet_(displayName), neutralizeForSheet_(found.values[index["Applicant name"]]),
+      neutralizeForSheet_(found.values[index.Category]), neutralizeForSheet_(found.values[index["City / service area"]]), neutralizeForSheet_(found.values[index["Phone / WhatsApp"]]), neutralizeForSheet_(found.values[index.Email]),
+      neutralizeForSheet_(found.values[index["Instagram / website"]]), rate, "Active", approvedAt, "https://saloniresinart.com/?ref=" + encodeURIComponent(code), neutralizeForSheet_(fields.staffNotes || ""), ""];
+    try {
+      partners.appendRow(partnerRow);
+    } catch (appendError) {
+      var afterValues = partners.getDataRange().getValues();
+      var afterMatches = afterValues.slice(1).filter(function (candidate) { return String(candidate[partnerIndex["Partner ID"]]) === partnerId && String(candidate[partnerIndex["Referral code"]]).toUpperCase() === code; });
+      if (afterMatches.length !== 1 || !partnerApprovalMatches_(afterMatches[0], intended, partnerIndex)) throw appendError;
+      existingPartner = afterMatches[0];
+      approvedAt = retentionDate_(existingPartner[partnerIndex["Approved at"]]) || approvedAt;
+    }
+  }
+  var currentStatus = String(found.values[index.Status] || "");
+  var currentPartnerId = String(found.values[index["Partner ID"]] || "");
+  if (currentStatus === "Approved" && currentPartnerId && currentPartnerId !== partnerId) throw new Error("Application is already linked to another partner.");
+  var applicationUpdated = found.values.slice().map(function (value) { return typeof value === "string" ? neutralizeForSheet_(value) : value; });
+  applicationUpdated[index.Status] = "Approved";
+  applicationUpdated[index["Review notes"]] = currentStatus === "Approved" ? applicationUpdated[index["Review notes"]] : neutralizeForSheet_(fields.reviewNotes || "");
+  applicationUpdated[index["Reviewed at"]] = currentStatus === "Approved" && retentionDate_(applicationUpdated[index["Reviewed at"]]) || approvedAt;
+  applicationUpdated[index["Partner ID"]] = neutralizeForSheet_(partnerId);
+  applications.getRange(found.row, 1, 1, PARTNER_APPLICATION_HEADERS.length).setValues([applicationUpdated]);
+  var verifiedApplication = applications.getDataRange().getValues()[found.row - 1];
+  if (!verifiedApplication || String(verifiedApplication[index.Status]) !== "Approved" || String(verifiedApplication[index["Partner ID"]]) !== String(applicationUpdated[index["Partner ID"]])) throw new Error("Partner approval link could not be verified.");
+  return { partnerId: partnerId, code: code };
 }
 
 function partnerApprovalMatches_(row, intended, index) {
