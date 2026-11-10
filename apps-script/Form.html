@@ -216,7 +216,8 @@
   var PARENT_ORIGIN = "https://saloniresinart.com";
   var PREVIEW_TIMEOUT_MS = 10000;
   var PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
-  var PREVIEW_FILENAME = "saloni-customizer-preview.png";
+  var PREVIEW_FILENAMES = { "image/jpeg": "saloni-customizer-preview.jpg", "image/png": "saloni-customizer-preview.png" };
+  function previewFilename(type) { return PREVIEW_FILENAMES[String(type || "").toLowerCase()] || ""; }
   var previewExpected = false;
   var previewResolved = true;
   var previewPending = false;
@@ -658,11 +659,11 @@
   function validPreviewBlob(blob) {
     return Boolean(blob && Object.prototype.toString.call(blob) === "[object Blob]" &&
       typeof blob.size === "number" && blob.size > 0 && blob.size <= PREVIEW_MAX_BYTES &&
-      String(blob.type || "").toLowerCase() === "image/png");
+      Boolean(previewFilename(blob.type)));
   }
   function attachPreviewBlob(attempt, blob) {
     if (!validPreviewBlob(blob)) {
-      previewFailure("The customizer preview was not a non-empty PNG of 5 MB or less.");
+      previewFailure("The customizer preview was not a non-empty JPEG or PNG of 5 MB or less.");
       return;
     }
     var FileCtor = window.File || (typeof File !== "undefined" ? File : null);
@@ -672,13 +673,14 @@
       return;
     }
     try {
-      var file = new FileCtor([blob], PREVIEW_FILENAME, { type: "image/png" });
+      var previewName = previewFilename(blob.type);
+      var file = new FileCtor([blob], previewName, { type: String(blob.type).toLowerCase() });
       var transfer = new DataTransferCtor();
       if (!transfer.items || typeof transfer.items.add !== "function") throw new Error("DataTransfer is unavailable");
       transfer.items.add(file);
       referenceImage.files = transfer.files;
       var assigned = referenceImage.files && referenceImage.files[0];
-      if (!assigned || assigned.name !== PREVIEW_FILENAME || String(assigned.type || "").toLowerCase() !== "image/png" || assigned.size !== blob.size) {
+      if (!assigned || assigned.name !== previewName || String(assigned.type || "").toLowerCase() !== String(blob.type).toLowerCase() || assigned.size !== blob.size) {
         throw new Error("The preview file could not be assigned");
       }
       revokePreviewObjectUrl();
@@ -692,7 +694,7 @@
       previewResolved = true;
       previewCanRetry = false;
       previewCanContinue = false;
-      setReferenceImageStatus("Customizer preview attached as " + PREVIEW_FILENAME + ".");
+      setReferenceImageStatus("Customizer preview attached as " + previewName + ".");
       updateReferenceImageActions();
     } catch (error) {
       try { referenceImage.value = ""; } catch (clearError) {}
@@ -1024,13 +1026,16 @@
     setStatus("Checking the request…", "");
     timeoutId = window.setTimeout(function () {
       if (!isCurrent(attempt)) return;
-      setStatus("This is taking longer than expected. Keep this window open; we are still confirming your request.", "");
+      attempt.stillSending = true;
+      setStatus("Still sending – please keep this window open. Your request is on its way and usually finishes within a minute.", "");
       if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
     }, 30000);
     getCaptchaToken(attempt, function (token) {
       if (!isCurrent(attempt)) return;
       if (!token) { showFailure("We could not verify this request. Please try again.", { captcha: "Captcha verification is required." }, attempt); return; }
       form.elements.captchaToken.value = token;
+      var attachedFile = referenceImage.files && referenceImage.files[0];
+      if (!attempt.stillSending) setStatus(attachedFile && /^saloni-customizer-preview\.(jpg|png)$/.test(attachedFile.name) ? "Sending your request and design preview…" : "Sending your request…", "");
       try {
         google.script.run.withSuccessHandler(function (result) {
           if (!isCurrent(attempt)) return;

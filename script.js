@@ -1687,7 +1687,7 @@
 
     function usablePreviewSnapshot(snapshot) {
       var dimensions = snapshot && snapshot.dimensions;
-      return Boolean(snapshot && usablePreviewDetails(snapshot.summary, dimensions) && snapshot.blob && typeof snapshot.blob.size === "number" && snapshot.blob.size > 0 && snapshot.blob.size <= 5 * 1024 * 1024 && typeof snapshot.blob.type === "string" && snapshot.blob.type.toLowerCase() === "image/png");
+      return Boolean(snapshot && usablePreviewDetails(snapshot.summary, dimensions) && snapshot.blob && typeof snapshot.blob.size === "number" && snapshot.blob.size > 0 && snapshot.blob.size <= 5 * 1024 * 1024 && typeof snapshot.blob.type === "string" && ["image/jpeg", "image/png"].indexOf(snapshot.blob.type.toLowerCase()) !== -1);
     }
 
     function clearOrderLoadingTimer() {

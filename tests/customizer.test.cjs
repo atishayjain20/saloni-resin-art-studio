@@ -470,24 +470,54 @@ test("announces fallback for export and native share failures", async () => {
   assert.equal(shareFailure.state.shareInProgress, false);
 });
 
-test("captures one immutable PNG snapshot with bounded summary and dimensions", async () => {
-  const state = { imageLoading: false, textOverflow: false, captureInProgress: false };
-  const canvas = {
-    toBlob(callback, type) {
-      assert.equal(type, "image/png");
-      callback({ type: "image/png", size: 42 });
+function jpegExportFixture(blobResult = { type: "image/jpeg", size: 42 }) {
+  const ops = [];
+  const flat = {
+    width: 0,
+    height: 0,
+    getContext(kind) {
+      assert.equal(kind, "2d");
+      return {
+        set fillStyle(value) { ops.push(["fillStyle", value]); },
+        fillRect(x, y, w, h) { ops.push(["fillRect", x, y, w, h]); },
+        drawImage(source, x, y) { ops.push(["drawImage", source, x, y]); },
+      };
+    },
+    toBlob(callback, type, quality) {
+      ops.push(["toBlob", type, quality]);
+      callback(blobResult);
     },
   };
+  const scene = {
+    width: 1200,
+    height: 1200,
+    toBlob() { throw new Error("the scene canvas must not be exported directly"); },
+  };
+  return { ops, flat, scene, createCanvas: () => flat };
+}
+
+test("captures one immutable JPEG snapshot flattened onto white with bounded summary and dimensions", async () => {
+  const state = { imageLoading: false, textOverflow: false, captureInProgress: false };
+  const { ops, flat, scene, createCanvas } = jpegExportFixture();
   const snapshot = await capturePreviewSnapshot({
     state,
-    canvas,
+    canvas: scene,
+    createCanvas,
     summary: "Custom resin frame\nText: hello",
     dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
     timeoutMs: 50,
   });
 
-  assert.equal(snapshot.blob.type, "image/png");
+  assert.equal(snapshot.blob.type, "image/jpeg");
   assert.equal(snapshot.blob.size, 42);
+  assert.deepEqual(ops, [
+    ["fillStyle", "#ffffff"],
+    ["fillRect", 0, 0, 1200, 1200],
+    ["drawImage", scene, 0, 0],
+    ["toBlob", "image/jpeg", 0.85],
+  ]);
+  assert.equal(flat.width, 1200);
+  assert.equal(flat.height, 1200);
   assert.equal(snapshot.summary, "Custom resin frame\nText: hello");
   assert.deepEqual(snapshot.dimensions, { height: "8", width: "8", heightUnit: "in", widthUnit: "in" });
   assert.equal(state.captureInProgress, false);
@@ -497,6 +527,28 @@ test("captures one immutable PNG snapshot with bounded summary and dimensions", 
   assert.equal(snapshot.summary, "Custom resin frame\nText: hello");
   assert.equal(snapshot.dimensions.width, "8");
   assert.equal(snapshot.blob.size, 42);
+});
+
+test("preview export is unavailable when no flattening canvas can be created", async () => {
+  await assert.rejects(() => capturePreviewSnapshot({
+    state: { imageLoading: false, textOverflow: false },
+    canvas: { width: 1200, height: 1200, toBlob() {} },
+    summary: "ok",
+    dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+  }), /preview-export-unavailable/);
+});
+
+test("preview snapshot rejects a blob that is not a JPEG", async () => {
+  for (const blob of [{ type: "image/png", size: 42 }, { type: "image/webp", size: 42 }, { type: "", size: 42 }]) {
+    const { scene, createCanvas } = jpegExportFixture(blob);
+    await assert.rejects(() => capturePreviewSnapshot({
+      state: { imageLoading: false, textOverflow: false },
+      canvas: scene,
+      createCanvas,
+      summary: "ok",
+      dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
+    }), /invalid-preview/);
+  }
 });
 
 test("rejects blocked or unsafe preview snapshot inputs", async () => {
@@ -521,16 +573,19 @@ test("rejects blocked or unsafe preview snapshot inputs", async () => {
   }), /capture-in-progress/);
   await assert.rejects(() => capturePreviewSnapshot({
     state: { imageLoading: false, textOverflow: false },
-    canvas: { toBlob() {} },
+    canvas: { width: 1200, height: 1200, toBlob() {} },
+    createCanvas: () => ({ getContext: () => ({ fillRect() {}, drawImage() {} }), toBlob() {} }),
     summary: "ok",
     dimensions: { height: "8", width: "8", heightUnit: "in", widthUnit: "in" },
     timeoutMs: 5,
   }), /timeout/);
 
-  assert.equal(validPreviewBlob({ type: "image/png", size: 1 }), true);
-  assert.equal(validPreviewBlob({ type: "image/jpeg", size: 1 }), false);
-  assert.equal(validPreviewBlob({ type: "image/png", size: 0 }), false);
-  assert.equal(validPreviewBlob({ type: "image/png", size: 5 * 1024 * 1024 + 1 }), false);
+  assert.equal(validPreviewBlob({ type: "image/jpeg", size: 1 }), true);
+  assert.equal(validPreviewBlob({ type: "image/png", size: 1 }), false);
+  assert.equal(validPreviewBlob({ type: "image/webp", size: 1 }), false);
+  assert.equal(validPreviewBlob({ type: "image/jpeg", size: 0 }), false);
+  assert.equal(validPreviewBlob({ type: "image/jpeg", size: 5 * 1024 * 1024 }), true);
+  assert.equal(validPreviewBlob({ type: "image/jpeg", size: 5 * 1024 * 1024 + 1 }), false);
   await assert.rejects(() => capturePreviewSnapshot({
     state: { imageLoading: false, textOverflow: false },
     canvas: { toBlob(callback) { callback({ type: "image/png", size: 1 }); } },
