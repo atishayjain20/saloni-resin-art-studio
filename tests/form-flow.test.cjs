@@ -988,13 +988,30 @@ test("preview accepts only the current full identity and ignores wrong or duplic
   assert.equal(request.port.peer.closed, true);
 });
 
+test("preview from the older PNG site is still accepted with a matching .png file name", async () => {
+  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
+  respondPreview(runtime, 0, { blob: pngBlob() });
+  const assigned = runtime.fields.referenceImage.files[0];
+  assert.equal(assigned.name, "saloni-customizer-preview.png");
+  assert.equal(assigned.type, "image/png");
+  assert.match(runtime.elements.get("reference-image-status").textContent, /saloni-customizer-preview\.png/);
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
+  assert.equal(runtime.status.textContent, "Sending your request and design preview…");
+});
+
 test("preview rejects malformed, empty, wrong-MIME, and oversized blobs", () => {
   for (const blob of [
     { size: 4, type: "image/jpeg" },
     new Blob([], { type: "image/jpeg" }),
-    new Blob([new Uint8Array(4)], { type: "image/png" }),
+    new Blob([], { type: "image/png" }),
     new Blob([new Uint8Array(4)], { type: "image/webp" }),
+    new Blob([new Uint8Array(4)], { type: "" }),
     jpegBlob(5 * 1024 * 1024 + 1),
+    pngBlob(5 * 1024 * 1024 + 1),
   ]) {
     const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
     respondPreview(runtime, 0, { blob });
