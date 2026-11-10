@@ -226,39 +226,30 @@ test("preserves only the exact quote stage in seeds and keeps invalid markers be
   }
 });
 
-test("requires exact CAPTCHA hostname, action, and finite score", () => {
-  const valid = makeRuntime({
-    properties: { CAPTCHA_MIN_SCORE: "0.7" },
-    captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.8 }
-  });
-  assert.equal(valid.context.submitOrder(validForm()).ok, true);
-  for (const captchaResponse of [
-    { success: true, hostname: "saloniresinart.com", score: 0.8 },
-    { success: true, hostname: "saloniresinart.com", action: "other", score: 0.8 },
-    { success: true, hostname: "saloniresinart.com", action: "order_request" },
-    { success: true, hostname: "saloniresinart.com", action: "order_request", score: Infinity },
-  ]) {
-    const runtime = makeRuntime({ properties: { CAPTCHA_MIN_SCORE: "0.7" }, captchaResponse });
-    assert.match(runtime.context.submitOrder(validForm()).errors.captcha, /Captcha/);
-    assert.equal(runtime.state.appendCalls, 0);
+test("accepts an order with no captchaToken and never calls or depends on CAPTCHA", () => {
+  const noToken = makeRuntime({ captchaThrows: true });
+  const form = validForm();
+  delete form.captchaToken;
+  const result = noToken.context.submitOrder(form);
+  assert.equal(result.ok, true);
+  assert.equal(noToken.state.captchaCalls, 0);
+  assert.equal(noToken.state.appendCalls, 1);
+  for (const properties of [{ CAPTCHA_SECRET: "", CAPTCHA_MIN_SCORE: "" }, { CAPTCHA_MIN_SCORE: "not-a-number" }]) {
+    const unconfigured = makeRuntime({ properties, captchaThrows: true });
+    assert.equal(unconfigured.context.submitOrder(validForm({ captchaToken: "" })).ok, true);
+    assert.equal(unconfigured.state.captchaCalls, 0);
   }
 });
 
-test("fails closed for blank thresholds and non-numeric or out-of-range CAPTCHA scores before writes", () => {
-  for (const properties of [{ CAPTCHA_MIN_SCORE: "" }, { CAPTCHA_MIN_SCORE: "not-a-number" }, { CAPTCHA_MIN_SCORE: "1.1" }]) {
-    const runtime = makeRuntime({ properties, captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 } });
-    const result = runtime.context.submitOrder(validForm({ referenceImage: imageBlob() }));
-    assert.match(result.errors.captcha, /Captcha/);
-    assert.equal(runtime.state.fileCreates, 0);
-    assert.equal(runtime.state.appendCalls, 0);
-  }
-  for (const score of [null, "0.9", true, false, 1.1, -0.1]) {
-    const runtime = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score } });
-    const result = runtime.context.submitOrder(validForm({ referenceImage: imageBlob() }));
-    assert.match(result.errors.captcha, /Captcha/);
-    assert.equal(runtime.state.fileCreates, 0);
-    assert.equal(runtime.state.appendCalls, 0);
-  }
+test("an order with no captchaToken still hits validation, the daily cap, and the kill switch", () => {
+  const invalid = makeRuntime({ captchaThrows: true });
+  assert.equal(invalid.context.submitOrder(validForm({ captchaToken: "", phone: "1" })).ok, false);
+  assert.equal(invalid.state.appendCalls, 0);
+  const daily = makeRuntime({ properties: { DAILY_ACCEPTANCE_CAP: "1" }, rows: [["old", "fingerprint", new Date(), "catalogue", "id"]], captchaThrows: true });
+  assert.match(daily.context.submitOrder(validForm({ captchaToken: "" })).errors.form, /daily request limit/);
+  const disabled = makeRuntime({ properties: { ORDER_FORM_DISABLED: "true" }, captchaThrows: true });
+  assert.equal(disabled.context.submitOrder(validForm({ captchaToken: "" })).ok, false);
+  assert.equal(disabled.state.appendCalls, 0);
 });
 
 test("neutralizes every spreadsheet formula prefix while leaving ordinary text unchanged", () => {
@@ -506,16 +497,10 @@ function imageBlob(bytes = [-1, -40, -1, 0]) {
   };
 }
 
-test("rejects disabled intake, wrong-host CAPTCHA, daily cap, and lock contention before writes", () => {
+test("rejects disabled intake, daily cap, and lock contention before writes", () => {
   const disabled = makeRuntime({ properties: { ORDER_FORM_DISABLED: "true" } });
   assert.equal(disabled.context.submitOrder(validForm()).ok, false);
   assert.equal(disabled.state.appendCalls, 0);
-  const invalidCaptcha = makeRuntime({ captchaResponse: { success: false, hostname: "saloniresinart.com" } });
-  assert.match(invalidCaptcha.context.submitOrder(validForm()).errors.captcha, /Captcha/);
-  assert.equal(invalidCaptcha.state.appendCalls, 0);
-  const wrongHost = makeRuntime({ captchaResponse: { success: true, hostname: "wrong.example", score: 0.9 } });
-  assert.match(wrongHost.context.submitOrder(validForm()).errors.captcha, /Captcha/);
-  assert.equal(wrongHost.state.appendCalls, 0);
   const daily = makeRuntime({ properties: { DAILY_ACCEPTANCE_CAP: "1" }, rows: [["old", "fingerprint", new Date(), "catalogue", "id"]] });
   assert.match(daily.context.submitOrder(validForm()).errors.form, /daily request limit/);
   assert.equal(daily.state.appendCalls, 0);

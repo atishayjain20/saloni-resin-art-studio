@@ -138,6 +138,11 @@ test("retention keeps the source order when a commission conflict cannot be reco
   assert.equal(runtime.orderSheet.rows.length, 1);
 });
 
+test("a partner application with no captcha token is still refused", () => {
+  const runtime = partnerRuntime();
+  assert.match(runtime.context.submitPartnerApplication(Object.assign(applicationForm(), { captchaToken: "" })).errors.captcha, /Captcha/);
+});
+
 test("applications, setup, and protection use the configured default contract", () => {
   const runtime = partnerRuntime({ setup: true });
   const application = applicationForm();

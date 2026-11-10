@@ -624,9 +624,6 @@ function submitOrder(form) {
   var validation = validatePayload_(payload);
   if (Object.keys(validation.errors).length) return validationFailure_(validation.errors);
 
-  var captcha = verifyCaptcha_(payload.captchaToken, properties);
-  if (!captcha.ok) return validationFailure_({ captcha: captcha.error });
-
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error("Unable to confirm order request.");
 
@@ -1920,7 +1917,6 @@ function collectPayload_(form) {
     requestedDate: stringValue_(form.requestedDate),
     referralCode: normalizeReferralCode_(form.referralCode),
     bundleSourceIds: stringValue_(form.bundleSourceIds),
-    captchaToken: stringValue_(form.captchaToken),
     referenceImage: normalizeReferenceImage_(form.referenceImage)
   };
 }
