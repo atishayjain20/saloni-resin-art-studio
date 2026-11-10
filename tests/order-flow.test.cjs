@@ -105,6 +105,8 @@ function createStorage(initial = {}) {
   };
 }
 
+const CATALOGUE_PREPARE_DELAY_MS = 600;
+
 function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "", diwaliOffer = false } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
@@ -326,6 +328,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const photoTrigger = () => ({ getAttribute: (name) => (name === "data-ai-images" ? aiImages : null) });
   if (aiImages) [card, premiumCards[0]].forEach((photoCard) => { photoCard.lightboxTrigger = photoTrigger(); });
   const posted = [];
+  const scheduledTimers = [];
+  const pendingCataloguePrepares = () => scheduledTimers.filter((timer) => !timer.cleared && timer.delay === CATALOGUE_PREPARE_DELAY_MS);
   const customizerOutcomes = [];
   const body = { appendChild() {}, removeChild() {} };
   const windowObject = {
@@ -360,8 +364,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     matchMedia: () => ({ matches: true }),
     confirm: () => confirms.length ? confirms.shift() : true,
     addEventListener(type, listener) { if (type === "message") this.messageListener = listener; if (type === "popstate") { this.popstateListener = listener; this.history._listener = listener; } },
-    setTimeout: () => 1,
-    clearTimeout() {},
+    setTimeout(callback, delay) { scheduledTimers.push({ callback, delay, cleared: false }); return scheduledTimers.length; },
+    clearTimeout(id) { if (scheduledTimers[id - 1]) scheduledTimers[id - 1].cleared = true; },
     grecaptcha: { ready(callback) { callback(); }, execute() { return Promise.resolve("parent-token"); } },
   };
   if (diwaliOffer) elements.set("diwali-offer-bar", { id: "diwali-offer-bar", hidden: false });
@@ -401,7 +405,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const premiumQuoteButtons = premiumCards.map((premiumCard) => premiumCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "quote"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { elements, photoTriggers: [card.lightboxTrigger, premiumCards[0].lightboxTrigger], premiumCards, premiumQuoteButtons, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
+  const flushCatalogueSeed = () => pendingCataloguePrepares().forEach((timer) => { timer.cleared = true; timer.callback(); });
+  return { flushCatalogueSeed, pendingCataloguePrepares, elements, photoTriggers: [card.lightboxTrigger, premiumCards[0].lightboxTrigger], premiumCards, premiumQuoteButtons, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
@@ -433,8 +438,10 @@ test("opens a general custom-gift enquiry through the existing catalogue seed co
 test("builds one deterministic request for multiple catalogue selections", () => {
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
   assert.equal(flow.posted.length, 1);
   flow.generatedCatalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
   assert.equal(flow.posted.length, 2);
   assert.equal(flow.catalogueSelection.hidden, false);
   assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
@@ -465,7 +472,8 @@ test("dedupes and removes catalogue selections before requesting the remaining i
   flow.catalogueButton.dispatch("click");
   assert.match(flow.catalogueSelectionSummary.textContent, /1 item selected/);
   flow.catalogueRequestSelected.dispatch("click");
-  assert.equal(flow.posted.length, 4);
+  assert.equal(flow.posted.length, 1, "rapid cart changes do not seed; Order now seeds the final cart once");
+  assert.equal(flow.pendingCataloguePrepares().length, 0, "Order now cancels the pending background seed");
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.productName, "Your flowers, held close");
   assert.doesNotMatch(seed.designDetails, /Test frame/);
@@ -516,11 +524,12 @@ test("keeps the loader after the iframe navigation loads and clears it after a 2
   assert.equal(status.hidden, false);
   assert.equal(frame.hidden, true);
   const timersBeforeLoad = timers.length;
+  const clearedBeforeLoad = cleared.length;
   frame.dispatch("load");
   assert.equal(frame.hidden, false);
   assert.equal(status.hidden, false);
   assert.equal(status.getAttribute("aria-busy"), "true");
-  assert.deepEqual(cleared.length, 1);
+  assert.deepEqual(cleared.length, clearedBeforeLoad + 1);
   assert.equal(timers.length, timersBeforeLoad + 1);
   assert.equal(timers.at(-1).delay, 2500);
   timers.at(-1).callback();
@@ -1026,7 +1035,9 @@ test("cart marks price ranges as from-prices and keeps price-on-request items ou
 test("fixed cart Order now opens the existing selected-items request without reseeding", () => {
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
   const submittedBeforeOrder = flow.posted.length;
+  assert.equal(submittedBeforeOrder, 1);
   flow.catalogueCartOrder.dispatch("click");
   assert.equal(flow.posted.length, submittedBeforeOrder);
   assert.equal(flow.orderDialog.open, true);
@@ -1310,10 +1321,13 @@ test("keeps the existing order and Partner Circle seed paths active", () => {
 test("prepares the cart request on add and replaces it without confirmation or duplicate submission", () => {
   const flow = runFlow({ confirms: [false] });
   flow.catalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
   const first = submittedSeed(flow.posted);
   flow.catalogueRequestSelected.dispatch("click");
   assert.equal(flow.posted.length, 1);
+  flow.orderDialog.close();
   flow.generatedCatalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
   const second = submittedSeed(flow.posted);
   assert.equal(flow.posted.length, 2);
   assert.notEqual(second.requestId, first.requestId);
@@ -1327,6 +1341,81 @@ test("does not preload a catalogue request when the form is not configured", () 
   flow.catalogueButton.dispatch("click");
   assert.equal(flow.posted.length, 0);
   flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(flow.posted.length, 0);
+});
+
+test("adding to the cart seeds the order form in the background after a short pause without opening the dialog", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.posted.length, 0, "nothing is sent until the cart settles");
+  assert.deepEqual(flow.pendingCataloguePrepares().map((timer) => timer.delay), [600]);
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 1);
+  assert.equal(flow.orderDialog.open, false, "the dialog stays closed");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.sourceId, "catalogue:multi-item");
+  assert.deepEqual(seed.bundleItems.map((item) => item.sourceId), ["catalogue:test-frame.png"]);
+});
+
+test("rapid cart changes are debounced into one background seed of the final cart", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.generatedCatalogueButton.dispatch("click");
+  flow.generatedCatalogueButtons[1].dispatch("click");
+  assert.equal(flow.pendingCataloguePrepares().length, 1, "each change replaces the earlier pending seed");
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 1);
+  assert.equal(submittedSeed(flow.posted).bundleItems.length, 3);
+  const quantity = flow.catalogueSelectionItems.children[0].querySelector("input");
+  quantity.value = "3";
+  quantity.dispatch("change");
+  assert.equal(flow.posted.length, 1);
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 2, "a quantity change reseeds after the pause");
+  assert.equal(submittedSeed(flow.posted).quantity, "5");
+});
+
+test("Order now with an unchanged cart opens the prepared form without a second seed", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
+  const prepared = flow.posted.length;
+  flow.catalogueCartOrder.dispatch("click");
+  assert.equal(flow.posted.length, prepared);
+  assert.equal(flow.orderDialog.open, true);
+  assert.equal(flow.pendingCataloguePrepares().length, 0);
+});
+
+test("Order now pressed before the pause seeds the current cart once and cancels the pending seed", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueCartOrder.dispatch("click");
+  assert.equal(flow.posted.length, 1);
+  assert.equal(flow.orderDialog.open, true);
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 1, "the cancelled background seed never fires");
+});
+
+test("Order now reseeds when the cart changed after the form was prepared", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 1);
+  flow.generatedCatalogueButton.dispatch("click");
+  flow.catalogueCartOrder.dispatch("click");
+  assert.equal(flow.posted.length, 2);
+  assert.equal(flow.orderDialog.open, true);
+  assert.deepEqual(submittedSeed(flow.posted).bundleItems.map((item) => item.sourceId).sort(), ["catalogue:concept-floral-memory-frame.webp", "catalogue:test-frame.png"]);
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 2);
+});
+
+test("emptying the cart cancels the pending background seed", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueButton.dispatch("click");
+  assert.equal(flow.pendingCataloguePrepares().length, 0);
+  flow.flushCatalogueSeed();
   assert.equal(flow.posted.length, 0);
 });
 
@@ -1914,10 +2003,12 @@ test("restores an older saved cart that has no photo field", () => {
 test("prepares the request with the new colour after the item is removed and added again", () => {
   const flow = runFlow({ aiImages: "emerald styled" });
   flow.catalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
   const before = flow.posted.length;
   flow.catalogueButton.dispatch("click");
   flow.photoTriggers[0].__saloniPhotoName = "emerald";
   flow.catalogueButton.dispatch("click");
+  flow.flushCatalogueSeed();
   assert.ok(flow.posted.length > before, "the form is prepared again for the new colour");
   assert.equal(submittedSeed(flow.posted).bundleItems[0].productName, EMERALD_NAME);
 });

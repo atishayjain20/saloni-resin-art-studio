@@ -804,6 +804,11 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("Online orders only", self.html)
         self.assertNotIn("no customer visits", self.html)
 
+    def test_home_page_preconnects_to_the_order_form_hosts(self):
+        head = self.html.split("</head>")[0]
+        self.assertIn('<link rel="preconnect" href="https://script.google.com">', head)
+        self.assertIn('<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>', head)
+
     def test_hero_banner_images_exist_with_real_dimensions_and_loading_rules(self):
         hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html)
         self.assertIsNotNone(hero)
