@@ -1063,3 +1063,23 @@ test("testOrderAlerts_ sends one labelled TEST WhatsApp and email with sample da
   assert.equal(runtime.rows.length, 0);
   assert.equal(/testOrderAlerts_/.test(runtime.context.doGet.toString() + runtime.context.doPost.toString()), false);
 });
+
+test("testOrderAlerts sends the TEST alerts only when the owner runs it from the editor", () => {
+  const owner = makeRuntime({ properties: ALERT_PROPERTIES, activeEmail: "owner@example.com", effectiveEmail: "owner@example.com" });
+  owner.context.testOrderAlerts();
+  assert.equal(owner.state.whatsappFetches.length, 1);
+  assert.equal(owner.state.emails.length, 1);
+  assert.ok(new URL(owner.state.whatsappFetches[0].url).searchParams.get("text").includes("TEST"));
+  assert.match(owner.state.emails[0].message.subject, /TEST/);
+});
+
+test("testOrderAlerts refuses a web visitor or a different user and sends nothing", () => {
+  for (const emails of [{ activeEmail: "", effectiveEmail: "owner@example.com" }, { activeEmail: "", effectiveEmail: "" }, { activeEmail: "stranger@example.com", effectiveEmail: "owner@example.com" }]) {
+    const runtime = makeRuntime(Object.assign({ properties: ALERT_PROPERTIES }, emails));
+    assert.throws(() => runtime.context.testOrderAlerts(), /Run this from the Apps Script editor as the owner\./);
+    assert.equal(runtime.state.whatsappFetches.length, 0);
+    assert.equal(runtime.state.emails.length, 0);
+  }
+  const runtime = makeRuntime();
+  assert.equal(/testOrderAlerts/.test(runtime.context.doGet.toString() + runtime.context.doPost.toString()), false);
+});

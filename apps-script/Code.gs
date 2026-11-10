@@ -779,7 +779,16 @@ function sendEmailAlert_(payload, receivedAt, referenceFile, properties) {
   });
 }
 
-// Editor-run only: sends one TEST alert so the owner can approve mail access and check delivery.
+// Public so it shows in the editor Run menu. Web visitors have an empty active user, so they are refused.
+function testOrderAlerts() {
+  var active = String(Session.getActiveUser().getEmail() || "");
+  if (!active || active !== String(Session.getEffectiveUser().getEmail() || "")) {
+    throw new Error("Run this from the Apps Script editor as the owner.");
+  }
+  testOrderAlerts_();
+}
+
+// Sends one TEST alert so the owner can approve mail access and check delivery.
 function testOrderAlerts_() {
   var properties = PropertiesService.getScriptProperties();
   var payload = collectPayload_({

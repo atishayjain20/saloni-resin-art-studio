@@ -59,7 +59,7 @@ When a new order is saved, Saloni gets a WhatsApp message (free CallMeBot API) a
 
 1. Get a CallMeBot key: send "I allow callmebot to send me messages" to the CallMeBot WhatsApp number from the instructions at callmebot.com, and CallMeBot replies with an API key.
 2. In **Project Settings → Script properties**, set `WHATSAPP_CALLMEBOT_KEY` to that key. Optional: `WHATSAPP_CALLMEBOT_PHONE` (default `918209238541`, country code first, no `+`) and `ORDER_ALERT_EMAIL` (default: the script owner's email). With no key, WhatsApp is skipped and email still goes out.
-3. Run `testOrderAlerts_` once from the Apps Script editor. It sends one clearly labelled TEST alert and asks you to approve the email permission.
+3. In the Apps Script editor choose `testOrderAlerts` in the Run menu → Run → approve the permission prompt; a TEST WhatsApp and email should arrive. It only works when the owner runs it from the editor.
 
 The WhatsApp text passes through a third party, so it has only the product, quantity, the customer's first name, "Pickup in Ajmer" or the city, a short request code, and the Orders sheet link. It never has the phone, email, address, or design notes; the email has the full details.
 
