@@ -434,6 +434,8 @@ function makeRuntime(options = {}) {
       if (index >= 0) folderFiles.splice(index, 1);
     } } },
     ScriptApp: {
+      AuthMode: { FULL: "FULL" },
+      requireScopes: (mode, scopes) => { (state.requiredScopes || (state.requiredScopes = [])).push({ mode, scopes }); },
       getProjectTriggers: () => options.triggers || [],
       newTrigger: (handler) => {
         const builder = {
@@ -1067,6 +1069,7 @@ test("testOrderAlerts_ sends one labelled TEST WhatsApp and email with sample da
 test("testOrderAlerts sends the TEST alerts only when the owner runs it from the editor", () => {
   const owner = makeRuntime({ properties: ALERT_PROPERTIES, activeEmail: "owner@example.com", effectiveEmail: "owner@example.com" });
   owner.context.testOrderAlerts();
+  assert.deepEqual(JSON.parse(JSON.stringify(owner.state.requiredScopes)), [{ mode: "FULL", scopes: ["https://www.googleapis.com/auth/script.send_mail", "https://www.googleapis.com/auth/script.external_request"] }], "asks Google to show the permission screen for mail and outbound calls");
   assert.equal(owner.state.whatsappFetches.length, 1);
   assert.equal(owner.state.emails.length, 1);
   assert.ok(new URL(owner.state.whatsappFetches[0].url).searchParams.get("text").includes("TEST"));
@@ -1077,6 +1080,7 @@ test("testOrderAlerts refuses a web visitor or a different user and sends nothin
   for (const emails of [{ activeEmail: "", effectiveEmail: "owner@example.com" }, { activeEmail: "", effectiveEmail: "" }, { activeEmail: "stranger@example.com", effectiveEmail: "owner@example.com" }]) {
     const runtime = makeRuntime(Object.assign({ properties: ALERT_PROPERTIES }, emails));
     assert.throws(() => runtime.context.testOrderAlerts(), /Run this from the Apps Script editor as the owner\./);
+    assert.equal(runtime.state.requiredScopes, undefined, "strangers never trigger a permission prompt");
     assert.equal(runtime.state.whatsappFetches.length, 0);
     assert.equal(runtime.state.emails.length, 0);
   }

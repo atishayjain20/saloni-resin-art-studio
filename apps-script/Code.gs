@@ -785,6 +785,8 @@ function testOrderAlerts() {
   if (!active || active !== String(Session.getEffectiveUser().getEmail() || "")) {
     throw new Error("Run this from the Apps Script editor as the owner.");
   }
+  // Shows Google's permission screen if mail or outbound-call access was never granted for this project.
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ["https://www.googleapis.com/auth/script.send_mail", "https://www.googleapis.com/auth/script.external_request"]);
   testOrderAlerts_();
 }
 
