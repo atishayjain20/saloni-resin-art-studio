@@ -2298,7 +2298,7 @@ class ResponsiveCardImageTests(unittest.TestCase):
     """Card photos offer a 540 px copy (covers a 171 px card on a 3x phone), while src and the popup keep the full photo."""
 
     PAGES = {
-        "index.html": 68,
+        "index.html": 79,
         "corporate-gifting/index.html": 3,
         "resin-photo-frames/index.html": 2,
     }
@@ -2342,7 +2342,25 @@ class ResponsiveCardImageTests(unittest.TestCase):
                     self.assertLessEqual(abs(small_height / small_width - original_height / original_width), 0.01)
                     self.assertLessEqual(small_path.stat().st_size, original.stat().st_size * 0.75, "copy must save 25% or more")
                     self.assertRegex(attrs.get("sizes", ""), r"\d+(px|vw)")
-                    self.assertEqual(attrs.get("loading"), "lazy")
+                    self.assertIn(attrs.get("loading"), ("lazy", "eager"))
+
+    def test_hero_photos_over_the_card_width_use_the_small_copy(self):
+        html_text = (ROOT / "index.html").read_text(encoding="utf-8")
+        hero = re.search(r'<section\b[^>]*class="hero-banner\b[\s\S]*?</section>', html_text).group(0)
+        images = re.findall(r"<img\b[^>]*>", hero)
+        self.assertEqual(len(images), 15)
+        with_copy = 0
+        for tag in images:
+            attrs = dict(re.findall(r'([\w-]+)="([^"]*)"', tag))
+            if "srcset" not in attrs:
+                continue
+            with_copy += 1
+            self.assertEqual(attrs["sizes"], "(max-width: 1440px) 30.5vw, 439px")
+            self.assertTrue(attrs["srcset"].startswith(f"assets/card/{Path(attrs['src']).name} {self.CARD_WIDTH}w, "))
+        self.assertEqual(with_copy, 11)
+        first = images[0]
+        self.assertIn('loading="eager"', first)
+        self.assertIn('fetchpriority="high"', first)
 
     def test_card_popup_link_still_opens_the_full_photo(self):
         html_text = (ROOT / "index.html").read_text(encoding="utf-8")
