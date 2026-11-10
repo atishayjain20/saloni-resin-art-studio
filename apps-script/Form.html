@@ -587,7 +587,7 @@
       google.script.run.withSuccessHandler(function (result) {
         if (requestVersion !== referralCheckVersion || normalizeReferralCode(referralInput.value) !== requested) return;
         checkReferral.disabled = false;
-        if (result && result.status === "active") { referralAcceptedCode = requested; showReferralStatus("Code accepted for " + String(result.displayName || "this partner") + ".", "success"); }
+        if (result && result.status === "active") { referralAcceptedCode = requested; showReferralStatus("Code accepted.", "success"); }
         else if (result && result.status === "error") { referralAcceptedCode = ""; showReferralStatus("Could not check the code; retry or clear it to continue without partner credit.", "error"); }
         else if (result && result.status === "paused") { referralAcceptedCode = ""; showReferralStatus("This code is paused. The order can continue without partner credit.", "error"); }
         else { referralAcceptedCode = ""; showReferralStatus("This code is not active. The order can continue without partner credit.", "error"); }

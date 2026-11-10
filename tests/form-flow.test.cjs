@@ -1219,12 +1219,13 @@ test("clears accepted referral status on edits and ignores stale lookup response
   check.dispatch("click");
   assert.equal(runtime.lookupCallbacks.length, 1);
   runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA", displayName: "Studio A" });
-  assert.match(runtime.elements.get("referral-status").textContent, /accepted for Studio A/);
+  assert.equal(runtime.elements.get("referral-status").textContent, "Code accepted.");
+  assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /Studio A/);
   code.value = "UNKNOWN";
   code.dispatch("input");
-  assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /accepted for Studio A/);
+  assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /Code accepted/);
   runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA", displayName: "Studio A" });
-  assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /accepted for Studio A/);
+  assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /Code accepted|Studio A/);
 });
 
 test("late success completes and late failure restores the original attempt after an advisory timeout", async () => {

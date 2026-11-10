@@ -62,7 +62,7 @@ test("returns only public active-code fields and rejects duplicate configuration
   };
   vm.createContext(context);
   vm.runInContext(code, context, { filename: "Code.gs" });
-  assert.deepEqual(JSON.parse(JSON.stringify(context.validateReferralCode(" ajmerphoto01 "))), { status: "active", code: "AJMERPHOTO01", displayName: "Ajmer Photo Studio" });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.validateReferralCode(" ajmerphoto01 "))), { status: "active", code: "AJMERPHOTO01" });
   assert.deepEqual(JSON.parse(JSON.stringify(context.validateReferralCode("unknown01"))), { status: "invalid", code: "UNKNOWN01" });
   rows.push(["partner-2", "AJMERPHOTO01", "Duplicate", "", "Photographer", "Ajmer", "", "", "", 0.05, "Active", new Date(), "", "", ""]);
   assert.deepEqual(JSON.parse(JSON.stringify(context.validateReferralCode("AJMERPHOTO01"))), { status: "error", code: "AJMERPHOTO01" });
@@ -472,6 +472,240 @@ test("setup reruns protections and fails closed, while application retry and cap
   assert.match(result.errors.form, /limit/i);
 });
 
+const REFERRAL_LINK_PREFIX = "https://saloniresinart.com/?ref=";
+
+test("a new application is approved at once and returns the referral code and link", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const result = runtime.context.submitPartnerApplication(applicationForm());
+  assert.equal(result.ok, true);
+  assert.equal(result.applicationId, "application-123456");
+  assert.match(result.referralCode, /^[A-Z0-9][A-Z0-9_-]{2,31}$/);
+  assert.match(result.referralCode, /^ASHASTUD[A-Z0-9]{4}$/);
+  assert.equal(result.referralLink, REFERRAL_LINK_PREFIX + result.referralCode);
+  assert.equal(runtime.partnerRows.length, 1);
+  const partner = runtime.partnerRows[0];
+  assert.equal(partner[0], "partner-application-123456");
+  assert.equal(partner[1], result.referralCode);
+  assert.equal(partner[9], 0.1);
+  assert.equal(partner[10], "Active");
+  assert.equal(partner[12], result.referralLink);
+  assert.equal(runtime.applicationRows.length, 1);
+  assert.equal(runtime.applicationRows[0][12], "Approved");
+  assert.equal(runtime.applicationRows[0][13], "Auto-approved on application");
+  assert.equal(runtime.applicationRows[0][16], "partner-application-123456");
+  assert.equal(runtime.lock.held, false);
+});
+
+test("a replayed application returns the same code and link without a second partner", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const first = runtime.context.submitPartnerApplication(applicationForm());
+  const second = runtime.context.submitPartnerApplication(applicationForm());
+  assert.equal(second.ok, true);
+  assert.equal(second.referralCode, first.referralCode);
+  assert.equal(second.referralLink, first.referralLink);
+  assert.equal(second.receivedAt, first.receivedAt);
+  assert.equal(runtime.partnerRows.length, 1);
+  assert.equal(runtime.applicationRows.length, 1);
+  const changed = Object.assign(applicationForm(), { referralPlan: "A different plan" });
+  assert.match(runtime.context.submitPartnerApplication(changed).errors.applicationId, /conflict/i);
+  assert.equal(runtime.partnerRows.length, 1);
+});
+
+test("a code collision retries with a new suffix and still approves", () => {
+  const taken = ["partner-9", "ASHASTUDAAAA", "Other", "", "photographer", "Ajmer", "", "", "", 0.1, "Active", new Date("2026-10-01"), REFERRAL_LINK_PREFIX + "ASHASTUDAAAA", "", ""];
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [taken] });
+  let calls = 0;
+  runtime.context.Math = { floor: Math.floor, random: () => (calls++ < 4 ? 0 : 0.999) };
+  const result = runtime.context.submitPartnerApplication(applicationForm());
+  assert.equal(result.referralCode, "ASHASTUD9999");
+  assert.equal(runtime.partnerRows.length, 2);
+  assert.equal(runtime.partnerRows[1][1], "ASHASTUD9999");
+  assert.equal(runtime.applicationRows[0][12], "Approved");
+  const exhausted = partnerRuntime({ applicationRows: [], partnerRows: [taken] });
+  exhausted.context.Math = { floor: Math.floor, random: () => 0 };
+  const failed = exhausted.context.submitPartnerApplication(applicationForm());
+  assert.equal(failed.ok, true);
+  assert.equal(failed.referralCode, undefined);
+  assert.equal(exhausted.partnerRows.length, 1);
+  assert.equal(exhausted.applicationRows[0][12], "Pending");
+});
+
+test("when approval fails after storing, the result is ok without a link and a replay finishes it", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const approve = runtime.context.approvePartnerLocked_;
+  runtime.context.approvePartnerLocked_ = () => { throw new Error("secret internal sheet failure"); };
+  const result = runtime.context.submitPartnerApplication(applicationForm());
+  assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(result))).sort(), ["applicationId", "ok", "receivedAt"]);
+  assert.equal(result.ok, true);
+  assert.doesNotMatch(JSON.stringify(result), /secret|internal/);
+  assert.equal(runtime.applicationRows.length, 1);
+  assert.equal(runtime.applicationRows[0][12], "Pending");
+  assert.equal(runtime.partnerRows.length, 0);
+  assert.equal(runtime.lock.held, false);
+  runtime.context.approvePartnerLocked_ = approve;
+  const replay = runtime.context.submitPartnerApplication(applicationForm());
+  assert.match(replay.referralCode, /^ASHASTUD[A-Z0-9]{4}$/);
+  assert.equal(replay.referralLink, REFERRAL_LINK_PREFIX + replay.referralCode);
+  assert.equal(runtime.partnerRows.length, 1);
+  assert.equal(runtime.applicationRows.length, 1);
+  assert.equal(runtime.applicationRows[0][12], "Approved");
+});
+
+test("a replay after a half-finished approval reuses the existing partner row", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [], failApplicationUpdateOnce: true });
+  const first = runtime.context.submitPartnerApplication(applicationForm());
+  assert.equal(first.referralCode, undefined);
+  assert.equal(runtime.partnerRows.length, 1);
+  const replay = runtime.context.submitPartnerApplication(applicationForm());
+  assert.equal(replay.referralCode, runtime.partnerRows[0][1]);
+  assert.equal(runtime.partnerRows.length, 1);
+  assert.equal(runtime.applicationRows[0][12], "Approved");
+});
+
+test("referral codes fall back to the applicant name, then to PARTNER", () => {
+  const byApplicant = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const named = byApplicant.context.submitPartnerApplication(Object.assign(applicationForm(), { businessName: "!!!" }));
+  assert.match(named.referralCode, /^ASHA[A-Z0-9]{4}$/);
+  const anonymous = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const fallback = anonymous.context.submitPartnerApplication(Object.assign(applicationForm(), { businessName: "!!!", applicantName: "??" }));
+  assert.match(fallback.referralCode, /^PARTNER[A-Z0-9]{4}$/);
+  const long = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const trimmed = long.context.submitPartnerApplication(Object.assign(applicationForm(), { businessName: "Wedding Planners of Ajmer & Jaipur" }));
+  assert.match(trimmed.referralCode, /^WEDDINGP[A-Z0-9]{4}$/);
+});
+
+test("disabled, captcha, validation and daily-cap paths create no partner", () => {
+  const disabled = partnerRuntime({ applicationRows: [], partnerRows: [], properties: { PARTNER_FORM_DISABLED: "true" } });
+  assert.match(disabled.context.submitPartnerApplication(applicationForm()).errors.form, /paused/i);
+  const captcha = partnerRuntime({ applicationRows: [], partnerRows: [], captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 } });
+  assert.match(captcha.context.submitPartnerApplication(applicationForm()).errors.captcha, /Captcha/);
+  const invalid = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  assert.ok(invalid.context.submitPartnerApplication(Object.assign(applicationForm(), { phone: "1" })).errors.phone);
+  const capped = partnerRuntime({ partnerRows: [], properties: { PARTNER_DAILY_ACCEPTANCE_CAP: "1" }, applicationRows: [["old-application", new Date(), "Asha", "Asha Studio", "photographer", "Ajmer", "8209238541", "asha@example.com", "https://example.com", "Families", "Plan", true, "Pending", "", "", "fingerprint", ""]] });
+  assert.match(capped.context.submitPartnerApplication(applicationForm()).errors.form, /limit/i);
+  [disabled, captcha, invalid, capped].forEach((runtime) => assert.equal(runtime.partnerRows.length, 0));
+  assert.equal(disabled.applicationRows.length + captcha.applicationRows.length + invalid.applicationRows.length, 0);
+  assert.equal(capped.applicationRows.length, 1);
+});
+
+test("an auto-approved partner can still be paused and the page says the link comes at once", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  runtime.context.submitPartnerApplication(applicationForm());
+  assert.equal(runtime.context.pausePartner_("partner-application-123456", "Paused", "Paused by Saloni"), true);
+  assert.equal(runtime.partnerRows[0][10], "Paused");
+  const page = fs.readFileSync(path.join(root, "partners", "index.html"), "utf8");
+  const form = fs.readFileSync(path.join(root, "apps-script", "PartnerForm.html"), "utf8");
+  assert.match(page, /right after you apply/i);
+  assert.match(page, /may pause or close a partnership/i);
+  assert.doesNotMatch(page + form, /reviews? applications manually|approval is not automatic|After Saloni reviews the application|Saloni approves applications manually/i);
+  assert.match(page, /monthly.*manual payout/i);
+});
+
+class PartnerFakeElement {
+  constructor(id, name, value = "") {
+    this.id = id; this.name = name || id; this.value = value; this.hidden = false; this.disabled = false; this.checked = false;
+    this.listeners = {}; this.attributes = {}; this.children = []; this.parentNode = null; this.focused = false; this.className = ""; this._text = "";
+  }
+  get textContent() { return this._text; }
+  set textContent(value) { this._text = String(value); this.children = []; }
+  set innerHTML(_value) { throw new Error("innerHTML must not be used"); }
+  addEventListener(type, listener) { this.listeners[type] = listener; }
+  dispatch(type) { return this.listeners[type]({ target: this, preventDefault() {} }); }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+  getAttribute(name) { return this.attributes[name] || ""; }
+  removeAttribute(name) { delete this.attributes[name]; }
+  appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
+  remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((child) => child !== this); }
+  focus() { this.focused = true; }
+}
+
+function makePartnerFormRuntime(options = {}) {
+  const html = fs.readFileSync(path.join(root, "apps-script", "PartnerForm.html"), "utf8");
+  const source = html.match(/<script>\n([\s\S]*?)\n<\/script>/)[1].replace(/<\?!= captchaEnabledJson \?>/g, "true").replace(/<\?!= captchaSiteKeyJson \?>/g, '"site-key"');
+  const ids = ["application-id", "captcha-token", "form-status", "submit-button", "another-button", "referral-result", "seed-data", "applicant-name"];
+  const elements = new Map(ids.map((id) => [id, new PartnerFakeElement(id)]));
+  elements.get("referral-result").hidden = true; elements.get("another-button").hidden = true;
+  elements.get("seed-data").textContent = JSON.stringify({ applicationId: "application-seed-123", channelNonce: "nonce-seed-123456" });
+  const fieldNames = { applicantName: "Asha", businessName: "Asha Studio", category: "Planner", serviceArea: "Ajmer", phone: "8209238541", email: "", website: "", typicalCustomers: "Couples", referralPlan: "Share", applicationId: "", captchaToken: "" };
+  const fields = {};
+  Object.keys(fieldNames).forEach((name) => { fields[name] = new PartnerFakeElement(name, name, fieldNames[name]); });
+  fields.applicationId = elements.get("application-id"); fields.captchaToken = elements.get("captcha-token");
+  fields.rulesAccepted = new PartnerFakeElement("rules-accepted", "rulesAccepted"); fields.rulesAccepted.checked = true;
+  const form = new PartnerFakeElement("partner-form"); form.elements = fields;
+  const fieldsets = [new PartnerFakeElement("fieldset")];
+  form.querySelectorAll = (selector) => selector === "fieldset, #submit-button, #captcha-token" ? fieldsets.concat([elements.get("submit-button"), elements.get("captcha-token")]) : [];
+  form.reset = () => {};
+  elements.set("partner-form", form);
+  const callbacks = [];
+  const run = { withSuccessHandler(callback) { this.success = callback; return this; }, withFailureHandler(callback) { this.failure = callback; return this; }, submitPartnerApplication() { callbacks.push({ success: this.success, failure: this.failure }); return this; } };
+  const clipboardWrites = [];
+  const selections = [];
+  const navigatorObject = options.clipboard === false ? {} : { clipboard: { writeText: (text) => { clipboardWrites.push(text); return options.clipboardReject ? Promise.reject(new Error("denied")) : Promise.resolve(); } } };
+  const parentMessages = [];
+  const channels = [];
+  const windowObject = {
+    crypto: { randomUUID: () => "partner-attempt-1" }, setTimeout: () => 1, clearTimeout() {}, navigator: navigatorObject,
+    MessageChannel: class { constructor() { this.port1 = { close() {} }; this.port2 = {}; channels.push(this); } },
+    top: { postMessage(message, _origin, ports) { parentMessages.push({ message, port: ports && ports[0] }); } },
+    getSelection: () => ({ removeAllRanges() {}, addRange(range) { selections.push(range.node); } }),
+  };
+  const documentObject = {
+    getElementById: (id) => elements.get(id) || null, createElement: (tag) => { const element = new PartnerFakeElement(tag); element.tagName = tag; return element; },
+    createRange: () => ({ node: null, selectNodeContents(node) { this.node = node; } }), execCommand: () => false,
+  };
+  const context = { console, document: documentObject, window: windowObject, navigator: navigatorObject, google: { script: { run } }, Promise };
+  vm.createContext(context);
+  vm.runInContext(source, context, { filename: "PartnerForm.html" });
+  form.dispatch("submit");
+  const request = parentMessages.find((entry) => entry.message.type === "saloni-order-captcha-request").message;
+  channels[0].port1.onmessage({ data: { type: "saloni-order-captcha-response", nonce: request.nonce, attemptId: request.attemptId, ok: true, token: "captcha-token" } });
+  return { elements, status: elements.get("form-status"), box: elements.get("referral-result"), callbacks, clipboardWrites, selections, another: elements.get("another-button") };
+}
+
+test("the partner form shows the referral link with a copy button and no innerHTML", async () => {
+  const link = REFERRAL_LINK_PREFIX + "ASHASTUD7K2M";
+  const runtime = makePartnerFormRuntime();
+  assert.equal(runtime.callbacks.length, 1);
+  runtime.callbacks[0].success({ ok: true, applicationId: "application-seed-123", receivedAt: "now", referralCode: "ASHASTUD7K2M", referralLink: link });
+  assert.equal(runtime.status.textContent, "You're in! Your referral link:");
+  assert.equal(runtime.box.hidden, false);
+  const anchor = runtime.box.children.find((child) => child.tagName === "a");
+  const copy = runtime.box.children.find((child) => child.tagName === "button");
+  assert.equal(anchor.textContent, link);
+  assert.equal(anchor.getAttribute("href"), link);
+  assert.equal(copy.textContent, "Copy link");
+  assert.match(runtime.box.children.map((child) => child.textContent).join(" "), /couples/i);
+  copy.dispatch("click");
+  await Promise.resolve();
+  assert.deepEqual(runtime.clipboardWrites, [link]);
+  assert.equal(copy.textContent, "Copied");
+  runtime.another.dispatch("click");
+  assert.equal(runtime.box.hidden, true);
+  assert.equal(runtime.box.children.length, 0);
+  assert.equal(runtime.status.textContent, "");
+});
+
+test("the partner form selects the link when the clipboard is unavailable and ignores unexpected links", async () => {
+  const link = REFERRAL_LINK_PREFIX + "ASHASTUD7K2M";
+  const runtime = makePartnerFormRuntime({ clipboard: false });
+  runtime.callbacks[0].success({ ok: true, applicationId: "application-seed-123", referralCode: "ASHASTUD7K2M", referralLink: link });
+  const anchor = runtime.box.children.find((child) => child.tagName === "a");
+  runtime.box.children.find((child) => child.tagName === "button").dispatch("click");
+  assert.deepEqual(runtime.selections, [anchor]);
+  const hostile = makePartnerFormRuntime();
+  hostile.callbacks[0].success({ ok: true, applicationId: "application-seed-123", referralLink: "javascript:alert(1)" });
+  assert.equal(hostile.box.children.length, 0);
+  assert.match(hostile.status.textContent, /Saloni will contact you with your referral link\. Application ID: application-seed-123/);
+});
+
+test("the partner form explains that the link follows when none came back", () => {
+  const runtime = makePartnerFormRuntime();
+  runtime.callbacks[0].success({ ok: true, applicationId: "application-seed-123", receivedAt: "now" });
+  assert.equal(runtime.status.textContent, "Application received. Saloni will contact you with your referral link. Application ID: application-seed-123");
+  assert.equal(runtime.box.hidden, true);
+  assert.equal(runtime.another.hidden, false);
+});
+
 function applicationForm() {
   return { applicationId: "application-123456", applicantName: "Asha", businessName: "Asha Studio", category: "photographer", serviceArea: "Ajmer", phone: "8209238541", email: "asha@example.com", website: "https://example.com", typicalCustomers: "Families", referralPlan: "I will share stories", rulesAccepted: "true", captchaToken: "token" };
 }
@@ -502,7 +736,7 @@ function partnerRuntime(options = {}) {
   const commissionRows = options.commissionRows ? options.commissionRows.map((row) => row.slice()) : [];
   const orderFormulas = options.orderFormulas ? options.orderFormulas.map((row) => row.slice()) : [];
   const protections = [];
-  const lock = { calls: 0, tryLock: () => { lock.calls += 1; return options.lockAvailable !== false; }, releaseLock() {} };
+  const lock = { calls: 0, held: false, tryLock: () => { lock.calls += 1; if (options.lockAvailable === false || lock.held) return false; lock.held = true; return true; }, releaseLock() { lock.held = false; } };
   const formatDateCalls = [];
   function sheetCellValue(value) {
     if (typeof value !== "string") return value;
