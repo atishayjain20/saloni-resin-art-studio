@@ -53,6 +53,16 @@ The form validates quantity, text lengths, independent feet-and-inch dimensions 
 
 Requests and uploaded images are scheduled for deletion after 90 days. Customers can request correction or deletion through Instagram `@saloniresin_art_studio` or phone `8209238541`.
 
+### Order alerts
+
+When a new order is saved, Saloni gets a WhatsApp message (free CallMeBot API) and a backup email. Alerts run after the order is saved and the script lock is released; if WhatsApp or email fails, the order and the customer's confirmation are not affected. Replays, validation failures, and paused or full intake send nothing.
+
+1. Get a CallMeBot key: send "I allow callmebot to send me messages" to the CallMeBot WhatsApp number from the instructions at callmebot.com, and CallMeBot replies with an API key.
+2. In **Project Settings → Script properties**, set `WHATSAPP_CALLMEBOT_KEY` to that key. Optional: `WHATSAPP_CALLMEBOT_PHONE` (default `918209238541`, country code first, no `+`) and `ORDER_ALERT_EMAIL` (default: the script owner's email). With no key, WhatsApp is skipped and email still goes out.
+3. Run `testOrderAlerts_` once from the Apps Script editor. It sends one clearly labelled TEST alert and asks you to approve the email permission.
+
+The WhatsApp text passes through a third party, so it has only the product, quantity, the customer's first name, "Pickup in Ajmer" or the city, a short request code, and the Orders sheet link. It never has the phone, email, address, or design notes; the email has the full details.
+
 ### Corporate Gifting setup, migration, and rollback
 
 `setupCorporateGifting()` is owner-only and idempotent. It creates the fixed `Corporate Enquiries` tab, validates the exact allowlisted columns, protects the full tab, and sets `CORPORATE_PROGRAM_CONFIGURED=true` only after those checks pass. Public submissions never create a tab. Keep the corporate tab in the private spreadsheet and leave `CORPORATE_FORM_DISABLED=true` until an isolated embedded submission and read-back are proven.
