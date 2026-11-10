@@ -213,8 +213,8 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261153">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261153" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261154">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261154" defer><\/script>/);
   assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261031" defer><\/script>/);
 });
 
@@ -1291,7 +1291,7 @@ test("a rating that cannot be saved undoes the stars, explains why and lets the 
   assert.deepEqual(disabledOf(failed), [false, false, false, false, false]);
   assert.equal(failed.docElements["lightbox-tell-more"].attributes.href, "reviews/?product=catalogue%3Asample-gift.jpg#write");
   assert.equal(failed.storage.has("saloni-product-ratings"), false);
-  assert.equal(textOf(failed.docElements["lightbox-rating-summary"]), "", "a failed rating does not change the average");
+  assert.equal(textOf(failed.docElements["lightbox-rating-summary"]), "No ratings yet", "a failed rating does not change the average");
   const paused = galleryHarness({ sample: "A lovely sample line for this piece.", feed: emptyFeed, rateResponse: { ok: false, error: "paused" } });
   paused.open();
   await settleAll();
@@ -1319,6 +1319,23 @@ test("the product popup shows the average star rating from real reviews of that 
   assert.equal(summary.hidden, false);
   assert.equal(textOf(summary), "★★★★★ 4.5 out of 5 · 2 ratings");
   assert.equal(summary.children[0].attributes["aria-hidden"], "true");
+});
+
+test("the product popup says No ratings yet once the feed shows none for that product", async () => {
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: { ok: true, intake: "open", summary: { count: 0, average: 0 }, reviews: [], ratings: { "catalogue:other-gift.jpg": [5, 1] } } });
+  h.open();
+  assert.equal(h.docElements["lightbox-rating-summary"].hidden, true, "nothing shows while the feed is loading");
+  await settleAll();
+  assert.equal(h.docElements["lightbox-rating-summary"].hidden, false);
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "No ratings yet");
+});
+
+test("the product popup shows no rating line when the feed could not be read", async () => {
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: "fail" });
+  h.open();
+  await settleAll();
+  assert.equal(h.docElements["lightbox-rating-summary"].hidden, true);
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "");
 });
 
 test("a retry after a network failure reuses the same rating ID so the server counts it once", async () => {
