@@ -362,7 +362,7 @@ function makeRuntime(options = {}) {
     folderAccess: options.folderAccess || "PRIVATE",
     captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 },
     driveDeletes: [], retentionTrashed: 0, rowDeletes: [], triggerCreates: 0, triggerConfig: null,
-    logs: [],
+    logs: [], locked: false, whatsappFetches: [], emails: [],
   };
   const sheet = {
     getLastColumn: () => headers.length,
@@ -408,7 +408,10 @@ function makeRuntime(options = {}) {
     ORDER_SHEET_ID: "sheet", ORDER_SHEET_TAB: "Orders", ORDER_DRIVE_FOLDER_ID: "folder",
     CAPTCHA_SECRET: "secret", CAPTCHA_MIN_SCORE: "0.5",
   }, options.properties || {});
-  const lock = { tryLock: () => options.lockAvailable !== false, releaseLock: () => { state.released = true; } };
+  const lock = {
+    tryLock: () => { state.locked = options.lockAvailable !== false; return state.locked; },
+    releaseLock: () => { state.released = true; state.locked = false; },
+  };
   const utilities = {
     getUuid: () => "00000000-0000-4000-8000-000000000000",
     newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(String(value))) }),
@@ -442,7 +445,16 @@ function makeRuntime(options = {}) {
         return builder;
       },
     },
-    UrlFetchApp: { fetch: () => {
+    MailApp: { sendEmail: (message) => {
+      state.emails.push({ message, lockHeld: state.locked });
+      if (options.mailThrows) throw new Error("mail failed");
+    } },
+    UrlFetchApp: { fetch: (url, params) => {
+      if (String(url).startsWith("https://api.callmebot.com/")) {
+        state.whatsappFetches.push({ url: String(url), params, lockHeld: state.locked });
+        if (options.whatsappThrows) throw new Error("whatsapp failed");
+        return { getResponseCode: () => 200 };
+      }
       state.captchaCalls += 1;
       if (options.captchaThrows) throw new Error("captcha should not be called");
       return { getContentText: () => JSON.stringify(state.captchaResponse) };
@@ -936,4 +948,138 @@ test("retention cleanup honors the existing script lock", () => {
   const runtime = makeRuntime({ lockAvailable: false, rows: [retentionRow("request-locked", new Date("2020-01-01T00:00:00.000Z"), "")] });
   assert.throws(() => runtime.context.purgeExpiredOrders_(), /Unable to start retention cleanup/);
   assert.equal(runtime.rows.length, 1);
+});
+
+const ALERT_PROPERTIES = { WHATSAPP_CALLMEBOT_KEY: "key 123", ORDER_ALERT_EMAIL: "saloni@example.com" };
+const alertForm = (overrides = {}) => validForm(Object.assign({
+  productName: "Resin photo frame", quantity: "2", customerName: "Priya Sharma", phone: "9876543210",
+  email: "priya@example.com", fulfillment: "shipping", shippingAddress: "12 Secret Lane", city: "Jaipur", state: "Rajasthan",
+  pin: "302001", designDetails: "Gold flowers", requestedDate: "2026-12-01", referralCode: "",
+}, overrides));
+
+test("a new order sends one privacy-light WhatsApp alert through CallMeBot after the lock is released", () => {
+  const runtime = makeRuntime({ properties: ALERT_PROPERTIES });
+  const result = runtime.context.submitOrder(alertForm());
+  assert.equal(result.ok, true);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.whatsappFetches.length, 1);
+  const fetch = runtime.state.whatsappFetches[0];
+  assert.equal(fetch.lockHeld, false);
+  assert.equal(fetch.params.muteHttpExceptions, true);
+  const url = new URL(fetch.url);
+  assert.equal(url.origin + url.pathname, "https://api.callmebot.com/whatsapp.php");
+  assert.equal(url.searchParams.get("phone"), "918209238541");
+  assert.equal(url.searchParams.get("apikey"), "key 123");
+  const text = url.searchParams.get("text");
+  assert.ok(text.startsWith("\u{1F6CD}\uFE0F New order on saloniresinart.com"));
+  assert.ok(text.includes("Resin photo frame"));
+  assert.ok(text.includes("\u00D7 2") || text.includes("\u00D72"));
+  assert.ok(text.includes("Priya"));
+  assert.ok(text.includes("Jaipur"));
+  assert.ok(text.includes("Request request-"));
+  assert.ok(text.includes("https://docs.google.com/spreadsheets/d/sheet/edit"));
+  for (const secret of ["Sharma", "9876543210", "priya@example.com", "Secret Lane", "Gold flowers", "302001"]) {
+    assert.equal(text.includes(secret), false, secret);
+  }
+});
+
+test("a pickup order says Pickup in Ajmer and a custom WhatsApp phone is used", () => {
+  const runtime = makeRuntime({ properties: Object.assign({ WHATSAPP_CALLMEBOT_PHONE: "919999999999" }, ALERT_PROPERTIES) });
+  assert.equal(runtime.context.submitOrder(alertForm({ fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "" })).ok, true);
+  const url = new URL(runtime.state.whatsappFetches[0].url);
+  assert.equal(url.searchParams.get("phone"), "919999999999");
+  assert.ok(url.searchParams.get("text").includes("Pickup in Ajmer"));
+});
+
+test("a new order sends one full-detail email after the lock is released", () => {
+  const runtime = makeRuntime({ properties: ALERT_PROPERTIES, effectiveEmail: "owner@example.com" });
+  assert.equal(runtime.context.submitOrder(alertForm({ referenceImage: imageBlob() })).ok, true);
+  assert.equal(runtime.state.emails.length, 1);
+  const { message, lockHeld } = runtime.state.emails[0];
+  assert.equal(lockHeld, false);
+  assert.equal(message.to, "saloni@example.com");
+  assert.equal(message.subject, "New order: Resin photo frame \u2013 Priya");
+  for (const detail of ["Priya Sharma", "9876543210", "priya@example.com", "Resin photo frame", "2", "Gold flowers", "12 Secret Lane", "Jaipur", "Rajasthan", "302001", "2026-12-01", "request-1234567890", "https://drive.google.test/file", "https://docs.google.com/spreadsheets/d/sheet/edit"]) {
+    assert.ok(message.body.includes(detail), detail);
+  }
+});
+
+test("the alert email falls back to the script owner, and is skipped when no address exists", () => {
+  const owner = makeRuntime({ properties: { WHATSAPP_CALLMEBOT_KEY: "k" }, effectiveEmail: "owner@example.com" });
+  owner.context.submitOrder(alertForm());
+  assert.equal(owner.state.emails[0].message.to, "owner@example.com");
+  const none = makeRuntime({ properties: { WHATSAPP_CALLMEBOT_KEY: "k" } });
+  assert.equal(none.context.submitOrder(alertForm()).ok, true);
+  assert.equal(none.state.emails.length, 0);
+});
+
+test("a missing CallMeBot key skips WhatsApp but still sends the email", () => {
+  const runtime = makeRuntime({ properties: { ORDER_ALERT_EMAIL: "saloni@example.com" } });
+  assert.equal(runtime.context.submitOrder(alertForm()).ok, true);
+  assert.equal(runtime.state.whatsappFetches.length, 0);
+  assert.equal(runtime.state.emails.length, 1);
+});
+
+test("a replayed request, validation failure, daily cap, kill switch, and failed append send no alerts", () => {
+  const first = alertForm();
+  const helper = makeRuntime();
+  const fingerprint = helper.context.payloadFingerprint_(helper.context.collectPayload_(first));
+  const replay = makeRuntime({ properties: ALERT_PROPERTIES, rows: [[first.requestId, fingerprint, new Date(), first.sourceKind, first.sourceId]] });
+  assert.equal(replay.context.submitOrder(first).ok, true);
+  const invalid = makeRuntime({ properties: ALERT_PROPERTIES });
+  assert.equal(invalid.context.submitOrder(alertForm({ customerName: "" })).ok, false);
+  const daily = makeRuntime({ properties: Object.assign({ DAILY_ACCEPTANCE_CAP: "1" }, ALERT_PROPERTIES), rows: [["old", "fingerprint", new Date(), "catalogue", "id"]] });
+  assert.equal(daily.context.submitOrder(alertForm()).ok, false);
+  const disabled = makeRuntime({ properties: Object.assign({ ORDER_FORM_DISABLED: "true" }, ALERT_PROPERTIES) });
+  assert.equal(disabled.context.submitOrder(alertForm()).ok, false);
+  const failed = makeRuntime({ properties: ALERT_PROPERTIES, appendMode: "before-throw" });
+  assert.throws(() => failed.context.submitOrder(alertForm()), /Unable to confirm/);
+  for (const runtime of [replay, invalid, daily, disabled, failed]) {
+    assert.equal(runtime.state.whatsappFetches.length, 0);
+    assert.equal(runtime.state.emails.length, 0);
+  }
+});
+
+test("WhatsApp or email failures never change the saved order or its result", () => {
+  for (const failure of [{ whatsappThrows: true }, { mailThrows: true }, { whatsappThrows: true, mailThrows: true }]) {
+    const runtime = makeRuntime(Object.assign({ properties: ALERT_PROPERTIES }, failure));
+    const result = runtime.context.submitOrder(alertForm());
+    assert.equal(result.ok, true);
+    assert.equal(result.requestId, "request-1234567890");
+    assert.equal(runtime.rows.length, 1);
+    assert.equal(runtime.state.whatsappFetches.length, 1);
+    assert.equal(runtime.state.emails.length, 1);
+    assert.equal(runtime.state.logs.some((line) => /Priya|9876543210|Secret Lane|key 123/.test(line)), false);
+  }
+});
+
+test("testOrderAlerts_ sends one labelled TEST WhatsApp and email with sample data", () => {
+  const runtime = makeRuntime({ properties: ALERT_PROPERTIES });
+  runtime.context.testOrderAlerts_();
+  assert.equal(runtime.state.whatsappFetches.length, 1);
+  assert.equal(runtime.state.emails.length, 1);
+  assert.ok(new URL(runtime.state.whatsappFetches[0].url).searchParams.get("text").includes("TEST"));
+  assert.match(runtime.state.emails[0].message.subject, /TEST/);
+  assert.equal(runtime.rows.length, 0);
+  assert.equal(/testOrderAlerts_/.test(runtime.context.doGet.toString() + runtime.context.doPost.toString()), false);
+});
+
+test("testOrderAlerts sends the TEST alerts only when the owner runs it from the editor", () => {
+  const owner = makeRuntime({ properties: ALERT_PROPERTIES, activeEmail: "owner@example.com", effectiveEmail: "owner@example.com" });
+  owner.context.testOrderAlerts();
+  assert.equal(owner.state.whatsappFetches.length, 1);
+  assert.equal(owner.state.emails.length, 1);
+  assert.ok(new URL(owner.state.whatsappFetches[0].url).searchParams.get("text").includes("TEST"));
+  assert.match(owner.state.emails[0].message.subject, /TEST/);
+});
+
+test("testOrderAlerts refuses a web visitor or a different user and sends nothing", () => {
+  for (const emails of [{ activeEmail: "", effectiveEmail: "owner@example.com" }, { activeEmail: "", effectiveEmail: "" }, { activeEmail: "stranger@example.com", effectiveEmail: "owner@example.com" }]) {
+    const runtime = makeRuntime(Object.assign({ properties: ALERT_PROPERTIES }, emails));
+    assert.throws(() => runtime.context.testOrderAlerts(), /Run this from the Apps Script editor as the owner\./);
+    assert.equal(runtime.state.whatsappFetches.length, 0);
+    assert.equal(runtime.state.emails.length, 0);
+  }
+  const runtime = makeRuntime();
+  assert.equal(/testOrderAlerts/.test(runtime.context.doGet.toString() + runtime.context.doPost.toString()), false);
 });

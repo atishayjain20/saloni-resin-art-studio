@@ -627,6 +627,7 @@ function submitOrder(form) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error("Unable to confirm order request.");
 
+  var newOrder = null;
   try {
     var sheet = openOrderSheet_(properties);
     var fingerprint = payloadFingerprint_(payload);
@@ -660,6 +661,7 @@ function submitOrder(form) {
         ? rowForPayload_(payload, fingerprint, receivedAt, referenceFile, attribution || { active: false }, rowNumber)
         : rowForPayload_(payload, fingerprint, receivedAt, referenceFile);
       sheet.appendRow(row);
+      newOrder = { receivedAt: receivedAt, referenceFile: referenceFile };
       return {
         ok: true, requestId: payload.requestId, receivedAt: receivedAt.toISOString(),
         referralCode: attribution && attribution.active ? attribution.code : "",
@@ -702,7 +704,102 @@ function submitOrder(form) {
     throw new Error("Unable to confirm order request.");
   } finally {
     lock.releaseLock();
+    // Alerts run after the lock is released and never throw or change the result.
+    if (newOrder) notifyNewOrder_(payload, newOrder.receivedAt, newOrder.referenceFile, properties);
   }
+}
+
+var ORDER_ALERT_WHATSAPP_PHONE = "918209238541";
+
+function notifyNewOrder_(payload, receivedAt, referenceFile, properties) {
+  try { sendWhatsAppAlert_(payload, properties); } catch (whatsappError) { console.error("WhatsApp order alert failed."); }
+  try { sendEmailAlert_(payload, receivedAt, referenceFile, properties); } catch (emailError) { console.error("Email order alert failed."); }
+}
+
+function orderSheetUrl_(properties) {
+  return "https://docs.google.com/spreadsheets/d/" + String(properties.getProperty("ORDER_SHEET_ID") || "") + "/edit";
+}
+
+function alertFirstName_(payload) {
+  return String(payload.customerName || "").trim().split(/\s+/)[0].slice(0, 40);
+}
+
+function alertProduct_(payload) {
+  return String(payload.productName || "").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function sendWhatsAppAlert_(payload, properties) {
+  var key = String(properties.getProperty("WHATSAPP_CALLMEBOT_KEY") || "").trim();
+  if (!key) return;
+  var phone = String(properties.getProperty("WHATSAPP_CALLMEBOT_PHONE") || "").trim() || ORDER_ALERT_WHATSAPP_PHONE;
+  var place = payload.fulfillment.toLowerCase() === "pickup" ? "Pickup in Ajmer" : (String(payload.city || "").trim() || "Shipping");
+  // The text goes through a third party: no phone, email, address or design notes.
+  var text = [
+    "\uD83D\uDECD\uFE0F New order on saloniresinart.com",
+    alertProduct_(payload) + " \u00D7 " + payload.quantity,
+    alertFirstName_(payload) + " - " + place,
+    "Request " + payload.requestId.slice(0, 8),
+    orderSheetUrl_(properties)
+  ].join("\n");
+  UrlFetchApp.fetch(
+    "https://api.callmebot.com/whatsapp.php?phone=" + encodeURIComponent(phone) +
+    "&text=" + encodeURIComponent(text) + "&apikey=" + encodeURIComponent(key),
+    { muteHttpExceptions: true }
+  );
+}
+
+function sendEmailAlert_(payload, receivedAt, referenceFile, properties) {
+  var to = String(properties.getProperty("ORDER_ALERT_EMAIL") || "").trim() || String(Session.getEffectiveUser().getEmail() || "").trim();
+  if (!to) return;
+  var validation = validatePayload_(payload);
+  var lines = [
+    "Customer: " + payload.customerName,
+    "Phone: " + payload.phone,
+    "Email: " + (payload.email || "-"),
+    "Product: " + payload.productName + " x " + payload.quantity
+  ];
+  if (validation.heightExpression || validation.widthExpression) {
+    lines.push("Size: " + (validation.heightExpression || "-") + " (height) x " + (validation.widthExpression || "-") + " (width)");
+  }
+  lines.push("Design details: " + (payload.designDetails || "-"));
+  lines.push("Fulfilment: " + payload.fulfillment);
+  if (payload.shippingAddress || payload.city || payload.state || payload.pin) {
+    lines.push("Ship to: " + [payload.shippingAddress, payload.city, payload.state, payload.pin].filter(String).join(", "));
+  }
+  lines.push("Requested date: " + (payload.requestedDate || "-"));
+  if (payload.referralCode) lines.push("Referral code: " + payload.referralCode);
+  if (referenceFile) lines.push("Reference image: " + referenceFile.getUrl());
+  lines.push("Request ID: " + payload.requestId);
+  lines.push("Received: " + Utilities.formatDate(receivedAt, "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " (IST)");
+  lines.push("Orders sheet: " + orderSheetUrl_(properties));
+  MailApp.sendEmail({
+    to: to,
+    subject: "New order: " + alertProduct_(payload) + " \u2013 " + alertFirstName_(payload),
+    body: lines.join("\n")
+  });
+}
+
+// Public so it shows in the editor Run menu. Web visitors have an empty active user, so they are refused.
+function testOrderAlerts() {
+  var active = String(Session.getActiveUser().getEmail() || "");
+  if (!active || active !== String(Session.getEffectiveUser().getEmail() || "")) {
+    throw new Error("Run this from the Apps Script editor as the owner.");
+  }
+  testOrderAlerts_();
+}
+
+// Sends one TEST alert so the owner can approve mail access and check delivery.
+function testOrderAlerts_() {
+  var properties = PropertiesService.getScriptProperties();
+  var payload = collectPayload_({
+    requestId: "TEST-ALERT-0000", productName: "TEST ALERT - sample frame (ignore)", quantity: "1",
+    customerName: "Test Customer", phone: "0000000000", email: "test@example.com", fulfillment: "pickup",
+    designDetails: "Sample alert, not a real order"
+  });
+  var failures = [];
+  try { sendWhatsAppAlert_(payload, properties); } catch (whatsappError) { failures.push("WhatsApp: " + whatsappError); }
+  try { sendEmailAlert_(payload, new Date(), null, properties); } catch (emailError) { failures.push("Email: " + emailError); }
+  if (failures.length) throw new Error("Test alert failed. " + failures.join(" "));
 }
 
 function submitPartnerApplication(form) {
