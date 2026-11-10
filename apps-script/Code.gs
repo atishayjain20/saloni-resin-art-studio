@@ -1387,7 +1387,8 @@ function publicReviewsResponse_() {
   return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// Intake is read live on every request; only the review list is cached.
+// Intake is read live on every request; only the review list is cached, for the 6-hour CacheService maximum.
+// Every review or rating write and every Reviews tab edit clears it, so new and hidden reviews show at once.
 function publicReviews_() {
   var properties = PropertiesService.getScriptProperties();
   var ready = reviewsReady_(properties);
@@ -1402,7 +1403,7 @@ function publicReviews_() {
       data = publishedReviews_(properties);
       var json = JSON.stringify(data);
       if (json.length <= 95000) {
-        try { cache.put(REVIEWS_CACHE_KEY, json, 300); } catch (putError) { /* the list is still served */ }
+        try { cache.put(REVIEWS_CACHE_KEY, json, 21600); } catch (putError) { /* the list is still served */ }
       }
     }
   }
@@ -1495,6 +1496,8 @@ function onReviewsSheetEdit_(event) {
       } catch (sharingError) { errors += 1; }
     });
   });
+  // Clear again: a read during this edit may have cached the old photo IDs.
+  clearReviewsCache_();
   if (errors) throw new Error("Review photo update failed.");
 }
 
