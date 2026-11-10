@@ -817,7 +817,7 @@ class FakeMessageChannel {
 }
 
 function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
-  const ids = ["request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
+  const ids = ["success-celebration", "request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const form = new FakeElement("order-form");
   elements.set("order-form", form);
@@ -1556,4 +1556,43 @@ test("a 1.6 MB customizer PNG preview is still submitted, but over 5 MB is block
   await Promise.resolve();
   assert.equal(oversized.submissions.length, 0);
   assert.ok(oversized.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE));
+});
+
+test("a received order shows the success celebration, and starting another request hides it", async () => {
+  const runtime = makeFormRuntime();
+  const celebration = runtime.elements.get("success-celebration");
+  celebration.hidden = true;
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(celebration.hidden, true, "nothing celebrates before the server answers");
+  runtime.callbacks[0].success({ ok: true, requestId: "req-1", receivedAt: "now" });
+  assert.equal(celebration.hidden, false);
+  assert.match(runtime.status.textContent, /Request received/);
+  runtime.elements.get("another-button").dispatch("click");
+  assert.equal(celebration.hidden, true);
+});
+
+test("a failed order never shows the success celebration", async () => {
+  const runtime = makeFormRuntime();
+  const celebration = runtime.elements.get("success-celebration");
+  celebration.hidden = true;
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  await Promise.resolve();
+  runtime.callbacks[0].failure(new Error("network"));
+  assert.equal(celebration.hidden, true);
+});
+
+test("the success celebration is decorative, animated, and still for reduced motion", () => {
+  const block = html.match(/<div id="success-celebration"[^>]*>[\s\S]*?<\/div>/);
+  assert.ok(block, "celebration markup exists");
+  assert.match(block[0], /aria-hidden="true"/);
+  assert.match(block[0], /\shidden[\s>]/);
+  assert.ok(html.indexOf('id="success-celebration"') < html.indexOf('id="form-status"'), "sits above the status text");
+  assert.ok((block[0].match(/class="confetti"/g) || []).length >= 10, "has a burst of confetti");
+  assert.match(html, /@keyframes success-draw/);
+  assert.match(html, /@media \(prefers-reduced-motion: reduce\)[^{]*\{[^}]*\.success-celebration[^}]*animation:\s*none/);
 });
