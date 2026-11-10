@@ -1627,7 +1627,7 @@ function approvePartner_(applicationId, partnerFields) {
     var code = normalizeReferralCode_(fields.referralCode);
     var partnerId = "partner-" + String(applicationId);
     var displayName = String(found.values[index["Business name"]] || found.values[index["Applicant name"]] || "").trim();
-    var rate = Number(fields.rate == null ? 0.05 : fields.rate);
+    var rate = Number(fields.rate == null ? 0.1 : fields.rate);
     if (!PARTNER_CODE_PATTERN.test(code) || !displayName || !isFinite(rate) || rate < 0 || rate > 1) throw new Error("Partner approval values are not valid.");
     var partnerValues = partners.getDataRange().getValues();
     var partnerIndex = headerIndex_(partnerValues[0].map(String));

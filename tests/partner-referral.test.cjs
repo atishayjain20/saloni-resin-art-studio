@@ -269,6 +269,16 @@ test("partner page keeps terms visible and consent links to the complete rules",
   assert.ok(partnerSeedStart >= 0);
   assert.doesNotMatch(script.slice(partnerSeedStart, partnerSeedStart + 180), /scrollToForm/);
   assert.match(form, /Partner Circle rules/);
+  assert.match(page, /<strong>10%<\/strong>/);
+  assert.match(page, /Eligible commission is 10% of the final product subtotal/);
+  assert.match(form, /eligible commission is 10% of the final product subtotal/);
+  assert.doesNotMatch(page + form, /\b5%/);
+});
+
+test("approval without an explicit rate stores the 10% partner commission", () => {
+  const runtime = partnerRuntime({ applicationRows: [applicationRow()], partnerRows: [] });
+  runtime.context.approvePartner_("application-123456", { referralCode: "NEWCODE01" });
+  assert.equal(runtime.partnerRows[0][9], 0.1);
 });
 
 test("correction preserves formulas, defaults direct rows, and recalculates the target formula", () => {
