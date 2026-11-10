@@ -2298,8 +2298,8 @@ class ResponsiveCardImageTests(unittest.TestCase):
     """Card photos offer a 540 px copy (covers a 171 px card on a 3x phone), while src and the popup keep the full photo."""
 
     PAGES = {
-        "index.html": 79,
-        "corporate-gifting/index.html": 3,
+        "index.html": 78,
+        "corporate-gifting/index.html": 2,
         "resin-photo-frames/index.html": 2,
     }
     CARD_WIDTH = 540
@@ -2338,6 +2338,7 @@ class ResponsiveCardImageTests(unittest.TestCase):
                     self.assertEqual(small_path.name, original.name)
                     self.assertEqual(small[1], f"{self.CARD_WIDTH}w")
                     self.assertEqual((base / full[0]).resolve(), original, "last candidate is the unchanged src file")
+                    self.assertGreaterEqual(original_height, original_width * 0.9, "landscape photos sit in square cover boxes; a small copy would be stretched")
                     small_width, small_height = self.real_size(small_path)
                     self.assertLessEqual(abs(small_height / small_width - original_height / original_width), 0.01)
                     self.assertLessEqual(small_path.stat().st_size, original.stat().st_size * 0.75, "copy must save 25% or more")
