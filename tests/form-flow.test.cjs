@@ -1377,3 +1377,17 @@ test("a shopper's own PNG reference upload is still sent with the plain sending 
   assert.equal(runtime.submissions.length, 1);
   assert.equal(runtime.fields.referenceImage.files[0].type, "image/png");
 });
+
+test("a slow captcha keeps the still-sending text when the token arrives late", async () => {
+  const runtime = makeFormRuntime();
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  runtime.timers[0]();
+  const stillSending = runtime.status.textContent;
+  assert.match(stillSending, /^Still sending/);
+  respondToken(runtime, 0);
+  await Promise.resolve();
+  assert.equal(runtime.callbacks.length, 1);
+  assert.equal(runtime.status.textContent, stillSending);
+});

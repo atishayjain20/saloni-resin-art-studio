@@ -1701,6 +1701,27 @@ test("serves exactly one immutable preview snapshot per validated request and al
   assert.equal(retry.messages[0].blob, valid.messages[0].blob);
 });
 
+test("a cached older PNG snapshot is still accepted, but other preview types are not", () => {
+  for (const [type, ok] of [["image/png", true], ["image/webp", false]]) {
+    const flow = runFlow();
+    let captured;
+    const capture = flow.windowObject.saloniCustomizerCapture;
+    flow.windowObject.saloniCustomizerCapture = (identity) => {
+      captured = capture(identity);
+      return captured;
+    };
+    flow.customizer.dispatch("click");
+    captured.blob = { type, size: 42 };
+    const seed = submittedSeed(flow.posted);
+    const source = flow.elements.get("order-form-frame").contentWindow;
+    const origin = "https://n-1234567890-1lu-script.googleusercontent.com";
+    flow.windowObject.messageListener({ origin, source, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key", mode: "order" }, ports: [] });
+    const port = new CapturingPort();
+    flow.windowObject.messageListener({ origin, source, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "preview-1" }, ports: [port] });
+    assert.equal(port.messages[0].ok, ok, type);
+  }
+});
+
 test("reports preview failures through the bounded error field without a Blob", () => {
   const flow = runFlow();
   let captured;

@@ -1026,6 +1026,7 @@
     setStatus("Checking the request…", "");
     timeoutId = window.setTimeout(function () {
       if (!isCurrent(attempt)) return;
+      attempt.stillSending = true;
       setStatus("Still sending – please keep this window open. Your request is on its way and usually finishes within a minute.", "");
       if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
     }, 30000);
@@ -1034,7 +1035,7 @@
       if (!token) { showFailure("We could not verify this request. Please try again.", { captcha: "Captcha verification is required." }, attempt); return; }
       form.elements.captchaToken.value = token;
       var attachedFile = referenceImage.files && referenceImage.files[0];
-      setStatus(attachedFile && /^saloni-customizer-preview\.(jpg|png)$/.test(attachedFile.name) ? "Sending your request and design preview…" : "Sending your request…", "");
+      if (!attempt.stillSending) setStatus(attachedFile && /^saloni-customizer-preview\.(jpg|png)$/.test(attachedFile.name) ? "Sending your request and design preview…" : "Sending your request…", "");
       try {
         google.script.run.withSuccessHandler(function (result) {
           if (!isCurrent(attempt)) return;
