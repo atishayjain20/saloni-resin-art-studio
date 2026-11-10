@@ -6,6 +6,9 @@
   var MAX_FILE_SIZE = 10 * 1024 * 1024;
   var MAX_PREVIEW_BYTES = 5 * 1024 * 1024;
   var MAX_PREVIEW_SUMMARY = 2000;
+  var PREVIEW_MIME_TYPE = "image/jpeg";
+  var PREVIEW_QUALITY = 0.85;
+  var PREVIEW_BACKGROUND = "#ffffff";
   var PREVIEW_CAPTURE_TIMEOUT = 10000;
   var HEX_RE = /^#[0-9A-Fa-f]{6}$/;
   var ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -39,7 +42,19 @@
   ];
 
   function validPreviewBlob(blob) {
-    return Boolean(blob && typeof blob.size === "number" && blob.size > 0 && blob.size <= MAX_PREVIEW_BYTES && typeof blob.type === "string" && blob.type.toLowerCase() === "image/png");
+    return Boolean(blob && typeof blob.size === "number" && blob.size > 0 && blob.size <= MAX_PREVIEW_BYTES && typeof blob.type === "string" && blob.type.toLowerCase() === PREVIEW_MIME_TYPE);
+  }
+
+  function flattenPreviewCanvas(source, createCanvas) {
+    var flat = createCanvas ? createCanvas() : (typeof document !== "undefined" && document.createElement ? document.createElement("canvas") : null);
+    var context = flat && flat.getContext ? flat.getContext("2d") : null;
+    if (!context) return null;
+    flat.width = source.width || CANVAS_SIZE;
+    flat.height = source.height || CANVAS_SIZE;
+    context.fillStyle = PREVIEW_BACKGROUND;
+    context.fillRect(0, 0, flat.width, flat.height);
+    context.drawImage(source, 0, 0);
+    return flat;
   }
 
   function shouldShowMobileCustomizerActions(state) {
@@ -88,6 +103,13 @@
       return Promise.reject(error);
     }
     if (!options.canvas || typeof options.canvas.toBlob !== "function") return Promise.reject(new Error("preview-export-unavailable"));
+    var exportCanvas;
+    try {
+      exportCanvas = flattenPreviewCanvas(options.canvas, options.createCanvas);
+    } catch (error) {
+      return Promise.reject(new Error("preview-export-unavailable"));
+    }
+    if (!exportCanvas || typeof exportCanvas.toBlob !== "function") return Promise.reject(new Error("preview-export-unavailable"));
     state.captureInProgress = true;
     var timeout = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : PREVIEW_CAPTURE_TIMEOUT;
     return new Promise(function (resolve, reject) {
@@ -103,7 +125,7 @@
         resolve(Object.freeze({ blob: blob, summary: summary, dimensions: dimensions }));
       }
       try {
-        options.canvas.toBlob(function (blob) { finish(null, blob); }, "image/png");
+        exportCanvas.toBlob(function (blob) { finish(null, blob); }, PREVIEW_MIME_TYPE, PREVIEW_QUALITY);
       } catch (error) {
         finish(new Error("preview-export-failed"));
       }

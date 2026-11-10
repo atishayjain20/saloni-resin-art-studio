@@ -963,6 +963,10 @@ function pngBlob(size = 4) {
   return new Blob([new Uint8Array(size)], { type: "image/png" });
 }
 
+function jpegBlob(size = 4) {
+  return new Blob([new Uint8Array(size)], { type: "image/jpeg" });
+}
+
 test("preview accepts only the current full identity and ignores wrong or duplicate responses", () => {
   const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
   const request = previewRequests(runtime)[0];
@@ -970,14 +974,14 @@ test("preview accepts only the current full identity and ignores wrong or duplic
     { version: 2 }, { nonce: "stale-nonce" }, { requestId: "stale-request" },
     { mode: "captcha" }, { transferId: "wrong-transfer" },
   ]) {
-    request.port.postMessage(Object.assign({ type: "saloni-preview-response", version: 1, nonce: request.message.nonce, requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: true, blob: pngBlob() }, mismatch));
+    request.port.postMessage(Object.assign({ type: "saloni-preview-response", version: 1, nonce: request.message.nonce, requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: true, blob: jpegBlob() }, mismatch));
   }
   assert.equal(runtime.fields.referenceImage.files.length, 0);
   assert.equal(runtime.elements.get("continue-without-preview").hidden, true);
-  respondPreview(runtime, 0, { blob: pngBlob() });
+  respondPreview(runtime, 0, { blob: jpegBlob() });
   const assigned = runtime.fields.referenceImage.files[0];
-  assert.equal(assigned.name, "saloni-customizer-preview.png");
-  assert.equal(assigned.type, "image/png");
+  assert.equal(assigned.name, "saloni-customizer-preview.jpg");
+  assert.equal(assigned.type, "image/jpeg");
   assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, false);
   request.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: request.message.nonce, requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: false, error: "late" });
   assert.equal(runtime.fields.referenceImage.files[0], assigned);
@@ -986,10 +990,11 @@ test("preview accepts only the current full identity and ignores wrong or duplic
 
 test("preview rejects malformed, empty, wrong-MIME, and oversized blobs", () => {
   for (const blob of [
-    { size: 4, type: "image/png" },
-    new Blob([], { type: "image/png" }),
-    new Blob([new Uint8Array(4)], { type: "image/jpeg" }),
-    pngBlob(5 * 1024 * 1024 + 1),
+    { size: 4, type: "image/jpeg" },
+    new Blob([], { type: "image/jpeg" }),
+    new Blob([new Uint8Array(4)], { type: "image/png" }),
+    new Blob([new Uint8Array(4)], { type: "image/webp" }),
+    jpegBlob(5 * 1024 * 1024 + 1),
   ]) {
     const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
     respondPreview(runtime, 0, { blob });
@@ -1025,10 +1030,10 @@ test("preview timeout can be retried with a fresh transfer while retaining seed 
   assert.equal(requests[1].message.nonce, first.message.nonce);
   assert.equal(requests[1].message.requestId, first.message.requestId);
   assert.notEqual(requests[1].message.transferId, first.message.transferId);
-  requests[1].port.postMessage({ type: "saloni-preview-response", version: 1, nonce: first.message.nonce, requestId: first.message.requestId, mode: "order", transferId: first.message.transferId, ok: true, blob: pngBlob() });
+  requests[1].port.postMessage({ type: "saloni-preview-response", version: 1, nonce: first.message.nonce, requestId: first.message.requestId, mode: "order", transferId: first.message.transferId, ok: true, blob: jpegBlob() });
   assert.equal(runtime.fields.referenceImage.files.length, 0);
-  respondPreview(runtime, 1, { blob: pngBlob() });
-  assert.equal(runtime.fields.referenceImage.files[0].name, "saloni-customizer-preview.png");
+  respondPreview(runtime, 1, { blob: jpegBlob() });
+  assert.equal(runtime.fields.referenceImage.files[0].name, "saloni-customizer-preview.jpg");
 });
 
 test("manual replacement wins a pending race and explicit removal blocks late preview reuse", () => {
@@ -1044,7 +1049,7 @@ test("manual replacement wins a pending race and explicit removal blocks late pr
   runtime.elements.get("remove-reference-image").dispatch("click");
   assert.equal(runtime.fields.referenceImage.files.length, 0);
   assert.equal(runtime.elements.get("retry-preview").hidden, false);
-  request.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: request.message.nonce, requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: true, blob: pngBlob() });
+  request.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: request.message.nonce, requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: true, blob: jpegBlob() });
   assert.equal(runtime.fields.referenceImage.files.length, 0);
 });
 
@@ -1064,7 +1069,7 @@ test("failed automatic attachment offers explicit continuation and gates submit 
 
 test("unsupported DataTransfer retains the draft and exposes retry or continuation", () => {
   const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", supportsDataTransfer: false, previewExpected: true });
-  respondPreview(runtime, 0, { blob: pngBlob() });
+  respondPreview(runtime, 0, { blob: jpegBlob() });
   assert.equal(runtime.fields.referenceImage.files.length, 0);
   assert.equal(runtime.elements.get("retry-preview").hidden, false);
   assert.equal(runtime.elements.get("continue-without-preview").hidden, false);
@@ -1073,7 +1078,7 @@ test("unsupported DataTransfer retains the draft and exposes retry or continuati
 
 test("assigned generated file and fields survive CAPTCHA and server failures", async () => {
   const tokenFailure = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(tokenFailure, 0, { blob: pngBlob() });
+  respondPreview(tokenFailure, 0, { blob: jpegBlob() });
   fillValid(tokenFailure.fields);
   tokenFailure.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
@@ -1083,7 +1088,7 @@ test("assigned generated file and fields survive CAPTCHA and server failures", a
   assert.equal(tokenFailure.fields.productName.value, "Test frame");
 
   const serverFailure = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(serverFailure, 0, { blob: pngBlob() });
+  respondPreview(serverFailure, 0, { blob: jpegBlob() });
   fillValid(serverFailure.fields);
   serverFailure.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
@@ -1098,7 +1103,7 @@ test("assigned generated file and fields survive CAPTCHA and server failures", a
 
 test("success and reset revoke the preview URL without reusing the old preview identity", async () => {
   const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { blob: pngBlob() });
+  respondPreview(runtime, 0, { blob: jpegBlob() });
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
@@ -1118,7 +1123,7 @@ test("success and reset revoke the preview URL without reusing the old preview i
   assert.equal(runtime.elements.get("retry-preview").hidden, true);
   assert.equal(runtime.elements.get("continue-without-preview").hidden, true);
   assert.match(runtime.elements.get("reference-image-status").textContent, /return to the designer/i);
-  first.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: first.message.nonce, requestId: first.message.requestId, mode: "order", transferId: first.message.transferId, ok: true, blob: pngBlob() });
+  first.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: first.message.nonce, requestId: first.message.requestId, mode: "order", transferId: first.message.transferId, ok: true, blob: jpegBlob() });
   assert.equal(runtime.fields.referenceImage.files.length, 0);
 });
 
@@ -1172,7 +1177,7 @@ test("page teardown closes a pending preview port and revokes its object URL", (
 
 test("BFCache preserves an attached preview and allows submission after restore", async () => {
   const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { blob: pngBlob() });
+  respondPreview(runtime, 0, { blob: jpegBlob() });
   const assigned = runtime.fields.referenceImage.files[0];
   runtime.pageListeners.pagehide({ persisted: true });
   assert.equal(runtime.fields.referenceImage.files[0], assigned);
@@ -1236,7 +1241,7 @@ test("late success completes and late failure restores the original attempt afte
   respondToken(runtime, 0);
   await Promise.resolve();
   runtime.timers[0]();
-  assert.match(runtime.status.textContent, /taking longer than expected/i);
+  assert.match(runtime.status.textContent, /Still sending.*keep this window open.*within a minute/i);
   assert.equal(runtime.elements.get("submit-button").disabled, true);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 1);
@@ -1264,7 +1269,7 @@ test("stalled CAPTCHA shows an advisory while general server errors remain reada
   fillValid(stalled.fields);
   stalled.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   stalled.timers[0]();
-  assert.match(stalled.status.textContent, /taking longer than expected/i);
+  assert.match(stalled.status.textContent, /Still sending.*keep this window open.*within a minute/i);
   assert.equal(stalled.elements.get("submit-button").disabled, true);
 
   const runtime = makeFormRuntime();
@@ -1311,4 +1316,47 @@ test("client validation blocks invalid normalized dimensions and associates the 
   assert.match(runtime.status.textContent, /correct/i);
   assert.equal(runtime.fields.heightFeet.focused || runtime.fields.productName.focused, true);
   assert.match(runtime.fields.productName.getAttribute("aria-describedby"), /productName-error/);
+});
+
+test("submit status goes from checking to sending, then still sending at 30 seconds", async () => {
+  const runtime = makeFormRuntime();
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  assert.equal(runtime.status.textContent, "Checking the request…");
+  assert.equal(runtime.timerDelays[0], 30000);
+  await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
+  assert.equal(runtime.status.textContent, "Sending your request…");
+  assert.equal(runtime.callbacks.length, 1);
+  runtime.timers[0]();
+  assert.equal(runtime.status.textContent, "Still sending \u2013 please keep this window open. Your request is on its way and usually finishes within a minute.");
+  assert.equal(runtime.elements.get("submit-button").disabled, true);
+  runtime.callbacks[0].success({ ok: true, requestId: "late", receivedAt: "late" });
+  assert.match(runtime.status.textContent, /Request received/);
+});
+
+test("customizer order mentions the design preview while sending and accepts the JPEG preview", async () => {
+  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
+  respondPreview(runtime, 0, { blob: jpegBlob() });
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  assert.equal(runtime.status.textContent, "Checking the request…");
+  await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
+  assert.equal(runtime.status.textContent, "Sending your request and design preview…");
+});
+
+test("a shopper's own PNG reference upload is still sent with the plain sending text", async () => {
+  const runtime = makeFormRuntime();
+  runtime.fields.referenceImage.files = [new File([pngBlob()], "manual.png", { type: "image/png" })];
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
+  assert.equal(runtime.status.textContent, "Sending your request…");
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.fields.referenceImage.files[0].type, "image/png");
 });

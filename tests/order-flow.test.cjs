@@ -354,7 +354,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
       const unit = frameUnitControl.value;
       const height = frameTypeControl.value === "arch" ? preset * 4 / 3 : preset;
       const format = (value) => unit === "ft" ? (value / 12).toFixed(2) : String(value);
-      return { blob: { type: "image/png", size: 42 }, summary: summary.textContent, dimensions: { height: format(height), width: format(preset), heightUnit: unit, widthUnit: unit }, requestId: identity.requestId, nonce: identity.nonce, mode: identity.mode };
+      return { blob: { type: "image/jpeg", size: 42 }, summary: summary.textContent, dimensions: { height: format(height), width: format(preset), heightUnit: unit, widthUnit: unit }, requestId: identity.requestId, nonce: identity.nonce, mode: identity.mode };
     },
     saloniCustomizerRequestOutcome(outcome) { customizerOutcomes.push(outcome); },
     matchMedia: () => ({ matches: true }),
@@ -1642,7 +1642,7 @@ test("direct preview bootstrap pins only after the complete identity and origin 
   flow.windowObject.messageListener({ origin, source, data: { type: "saloni-preview-request", version: 1, nonce: seed.channelNonce, requestId: seed.requestId, mode: "order", transferId: "bootstrap-1" }, ports: [port] });
   assert.equal(port.messages.length, 1);
   assert.equal(port.messages[0].ok, true);
-  assert.equal(port.messages[0].blob.type, "image/png");
+  assert.equal(port.messages[0].blob.type, "image/jpeg");
 });
 
 test("preview rejects two ports without pinning, and the separate CAPTCHA channel remains distinct", async () => {
@@ -1685,7 +1685,7 @@ test("serves exactly one immutable preview snapshot per validated request and al
   assert.equal(valid.messages[0].type, "saloni-preview-response");
   assert.equal(valid.messages[0].ok, true);
   assert.equal(valid.messages[0].blob.size, 42);
-  assert.equal(valid.messages[0].blob.type, "image/png");
+  assert.equal(valid.messages[0].blob.type, "image/jpeg");
   assert.equal(seed.formMode, "order");
   assert.equal(seed.previewExpected, true);
   assert.equal(submittedSeed(flow.posted).designDetails, "Custom details");
@@ -1710,7 +1710,7 @@ test("reports preview failures through the bounded error field without a Blob", 
     return captured;
   };
   flow.customizer.dispatch("click");
-  captured.blob = { type: "image/png", size: 0 };
+  captured.blob = { type: "image/jpeg", size: 0 };
   const seed = submittedSeed(flow.posted);
   const source = flow.elements.get("order-form-frame").contentWindow;
   const origin = "https://n-1234567890-1lu-script.googleusercontent.com";

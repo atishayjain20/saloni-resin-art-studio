@@ -2025,6 +2025,8 @@ class StaticSiteContractTests(unittest.TestCase):
             with self.subTest(helper=helper):
                 self.assertRegex(script, rf'function {helper}\s*\(')
         self.assertIn("sceneCanvas.toBlob", script)
+        self.assertIn("exportCanvas.toBlob", script)
+        self.assertIn("PREVIEW_MIME_TYPE", script)
         self.assertIn("createObjectURL", script)
         self.assertIn("download-preview", script)
         self.assertIn("ArrowLeft", script)
