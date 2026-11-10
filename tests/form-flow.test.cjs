@@ -1414,6 +1414,7 @@ test("a slow captcha keeps the still-sending text when the token arrives late", 
 });
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
+const PREVIEW_LIMIT = 5 * 1024 * 1024;
 const REFERENCE_TOO_LARGE = "This image is too large to send. Please choose a smaller photo or screenshot (under 1.5 MB).";
 const largePng = (name = "wall photo.png", size = 4 * 1024 * 1024) => new File([pngBlob(size)], name, { type: "image/png" });
 
@@ -1545,4 +1546,25 @@ test("the customizer preview is attached as is and not shrunk", async () => {
   assert.equal(assigned.size, 1000 * 1024);
   assert.equal(runtime.imaging.canvases.length, 0);
   assert.equal(runtime.elements.get("submit-button").disabled, false);
+});
+
+test("a 1.6 MB customizer PNG preview is still submitted, but over 5 MB is blocked", async () => {
+  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
+  respondPreview(runtime, 0, { blob: pngBlob(1.6 * 1024 * 1024) });
+  assert.equal(runtime.fields.referenceImage.files[0].name, "saloni-customizer-preview.png");
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  respondToken(runtime, 0);
+  await Promise.resolve();
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE), false);
+
+  const oversized = makeFormRuntime();
+  fillValid(oversized.fields);
+  oversized.fields.referenceImage.files = [{ name: "saloni-customizer-preview.png", type: "image/png", size: PREVIEW_LIMIT + 1 }];
+  oversized.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  assert.equal(oversized.submissions.length, 0);
+  assert.ok(oversized.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE));
 });
