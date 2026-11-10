@@ -146,7 +146,7 @@
 
     <fieldset>
       <legend>Optional reference image</legend>
-      <label for="reference-image">JPG or PNG, one file up to 5 MB <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+      <label for="reference-image">JPG or PNG, one photo (large photos are shrunk automatically) <input id="reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
       <div id="reference-image-preview-wrap" hidden>
         <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" loading="lazy" decoding="async">
       </div>
@@ -218,6 +218,11 @@
   var PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
   var PREVIEW_FILENAMES = { "image/jpeg": "saloni-customizer-preview.jpg", "image/png": "saloni-customizer-preview.png" };
   function previewFilename(type) { return PREVIEW_FILENAMES[String(type || "").toLowerCase()] || ""; }
+  var REFERENCE_MAX_BYTES = 1536 * 1024;
+  var REFERENCE_KEEP_BYTES = 700 * 1024;
+  var REFERENCE_MAX_SIDE = 1600;
+  var REFERENCE_TOO_LARGE = "This image is too large to send. Please choose a smaller photo or screenshot (under 1.5 MB).";
+  var referencePreparing = false;
   var previewExpected = false;
   var previewResolved = true;
   var previewPending = false;
@@ -746,24 +751,119 @@
       previewFailure("The customizer preview is unavailable in this browser.");
     }
   }
+  function isJpegOrPng(file) {
+    return ["image/jpeg", "image/png"].indexOf(String(file.type || "").toLowerCase()) !== -1 || /\.(jpe?g|png)$/i.test(String(file.name || ""));
+  }
+  function setReferencePreparing(on) {
+    referencePreparing = on;
+    submitButton.disabled = on || active;
+  }
+  function clearReferenceFile() {
+    try { referenceImage.value = ""; } catch (error) {}
+    try { referenceImage.files = []; } catch (error) {}
+  }
+  function showAttachedReference(file) {
+    revokePreviewObjectUrl();
+    var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+    if (urlApi && typeof urlApi.createObjectURL === "function") {
+      previewObjectUrl = urlApi.createObjectURL(file);
+      referenceImagePreview.setAttribute("src", previewObjectUrl);
+      referenceImagePreviewWrap.hidden = false;
+    }
+    referenceImagePreview.setAttribute("alt", "Attached reference image");
+    setReferenceImageStatus("Reference image attached.");
+  }
+  function decodeReferenceImage(file) {
+    var bitmapApi = window.createImageBitmap || (typeof createImageBitmap !== "undefined" ? createImageBitmap : null);
+    if (typeof bitmapApi === "function") return bitmapApi.call(window, file);
+    return new Promise(function (resolve, reject) {
+      var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
+      var ImageCtor = window.Image || (typeof Image !== "undefined" ? Image : null);
+      if (!urlApi || typeof urlApi.createObjectURL !== "function" || !ImageCtor) { reject(new Error("Image decoding is unavailable")); return; }
+      var url = urlApi.createObjectURL(file);
+      var image = new ImageCtor();
+      image.onload = function () { try { urlApi.revokeObjectURL(url); } catch (error) {} resolve(image); };
+      image.onerror = function () { try { urlApi.revokeObjectURL(url); } catch (error) {} reject(new Error("The image could not be decoded")); };
+      image.src = url;
+    });
+  }
+  function shrinkReferenceImage(file) {
+    return decodeReferenceImage(file).then(function (source) {
+      var sourceWidth = source.naturalWidth || source.width;
+      var sourceHeight = source.naturalHeight || source.height;
+      if (!(sourceWidth > 0 && sourceHeight > 0)) throw new Error("The image has no size");
+      var scale = Math.min(1, REFERENCE_MAX_SIDE / Math.max(sourceWidth, sourceHeight));
+      var width = Math.max(1, Math.round(sourceWidth * scale));
+      var height = Math.max(1, Math.round(sourceHeight * scale));
+      var canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      var context = canvas.getContext && canvas.getContext("2d");
+      if (!context || typeof canvas.toBlob !== "function") throw new Error("Canvas is unavailable");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(source, 0, 0, width, height);
+      if (typeof source.close === "function") { try { source.close(); } catch (error) {} }
+      return new Promise(function (resolve, reject) {
+        canvas.toBlob(function (blob) { if (blob) resolve(blob); else reject(new Error("The image could not be exported")); }, "image/jpeg", 0.82);
+      });
+    }).then(function (blob) {
+      if (!blob.size || blob.size > REFERENCE_MAX_BYTES) throw new Error("The shrunk image is still too large");
+      var FileCtor = window.File || (typeof File !== "undefined" ? File : null);
+      var DataTransferCtor = window.DataTransfer || (typeof DataTransfer !== "undefined" ? DataTransfer : null);
+      if (!FileCtor || !DataTransferCtor) throw new Error("This browser cannot attach the shrunk image");
+      var name = (String(file.name || "").replace(/\.[^.\/\\]*$/, "") || "reference-image") + ".jpg";
+      return { file: new FileCtor([blob], name, { type: "image/jpeg" }), transfer: new DataTransferCtor() };
+    });
+  }
+  function assignShrunkReference(shrunk) {
+    var transfer = shrunk.transfer;
+    if (!transfer.items || typeof transfer.items.add !== "function") throw new Error("DataTransfer is unavailable");
+    transfer.items.add(shrunk.file);
+    referenceImage.files = transfer.files;
+    var assigned = referenceImage.files && referenceImage.files[0];
+    if (!assigned || assigned.name !== shrunk.file.name || String(assigned.type || "").toLowerCase() !== "image/jpeg" || assigned.size !== shrunk.file.size) {
+      throw new Error("The shrunk image could not be assigned");
+    }
+    return assigned;
+  }
+  function prepareReferenceImage(file) {
+    var generation = attachmentGeneration;
+    setReferencePreparing(true);
+    setReferenceImageStatus("Preparing your image…");
+    var finish = function (shrunk) {
+      if (generation !== attachmentGeneration) return;
+      setReferencePreparing(false);
+      var assigned = null;
+      try { assigned = shrunk ? assignShrunkReference(shrunk) : null; } catch (error) {}
+      if (assigned) showAttachedReference(assigned);
+      else {
+        clearReferenceFile();
+        revokePreviewObjectUrl();
+        if (referenceImagePreviewWrap) referenceImagePreviewWrap.hidden = true;
+        previewCanRetry = previewExpected;
+        setReferenceImageStatus(REFERENCE_TOO_LARGE, "error");
+      }
+      updateReferenceImageActions();
+    };
+    var started;
+    try { started = shrinkReferenceImage(file); } catch (error) { started = Promise.reject(error); }
+    started.then(finish, function () { finish(null); });
+  }
   function handleReferenceImageChange() {
     attachmentGeneration += 1;
     closePreviewAttempt();
     previewResolved = true;
     previewCanRetry = false;
     previewCanContinue = false;
+    setReferencePreparing(false);
     revokePreviewObjectUrl();
     if (referenceImagePreviewWrap) referenceImagePreviewWrap.hidden = true;
     var file = referenceImage.files && referenceImage.files[0];
-    if (file) {
-      var urlApi = window.URL || (typeof URL !== "undefined" ? URL : null);
-      if (urlApi && typeof urlApi.createObjectURL === "function") {
-        previewObjectUrl = urlApi.createObjectURL(file);
-        referenceImagePreview.setAttribute("src", previewObjectUrl);
-        referenceImagePreviewWrap.hidden = false;
-      }
-      referenceImagePreview.setAttribute("alt", "Attached reference image");
-      setReferenceImageStatus("Reference image attached.");
+    if (file && (file.size > REFERENCE_KEEP_BYTES || !isJpegOrPng(file))) {
+      prepareReferenceImage(file);
+    } else if (file) {
+      showAttachedReference(file);
     } else {
       setReferenceImageStatus(previewExpected ? "Reference image removed. You can retry the customizer preview." : "No reference image attached.");
       previewCanRetry = previewExpected;
@@ -968,7 +1068,7 @@
     if (file && file.size !== 0) {
       var fileName = String(file.name || "").toLowerCase();
       var fileType = String(file.type || "").toLowerCase();
-      if (file.size > 5 * 1024 * 1024) errors.referenceImage = "The reference image must be 5 MB or smaller.";
+      if (file.size > REFERENCE_MAX_BYTES) errors.referenceImage = REFERENCE_TOO_LARGE;
       else if (["image/jpeg", "image/png"].indexOf(fileType) === -1 && !/\.(jpe?g|png)$/.test(fileName)) errors.referenceImage = "Attach one JPG or PNG image.";
     }
     return errors;
@@ -1006,6 +1106,7 @@
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     if (active) return;
+    if (referencePreparing) { setStatus("Preparing your image… please try again in a moment.", ""); return; }
     if (isBundle()) updateBundleScalars(true);
     else if (!dimensionsRequired()) fillBlankSizeParts();
     clearErrors();
