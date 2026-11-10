@@ -465,15 +465,12 @@
         return match ? "catalogue:" + match[1] : "";
       }
 
-      // The average covers this product's real ratings only; studio notes never count. Once the feed is in, an unrated piece says so.
-      function renderProductRating(average, count, known) {
+      // The average covers this product's real ratings only; studio notes never count. An unrated piece shows no line.
+      function renderProductRating(average, count) {
         if (!lightboxRatingSummary) return;
         while (lightboxRatingSummary.firstChild) lightboxRatingSummary.removeChild(lightboxRatingSummary.firstChild);
-        lightboxRatingSummary.hidden = !count && !known;
-        if (!count) {
-          if (known) lightboxRatingSummary.appendChild(reviewSpan("lightbox-rating-text", "No ratings yet"));
-          return;
-        }
+        lightboxRatingSummary.hidden = !count;
+        if (!count) return;
         var filled = Math.round(average);
         var stars = reviewSpan("review-stars", "\u2605\u2605\u2605\u2605\u2605".slice(0, filled) + "\u2606\u2606\u2606\u2606\u2606".slice(0, 5 - filled));
         stars.setAttribute("aria-hidden", "true");
@@ -645,7 +642,7 @@
           ratingTotal += ratingAdjustments[productId][0];
           ratingCount += ratingAdjustments[productId][1];
         }
-        renderProductRating(ratingCount ? ratingTotal / ratingCount : 0, ratingCount, Boolean(productReviewsData && !productReviewsFailed && productId));
+        renderProductRating(ratingCount ? ratingTotal / ratingCount : 0, ratingCount);
         renderRateState(productId);
         var sample = item.card && typeof item.card.getAttribute === "function" ? item.card.getAttribute("data-sample-review") || "" : "";
         if (sample) {
