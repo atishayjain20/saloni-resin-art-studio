@@ -2120,9 +2120,7 @@ function validateReferralCode(code) {
   if (!normalized || !PARTNER_CODE_PATTERN.test(normalized)) return { status: "invalid", code: normalized };
   try {
     var partner = lookupPartner_(normalized, PropertiesService.getScriptProperties());
-    var response = { status: partner.status, code: normalized };
-    if (partner.status === "active") response.displayName = partner.displayName;
-    return response;
+    return { status: partner.status, code: normalized };
   } catch (error) {
     return { status: "error", code: normalized };
   }

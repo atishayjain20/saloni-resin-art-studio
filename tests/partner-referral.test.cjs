@@ -62,7 +62,7 @@ test("returns only public active-code fields and rejects duplicate configuration
   };
   vm.createContext(context);
   vm.runInContext(code, context, { filename: "Code.gs" });
-  assert.deepEqual(JSON.parse(JSON.stringify(context.validateReferralCode(" ajmerphoto01 "))), { status: "active", code: "AJMERPHOTO01", displayName: "Ajmer Photo Studio" });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.validateReferralCode(" ajmerphoto01 "))), { status: "active", code: "AJMERPHOTO01" });
   assert.deepEqual(JSON.parse(JSON.stringify(context.validateReferralCode("unknown01"))), { status: "invalid", code: "UNKNOWN01" });
   rows.push(["partner-2", "AJMERPHOTO01", "Duplicate", "", "Photographer", "Ajmer", "", "", "", 0.05, "Active", new Date(), "", "", ""]);
   assert.deepEqual(JSON.parse(JSON.stringify(context.validateReferralCode("AJMERPHOTO01"))), { status: "error", code: "AJMERPHOTO01" });
@@ -695,13 +695,13 @@ test("the partner form selects the link when the clipboard is unavailable and ig
   const hostile = makePartnerFormRuntime();
   hostile.callbacks[0].success({ ok: true, applicationId: "application-seed-123", referralLink: "javascript:alert(1)" });
   assert.equal(hostile.box.children.length, 0);
-  assert.match(hostile.status.textContent, /Your referral link will be sent to you shortly\. Application ID: application-seed-123/);
+  assert.match(hostile.status.textContent, /Saloni will contact you with your referral link\. Application ID: application-seed-123/);
 });
 
 test("the partner form explains that the link follows when none came back", () => {
   const runtime = makePartnerFormRuntime();
   runtime.callbacks[0].success({ ok: true, applicationId: "application-seed-123", receivedAt: "now" });
-  assert.equal(runtime.status.textContent, "Application received. Your referral link will be sent to you shortly. Application ID: application-seed-123");
+  assert.equal(runtime.status.textContent, "Application received. Saloni will contact you with your referral link. Application ID: application-seed-123");
   assert.equal(runtime.box.hidden, true);
   assert.equal(runtime.another.hidden, false);
 });
