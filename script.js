@@ -978,6 +978,12 @@
       var offerLabel = slide.querySelector(".hero-slide-offer");
       if (offerLabel) offerLabel.hidden = false;
       slide.parentNode.insertBefore(slide, slide.parentNode.firstChild);
+      // Its first photo is now the first one shoppers see, so load it first instead of lazily.
+      var leadImage = slide.querySelector("img");
+      if (leadImage) {
+        leadImage.setAttribute("loading", "eager");
+        leadImage.setAttribute("fetchpriority", "high");
+      }
       // The browser keeps the old first slide in view after the move, so start the carousel at Diwali.
       slide.parentNode.scrollLeft = 0;
       Array.prototype.forEach.call(slide.parentNode.querySelectorAll(".hero-slide"), function (item, index) {
@@ -1628,7 +1634,7 @@
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
     var requestedMode = embed.getAttribute("data-form-mode");
-    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" || requestedMode === "review" ? requestedMode : "order" };
+    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", catalogueSeedTimer: null, sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" || requestedMode === "review" ? requestedMode : "order" };
     var corporateIntakeReady = embed.getAttribute("data-intake-ready") === "true";
     var orderDialogEnabled = Boolean(orderDialog && typeof orderDialog.showModal === "function");
     var orderDialogHistoryActive = false;
@@ -2007,7 +2013,14 @@
       return seed;
     }
 
+    function cancelScheduledCataloguePrepare() {
+      if (frameState.catalogueSeedTimer === null) return;
+      window.clearTimeout(frameState.catalogueSeedTimer);
+      frameState.catalogueSeedTimer = null;
+    }
+
     function submitSeed(seed, shouldScroll, identity, previewSnapshot, previewExpected, opener, customizerHandoff, openDialog) {
+      cancelScheduledCataloguePrepare();
       if (!configured) {
         invalidateChannel();
         status.innerHTML = frameState.mode === "corporate"
@@ -2068,6 +2081,7 @@
     }
 
     function clearPreparedCatalogueRequest() {
+      cancelScheduledCataloguePrepare();
       if (orderDialogEnabled && orderDialog.open) {
         frameState.catalogueSeedKey = "";
         return;
@@ -2220,6 +2234,7 @@
     var catalogueButtons = [];
     var CATALOGUE_CART_STORAGE_KEY = "saloniCatalogueCart";
     var catalogueCartExpiresAt = 0;
+    var CATALOGUE_PREPARE_DELAY_MS = 600;
 
     function catalogueCartStorage() {
       try { return window.localStorage || null; } catch (error) { return null; }
@@ -2468,7 +2483,7 @@
           setCatalogueSelectionStatus("");
           markCatalogueSelectionChanged();
           updateCatalogueSelection();
-          prepareCatalogueSelection();
+          scheduleCatalogueSelectionPrepare();
         });
         var linePrice = document.createElement("span");
         linePrice.className = "catalogue-selection-item-price";
@@ -2485,7 +2500,7 @@
           setCatalogueSelectionStatus("");
           markCatalogueSelectionChanged();
           updateCatalogueSelection();
-          if (selectedCatalogueItems.length) prepareCatalogueSelection();
+          if (selectedCatalogueItems.length) scheduleCatalogueSelectionPrepare();
           else clearPreparedCatalogueRequest();
         });
         label.appendChild(input);
@@ -2572,10 +2587,22 @@
       return prepared;
     }
 
+    // Seed the order form in the background shortly after the cart settles, so Order now can open it instantly.
+    function scheduleCatalogueSelectionPrepare() {
+      cancelScheduledCataloguePrepare();
+      if (!configured || !selectedCatalogueItems.length) return;
+      frameState.catalogueSeedTimer = window.setTimeout(function () {
+        frameState.catalogueSeedTimer = null;
+        if (orderDialogEnabled && orderDialog.open) return;
+        prepareCatalogueSelection();
+      }, CATALOGUE_PREPARE_DELAY_MS);
+    }
+
     function openCatalogueSelectionRequest(items, opener) {
       var requestOpener = opener || catalogueRequestSelected;
       var key = catalogueSelectionKey(items);
       if (frameState.loaded && frameState.sourceKind === "catalogue" && frameState.catalogueSeedKey === key) {
+        cancelScheduledCataloguePrepare();
         if (continueOrderButton) continueOrderButton.hidden = false;
         if (orderDialogEnabled) openOrderDialog(requestOpener, true);
         else scrollToForm();
@@ -2594,7 +2621,7 @@
         setCatalogueSelectionStatus("");
         markCatalogueSelectionChanged();
         updateCatalogueSelection();
-        if (selectedCatalogueItems.length) prepareCatalogueSelection();
+        if (selectedCatalogueItems.length) scheduleCatalogueSelectionPrepare();
         else clearPreparedCatalogueRequest();
         return;
       }
@@ -2607,7 +2634,7 @@
       setCatalogueSelectionStatus("");
       markCatalogueSelectionChanged();
       updateCatalogueSelection();
-      prepareCatalogueSelection();
+      scheduleCatalogueSelectionPrepare();
     }
 
     function catalogueSeed(card) {

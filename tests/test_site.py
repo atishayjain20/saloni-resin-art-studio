@@ -142,6 +142,14 @@ MARRIAGE_GIFTS = (
 )
 
 class StaticSiteContractTests(unittest.TestCase):
+    def assert_square_image_matches_file(self, image_tag, path):
+        """Concept previews stay square, are never upscaled past 1024 px, and declare their real pixel size."""
+        width, height = webp_dimensions(path)
+        self.assertEqual(width, height, path)
+        self.assertLessEqual(width, 1024, path)
+        self.assertIn(f'width="{width}"', image_tag)
+        self.assertIn(f'height="{height}"', image_tag)
+
     @classmethod
     def setUpClass(cls):
         cls.html_path = ROOT / "index.html"
@@ -399,9 +407,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertRegex(image.group(0), r'alt=["\']Illustrative preview: [^"\']+["\']')
                 self.assertIn('loading="lazy"', image.group(0))
                 self.assertIn('decoding="async"', image.group(0))
-                self.assertIn('width="1024"', image.group(0))
-                self.assertIn('height="1024"', image.group(0))
-                self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
+                self.assert_square_image_matches_file(image.group(0), ROOT / "assets" / asset)
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 self.assertRegex(pricing.group(0), rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(festive)}</dd>')
@@ -430,9 +436,7 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertRegex(image.group(0), r'alt=["\']Illustrative preview: [^"\']+["\']')
                 self.assertIn('loading="lazy"', image.group(0))
                 self.assertIn('decoding="async"', image.group(0))
-                self.assertIn('width="1024"', image.group(0))
-                self.assertIn('height="1024"', image.group(0))
-                self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
+                self.assert_square_image_matches_file(image.group(0), ROOT / "assets" / asset)
                 pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
                 self.assertIsNotNone(pricing)
                 self.assertRegex(pricing.group(0), rf'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹{re.escape(offer)}</dd>')
@@ -800,6 +804,11 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn("Online orders only", self.html)
         self.assertNotIn("no customer visits", self.html)
 
+    def test_home_page_preconnects_to_the_order_form_hosts(self):
+        head = self.html.split("</head>")[0]
+        self.assertIn('<link rel="preconnect" href="https://script.google.com">', head)
+        self.assertIn('<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>', head)
+
     def test_hero_banner_images_exist_with_real_dimensions_and_loading_rules(self):
         hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html)
         self.assertIsNotNone(hero)
@@ -1018,11 +1027,9 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIsNotNone(image)
                 image_tag = image.group(0)
                 self.assertRegex(image_tag, r'alt=["\']Illustrative preview: [^"\']+["\']')
-                self.assertIn('width="1024"', image_tag)
-                self.assertIn('height="1024"', image_tag)
+                self.assert_square_image_matches_file(image_tag, ROOT / "assets" / asset)
                 self.assertIn('loading="lazy"', image_tag)
                 self.assertIn('decoding="async"', image_tag)
-                self.assertEqual(webp_dimensions(ROOT / "assets" / asset), (1024, 1024))
                 trigger = re.search(r'<a\b[^>]*data-lightbox-trigger[^>]*href=["\']([^"\']+)["\']', card)
                 self.assertIsNotNone(trigger)
                 self.assertEqual(trigger.group(1), f"assets/{asset}")
@@ -1751,11 +1758,9 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIsNotNone(image)
                 image_tag = image.group(0)
                 self.assertRegex(image_tag, r'alt=["\']Illustrative preview: [^"\']+["\']')
-                self.assertIn('width="1024"', image_tag)
-                self.assertIn('height="1024"', image_tag)
+                self.assert_square_image_matches_file(image_tag, ROOT / f"assets/{asset}")
                 self.assertIn('loading="lazy"', image_tag)
                 self.assertIn('decoding="async"', image_tag)
-                self.assertEqual(webp_dimensions(ROOT / f"assets/{asset}"), (1024, 1024))
                 href = re.search(r'<a\b[^>]*data-lightbox-trigger[^>]*href=["\']([^"\']+)["\']', card).group(1)
                 self.assertEqual(href, f"assets/{asset}")
 

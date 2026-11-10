@@ -213,9 +213,9 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261157">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261157" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261157" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261158">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261158" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261158" defer><\/script>/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -2451,7 +2451,8 @@ test("on 8 and 9 November the Diwali hero slide moves first and shows the offer"
     const slides = [label("1 of 5: Premium"), label("2 of 5: Couple"), label("3 of 5: Marriage"), label("4 of 5: Corporate"), label("5 of 5: Diwali")];
     const offerLabel = { hidden: true };
     const slide = slides[4];
-    slide.querySelector = (sel) => (sel === ".hero-slide-offer" ? offerLabel : null);
+    const leadImage = { attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
+    slide.querySelector = (sel) => (sel === ".hero-slide-offer" ? offerLabel : sel === "img" ? leadImage : null);
     const track = {
       scrollLeft: 360,
       get firstChild() { return slides[0]; },
@@ -2466,15 +2467,17 @@ test("on 8 and 9 November the Diwali hero slide moves first and shows the offer"
     };
     vm.createContext(context);
     vm.runInContext(`${source}\ninitDiwaliGreeting(${Date.parse(iso)});`, context);
-    return { labels: slides.map((item) => item.text), offerLabel, track };
+    return { labels: slides.map((item) => item.text), offerLabel, track, leadImage };
   };
   const during = run("2026-11-08T09:00:00Z");
   assert.deepEqual(during.labels, ["1 of 5: Diwali", "2 of 5: Premium", "3 of 5: Couple", "4 of 5: Marriage", "5 of 5: Corporate"]);
   assert.equal(during.offerLabel.hidden, false);
   assert.equal(during.track.scrollLeft, 0, "the carousel starts on the Diwali slide");
+  assert.deepEqual(during.leadImage.attributes, { loading: "eager", fetchpriority: "high" }, "the first photo shoppers see loads first, not lazily");
   const after = run("2026-11-09T18:31:00Z");
   assert.deepEqual(after.labels, ["1 of 5: Premium", "2 of 5: Couple", "3 of 5: Marriage", "4 of 5: Corporate", "5 of 5: Diwali"], "back to normal from 10 Nov");
   assert.equal(after.offerLabel.hidden, true);
+  assert.deepEqual(after.leadImage.attributes, {}, "outside the offer the Diwali slide stays lazy");
 });
 
 test("the Diwali wish and offer replace the Dhanteras pop-up and show only on 8 and 9 November 2026 (India time)", () => {
