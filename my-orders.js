@@ -9,6 +9,10 @@
  * last known status still shows when the check fails. The shopper never sees Saloni's own Status wording.
  * When Saloni has confirmed an order and typed an advance amount, the same answer carries advance {amount, payee, name}. It is
  * kept in memory only (never in localStorage), checked again here, and turned into "Pay with" UPI app links plus a copy option.
+ * The home page also runs that status check once, about 2.5 s after it has loaded (never more than once per 10 minutes, and only
+ * when this browser holds an order that could still owe an advance). If the answer holds an advance, a small popup says so; "Pay now"
+ * opens My orders on that order, "Later" (or Escape, or Back) hides it for that order for 12 hours (the only thing stored for it
+ * is the request ID and the time). This script is loaded on the home page only, so no other page shows the popup.
  */
 (function () {
   "use strict";
@@ -303,6 +307,11 @@
   var listElement = document.getElementById("my-orders-list");
   var emptyElement = document.getElementById("my-orders-empty");
   var contactElement = document.getElementById("my-orders-contact");
+  var popup = document.getElementById("advance-popup");
+  var popupText = document.getElementById("advance-popup-text");
+  var popupMore = document.getElementById("advance-popup-more");
+  var popupPay = document.getElementById("advance-popup-pay");
+  var popupLater = document.getElementById("advance-popup-later");
   var opener = null;
   var views = [];
   var lastStatusCheckAt = 0;
@@ -387,7 +396,7 @@
     card.appendChild(items);
     card.appendChild(element("p", "my-order-meta", FULFILLMENT_LABELS[order.fulfillment]));
     if (order.notes) card.appendChild(element("p", "my-order-notes", "Your notes: " + order.notes));
-    var view = { order: order, card: card, status: element("p", "my-order-status"), note: element("p", "my-order-note"), advance: element("div", "my-order-advance"), advanceKey: "", cancel: null, sending: false };
+    var view = { order: order, card: card, status: element("p", "my-order-status"), note: element("p", "my-order-note"), advance: element("div", "my-order-advance"), advanceKey: "", firstPay: null, cancel: null, sending: false };
     view.note.setAttribute("aria-live", "polite");
     view.note.hidden = true;
     view.advance.hidden = true;
@@ -414,10 +423,10 @@
     }
   }
   // The advance only shows while the order reads "Confirmed" here too (a cancellation the shopper asked for, or any later status, hides it).
-  function advanceFor(view) {
-    var order = view.order;
+  function advanceForOrder(order) {
     return effectiveStatus(order) === "confirmed" && Object.prototype.hasOwnProperty.call(advanceByRequest, order.requestId) ? advanceByRequest[order.requestId] : null;
   }
+  function advanceFor(view) { return advanceForOrder(view.order); }
   // Rebuilt only when the amount or UPI ID changes, so a repaint never takes focus away from the Copy button.
   function paintAdvance(view) {
     var advance = advanceFor(view);
@@ -426,6 +435,7 @@
     view.advanceKey = key;
     var box = view.advance;
     var hadFocus = isInside(box, document.activeElement);
+    view.firstPay = null;
     clearChildren(box);
     box.hidden = !advance;
     if (!advance) {
@@ -444,6 +454,7 @@
       pay.setAttribute("title", option.aria);
       pay.appendChild(iconSvg(option));
       choice.appendChild(pay);
+      if (!view.firstPay) view.firstPay = pay;
     });
     box.appendChild(choice);
     var alternative = element("p", "my-order-advance-alt");
@@ -589,12 +600,13 @@
   }
   // Ask for the live status of every remembered order, at most once a minute. The answer is stored and painted in place (an open
   // cancel confirm stays open); any failure is silent and the last known status stays on screen.
-  function refreshStatuses() {
-    if (statusInFlight || !execUrl()) return;
+  // Returns true when a request went out. onAnswer runs after a usable answer has been stored and painted.
+  function refreshStatuses(onAnswer) {
+    if (statusInFlight || !execUrl()) return false;
     var now = Date.now();
-    if (lastStatusCheckAt && now - lastStatusCheckAt < STATUS_CHECK_GAP_MS && now >= lastStatusCheckAt) return;
+    if (lastStatusCheckAt && now - lastStatusCheckAt < STATUS_CHECK_GAP_MS && now >= lastStatusCheckAt) return false;
     var ids = read().map(function (order) { return order.requestId; }).filter(function (id) { return CANCELLABLE_ID.test(id); }).slice(0, MAX_ORDERS);
-    if (!ids.length) return;
+    if (!ids.length) return false;
     statusInFlight = true;
     lastStatusCheckAt = now;
     postAction("status", { requestIds: ids }, STATUS_TIMEOUT_MS).then(function (reply) {
@@ -611,7 +623,9 @@
       });
       // An order the server did not answer for (or one whose advance went away) loses its Pay button too.
       views.forEach(paintAdvance);
+      if (onAnswer) onAnswer();
     }, function () { statusInFlight = false; });
+    return true;
   }
   // A cancel confirm sits low in a scrolling panel, so its buttons are focused with scrolling on.
   function focusIfPossible(target, scrollIntoView) {
@@ -630,6 +644,108 @@
     refreshStatuses();
     return true;
   }
+  // --- the advance payment popup ---
+  var SNOOZE_KEY = "saloniAdvanceSnoozed";
+  var LOAD_CHECK_KEY = "saloniAdvanceLoadCheckAt";
+  var SNOOZE_MS = 12 * 60 * 60 * 1000;
+  var LOAD_CHECK_GAP_MS = 10 * 60 * 1000;
+  var IDLE_DELAY_MS = 2500;
+  // An order in one of these states cannot owe an advance any more, so it never triggers the load check.
+  var NO_ADVANCE_STATUSES = { delivered: true, dispatched: true, cancelled: true, advance_paid: true, cancel_requested: true };
+  var popupOrders = [];
+  var payingNow = false;
+  var popupReturnFocus = null;
+
+  function anotherDialogOpen() {
+    return typeof document.querySelector === "function" && Boolean(document.querySelector("dialog[open]"));
+  }
+  // The time of the last load check, or 0 when nothing (or nothing sensible) is stored.
+  function lastLoadCheck(now) {
+    var store = storage();
+    if (!store) return 0;
+    try {
+      var raw = store.getItem(LOAD_CHECK_KEY);
+      if (typeof raw !== "string" || !/^[0-9]{1,15}$/.test(raw)) return 0;
+      var at = Number(raw);
+      return at > now + CLOCK_SKEW_MS ? 0 : at;
+    } catch (error) { return 0; }
+  }
+  // The live snoozes as {requestId: time}. Anything that is not exactly that shape, or older than 12 hours, is ignored.
+  function readSnoozes(now) {
+    var store = storage();
+    var live = {};
+    if (!store) return live;
+    var record = null;
+    try {
+      var raw = store.getItem(SNOOZE_KEY);
+      if (typeof raw === "string" && raw.length <= MAX_RAW_LENGTH) record = JSON.parse(raw);
+    } catch (error) { record = null; }
+    var map = record && record.version === VERSION && record.snoozed && typeof record.snoozed === "object" && !Array.isArray(record.snoozed) ? record.snoozed : {};
+    Object.keys(map).forEach(function (id) {
+      var at = map[id];
+      if (REQUEST_ID.test(id) && typeof at === "number" && at % 1 === 0 && at <= now + CLOCK_SKEW_MS && now - at < SNOOZE_MS) live[id] = at;
+    });
+    return live;
+  }
+  // Snooze these orders now. Only orders still stored are kept, so the record stays as small as the order list.
+  function snooze(requestIds) {
+    var store = storage();
+    if (!store || !requestIds.length) return;
+    var now = Date.now();
+    var snoozed = readSnoozes(now);
+    requestIds.forEach(function (id) { snoozed[id] = now; });
+    var kept = {};
+    var count = 0;
+    read().forEach(function (order) { if (snoozed[order.requestId] !== undefined) { kept[order.requestId] = snoozed[order.requestId]; count += 1; } });
+    try {
+      if (count) store.setItem(SNOOZE_KEY, JSON.stringify({ version: VERSION, snoozed: kept }));
+      else store.removeItem(SNOOZE_KEY);
+    } catch (error) {}
+  }
+  function showPopup(due) {
+    var first = due[0];
+    var advance = advanceForOrder(first);
+    popupOrders = due.map(function (order) { return order.requestId; });
+    popupText.textContent = "₹" + advance.amount + " for " + first.items[0].name + " (order " + first.requestId.slice(0, 8) + ")";
+    popupMore.textContent = due.length > 1 ? "+ " + (due.length - 1) + " more order" + (due.length > 2 ? "s" : "") : "";
+    popupMore.hidden = due.length < 2;
+    var active = document.activeElement;
+    popupReturnFocus = active && active !== document.body ? active : null;
+    payingNow = false;
+    pushHistory();
+    popup.showModal();
+    focusIfPossible(popupPay);
+  }
+  // After a usable status answer: pop up for the newest order that owes an advance and is not snoozed.
+  function offerPopup() {
+    if (popup.open || anotherDialogOpen() || backPending) return;
+    var snoozed = readSnoozes(Date.now());
+    var due = read().filter(function (order) { return advanceForOrder(order) && snoozed[order.requestId] === undefined; });
+    if (due.length) showPopup(due);
+  }
+  // Once, after the page has loaded: look only if an order could still owe an advance, not while a dialog is open, and at most
+  // once per 10 minutes. The check itself is the same one My orders runs, with its own 60 s gap and one-at-a-time guard.
+  function loadCheck() {
+    var store = storage();
+    if (!store || popup.open || anotherDialogOpen() || backPending) return;
+    var possible = read().some(function (order) { return CANCELLABLE_ID.test(order.requestId) && !NO_ADVANCE_STATUSES[effectiveStatus(order)]; });
+    if (!possible) return;
+    var now = Date.now();
+    var last = lastLoadCheck(now);
+    if (last && now - last < LOAD_CHECK_GAP_MS && now >= last) return;
+    if (!refreshStatuses(offerPopup)) return;
+    try { store.setItem(LOAD_CHECK_KEY, String(now)); } catch (error) {}
+  }
+  // Pay now: the history entry the popup took passes to My orders, which opens on that order with its first pay icon focused.
+  function payNow() {
+    var requestId = popupOrders[0];
+    payingNow = true;
+    popup.close();
+    var links = document.querySelectorAll("[data-my-orders-open]");
+    if (!open(links && links.length ? links[0] : null)) return;
+    var view = liveView(requestId);
+    if (view && view.firstPay) focusIfPossible(view.firstPay, true);
+  }
   function openFromLink(link, event) {
     if (!dialog || typeof dialog.showModal !== "function") return;
     if (event && (event.defaultPrevented || (event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
@@ -642,6 +758,29 @@
   }
 
   if (dialog && listElement && emptyElement && contactElement) {
+    if (popup && popupText && popupMore && popupPay && popupLater && typeof popup.showModal === "function" && typeof dialog.showModal === "function") {
+      popupPay.addEventListener("click", payNow);
+      popupLater.addEventListener("click", function () { popup.close(); });
+      // The panel fills the dialog, so a click that lands on the dialog itself is the backdrop.
+      popup.addEventListener("click", function (event) { if (event && event.target === popup) popup.close(); });
+      popup.addEventListener("close", function () {
+        var paying = payingNow;
+        var back = popupReturnFocus;
+        payingNow = false;
+        popupReturnFocus = null;
+        // Every way out snoozes the orders it named: Later, Escape, the backdrop, Back, and Pay now (Saloni confirms the payment by hand).
+        snooze(popupOrders);
+        popupOrders = [];
+        if (paying) return;
+        consumeHistory();
+        closedByHistory = false;
+        var visible = back && typeof back.getClientRects === "function" && back.getClientRects().length > 0;
+        if (visible) focusIfPossible(back);
+      });
+      var scheduleLoadCheck = function () { if (typeof window.setTimeout === "function") window.setTimeout(loadCheck, IDLE_DELAY_MS); };
+      if (document.readyState === "complete" || typeof window.addEventListener !== "function") scheduleLoadCheck();
+      else window.addEventListener("load", scheduleLoadCheck);
+    }
     Array.prototype.forEach.call(document.querySelectorAll("[data-my-orders-open]"), function (link) {
       link.addEventListener("click", function (event) { openFromLink(link, event); });
     });
@@ -674,9 +813,10 @@
       if (historyActive && !isHistoryState(event && event.state)) {
         closedByHistory = true;
         if (dialog.open) dialog.close();
+        if (popup && popup.open) popup.close();
         return;
       }
-      if (!historyActive && !dialog.open && isHistoryState(event && event.state)) {
+      if (!historyActive && !dialog.open && !(popup && popup.open) && isHistoryState(event && event.state)) {
         try { window.history.back(); } catch (error) {}
       }
     });
