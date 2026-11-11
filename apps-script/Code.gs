@@ -909,7 +909,8 @@ function orderStatuses_(requestIds) {
         var paid = advanceIsPaid_(values[row][amountColumn + 1]);
         if (paid && (code === "received" || code === "confirmed" || code === "in_progress")) {
           code = "advance_paid";
-        } else if (!paid && payee && code === "confirmed") {
+        } else if (!paid && payee && code === "confirmed" && String(values[row][statusColumn + 1] == null ? "" : values[row][statusColumn + 1]).indexOf(CANCEL_NOTE_PREFIX) === -1) {
+          // A cancellation request in Staff notes hides the advance, so a second device never offers to pay for a cancelled order.
           var amount = advanceAmount_(values[row][amountColumn]);
           if (amount) { advances[id] = { amount: amount, payee: payee.id, name: payee.name }; advanceCount += 1; }
         }
@@ -2786,7 +2787,10 @@ function migrateOrdersSchema_(sheet) {
 // layout. Headers only: no data row is read or written. Safe to run twice (the second run changes nothing).
 function migrateAdvanceSchema_(sheet) {
   var columns = ensureSchema_(sheet);
-  if (columns === ORDER_HEADERS_WITH_ADVANCE.length) return false;
+  if (columns === ORDER_HEADERS_WITH_ADVANCE.length) {
+    plainTextAdvanceColumns_(sheet);
+    return false;
+  }
   if (columns < ORDER_HEADERS.length) {
     migrateOrdersSchema_(sheet);
     columns = ensureSchema_(sheet);
@@ -2797,7 +2801,15 @@ function migrateAdvanceSchema_(sheet) {
   if (sheet.getRange(1, 1, 1, ORDER_HEADERS_WITH_ADVANCE.length).getValues()[0].map(String).join("\u001f") !== ORDER_HEADERS_WITH_ADVANCE.join("\u001f")) {
     throw new Error("Order sheet migration could not verify the advance headers.");
   }
+  plainTextAdvanceColumns_(sheet);
   return true;
+}
+
+// Plain text for the whole of the two advance columns (header and every row), so a typed 500 stays 500 and is never turned
+// into a date by a format the new column inherited. Formats only: no cell value changes. Setting it again changes nothing.
+function plainTextAdvanceColumns_(sheet) {
+  var rows = Number(sheet.getMaxRows && sheet.getMaxRows()) || Number(sheet.getLastRow()) || 1;
+  sheet.getRange(1, ORDER_HEADERS.length + 1, rows, ADVANCE_ORDER_HEADERS.length).setNumberFormat("@");
 }
 
 function orderSchemaLength_(sheet) {

@@ -656,6 +656,7 @@ function partnerRuntime(options = {}) {
         getFormulas: () => row === 1 ? [new Array(columnCount || target.headers.length).fill("")] : [((target.formulas[row - 2] || []).slice(column - 1, column - 1 + (columnCount || target.headers.length)))],
         setValues(valuesToSet) { if (column + (valuesToSet[0] || []).length - 1 > target.maxColumns) throw new Error("range exceeds sheet capacity"); target.writePayloads.push({ method: "setValues", values: valuesToSet.map((values) => values.slice()) }); for (let r = 0; r < valuesToSet.length; r += 1) { if (row === 1) { valuesToSet[r].forEach((value, c) => { target.headers[column - 1 + c] = value; }); } else { const destination = target.rows[row - 2 + r] || []; const formulaDestination = target.formulas[row - 2 + r] || []; while (destination.length < target.headers.length) destination.push(""); while (formulaDestination.length < target.headers.length) formulaDestination.push(""); valuesToSet[r].forEach((value, c) => { const storedValue = sheetCellValue(value); destination[column - 1 + c] = storedValue; formulaDestination[column - 1 + c] = typeof storedValue === "string" && storedValue.charAt(0) === "=" ? storedValue : ""; }); target.rows[row - 2 + r] = destination; target.formulas[row - 2 + r] = formulaDestination; if (options.failApplicationUpdateOnce && target.name === applicationTab && row > 1 && column === 1 && !options._applicationUpdateFailed) { options._applicationUpdateFailed = true; throw new Error("application update failed after write"); } if (options.failPartnerUpdateOnce && target.name === partnerTab && row > 1 && column === 1 && !options._partnerUpdateFailed) { options._partnerUpdateFailed = true; throw new Error("partner status update failed after write"); } } } },
         setValue(value) { range.setValues([[value]]); },
+        setNumberFormat(format) { (target.numberFormats = target.numberFormats || []).push({ row, column, rowCount, columnCount, format }); return range; },
         protect() { if (options.protectFailure) throw new Error("protection failed"); const protection = { sheet: target, warningOnly: true, numRows: rowCount || 1, numColumns: columnCount || 1, setWarningOnly(value) { protection.warningOnly = value; }, setDescription(value) { protection.description = value; }, getDescription() { return protection.description || ""; }, setRange(rangeToSet) { protection.numRows = rangeToSet.rowCount || target.maxRows; protection.numColumns = rangeToSet.columnCount || protection.numColumns; }, getEditors() { return []; }, removeEditors() { protection.removedEditors = true; }, addEditor() { protection.addedEditor = true; }, canDomainEdit: () => true, setDomainEdit(value) { protection.domainEdit = value; } }; protections.push(protection); return protection; },
       };
       return range;
@@ -876,4 +877,20 @@ test("retention on the advance layout deletes a plain expired order and keeps a 
   runtime.context.purgeExpiredOrdersAt_(new Date("2027-01-01"));
   assert.deepEqual(runtime.orderSheet.rows.map((row) => row[0]), ["request-new-123456"]);
   assert.equal(runtime.orderSheet.rows[0][37], 300);
+});
+
+test("setupAdvancePayments sets plain text on exactly the two advance columns, every row, and again on a rerun", () => {
+  for (const options of [{ migrated: true }, { orderMaxColumns: 26 }]) {
+    const runtime = partnerRuntime(Object.assign({ orderRows: [legacyRow("request-legacy-1", "Confirmed")] }, options));
+    if (!options.migrated) runtime.orderSheet.rows[0] = legacyRow("request-legacy-1", "Confirmed");
+    runtime.context.setupAdvancePayments();
+    const expected = [{ row: 1, column: 38, rowCount: runtime.orderSheet.maxRows, columnCount: 2, format: "@" }];
+    assert.equal(JSON.stringify(runtime.orderSheet.numberFormats), JSON.stringify(expected));
+    runtime.context.setupAdvancePayments();
+    assert.equal(JSON.stringify(runtime.orderSheet.numberFormats), JSON.stringify(expected.concat(expected)), "a rerun sets the same format again and nothing else");
+    assert.equal(runtime.orderSheet.rows[0][0], "request-legacy-1", "no value was changed");
+  }
+  const refused = partnerRuntime({ migrated: true, orderHeaders: ["Wrong"].concat(advanceLayout().slice(1, 37)) });
+  assert.throws(() => refused.context.setupAdvancePayments(), /schema/i);
+  assert.equal((refused.orderSheet.numberFormats || []).length, 0);
 });

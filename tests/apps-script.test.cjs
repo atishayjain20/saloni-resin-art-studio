@@ -1895,3 +1895,16 @@ test("action=status does not mix up advance cells between orders and ignores ids
   assert.equal(reply.advance[runtime.ids[0]].amount, 100);
   assert.equal(reply.advance[runtime.ids[2]].amount, 300);
 });
+
+test("action=status gives no advance once the shopper asked to cancel (Staff notes carry the request), on any device", () => {
+  const runtime = advanceRuntime([["Confirmed", 500, ""], ["Confirmed", 500, ""], ["Confirmed", 500, ""]]);
+  runtime.rows[0][25] = "Customer asked to cancel on 11 Nov 2026, 05:40 PM IST via My orders";
+  runtime.rows[1][25] = "Note first | Customer asked to cancel on 11 Nov 2026, 05:40 PM IST via My orders";
+  runtime.rows[2][25] = "Customer called about colours";
+  const reply = statusPost(runtime, { requestIds: runtime.ids });
+  assert.deepEqual(Object.keys(reply.advance), [runtime.ids[2]]);
+  assert.deepEqual(Object.values(reply.statuses), ["confirmed", "confirmed", "confirmed"], "the status itself is unchanged");
+  const onlyCancelled = advanceRuntime([["Confirmed", 500, ""]]);
+  onlyCancelled.rows[0][25] = "Customer asked to cancel on 11 Nov 2026";
+  assert.deepEqual(statusPost(onlyCancelled, { requestIds: onlyCancelled.ids }), { ok: true, statuses: { [onlyCancelled.ids[0]]: "confirmed" } });
+});
