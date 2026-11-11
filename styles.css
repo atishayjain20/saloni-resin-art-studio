@@ -472,6 +472,17 @@ dialog.my-orders-dialog:not([open]) { display: none; }
 dialog.my-orders-dialog { width: min(680px, calc(100vw - 2rem)); max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); padding: 0; border: 0; background: transparent; color: var(--ink); }
 dialog.my-orders-dialog::backdrop { background: rgba(42, 14, 31, .72); }
 .my-orders-panel { position: relative; width: 100%; max-height: calc(100dvh - 2rem); overflow: auto; overscroll-behavior: contain; padding: clamp(2.8rem, 4vw, 3.5rem) clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 1.5rem); border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }
+dialog.advance-popup:not([open]) { display: none; }
+dialog.advance-popup { width: min(420px, calc(100vw - 2rem)); max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); padding: 0; border: 0; background: transparent; color: var(--ink); }
+dialog.advance-popup::backdrop { background: rgba(42, 14, 31, .72); }
+.advance-popup-panel { max-height: calc(100dvh - 2rem); overflow: auto; overscroll-behavior: contain; padding: 1.4rem 1.2rem 1.2rem; border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }
+.advance-popup-title { margin: 0 0 .6rem; color: var(--ink); font: 500 clamp(1.5rem, 5vw, 1.9rem)/1.1 var(--display); }
+.advance-popup-text, .advance-popup-more { margin: 0 0 .4rem; color: var(--ink); font-size: .95rem; line-height: 1.5; overflow-wrap: anywhere; }
+.advance-popup-more { color: var(--muted); font-size: .85rem; }
+.advance-popup-more[hidden] { display: none; }
+.advance-popup-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.advance-popup-actions .button { flex: 1 1 8rem; justify-content: center; }
+.advance-popup-actions .button-line:not(:hover):not(:focus-visible) { background: transparent; }
 .my-orders-title { margin: 0 0 .5rem; color: var(--ink); font: 500 clamp(1.6rem, 4vw, 2.2rem)/1.1 var(--display); }
 .my-orders-empty p, .my-orders-contact p { margin: 0 0 .8rem; color: var(--muted); font-size: .85rem; line-height: 1.5; }
 .my-orders-empty { padding: 1rem 0 .5rem; }

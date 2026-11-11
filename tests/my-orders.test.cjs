@@ -47,10 +47,14 @@ function createStorage(initial = {}) {
 
 const EXEC_URL = "https://script.google.test/exec";
 
-function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false, statusImpl = null, clock = null, navigator = undefined } = {}) {
-  const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "nav-toggle"];
+function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false, statusImpl = null, clock = null, navigator = undefined, withoutPopup = false } = {}) {
+  const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "nav-toggle", "advance-popup", "advance-popup-text", "advance-popup-more", "advance-popup-pay", "advance-popup-later"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id === "my-orders-list" ? "ol" : "div", id)]));
   const dialog = elements.get("my-orders-dialog");
+  // The advance popup, and any other dialog of the page (Diwali greeting, order form, product popup), for "is a dialog open?".
+  if (withoutPopup) ["advance-popup", "advance-popup-text", "advance-popup-more", "advance-popup-pay", "advance-popup-later"].forEach((id) => elements.delete(id));
+  const popup = elements.get("advance-popup") || new FakeElement("dialog", "advance-popup");
+  const otherDialog = new FakeElement("dialog", "other-dialog");
   if (!dialogSupported) { dialog.showModal = undefined; }
   // The order form's embed element carries the Apps Script URL; my-orders.js reads it the same way order-form.js does.
   if (execUrl !== null) { const embed = new FakeElement("div", "order-form-embed"); embed.attributes["data-order-form-url"] = execUrl; elements.set("order-form-embed", embed); }
@@ -63,6 +67,7 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
     createElement: (tag) => new FakeElement(tag),
     createElementNS: (ns, tag) => { const node = new FakeElement(tag); node.namespace = ns; return node; },
     querySelectorAll: (selector) => (selector === "[data-my-orders-open]" ? [link] : []),
+    querySelector: (selector) => (selector === "dialog[open]" ? [dialog, popup, otherDialog].find((item) => item.open) || null : null),
     activeElement: null,
   };
   FakeElement.onFocus = (element) => { documentObject.activeElement = element; };
@@ -82,6 +87,7 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   const statusCalls = [];
   const statusTimers = [];
   const timers = [];
+  const idleTimers = [];
   const aborts = [];
   if (!noFetch) windowObject.fetch = (url, init) => {
     if (String(url).endsWith("?action=status")) { statusCalls.push({ url, init }); return (statusImpl || jsonReply({ ok: false, error: "paused" }))(url, init); }
@@ -90,6 +96,8 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   windowObject.AbortController = function () { this.signal = { aborted: false }; this.abort = () => { this.signal.aborted = true; aborts.push(this); }; };
   windowObject.setTimeout = (callback, delay) => {
     if (delay === 15000) { statusTimers.push({ callback, delay, cleared: false }); return -statusTimers.length; }
+    // The advance popup waits 2.5 s after the page has loaded before it looks at anything.
+    if (delay === 2500) { idleTimers.push({ callback, delay }); return 100000 + idleTimers.length; }
     timers.push({ callback, delay, cleared: false }); return timers.length;
   };
   windowObject.clearTimeout = (id) => { const timer = id < 0 ? statusTimers[-id - 1] : timers[id - 1]; if (timer) timer.cleared = true; };
@@ -106,7 +114,8 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   const real = windowObject.saloniMyOrders;
   // Arrays made inside the vm context have another prototype; hand the tests plain objects.
   const api = Object.assign({}, real, { list: () => JSON.parse(JSON.stringify(real.list())) });
-  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject, history, popstate, flushFrame, fetchCalls, statusCalls, statusTimers, timers, aborts };
+  const fireIdle = () => { const due = idleTimers.splice(0); due.forEach((timer) => timer.callback()); return due.length; };
+  return { api, storage, elements, dialog, popup, otherDialog, idleTimers, fireIdle, link, browseLink, documentObject, windowObject, history, popstate, flushFrame, fetchCalls, statusCalls, statusTimers, timers, aborts };
 }
 
 const order = (overrides = {}) => Object.assign({
@@ -1386,4 +1395,415 @@ test("my-orders.js builds the advance with text nodes only and keeps the UPI sha
   assert.match(css, /\.my-order-pay:focus-visible/);
   assert.doesNotMatch(css, /my-order-pay-hint/);
   assert.match(css, /\.my-order-advance\b/);
+});
+
+// --- Advance payment popup: one quiet status check after the home page has loaded, then a small popup when an advance is due ---
+const LOAD_KEY = "saloniAdvanceLoadCheckAt";
+const SNOOZE_KEY = "saloniAdvanceSnoozed";
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const ADV_ID_2 = "bbbb2222-ef56-4789-a012-3456789abcde";
+const ADV_ID_3 = "cccc3333-ef56-4789-a012-3456789abcde";
+const popupText = (runtime) => text(runtime.elements.get("advance-popup-text"));
+const popupButton = (runtime, id) => runtime.elements.get(id);
+// A browser with one confirmed order that owes an advance. clock is optional; storage can be shared to simulate a reload.
+function dueRuntime(options = {}) {
+  const runtime = makeRuntime(Object.assign({ statusImpl: advanceReply("confirmed", ADV) }, options));
+  if (!options.skipSave) runtime.api.save(order({ requestId: ADV_ID }));
+  return runtime;
+}
+const load = async (runtime) => { runtime.fireIdle(); await settle(); return runtime; };
+const setStored = (storage, changes) => {
+  const record = JSON.parse(storage.data[KEY]);
+  record.orders.forEach((entry) => { if (changes[entry.requestId]) Object.assign(entry, changes[entry.requestId]); });
+  storage.data[KEY] = JSON.stringify(record);
+};
+
+test("the page asks nothing of the server until it has loaded and sat idle for 2.5 seconds", () => {
+  const runtime = dueRuntime();
+  assert.equal(runtime.idleTimers.length, 1);
+  assert.equal(runtime.idleTimers[0].delay, 2500);
+  assert.equal(runtime.statusCalls.length, 0);
+  assert.equal(runtime.popup.open, false);
+});
+
+test("a visitor with no stored orders makes no request and writes nothing", async () => {
+  const runtime = dueRuntime({ skipSave: true });
+  await load(runtime);
+  assert.equal(runtime.statusCalls.length, 0);
+  assert.equal(runtime.fetchCalls.length, 0);
+  assert.deepEqual(runtime.storage.data, {});
+  assert.equal(runtime.popup.open, false);
+});
+
+test("orders that cannot owe an advance any more, or have no request ID the server accepts, make no request", async () => {
+  for (const status of ["delivered", "dispatched", "cancelled", "advance_paid", "cancel_requested"]) {
+    const runtime = dueRuntime();
+    setStored(runtime.storage, { [ADV_ID]: { status, statusCheckedAt: Date.now() } });
+    await load(runtime);
+    assert.equal(runtime.statusCalls.length, 0, status);
+  }
+  const asked = dueRuntime();
+  assert.equal(asked.api.save(order({ requestId: ADV_ID_2 })), true);
+  asked.storage.data[KEY] = JSON.stringify({ version: 1, orders: JSON.parse(asked.storage.data[KEY]).orders.map((entry) => Object.assign(entry, { cancelRequestedAt: entry.at, status: "confirmed", statusCheckedAt: entry.at })) });
+  await load(asked);
+  assert.equal(asked.statusCalls.length, 0, "a cancellation the shopper asked for");
+  const odd = dueRuntime({ skipSave: true });
+  odd.api.save(order({ requestId: "request-1" }));
+  await load(odd);
+  assert.equal(odd.statusCalls.length, 0, "a short request ID");
+  const noUrl = dueRuntime({ execUrl: null });
+  await load(noUrl);
+  assert.equal(noUrl.statusCalls.length, 0, "no server address");
+});
+
+test("with eligible orders the page makes one action=status check with their request IDs, and remembers when", async () => {
+  const clock = { now: Date.now() };
+  const runtime = dueRuntime({ clock });
+  runtime.api.save(order({ requestId: ADV_ID_2 }));
+  await load(runtime);
+  assert.equal(runtime.statusCalls.length, 1);
+  assert.equal(runtime.statusCalls[0].url, EXEC_URL + "?action=status");
+  assert.deepEqual(JSON.parse(runtime.statusCalls[0].init.body).requestIds.sort(), [ADV_ID, ADV_ID_2].sort());
+  assert.equal(runtime.storage.data[LOAD_KEY], String(clock.now));
+  assert.equal(runtime.fetchCalls.length, 0, "nothing but the status check");
+});
+
+test("the load check runs at most once every 10 minutes, across page loads", async () => {
+  const clock = { now: Date.now() };
+  const storage = createStorage();
+  await load(dueRuntime({ clock, storage }));
+  clock.now += 9 * MINUTE + 59 * 1000;
+  const early = await load(dueRuntime({ clock, storage, skipSave: true }));
+  assert.equal(early.statusCalls.length, 0, "9 min 59 s after the last check");
+  clock.now += 2 * 1000;
+  const later = await load(dueRuntime({ clock, storage, skipSave: true }));
+  assert.equal(later.statusCalls.length, 1, "10 minutes later");
+  assert.equal(storage.data[LOAD_KEY], String(clock.now));
+});
+
+test("a damaged, future or blocked load-check time never stops the check or throws", async () => {
+  for (const value of ["abc", "-5", "1e99", String(Date.now() + 3 * DAY), "{}", ""]) {
+    const storage = createStorage({ [LOAD_KEY]: value });
+    const runtime = dueRuntime({ storage });
+    await load(runtime);
+    assert.equal(runtime.statusCalls.length, 1, JSON.stringify(value));
+  }
+  const storage = createStorage();
+  storage.setItem = (key, value) => { if (key === LOAD_KEY) throw new Error("quota"); storage.data[key] = String(value); };
+  const runtime = dueRuntime({ storage });
+  await load(runtime);
+  assert.equal(runtime.statusCalls.length, 1);
+});
+
+test("the load check respects the 60 second status throttle and the check that is already out", async () => {
+  const clock = { now: Date.now() };
+  let release;
+  const runtime = dueRuntime({ clock, statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  openDialog(runtime);
+  assert.equal(runtime.statusCalls.length, 1);
+  closeDialog(runtime);
+  runtime.fireIdle();
+  assert.equal(runtime.statusCalls.length, 1, "the open's check is still out");
+  assert.equal(runtime.storage.data[LOAD_KEY], undefined, "no check started, so nothing is remembered");
+  release({ json: () => Promise.resolve({ ok: true, statuses: {} }) });
+  await settle();
+  runtime.idleTimers.length = 0;
+  const throttled = makeRuntime({ clock, statusImpl: advanceReply("confirmed", ADV) });
+  throttled.api.save(order({ requestId: ADV_ID }));
+  openDialog(throttled);
+  await settle();
+  closeDialog(throttled);
+  clock.now += 30 * 1000;
+  await load(throttled);
+  assert.equal(throttled.statusCalls.length, 1, "within 60 s of the last check");
+});
+
+test("a popup shows only when the answer carries an advance for a confirmed order", async () => {
+  const none = await load(dueRuntime({ statusImpl: advanceReply("confirmed", undefined) }));
+  assert.equal(none.statusCalls.length, 1);
+  assert.equal(none.popup.open, false, "no advance");
+  const received = await load(dueRuntime({ statusImpl: advanceReply("received", ADV) }));
+  assert.equal(received.popup.open, false, "the order is not confirmed");
+  const odd = await load(dueRuntime({ statusImpl: advanceReply("confirmed", { amount: -5, payee: "nope", name: "x" }) }));
+  assert.equal(odd.popup.open, false, "an advance the server could not have sent");
+  const paused = await load(dueRuntime({ statusImpl: jsonReply({ ok: false, error: "paused" }) }));
+  assert.equal(paused.popup.open, false, "a failed check");
+  const broken = await load(dueRuntime({ statusImpl: () => Promise.reject(new Error("offline")) }));
+  assert.equal(broken.popup.open, false, "a network failure");
+  const due = await load(dueRuntime());
+  assert.equal(due.popup.open, true);
+});
+
+test("no popup for an order that is paid, cancelled or has moved on, even if an old advance is still in the answer", async () => {
+  for (const code of ["advance_paid", "cancelled", "in_progress", "ready", "dispatched", "delivered", "cancel_requested"]) {
+    const runtime = await load(dueRuntime({ statusImpl: advanceReply(code, ADV) }));
+    assert.equal(runtime.popup.open, false, code);
+  }
+});
+
+test("the popup says what is due: the title, the amount, the first item and the short order reference", async () => {
+  const runtime = await load(dueRuntime());
+  assert.equal(runtime.popup.open, true);
+  assert.equal(popupText(runtime), "₹500 for Heart tray (order abcd1234)");
+  assert.equal(runtime.elements.get("advance-popup-more").hidden, true);
+  assert.match(html, /id="advance-popup-title"[^>]*>Advance payment due</);
+});
+
+test("with several orders due the popup names the newest and counts the rest", async () => {
+  const advance = (amount) => ({ amount, payee: ADV.payee, name: ADV.name });
+  const reply = jsonReply({ ok: true, statuses: { [ADV_ID]: "confirmed", [ADV_ID_2]: "confirmed", [ADV_ID_3]: "confirmed" }, advance: { [ADV_ID]: advance(500), [ADV_ID_2]: advance(750), [ADV_ID_3]: advance(900) } });
+  const runtime = dueRuntime({ statusImpl: reply, skipSave: true });
+  const item = (name) => [{ name, quantity: 1, price: "", image: "" }];
+  runtime.api.save(order({ requestId: ADV_ID, items: item("Old tray") }));
+  runtime.api.save(order({ requestId: ADV_ID_2, items: item("Middle tray") }));
+  runtime.api.save(order({ requestId: ADV_ID_3, items: item("New tray") }));
+  setStored(runtime.storage, { [ADV_ID]: { at: Date.now() - 2000 }, [ADV_ID_2]: { at: Date.now() - 1000 }, [ADV_ID_3]: { at: Date.now() } });
+  await load(runtime);
+  assert.equal(popupText(runtime), "₹900 for New tray (order cccc3333)");
+  assert.equal(runtime.elements.get("advance-popup-more").hidden, false);
+  assert.equal(text(runtime.elements.get("advance-popup-more")), "+ 2 more orders");
+  const two = dueRuntime({ statusImpl: jsonReply({ ok: true, statuses: { [ADV_ID]: "confirmed", [ADV_ID_2]: "confirmed" }, advance: { [ADV_ID]: advance(500), [ADV_ID_2]: advance(750) } }) });
+  two.api.save(order({ requestId: ADV_ID_2 }));
+  setStored(two.storage, { [ADV_ID]: { at: Date.now() - 1000 } });
+  await load(two);
+  assert.equal(text(two.elements.get("advance-popup-more")), "+ 1 more order");
+});
+
+test("the popup moves focus to Pay now, and the stored text only ever lands as text", async () => {
+  const hostile = "<img src=x onerror=alert(1)>";
+  const runtime = dueRuntime({ skipSave: true });
+  runtime.api.save(order({ requestId: ADV_ID, items: [{ name: hostile, quantity: 1, price: "", image: "" }] }));
+  await load(runtime);
+  assert.equal(runtime.popup.open, true);
+  assert.equal(popupButton(runtime, "advance-popup-pay").focused, true);
+  assert.equal(popupText(runtime), "₹500 for " + hostile + " (order abcd1234)");
+  assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML|outerHTML/);
+});
+
+test("Pay now closes the popup and opens My orders on that order with its first pay icon focused", async () => {
+  const runtime = await load(dueRuntime({ navigator: { userAgent: ANDROID_UA, platform: "Linux armv8l" } }));
+  popupButton(runtime, "advance-popup-pay").dispatch("click");
+  assert.equal(runtime.popup.open, false);
+  assert.equal(runtime.dialog.open, true);
+  const card = runtime.elements.get("my-orders-list").children[0];
+  assert.match(text(card), new RegExp(ADV_ID));
+  const first = payLink(card);
+  assert.ok(first, "the pay icons are on the card");
+  assert.equal(first.focused, true);
+  assert.equal(payApp(first), "Google Pay");
+  assert.equal(runtime.statusCalls.length, 1, "no second status check");
+  assert.equal(runtime.history.pushed.length, 1, "one history entry for popup and My orders together");
+});
+
+test("after Pay now the phone Back button closes My orders and leaves no extra history entry", async () => {
+  const runtime = await load(dueRuntime());
+  popupButton(runtime, "advance-popup-pay").dispatch("click");
+  runtime.popstate(null);
+  assert.equal(runtime.dialog.open, false);
+  assert.equal(runtime.history.backs, 0);
+  assert.equal(runtime.history.pushed.length, 1);
+});
+
+test("Pay now with several orders due goes to the one the popup named", async () => {
+  const reply = jsonReply({ ok: true, statuses: { [ADV_ID]: "confirmed", [ADV_ID_2]: "confirmed" }, advance: { [ADV_ID]: ADV, [ADV_ID_2]: ADV } });
+  const runtime = dueRuntime({ statusImpl: reply });
+  runtime.api.save(order({ requestId: ADV_ID_2 }));
+  setStored(runtime.storage, { [ADV_ID]: { at: Date.now() - 5000 } });
+  await load(runtime);
+  assert.match(popupText(runtime), /order bbbb2222/);
+  popupButton(runtime, "advance-popup-pay").dispatch("click");
+  const cards = runtime.elements.get("my-orders-list").children;
+  const named = cards.find((card) => text(card).includes(ADV_ID_2));
+  assert.equal(payLink(named).focused, true);
+  assert.equal(payLink(cards.find((card) => text(card).includes(ADV_ID))).focused, false);
+});
+
+test("Pay now also snoozes the popup, so a reload before Saloni confirms the payment does not ask again", async () => {
+  const clock = { now: Date.now() };
+  const storage = createStorage();
+  const runtime = await load(dueRuntime({ clock, storage }));
+  popupButton(runtime, "advance-popup-pay").dispatch("click");
+  clock.now += 11 * MINUTE;
+  const again = await load(dueRuntime({ clock, storage, skipSave: true }));
+  assert.equal(again.statusCalls.length, 1);
+  assert.equal(again.popup.open, false);
+});
+
+test("Later closes the popup, steps the history entry back, and remembers the snooze for that order with its time", async () => {
+  const clock = { now: Date.now() };
+  const runtime = await load(dueRuntime({ clock }));
+  assert.equal(runtime.history.pushed.length, 1);
+  popupButton(runtime, "advance-popup-later").dispatch("click");
+  assert.equal(runtime.popup.open, false);
+  assert.equal(runtime.history.backs, 1);
+  assert.deepEqual(JSON.parse(runtime.storage.data[SNOOZE_KEY]), { version: 1, snoozed: { [ADV_ID]: clock.now } });
+  assert.equal(runtime.dialog.open, false);
+});
+
+test("Later snoozes for 12 hours across page loads, then the popup is allowed again", async () => {
+  const clock = { now: Date.now() };
+  const storage = createStorage();
+  const first = await load(dueRuntime({ clock, storage }));
+  popupButton(first, "advance-popup-later").dispatch("click");
+  clock.now += 11 * HOUR + 59 * MINUTE;
+  const snoozed = await load(dueRuntime({ clock, storage, skipSave: true }));
+  assert.equal(snoozed.statusCalls.length, 1, "the check still runs");
+  assert.equal(snoozed.popup.open, false, "11 h 59 min later");
+  clock.now += 11 * MINUTE;
+  const back = await load(dueRuntime({ clock, storage, skipSave: true }));
+  assert.equal(back.popup.open, true, "12 hours later (and past the 10 minute load gap)");
+  assert.equal(popupText(back), "₹500 for Heart tray (order abcd1234)");
+});
+
+test("Escape, the backdrop and the phone Back button snooze like Later; Escape returns focus to where it was", async () => {
+  const clock = { now: Date.now() };
+  const escape = dueRuntime({ clock });
+  const before = new FakeElement("button");
+  escape.documentObject.activeElement = before;
+  await load(escape);
+  escape.popup.close();
+  assert.equal(escape.popup.open, false);
+  assert.equal(before.focused, true, "focus is back on what had it");
+  assert.ok(JSON.parse(escape.storage.data[SNOOZE_KEY]).snoozed[ADV_ID]);
+  assert.equal(escape.history.backs, 1);
+  const backdrop = await load(dueRuntime({ clock }));
+  backdrop.popup.dispatch("click", { target: backdrop.popup });
+  assert.equal(backdrop.popup.open, false);
+  assert.ok(JSON.parse(backdrop.storage.data[SNOOZE_KEY]).snoozed[ADV_ID]);
+  const phone = await load(dueRuntime({ clock }));
+  phone.popstate(null);
+  assert.equal(phone.popup.open, false);
+  assert.equal(phone.history.backs, 0, "Back already moved the history");
+  assert.ok(JSON.parse(phone.storage.data[SNOOZE_KEY]).snoozed[ADV_ID]);
+  const inside = await load(dueRuntime({ clock }));
+  inside.popup.dispatch("click", { target: popupButton(inside, "advance-popup-pay") });
+  assert.equal(inside.popup.open, true, "a click inside the panel does not close it");
+});
+
+test("Later snoozes every order the popup mentioned, not only the first", async () => {
+  const reply = jsonReply({ ok: true, statuses: { [ADV_ID]: "confirmed", [ADV_ID_2]: "confirmed" }, advance: { [ADV_ID]: ADV, [ADV_ID_2]: ADV } });
+  const runtime = dueRuntime({ statusImpl: reply });
+  runtime.api.save(order({ requestId: ADV_ID_2 }));
+  await load(runtime);
+  popupButton(runtime, "advance-popup-later").dispatch("click");
+  assert.deepEqual(Object.keys(JSON.parse(runtime.storage.data[SNOOZE_KEY]).snoozed).sort(), [ADV_ID, ADV_ID_2].sort());
+});
+
+test("a snooze for one order does not hide the popup for another order", async () => {
+  const clock = { now: Date.now() };
+  const storage = createStorage({ [SNOOZE_KEY]: JSON.stringify({ version: 1, snoozed: { [ADV_ID_2]: clock.now - HOUR } }) });
+  const runtime = dueRuntime({ clock, storage, skipSave: true });
+  runtime.api.save(order({ requestId: ADV_ID }));
+  runtime.api.save(order({ requestId: ADV_ID_2 }));
+  setStored(storage, { [ADV_ID]: { at: clock.now - 1000 } });
+  await load(runtime);
+  assert.equal(runtime.popup.open, true);
+  assert.match(popupText(runtime), /order abcd1234/);
+});
+
+test("a damaged or tampered snooze record is ignored and cleaned, and never throws", async () => {
+  const clock = { now: Date.now() };
+  const bad = [
+    "not json", "[]", "null", JSON.stringify({ version: 2, snoozed: {} }), JSON.stringify({ version: 1, snoozed: [] }),
+    JSON.stringify({ version: 1, snoozed: { [ADV_ID]: "now" } }), JSON.stringify({ version: 1, snoozed: { [ADV_ID]: clock.now + DAY } }),
+    JSON.stringify({ version: 1, snoozed: { [ADV_ID]: clock.now - 13 * HOUR } }), JSON.stringify({ version: 1, snoozed: { [ADV_ID]: 1.5 } }),
+    JSON.stringify({ version: 1, snoozed: { "bad id!": clock.now } }),
+  ];
+  for (const value of bad) {
+    const runtime = await load(dueRuntime({ clock, storage: createStorage({ [SNOOZE_KEY]: value }) }));
+    assert.equal(runtime.popup.open, true, value);
+  }
+  const huge = createStorage({ [SNOOZE_KEY]: "x".repeat(600000) });
+  assert.equal((await load(dueRuntime({ clock, storage: huge }))).popup.open, true);
+  const blocked = createStorage();
+  blocked.setItem = (key, value) => { if (key === SNOOZE_KEY) throw new Error("quota"); blocked.data[key] = String(value); };
+  const runtime = await load(dueRuntime({ clock, storage: blocked }));
+  popupButton(runtime, "advance-popup-later").dispatch("click");
+  assert.equal(runtime.popup.open, false);
+});
+
+test("snoozes are kept only for stored orders, so the record cannot grow without end", async () => {
+  const clock = { now: Date.now() };
+  const stale = {};
+  for (let index = 0; index < 80; index += 1) stale["gone" + String(index).padStart(10, "0")] = clock.now - 1000;
+  const storage = createStorage({ [SNOOZE_KEY]: JSON.stringify({ version: 1, snoozed: stale }) });
+  const runtime = await load(dueRuntime({ clock, storage }));
+  popupButton(runtime, "advance-popup-later").dispatch("click");
+  assert.deepEqual(Object.keys(JSON.parse(storage.data[SNOOZE_KEY]).snoozed), [ADV_ID]);
+});
+
+test("nothing is checked while another dialog is open, and nothing pops up over one that opened during the check", async () => {
+  const diwali = dueRuntime();
+  diwali.otherDialog.open = true;
+  await load(diwali);
+  assert.equal(diwali.statusCalls.length, 0, "the Diwali greeting, order form or product popup is open");
+  assert.equal(diwali.popup.open, false);
+  assert.equal(diwali.storage.data[LOAD_KEY], undefined, "a skipped page view is not remembered as a check");
+  const mine = dueRuntime();
+  openDialog(mine);
+  mine.statusCalls.length = 0;
+  await load(mine);
+  assert.equal(mine.popup.open, false, "My orders is open");
+  assert.equal(mine.statusCalls.length, 0);
+  let release;
+  const during = dueRuntime({ statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  during.fireIdle();
+  during.otherDialog.open = true;
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [ADV_ID]: "confirmed" }, advance: { [ADV_ID]: ADV } }) });
+  await settle();
+  assert.equal(during.popup.open, false, "a dialog opened while the answer was on its way");
+  during.otherDialog.open = false;
+  assert.equal(during.dialog.open, false);
+});
+
+test("the popup does not open while a step back from another dialog is still on its way", async () => {
+  const runtime = dueRuntime();
+  openDialog(runtime);
+  runtime.dialog.close();
+  runtime.statusCalls.length = 0;
+  await load(runtime);
+  assert.equal(runtime.popup.open, false);
+});
+
+test("a page without the popup markup, or a browser without <dialog>, does nothing and does not throw", async () => {
+  const unsupported = dueRuntime({ dialogSupported: false });
+  await load(unsupported);
+  assert.equal(unsupported.popup.open, false);
+  assert.equal(unsupported.statusCalls.length, 0, "no popup, so no load check either");
+  const noPopup = dueRuntime({ withoutPopup: true });
+  assert.equal(noPopup.idleTimers.length, 0, "nothing is scheduled without the markup");
+  openDialog(noPopup);
+  await settle();
+  assert.equal(noPopup.statusCalls.length, 1, "My orders still works");
+});
+
+test("no history API: the popup still opens, snoozes and closes", async () => {
+  const runtime = await load(dueRuntime({ noHistory: true }));
+  assert.equal(runtime.popup.open, true);
+  popupButton(runtime, "advance-popup-later").dispatch("click");
+  assert.equal(runtime.popup.open, false);
+  assert.ok(runtime.storage.data[SNOOZE_KEY]);
+});
+
+test("the popup is static accessible markup with phone-first styles that reuse the dialog look and buttons", () => {
+  const dialog = html.match(/<dialog class="advance-popup" id="advance-popup"[\s\S]*?<\/dialog>/)?.[0] || "";
+  assert.match(dialog, /aria-labelledby="advance-popup-title"/);
+  assert.match(dialog, /aria-describedby="advance-popup-text"/);
+  assert.match(dialog, /<h2[^>]*id="advance-popup-title"[^>]*>Advance payment due<\/h2>/);
+  assert.match(dialog, /<p[^>]*id="advance-popup-text"/);
+  assert.match(dialog, /<p[^>]*id="advance-popup-more"[^>]*hidden/);
+  assert.match(dialog, /<button class="button button-dark" id="advance-popup-pay" type="button">Pay now<\/button>/);
+  assert.match(dialog, /<button class="button button-line" id="advance-popup-later" type="button">Later<\/button>/);
+  assert.doesNotMatch(dialog, /<form|href=/);
+  assert.match(css, /dialog\.advance-popup:not\(\[open\]\)\s*\{\s*display:\s*none/);
+  assert.match(css, /dialog\.advance-popup\s*\{[^}]*width:\s*min\([^}]*calc\(100vw - 2rem\)[^}]*max-height:\s*calc\(100dvh - 2rem\)/);
+  assert.match(css, /dialog\.advance-popup::backdrop/);
+  assert.match(css, /\.advance-popup-text\b[^}]*overflow-wrap:\s*anywhere/);
+});
+
+test("my-orders.js keeps the popup to the home page: it is loaded there only, and says so", () => {
+  const pages = ["corporate-gifting", "partners", "reviews", "customised-hampers", "namokar-mantra-frames", "resin-photo-frames"];
+  pages.forEach((page) => assert.doesNotMatch(fs.readFileSync(path.join(root, page, "index.html"), "utf8"), /my-orders\.js/, page));
+  assert.match(fs.readFileSync(path.join(root, "README.md"), "utf8"), /advance payment popup/i);
 });
