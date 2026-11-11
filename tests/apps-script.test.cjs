@@ -362,12 +362,15 @@ function makeRuntime(options = {}) {
     folderAccess: options.folderAccess || "PRIVATE",
     captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 },
     driveDeletes: [], retentionTrashed: 0, rowDeletes: [], triggerCreates: 0, triggerConfig: null,
-    logs: [], locked: false, whatsappFetches: [], emails: [], base64Decodes: 0,
+    logs: [], locked: false, whatsappFetches: [], emails: [], base64Decodes: 0, cellWrites: [], formats: [],
   };
   const sheet = {
     getLastColumn: () => headers.length,
     getLastRow: () => rows.length + 1,
-    getRange: () => ({
+    getRange: (row, column) => (row >= 2 ? {
+      // A body cell: only setValue is needed (the cancellation request writes Status and Staff notes one cell at a time).
+      setValue: (value) => { state.cellWrites.push({ row, column, value }); rows[row - 2][column - 1] = value; },
+    } : {
       getValues: () => [headers],
       setValues: (values) => { headers.splice(0, headers.length, ...values[0]); },
     }),
@@ -423,7 +426,7 @@ function makeRuntime(options = {}) {
     base64Decode: (text) => { state.base64Decodes += 1; return Array.from(Buffer.from(String(text), "base64")).map((byte) => byte > 127 ? byte - 256 : byte); },
     DigestAlgorithm: { SHA_256: "SHA-256" },
     computeDigest: (_algorithm, bytes) => Array.from(crypto.createHash("sha256").update(Buffer.from(bytes.map((byte) => byte < 0 ? byte + 256 : byte))).digest()).map((byte) => byte > 127 ? byte - 256 : byte),
-    formatDate: (date) => new Date(date).toISOString().slice(0, 10),
+    formatDate: (date, zone, format) => { state.formats.push([date, zone, format]); return new Date(date).toISOString().slice(0, 10); },
   };
   const runtimeContext = {
     console: { log: (...values) => state.logs.push(values.join(" ")), error: (...values) => state.logs.push(values.join(" ")) },
@@ -1447,4 +1450,169 @@ test("action=seed still renders the order form for pages cached before the chang
   const runtime = makeRuntime();
   runtime.context.doPost({ parameter: { action: "seed", mode: "order", seed: JSON.stringify({ requestId: "request-cached-page" }) } });
   assert.equal(runtime.state.templateName, "Form");
+});
+
+// --- action=cancel: the shopper asks Saloni to cancel (it never cancels by itself) ---
+const CANCEL_ID = "request-1234567890";
+const cancelPost = (runtime, body) => orderPost(runtime, body, "cancel");
+function orderedRuntime(options = {}) {
+  const runtimeOptions = Object.assign({ properties: ALERT_PROPERTIES }, options);
+  const runtime = makeRuntime(runtimeOptions);
+  runtime.options = runtimeOptions;
+  assert.equal(orderPost(runtime, postedOrder(alertFormFields())).ok, true);
+  runtime.state.emails.length = 0;
+  runtime.state.cellWrites.length = 0;
+  runtime.state.dataReads = 0;
+  return runtime;
+}
+function alertFormFields() { const form = alertForm(); delete form.captchaToken; return form; }
+
+test("action=cancel marks the order, adds a dated Staff notes line, and sends one email after the lock is released", () => {
+  const runtime = orderedRuntime();
+  const before = runtime.rows[0].slice();
+  assert.equal(before[24], "New request");
+  const result = cancelPost(runtime, { requestId: CANCEL_ID });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(runtime.rows[0][24], "Cancellation requested");
+  assert.match(runtime.rows[0][25], /^Customer asked to cancel on .+ IST via My orders$/);
+  assert.ok(runtime.state.formats.some((call) => call[1] === "Asia/Kolkata" && call[2] === "dd MMM yyyy, hh:mm a"), "the note date is written in India time");
+  runtime.rows[0].forEach((cell, index) => { if (index !== 24 && index !== 25) assert.equal(cell, before[index], "column " + index + " is unchanged"); });
+  assert.equal(runtime.rows.length, 1);
+  assert.deepEqual(runtime.state.cellWrites.map((write) => write.column).sort(), [25, 26]);
+  assert.equal(runtime.state.emails.length, 1);
+  const { message, lockHeld } = runtime.state.emails[0];
+  assert.equal(lockHeld, false);
+  assert.equal(message.to, "saloni@example.com");
+  assert.equal(message.subject, "Cancellation request: Resin photo frame \u2013 Priya");
+  for (const detail of [CANCEL_ID, "Resin photo frame", "2", "New request", "https://docs.google.com/spreadsheets/d/sheet/edit"]) assert.ok(message.body.includes(detail), detail);
+  assert.match(message.body, /Received:/);
+  assert.equal(runtime.state.whatsappFetches.length, 1, "only the order's own alert; cancelling sends no WhatsApp");
+});
+
+test("action=cancel appends to existing Staff notes instead of replacing them and keeps text formula-safe", () => {
+  const runtime = orderedRuntime();
+  runtime.rows[0][25] = "Call before 5pm";
+  assert.equal(cancelPost(runtime, { requestId: CANCEL_ID }).ok, true);
+  assert.match(runtime.rows[0][25], /^Call before 5pm \| Customer asked to cancel on /);
+  const formula = orderedRuntime();
+  formula.rows[0][25] = "=HYPERLINK(1)";
+  cancelPost(formula, { requestId: CANCEL_ID });
+  assert.ok(formula.rows[0][25].startsWith("'=HYPERLINK(1)"));
+});
+
+test("action=cancel with an unknown request ID answers not_found and writes and sends nothing", () => {
+  const runtime = orderedRuntime();
+  const result = cancelPost(runtime, { requestId: "request-unknown-0000" });
+  assert.deepEqual(result, { ok: false, error: "not_found" });
+  assert.equal(runtime.state.cellWrites.length, 0);
+  assert.equal(runtime.state.emails.length, 0);
+  assert.equal(runtime.rows[0][24], "New request");
+});
+
+test("action=cancel rejects a bad request ID or body before any sheet read", () => {
+  for (const body of [{ requestId: "short" }, { requestId: "has space in it!!" }, { requestId: "x".repeat(81) }, { requestId: 1234567890123 }, { requestId: ["request-1234567890"] }, {}, "not json", "[]", "null"]) {
+    const runtime = orderedRuntime();
+    const result = cancelPost(runtime, body);
+    assert.equal(result.ok, false, JSON.stringify(body));
+    assert.equal(result.error, "invalid");
+    assert.equal(runtime.state.dataReads, 0, "no sheet read for " + JSON.stringify(body));
+    assert.equal(runtime.state.cellWrites.length, 0);
+    assert.equal(runtime.state.emails.length, 0);
+  }
+});
+
+test("action=cancel repeated is idempotent: already, no second write and no second email", () => {
+  const runtime = orderedRuntime();
+  assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true });
+  const notes = runtime.rows[0][25];
+  const again = cancelPost(runtime, { requestId: CANCEL_ID });
+  assert.deepEqual(again, { ok: true, already: true });
+  assert.equal(runtime.state.emails.length, 1);
+  assert.equal(runtime.rows[0][25], notes);
+  assert.equal(runtime.state.cellWrites.length, 2);
+});
+
+test("ORDER_CANCEL_DISABLED pauses cancellations before any sheet read, but ORDER_FORM_DISABLED does not", () => {
+  const paused = orderedRuntime();
+  paused.properties.ORDER_CANCEL_DISABLED = "true";
+  assert.deepEqual(cancelPost(paused, { requestId: CANCEL_ID }), { ok: false, error: "paused" });
+  assert.equal(paused.state.dataReads, 0);
+  assert.equal(paused.rows[0][24], "New request");
+  assert.equal(paused.state.emails.length, 0);
+  const ordersPaused = orderedRuntime();
+  ordersPaused.properties.ORDER_FORM_DISABLED = "true";
+  assert.deepEqual(cancelPost(ordersPaused, { requestId: CANCEL_ID }), { ok: true });
+});
+
+test("a failing email never fails the cancellation request", () => {
+  const runtime = orderedRuntime();
+  runtime.context.MailApp.sendEmail = () => { throw new Error("mail down"); };
+  const result = cancelPost(runtime, { requestId: CANCEL_ID });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(runtime.rows[0][24], "Cancellation requested");
+});
+
+test("the cancel email goes to the script owner when ORDER_ALERT_EMAIL is not set, and is skipped when there is no address", () => {
+  const owner = orderedRuntime({ properties: {}, effectiveEmail: "owner@example.com" });
+  assert.equal(cancelPost(owner, { requestId: CANCEL_ID }).ok, true);
+  assert.equal(owner.state.emails.length, 1);
+  assert.equal(owner.state.emails[0].message.to, "owner@example.com");
+  const none = orderedRuntime({ properties: {} });
+  assert.equal(cancelPost(none, { requestId: CANCEL_ID }).ok, true);
+  assert.equal(none.state.emails.length, 0);
+});
+
+test("the cancel reply carries no customer data, and lock trouble or a sheet error is unconfirmed", () => {
+  const runtime = orderedRuntime();
+  const text = runtime.context.doPost({ parameter: { action: "cancel" }, postData: { contents: JSON.stringify({ requestId: CANCEL_ID }) } }).text;
+  for (const secret of ["Priya", "9876543210", "priya@example.com", "Secret Lane", "Resin photo frame", "302001"]) assert.ok(!text.includes(secret), secret);
+  const busy = orderedRuntime();
+  busy.options.lockAvailable = false;
+  assert.deepEqual(cancelPost(busy, { requestId: CANCEL_ID }), { ok: false, error: "unconfirmed" });
+  assert.equal(busy.rows[0][24], "New request");
+  const broken = orderedRuntime();
+  broken.properties.ORDER_SHEET_ID = "";
+  assert.deepEqual(cancelPost(broken, { requestId: CANCEL_ID }), { ok: false, error: "unconfirmed" });
+});
+
+test("a cancel request never overwrites a Status Saloni already set: note and email only, reply ok", () => {
+  for (const status of ["Cancelled", "Confirmed", "In progress", "Dispatched"]) {
+    const runtime = orderedRuntime();
+    runtime.rows[0][24] = status;
+    runtime.rows[0][25] = "Started the tray";
+    const before = runtime.rows[0].slice();
+    assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true }, status);
+    assert.equal(runtime.rows[0][24], status, "Status is kept: " + status);
+    assert.match(runtime.rows[0][25], /^Started the tray \| Customer asked to cancel on .+ IST via My orders$/);
+    runtime.rows[0].forEach((cell, index) => { if (index !== 25) assert.equal(cell, before[index]); });
+    assert.deepEqual(runtime.state.cellWrites.map((write) => write.column), [26], "only Staff notes is written");
+    assert.equal(runtime.state.emails.length, 1);
+    const { message, lockHeld } = runtime.state.emails[0];
+    assert.equal(lockHeld, false);
+    assert.equal(message.subject, "Cancellation request: Resin photo frame \u2013 Priya (status: " + status + ")");
+    assert.ok(message.body.includes("Status before this request: " + status));
+    assert.match(message.body, /Status was not changed/);
+  }
+});
+
+test("a repeat request on a row with another Status finds the Staff notes line and answers already, with no second email", () => {
+  const runtime = orderedRuntime();
+  runtime.rows[0][24] = "Confirmed";
+  assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true });
+  const notes = runtime.rows[0][25];
+  assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true, already: true });
+  assert.equal(runtime.rows[0][25], notes);
+  assert.equal(runtime.rows[0][24], "Confirmed");
+  assert.equal(runtime.state.emails.length, 1);
+  assert.equal(runtime.state.cellWrites.length, 1);
+});
+
+test("a blank Status is treated like New request: it becomes Cancellation requested", () => {
+  const runtime = orderedRuntime();
+  runtime.rows[0][24] = "";
+  assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true });
+  assert.equal(runtime.rows[0][24], "Cancellation requested");
+  assert.equal(runtime.state.emails.length, 1);
+  assert.ok(!runtime.state.emails[0].message.subject.includes("(status:"));
+  assert.ok(!/Status was not changed/.test(runtime.state.emails[0].message.body));
 });

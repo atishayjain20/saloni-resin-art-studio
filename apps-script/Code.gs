@@ -23,6 +23,7 @@ var REVIEW_PRODUCTS_URL = "https://saloniresinart.com/reviews/products.json";
 var ORDER_CAPTCHA_ACTION = "order_request";
 var RETENTION_DAYS = 90;
 var RETENTION_MILLISECONDS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
+var ORDER_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{12,80}$/;
 var ORDER_FILE_NAME_PATTERN = /^order-([A-Za-z0-9_-]{12,80})\.(jpg|png)$/;
 var LEGACY_ORDER_HEADERS = [
   "Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID",
@@ -89,6 +90,7 @@ function doPost(event) {
   if (action === "rate") return ContentService.createTextOutput(JSON.stringify(submitQuickRating_(parameters))).setMimeType(ContentService.MimeType.JSON);
   // The order, partner, corporate and review forms live in the site itself and talk to these JSON actions; "seed" below stays so older cached pages keep working.
   if (action === "order") return json_(orderFromPost_(event));
+  if (action === "cancel") return json_(cancelFromPost_(event));
   if (action === "referral") return json_(referralFromPost_(event));
   if (action === "partner") return json_(partnerFromPost_(event));
   if (action === "corporate") return json_(corporateFromPost_(event));
@@ -298,7 +300,7 @@ function purgeExpiredOrdersAt_(now) {
       continue;
     }
     if (receivedAt.getTime() > cutoff.getTime()) continue;
-    if (!/^[A-Za-z0-9_-]{12,80}$/.test(requestId)) {
+    if (!ORDER_REQUEST_ID_PATTERN.test(requestId)) {
       errors += 1;
       continue;
     }
@@ -795,6 +797,89 @@ function submitOrder(form) {
     // Alerts run after the lock is released and never throw or change the result.
     if (newOrder) dispatchOrderAlert_(payload, newOrder.receivedAt, newOrder.referenceFile, properties);
   }
+}
+
+// --- Cancellation requests from "My orders" -------------------------------
+// The shopper only ASKS Saloni to cancel: the Orders row gets Status "Cancellation requested" and a Staff notes line, and
+// Saloni is emailed. Nothing is cancelled, refunded or deleted by this action. The request ID is a random UUID that only
+// the shopper's browser knows, and that is the whole credential, so the reply carries only ok/error/already, never order data.
+// A Status Saloni already set (Confirmed, In progress, Cancelled, ...) is never overwritten: only "New request" or blank
+// becomes "Cancellation requested". For any other Status the request is still logged in Staff notes and emailed, with the
+// current Status shown, so Saloni sees it was asked after work started.
+// Paused by ORDER_CANCEL_DISABLED=true (its own switch: cancellations keep working while new orders are paused).
+var CANCEL_REQUESTED_STATUS = "Cancellation requested";
+var CANCEL_NOTE_PREFIX = "Customer asked to cancel";
+
+function cancelFromPost_(event) {
+  var body;
+  try { body = postedJson_(event); } catch (parseError) { return { ok: false, error: "invalid" }; }
+  try { return requestOrderCancellation_(body.requestId); } catch (error) { return { ok: false, error: "unconfirmed" }; }
+}
+
+function requestOrderCancellation_(requestId) {
+  var properties = PropertiesService.getScriptProperties();
+  if (isTrue_(properties.getProperty("ORDER_CANCEL_DISABLED"))) return { ok: false, error: "paused" };
+  if (typeof requestId !== "string" || !ORDER_REQUEST_ID_PATTERN.test(requestId)) return { ok: false, error: "invalid" };
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to record the cancellation request.");
+
+  var alert = null;
+  try {
+    var sheet = openOrderSheet_(properties);
+    var values = sheet.getDataRange().getValues();
+    var headers = headerIndex_((values[0] || []).map(String));
+    var target = null;
+    for (var row = 1; row < values.length; row += 1) {
+      if (String(values[row][0]) === requestId) { target = { number: row + 1, values: values[row] }; break; }
+    }
+    if (!target) return { ok: false, error: "not_found" };
+    var statusColumn = headers["Status"];
+    var notesColumn = headers["Staff notes"];
+    var before = String(target.values[statusColumn] == null ? "" : target.values[statusColumn]).trim();
+    if (before === CANCEL_REQUESTED_STATUS) return { ok: true, already: true };
+    var notes = String(target.values[notesColumn] == null ? "" : target.values[notesColumn]);
+    var open = before === "" || before === "New request";
+    if (!open && notes.indexOf(CANCEL_NOTE_PREFIX) !== -1) return { ok: true, already: true };
+
+    var now = new Date();
+    var line = CANCEL_NOTE_PREFIX + " on " + Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " IST via My orders";
+    // Only Staff notes (and Status, when it was still open) are written; every other column keeps its value.
+    sheet.getRange(target.number, notesColumn + 1).setValue(neutralizeForSheet_(notes ? notes + " | " + line : line));
+    if (open) sheet.getRange(target.number, statusColumn + 1).setValue(CANCEL_REQUESTED_STATUS);
+    alert = { requestId: requestId, values: target.values, headers: headers, statusBefore: before, statusKept: !open };
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+    // The email goes out after the lock is released and never throws or changes the reply.
+    if (alert) {
+      try { sendCancellationAlert_(alert, properties); } catch (emailError) { console.error("Cancellation email failed."); }
+    }
+  }
+}
+
+function sendCancellationAlert_(alert, properties) {
+  var to = String(properties.getProperty("ORDER_ALERT_EMAIL") || "").trim() || String(Session.getEffectiveUser().getEmail() || "").trim();
+  if (!to) return;
+  var cell = function (name) { var value = alert.values[alert.headers[name]]; return value == null ? "" : value; };
+  var product = alertProduct_({ productName: cell("Product name") });
+  var received = cell("Received at");
+  var receivedText = received instanceof Date && !isNaN(received.getTime())
+    ? Utilities.formatDate(received, "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " (IST)"
+    : String(received || "-");
+  MailApp.sendEmail({
+    to: to,
+    subject: "Cancellation request: " + product + " \u2013 " + alertFirstName_({ customerName: cell("Customer name") }) + (alert.statusKept ? " (status: " + alert.statusBefore + ")" : ""),
+    body: [
+      "A customer asked to cancel this order from My orders. Nothing has been cancelled yet.",
+      "Request ID: " + alert.requestId,
+      "Product: " + product + " x " + cell("Quantity"),
+      "Received: " + receivedText,
+      "Status before this request: " + (alert.statusBefore || "-"),
+      alert.statusKept ? "Status was not changed because the order is already past New request. Please contact the customer." : "Status is now: " + CANCEL_REQUESTED_STATUS,
+      "Orders sheet: " + orderSheetUrl_(properties)
+    ].join("\n")
+  });
 }
 
 var ORDER_ALERT_WHATSAPP_PHONE = "918209238541";
@@ -2251,8 +2336,7 @@ function normalizeReferenceImage_(blob) {
 
 function validatePayload_(payload) {
   var errors = {};
-  var requestIdPattern = /^[A-Za-z0-9_-]{12,80}$/;
-  if (!requestIdPattern.test(payload.requestId)) errors.requestId = "Please reload the form and try again.";
+  if (!ORDER_REQUEST_ID_PATTERN.test(payload.requestId)) errors.requestId = "Please reload the form and try again.";
   if (payload.requestStage !== undefined && payload.requestStage !== "" && payload.requestStage !== "quote") {
     errors.requestStage = "This request stage is not recognised.";
   }

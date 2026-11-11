@@ -45,12 +45,15 @@ function createStorage(initial = {}) {
   return { data, getItem: (key) => (key in data ? data[key] : null), setItem(key, value) { data[key] = String(value); }, removeItem(key) { delete data[key]; } };
 }
 
-function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false } = {}) {
-  const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "my-orders-clear", "my-orders-confirm", "my-orders-confirm-yes", "my-orders-confirm-no", "my-orders-clear-area", "nav-toggle"];
+const EXEC_URL = "https://script.google.test/exec";
+
+function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false } = {}) {
+  const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "nav-toggle"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id === "my-orders-list" ? "ol" : "div", id)]));
   const dialog = elements.get("my-orders-dialog");
   if (!dialogSupported) { dialog.showModal = undefined; }
-  elements.get("my-orders-confirm").hidden = true;
+  // The order form's embed element carries the Apps Script URL; my-orders.js reads it the same way order-form.js does.
+  if (execUrl !== null) { const embed = new FakeElement("div", "order-form-embed"); embed.attributes["data-order-form-url"] = execUrl; elements.set("order-form-embed", embed); }
   const link = new FakeElement("a"); link.attributes["data-my-orders-open"] = "";
   const browseLink = new FakeElement("a"); browseLink.attributes["data-browse-all"] = "";
   dialog.querySelectorAll = (selector) => (selector === "[data-browse-all]" ? [browseLink] : []);
@@ -71,6 +74,14 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   };
   const popstateListeners = [];
   const windowObject = { localStorage: storage, document: documentObject, history, location: { href: "https://saloniresinart.com/" }, addEventListener(type, listener) { if (type === "popstate") popstateListeners.push(listener); } };
+  // fetch is a stub that records the call; each test decides what it answers. Timers are manual so the 25 s limit can be fired.
+  const fetchCalls = [];
+  const timers = [];
+  const aborts = [];
+  if (!noFetch) windowObject.fetch = (url, init) => { fetchCalls.push({ url, init }); return (fetchImpl || (() => Promise.resolve({ json: () => Promise.resolve({ ok: true }) })))(url, init); };
+  windowObject.AbortController = function () { this.signal = { aborted: false }; this.abort = () => { this.signal.aborted = true; aborts.push(this); }; };
+  windowObject.setTimeout = (callback, delay) => { timers.push({ callback, delay, cleared: false }); return timers.length; };
+  windowObject.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].cleared = true; };
   // Animation frames run at once unless a test wants to see what happens between them.
   const frames = [];
   windowObject.requestAnimationFrame = (callback) => { if (manualFrames) frames.push(callback); else callback(); return frames.length; };
@@ -82,7 +93,7 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   const real = windowObject.saloniMyOrders;
   // Arrays made inside the vm context have another prototype; hand the tests plain objects.
   const api = Object.assign({}, real, { list: () => JSON.parse(JSON.stringify(real.list())) });
-  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject, history, popstate, flushFrame };
+  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject, history, popstate, flushFrame, fetchCalls, timers, aborts };
 }
 
 const order = (overrides = {}) => Object.assign({
@@ -93,13 +104,28 @@ const order = (overrides = {}) => Object.assign({
 }, overrides);
 const stored = (storage) => JSON.parse(storage.data[KEY]);
 const text = (element) => element.textContent;
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+const CANCEL_ID = "request-1234567890";
+const find = (root, predicate) => root.find(predicate);
+const button = (root, label) => find(root, (element) => element.tagName === "BUTTON" && element.textContent === label)[0] || null;
+const byClass = (root, name) => find(root, (element) => element.className.split(" ").includes(name))[0] || null;
+const jsonReply = (value) => () => Promise.resolve({ json: () => Promise.resolve(value) });
+// Opens the dialog with one cancellable order and returns the pieces a cancel test needs.
+function withOrder(options = {}) {
+  const runtime = makeRuntime(options);
+  runtime.api.save(order({ requestId: CANCEL_ID }));
+  runtime.link.dispatch("click", { button: 0 });
+  runtime.card = runtime.elements.get("my-orders-list").children[0];
+  return runtime;
+}
 
-test("my-orders.js exists and exposes save, list and clear", () => {
+test("my-orders.js exists and exposes save and list, and no longer has a clear-all feature", () => {
   assert.ok(source, "my-orders.js is missing");
   const { api } = makeRuntime();
   assert.equal(typeof api.save, "function");
   assert.equal(typeof api.list, "function");
-  assert.equal(typeof api.clear, "function");
+  assert.equal(api.clear, undefined);
+  assert.doesNotMatch(source, /my-orders-clear|my-orders-confirm|clearButton|function clear\b/);
 });
 
 test("save stores a versioned record with the confirmed time and only the allowed order fields", () => {
@@ -185,7 +211,6 @@ test("blocked storage (private mode, quota, denied) never throws", () => {
   const { api } = makeRuntime({ storage: denied });
   assert.deepEqual(api.list(), []);
   assert.equal(api.save(order()), false);
-  assert.doesNotThrow(() => api.clear());
   const none = makeRuntime({ storage: null });
   assert.deepEqual(none.api.list(), []);
   assert.equal(none.api.save(order()), false);
@@ -195,14 +220,6 @@ test("save rejects a summary with no usable request ID or items", () => {
   const { api, storage } = makeRuntime();
   for (const summary of [null, {}, order({ requestId: "" }), order({ items: [] }), order({ items: [{ name: "", quantity: 1 }] }), order({ fulfillment: "x" }), "text"]) assert.equal(api.save(summary), false);
   assert.equal(storage.data[KEY], undefined);
-});
-
-test("clear removes every saved order", () => {
-  const { api, storage } = makeRuntime();
-  api.save(order());
-  api.clear();
-  assert.equal(storage.data[KEY], undefined);
-  assert.deepEqual(api.list(), []);
 });
 
 test("opening the dialog from the nav link shows the newest order first with date, items, thumbnails, quantity, price, fulfilment, request ID, status and notes", () => {
@@ -233,16 +250,14 @@ test("opening the dialog from the nav link shows the newest order first with dat
   assert.deepEqual(images.map((image) => image.getAttribute("src")).sort(), ["assets/one.webp", "assets/romantic-heart-trinket-tray.webp"]);
   assert.equal(elements.get("my-orders-empty").hidden, true);
   assert.equal(elements.get("my-orders-contact").hidden, false);
-  assert.equal(elements.get("my-orders-clear-area").hidden, false);
 });
 
-test("the empty state shows when nothing is saved and hides the list, contact and clear controls", () => {
+test("the empty state shows when nothing is saved and hides the list and contact controls", () => {
   const { link, elements } = makeRuntime();
   link.dispatch("click", { button: 0 });
   assert.equal(elements.get("my-orders-empty").hidden, false);
   assert.equal(elements.get("my-orders-list").children.length, 0);
   assert.equal(elements.get("my-orders-contact").hidden, true);
-  assert.equal(elements.get("my-orders-clear-area").hidden, true);
 });
 
 test("rendering uses textContent and safe image paths only: markup in stored text stays text", () => {
@@ -253,42 +268,6 @@ test("rendering uses textContent and safe image paths only: markup in stored tex
   const card = text(elements.get("my-orders-list").children[0]);
   assert.match(card, /<script>alert\(1\)<\/script>/);
   assert.match(card, /<b onclick=x>bold<\/b>/);
-});
-
-test("Remove these from this device asks first, then clears and shows the empty state; Keep them cancels", () => {
-  const { api, link, elements, storage } = makeRuntime();
-  api.save(order());
-  link.dispatch("click", { button: 0 });
-  const confirm = elements.get("my-orders-confirm");
-  assert.equal(confirm.hidden, true);
-  elements.get("my-orders-clear").dispatch("click");
-  assert.equal(confirm.hidden, false);
-  assert.equal(stored(storage).orders.length, 1, "nothing is removed before the confirm step");
-  assert.equal(elements.get("my-orders-confirm-no").focused, true);
-  elements.get("my-orders-confirm-no").dispatch("click");
-  assert.equal(confirm.hidden, true);
-  assert.equal(stored(storage).orders.length, 1);
-  assert.equal(elements.get("my-orders-clear").focused, true);
-  elements.get("my-orders-clear").dispatch("click");
-  elements.get("my-orders-confirm-yes").dispatch("click");
-  assert.equal(storage.data[KEY], undefined);
-  assert.equal(elements.get("my-orders-list").children.length, 0);
-  assert.equal(elements.get("my-orders-empty").hidden, false);
-  assert.equal(confirm.hidden, true);
-  assert.equal(elements.get("my-orders-close").focused, true, "focus is not lost when the clear controls hide");
-});
-
-test("reopening the dialog starts with the confirm step closed and a fresh list", () => {
-  const { api, link, dialog, elements, popstate } = makeRuntime();
-  api.save(order());
-  link.dispatch("click", { button: 0 });
-  elements.get("my-orders-clear").dispatch("click");
-  dialog.close();
-  popstate(null);
-  api.save(order({ requestId: "second" }));
-  link.dispatch("click", { button: 0 });
-  assert.equal(elements.get("my-orders-confirm").hidden, true);
-  assert.equal(elements.get("my-orders-list").children.length, 2);
 });
 
 test("closing returns focus to the nav link, or to the menu button when the phone menu has closed", () => {
@@ -331,12 +310,10 @@ test("the primary nav has My orders with the gem icon, and the dialog is accessi
   assert.match(dialog, /aria-labelledby="my-orders-title"/);
   assert.match(dialog, /<h2[^>]*id="my-orders-title"[^>]*>My orders<\/h2>/);
   assert.match(dialog, /<form method="dialog"[^>]*>\s*<button[^>]*id="my-orders-close"[^>]*type="submit"[^>]*aria-label="Close my orders"/);
-  assert.match(dialog, /Orders are saved only in this browser for 30 days\./);
+  assert.doesNotMatch(dialog, /saved only in this browser|Remove these from this device|my-orders-clear|my-orders-confirm|Yes, remove|Keep them/);
   assert.match(dialog, /id="my-orders-empty"[^>]*hidden[\s\S]*No orders on this device in the last 30 days\.[\s\S]*<a[^>]+href="#catalogue-filters"[^>]+data-browse-all/);
   assert.match(dialog, /<ol[^>]+id="my-orders-list"/);
   assert.match(dialog, /id="my-orders-contact"[\s\S]*href="tel:\+918209238541"[\s\S]*href="https:\/\/wa\.me\/918209238541/);
-  assert.match(dialog, /<button[^>]+id="my-orders-clear"[^>]*>Remove these from this device<\/button>/);
-  assert.match(dialog, /id="my-orders-confirm"[^>]*hidden[\s\S]*id="my-orders-confirm-yes"[\s\S]*id="my-orders-confirm-no"/);
   assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=\d+" defer><\/script>/);
 });
 
@@ -419,18 +396,6 @@ test("without the History API the dialog still opens and closes", () => {
   assert.doesNotThrow(() => dialog.close());
 });
 
-test("the confirm step buttons take focus without preventScroll, so Keep them is scrolled into view", () => {
-  const { api, link, elements } = makeRuntime();
-  api.save(order());
-  link.dispatch("click", { button: 0 });
-  elements.get("my-orders-clear").dispatch("click");
-  assert.equal(elements.get("my-orders-confirm-no").focused, true);
-  assert.notEqual(elements.get("my-orders-confirm-no").focusOptions && elements.get("my-orders-confirm-no").focusOptions.preventScroll, true);
-  elements.get("my-orders-confirm-no").dispatch("click");
-  assert.equal(elements.get("my-orders-clear").focused, true);
-  assert.notEqual(elements.get("my-orders-clear").focusOptions && elements.get("my-orders-clear").focusOptions.preventScroll, true);
-});
-
 test("opening from the nav link waits two animation frames, so the phone menu has closed and laid out before the modal opens", () => {
   const { link, dialog, elements, history, flushFrame } = makeRuntime({ manualFrames: true });
   const click = link.dispatch("click", { button: 0 });
@@ -452,4 +417,259 @@ test("tapping the nav link twice quickly opens the dialog once", () => {
   flushFrame(); flushFrame(); flushFrame();
   assert.equal(dialog.open, true);
   assert.equal(history.pushed.length, 1);
+});
+
+// --- Cancel order: the shopper ASKS Saloni to cancel; nothing is cancelled by the page itself ---
+test("the removed clear-all styles are gone and the cancel controls have styles", () => {
+  assert.doesNotMatch(css, /\.my-orders-clear|\.my-orders-confirm|\.my-orders-note/);
+  assert.match(css, /\.my-order-actions/);
+  assert.match(css, /\.my-order-feedback/);
+});
+
+test("a stored cancelRequestedAt is validated like the rest: a whole number near the order time, else the entry is dropped", () => {
+  const now = Date.now();
+  const entry = (requestId, extra) => Object.assign({ at: now - 1000 }, order({ requestId }), extra);
+  const storage = createStorage({ [KEY]: JSON.stringify({ version: 1, orders: [
+    entry("good-request-id-1", { cancelRequestedAt: now - 500 }),
+    entry("bad-string-id-123", { cancelRequestedAt: "yesterday" }),
+    entry("bad-float-id-1234", { cancelRequestedAt: 1.5 }),
+    entry("bad-future-id-123", { cancelRequestedAt: now + 10 * DAY }),
+    entry("bad-before-id-123", { cancelRequestedAt: now - 20 * DAY }),
+    entry("bad-null-id-12345", { cancelRequestedAt: null }),
+  ] }) });
+  const { api } = makeRuntime({ storage });
+  const listed = api.list();
+  assert.deepEqual(listed.map((item) => item.requestId), ["good-request-id-1"]);
+  assert.equal(listed[0].cancelRequestedAt, now - 500);
+  assert.equal(api.list().length, 1);
+});
+
+test("save never writes cancelRequestedAt, even if the summary carries one", () => {
+  const { api, storage } = makeRuntime();
+  api.save(order({ requestId: CANCEL_ID, cancelRequestedAt: Date.now() }));
+  assert.equal("cancelRequestedAt" in stored(storage).orders[0], false);
+});
+
+test("each order shows a Cancel order button next to its status, and nothing is requested until it is pressed", () => {
+  const { card, fetchCalls } = withOrder();
+  assert.ok(button(card, "Cancel order"));
+  assert.match(text(card), /Request sent — Saloni will contact you to confirm/);
+  assert.doesNotMatch(text(card), /Ask Saloni to cancel/);
+  assert.equal(fetchCalls.length, 0);
+});
+
+test("there is no Cancel order button when the request ID is not one the server accepts, or the page has no server address", () => {
+  const short = makeRuntime();
+  short.api.save(order({ requestId: "request-1" }));
+  short.link.dispatch("click", { button: 0 });
+  assert.equal(button(short.elements.get("my-orders-list"), "Cancel order"), null);
+  for (const execUrl of [null, "https://script.google.com/macros/s/REPLACE_WITH_DEPLOYMENT_ID/exec", ""]) {
+    const unconfigured = withOrder({ execUrl });
+    assert.equal(button(unconfigured.card, "Cancel order"), null, String(execUrl));
+  }
+  const noFetch = withOrder({ noFetch: true });
+  assert.equal(button(noFetch.card, "Cancel order"), null);
+});
+
+test("Cancel order opens a small in-place confirm and moves focus to Keep order", () => {
+  const { card, fetchCalls } = withOrder();
+  const cancel = button(card, "Cancel order");
+  cancel.dispatch("click");
+  const confirm = byClass(card, "my-order-confirm");
+  assert.ok(confirm);
+  assert.equal(confirm.getAttribute("role"), "group");
+  assert.match(confirm.getAttribute("aria-label"), /cancel/i);
+  assert.match(text(confirm), /Ask Saloni to cancel this order\?/);
+  assert.ok(button(card, "Yes, ask to cancel"));
+  const keep = button(card, "Keep order");
+  assert.equal(keep.focused, true);
+  assert.notEqual(keep.focusOptions && keep.focusOptions.preventScroll, true, "focused with scrolling so the confirm is in view");
+  assert.equal(button(card, "Cancel order"), null, "the confirm takes the button's place, so the card does not grow");
+  assert.equal(fetchCalls.length, 0);
+});
+
+test("Keep order closes the confirm, returns focus to Cancel order, sends nothing and stores nothing", () => {
+  const { card, fetchCalls, storage } = withOrder();
+  button(card, "Cancel order").dispatch("click");
+  button(card, "Keep order").dispatch("click");
+  assert.equal(byClass(card, "my-order-confirm"), null);
+  const cancel = button(card, "Cancel order");
+  assert.ok(cancel);
+  assert.equal(cancel.focused, true);
+  assert.equal(fetchCalls.length, 0);
+  assert.equal("cancelRequestedAt" in stored(storage).orders[0], false);
+});
+
+test("Yes, ask to cancel posts the request ID to the order form's /exec URL as text/plain JSON, and nothing else", async () => {
+  let release;
+  const { card, fetchCalls } = withOrder({ fetchImpl: () => new Promise((resolve) => { release = resolve; }) });
+  button(card, "Cancel order").dispatch("click");
+  const yes = button(card, "Yes, ask to cancel");
+  yes.dispatch("click");
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].url, EXEC_URL + "?action=cancel");
+  assert.equal(fetchCalls[0].init.method, "POST");
+  assert.equal(fetchCalls[0].init.credentials, "omit");
+  assert.deepEqual(JSON.parse(fetchCalls[0].init.body), { requestId: CANCEL_ID });
+  assert.equal(fetchCalls[0].init.headers, undefined, "no custom header, so the browser sends a simple request without a preflight");
+  assert.equal(yes.disabled, true, "pressed buttons are disabled while the request is in flight");
+  assert.equal(button(card, "Keep order").disabled, true);
+  assert.match(text(byClass(card, "my-order-feedback")), /Sending/);
+  yes.dispatch("click");
+  assert.equal(fetchCalls.length, 1, "a second press does not send a second request");
+  release({ json: () => Promise.resolve({ ok: true }) });
+  await settle();
+});
+
+test("on success the order says Cancellation requested, the button is gone, focus moves to the status, and it is remembered", async () => {
+  const { api, card, storage, fetchCalls } = withOrder({ fetchImpl: jsonReply({ ok: true }) });
+  button(card, "Cancel order").dispatch("click");
+  const before = Date.now();
+  button(card, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  assert.equal(fetchCalls.length, 1);
+  assert.match(text(card), /Cancellation requested — Saloni will confirm/);
+  assert.doesNotMatch(text(card), /Request sent — Saloni will contact you to confirm/);
+  assert.equal(button(card, "Cancel order"), null);
+  assert.equal(button(card, "Yes, ask to cancel"), null);
+  assert.equal(byClass(card, "my-order-confirm"), null);
+  const status = byClass(card, "my-order-status");
+  assert.equal(status.focused, true);
+  assert.equal(status.getAttribute("tabindex"), "-1");
+  const savedAt = stored(storage).orders[0].cancelRequestedAt;
+  assert.ok(savedAt >= before && savedAt <= Date.now());
+  assert.deepEqual(Object.keys(stored(storage).orders[0]).sort(), ["at", "cancelRequestedAt", "fulfillment", "items", "notes", "requestId"]);
+  assert.equal(api.list()[0].cancelRequestedAt, savedAt);
+});
+
+test("the success state survives closing and reopening the dialog, and only that order changes", async () => {
+  const runtime = makeRuntime({ fetchImpl: jsonReply({ ok: true }) });
+  runtime.api.save(order({ requestId: "first-request-id-1" }));
+  runtime.api.save(order({ requestId: "second-request-id-2" }));
+  runtime.link.dispatch("click", { button: 0 });
+  const list = runtime.elements.get("my-orders-list");
+  const first = list.children.find((card) => text(card).includes("second-request-id-2"));
+  button(first, "Cancel order").dispatch("click");
+  button(first, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  runtime.dialog.close();
+  runtime.popstate(null);
+  runtime.link.dispatch("click", { button: 0 });
+  const cards = runtime.elements.get("my-orders-list").children;
+  assert.equal(cards.length, 2);
+  const done = cards.find((card) => text(card).includes("second-request-id-2"));
+  const open = cards.find((card) => text(card).includes("first-request-id-1"));
+  assert.match(text(done), /Cancellation requested — Saloni will confirm/);
+  assert.equal(button(done, "Cancel order"), null);
+  assert.ok(button(open, "Cancel order"));
+  assert.match(text(open), /Request sent/);
+});
+
+test("an already-requested answer counts as success", async () => {
+  const { card, storage } = withOrder({ fetchImpl: jsonReply({ ok: true, already: true }) });
+  button(card, "Cancel order").dispatch("click");
+  button(card, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  assert.match(text(card), /Cancellation requested — Saloni will confirm/);
+  assert.ok(stored(storage).orders[0].cancelRequestedAt);
+});
+
+const FAILURE = /Could not send the request\. Please try again or call\/WhatsApp Saloni\./;
+const failureCases = {
+  "an ok:false answer": jsonReply({ ok: false, error: "not_found" }),
+  "a paused answer": jsonReply({ ok: false, error: "paused" }),
+  "an answer without ok": jsonReply({ error: "x" }),
+  "ok that is not exactly true": jsonReply({ ok: "true" }),
+  "a null answer": jsonReply(null),
+  "an HTML page instead of JSON": () => Promise.resolve({ json: () => Promise.reject(new SyntaxError("Unexpected token <")) }),
+  "a network error": () => Promise.reject(new TypeError("Failed to fetch")),
+  "a throw inside fetch": () => { throw new Error("blocked"); },
+};
+for (const [name, fetchImpl] of Object.entries(failureCases)) {
+  test("failure (" + name + ") keeps the Cancel order button, shows the error, stores nothing and never shows success", async () => {
+    const { card, storage } = withOrder({ fetchImpl });
+    button(card, "Cancel order").dispatch("click");
+    button(card, "Yes, ask to cancel").dispatch("click");
+    await settle();
+    const cancel = button(card, "Cancel order");
+    assert.ok(cancel, "the button is back");
+    assert.equal(cancel.disabled === true, false);
+    assert.equal(cancel.focused, true);
+    assert.match(text(byClass(card, "my-order-feedback")), FAILURE);
+    assert.doesNotMatch(text(card), /Cancellation requested/);
+    assert.match(text(card), /Request sent — Saloni will contact you to confirm/);
+    assert.equal(byClass(card, "my-order-confirm"), null);
+    assert.equal("cancelRequestedAt" in stored(storage).orders[0], false);
+  });
+}
+
+test("after a failure the shopper can try again, and the error clears when the retry works", async () => {
+  let attempt = 0;
+  const { card, fetchCalls } = withOrder({ fetchImpl: () => (attempt++ === 0 ? Promise.reject(new TypeError("offline")) : Promise.resolve({ json: () => Promise.resolve({ ok: true }) })) });
+  button(card, "Cancel order").dispatch("click");
+  button(card, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  assert.match(text(card), FAILURE);
+  button(card, "Cancel order").dispatch("click");
+  assert.doesNotMatch(text(card), FAILURE, "opening the confirm again clears the old error");
+  button(card, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  assert.equal(fetchCalls.length, 2);
+  assert.doesNotMatch(text(card), FAILURE);
+  assert.match(text(card), /Cancellation requested — Saloni will confirm/);
+});
+
+test("a request that never answers is aborted after 25 seconds and treated as a failure", async () => {
+  const { card, timers, aborts, fetchCalls } = withOrder({ fetchImpl: () => new Promise(() => {}) });
+  button(card, "Cancel order").dispatch("click");
+  button(card, "Yes, ask to cancel").dispatch("click");
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 25000);
+  assert.ok(fetchCalls[0].init.signal, "fetch gets an abort signal");
+  timers[0].callback();
+  assert.equal(aborts.length, 1);
+});
+
+test("a cancel-requested order is not offered the button again, and a request ID that is already stored as requested sends nothing", () => {
+  const now = Date.now();
+  const storage = createStorage({ [KEY]: JSON.stringify({ version: 1, orders: [Object.assign({ at: now - 1000, cancelRequestedAt: now - 500 }, order({ requestId: CANCEL_ID }))] }) });
+  const runtime = makeRuntime({ storage });
+  runtime.link.dispatch("click", { button: 0 });
+  const card = runtime.elements.get("my-orders-list").children[0];
+  assert.equal(button(card, "Cancel order"), null);
+  assert.match(text(card), /Cancellation requested — Saloni will confirm/);
+  assert.equal(runtime.fetchCalls.length, 0);
+});
+
+test("reopening the dialog starts every order with the confirm closed", () => {
+  const runtime = withOrder();
+  button(runtime.card, "Cancel order").dispatch("click");
+  runtime.dialog.close();
+  runtime.popstate(null);
+  runtime.link.dispatch("click", { button: 0 });
+  const card = runtime.elements.get("my-orders-list").children[0];
+  assert.equal(byClass(card, "my-order-confirm"), null);
+  assert.ok(button(card, "Cancel order"));
+});
+
+test("an answer that arrives after the dialog was closed and reopened does not throw and is still remembered", async () => {
+  let release;
+  const runtime = withOrder({ fetchImpl: () => new Promise((resolve) => { release = resolve; }) });
+  button(runtime.card, "Cancel order").dispatch("click");
+  button(runtime.card, "Yes, ask to cancel").dispatch("click");
+  runtime.dialog.close();
+  release({ json: () => Promise.resolve({ ok: true }) });
+  await settle();
+  assert.ok(stored(runtime.storage).orders[0].cancelRequestedAt);
+});
+
+test("blocked storage does not turn a sent request into an error", async () => {
+  const data = {};
+  const flaky = { getItem: (key) => (key in data ? data[key] : null), setItem(key, value) { if (this.deny) throw new Error("quota"); data[key] = String(value); }, removeItem() {}, deny: false };
+  const { card } = withOrder({ storage: flaky, fetchImpl: jsonReply({ ok: true }) });
+  flaky.deny = true;
+  button(card, "Cancel order").dispatch("click");
+  button(card, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  assert.match(text(card), /Cancellation requested — Saloni will confirm/);
 });
