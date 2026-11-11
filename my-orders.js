@@ -8,7 +8,7 @@
  * per request ID (read from the Status column Saloni updates by hand), which is stored as status/statusCheckedAt so the
  * last known status still shows when the check fails. The shopper never sees Saloni's own Status wording.
  * When Saloni has confirmed an order and typed an advance amount, the same answer carries advance {amount, payee, name}. It is
- * kept in memory only (never in localStorage), checked again here, and turned into a "Pay advance" UPI link plus a copy option.
+ * kept in memory only (never in localStorage), checked again here, and turned into "Pay with" UPI app links plus a copy option.
  */
 (function () {
   "use strict";
@@ -246,9 +246,26 @@
   }
   // The note the bank statement and Saloni's UPI app will show: "Saloni order" and the first 8 characters of the request ID.
   function paymentNote(requestId) { return "Saloni order " + requestId.slice(0, 8); }
-  function upiLink(advance, requestId) {
-    return "upi://pay?pa=" + encodeURIComponent(advance.payee) + "&pn=" + encodeURIComponent(advance.name) +
+  // The same five encoded fields for every app; only the scheme in front changes.
+  function upiParams(advance, requestId) {
+    return "pa=" + encodeURIComponent(advance.payee) + "&pn=" + encodeURIComponent(advance.name) +
       "&am=" + encodeURIComponent(advance.amount + ".00") + "&cu=INR&tn=" + encodeURIComponent(paymentNote(requestId));
+  }
+  // iPhone, iPad and iPadOS (which calls itself a Mac but has a touch screen) open Google Pay as gpay://; everything else as tez://.
+  function isIos() {
+    var nav = window.navigator;
+    if (!nav) return false;
+    return /iPhone|iPad|iPod/.test(String(nav.userAgent || "")) || (nav.platform === "MacIntel" && nav.maxTouchPoints > 1);
+  }
+  // The shopper picks the app: one link per app, so no phone silently opens its default UPI handler.
+  function payOptions(advance, requestId) {
+    var params = upiParams(advance, requestId);
+    return [
+      { label: "Google Pay", aria: "Google Pay", href: (isIos() ? "gpay://upi/pay?" : "tez://upi/pay?") + params },
+      { label: "PhonePe", aria: "PhonePe", href: "phonepe://pay?" + params },
+      { label: "Paytm", aria: "Paytm", href: "paytmmp://pay?" + params },
+      { label: "Other UPI app", aria: "another UPI app", href: "upi://pay?" + params }
+    ];
   }
 
   // --- the dialog ---
@@ -389,9 +406,16 @@
     var rupees = "\u20B9" + advance.amount;
     var note = paymentNote(view.order.requestId);
     box.appendChild(element("p", "my-order-advance-amount", "Advance to pay: " + rupees));
-    var pay = element("a", "button button-dark my-order-pay", "Pay advance " + rupees);
-    pay.setAttribute("href", upiLink(advance, view.order.requestId));
-    box.appendChild(pay);
+    box.appendChild(element("p", "my-order-pay-label", "Pay with"));
+    var choice = element("div", "my-order-pay-choice");
+    payOptions(advance, view.order.requestId).forEach(function (option) {
+      var pay = element("a", "button button-dark my-order-pay", option.label);
+      pay.setAttribute("href", option.href);
+      pay.setAttribute("aria-label", "Pay " + rupees + " with " + option.aria);
+      choice.appendChild(pay);
+    });
+    box.appendChild(choice);
+    box.appendChild(element("p", "my-order-pay-hint", "If nothing opens, that app isn\u2019t installed \u2014 choose another or copy the UPI ID."));
     var alternative = element("p", "my-order-advance-alt");
     alternative.appendChild(element("span", undefined, "Or pay " + rupees + " to "));
     alternative.appendChild(element("strong", "my-order-upi-id", advance.payee));
