@@ -1574,3 +1574,45 @@ test("the cancel reply carries no customer data, and lock trouble or a sheet err
   broken.properties.ORDER_SHEET_ID = "";
   assert.deepEqual(cancelPost(broken, { requestId: CANCEL_ID }), { ok: false, error: "unconfirmed" });
 });
+
+test("a cancel request never overwrites a Status Saloni already set: note and email only, reply ok", () => {
+  for (const status of ["Cancelled", "Confirmed", "In progress", "Dispatched"]) {
+    const runtime = orderedRuntime();
+    runtime.rows[0][24] = status;
+    runtime.rows[0][25] = "Started the tray";
+    const before = runtime.rows[0].slice();
+    assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true }, status);
+    assert.equal(runtime.rows[0][24], status, "Status is kept: " + status);
+    assert.match(runtime.rows[0][25], /^Started the tray \| Customer asked to cancel on .+ IST via My orders$/);
+    runtime.rows[0].forEach((cell, index) => { if (index !== 25) assert.equal(cell, before[index]); });
+    assert.deepEqual(runtime.state.cellWrites.map((write) => write.column), [26], "only Staff notes is written");
+    assert.equal(runtime.state.emails.length, 1);
+    const { message, lockHeld } = runtime.state.emails[0];
+    assert.equal(lockHeld, false);
+    assert.equal(message.subject, "Cancellation request: Resin photo frame \u2013 Priya (status: " + status + ")");
+    assert.ok(message.body.includes("Status before this request: " + status));
+    assert.match(message.body, /Status was not changed/);
+  }
+});
+
+test("a repeat request on a row with another Status finds the Staff notes line and answers already, with no second email", () => {
+  const runtime = orderedRuntime();
+  runtime.rows[0][24] = "Confirmed";
+  assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true });
+  const notes = runtime.rows[0][25];
+  assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true, already: true });
+  assert.equal(runtime.rows[0][25], notes);
+  assert.equal(runtime.rows[0][24], "Confirmed");
+  assert.equal(runtime.state.emails.length, 1);
+  assert.equal(runtime.state.cellWrites.length, 1);
+});
+
+test("a blank Status is treated like New request: it becomes Cancellation requested", () => {
+  const runtime = orderedRuntime();
+  runtime.rows[0][24] = "";
+  assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true });
+  assert.equal(runtime.rows[0][24], "Cancellation requested");
+  assert.equal(runtime.state.emails.length, 1);
+  assert.ok(!runtime.state.emails[0].message.subject.includes("(status:"));
+  assert.ok(!/Status was not changed/.test(runtime.state.emails[0].message.body));
+});

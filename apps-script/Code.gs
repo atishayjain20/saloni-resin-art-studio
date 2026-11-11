@@ -803,8 +803,12 @@ function submitOrder(form) {
 // The shopper only ASKS Saloni to cancel: the Orders row gets Status "Cancellation requested" and a Staff notes line, and
 // Saloni is emailed. Nothing is cancelled, refunded or deleted by this action. The request ID is a random UUID that only
 // the shopper's browser knows, and that is the whole credential, so the reply carries only ok/error/already, never order data.
+// A Status Saloni already set (Confirmed, In progress, Cancelled, ...) is never overwritten: only "New request" or blank
+// becomes "Cancellation requested". For any other Status the request is still logged in Staff notes and emailed, with the
+// current Status shown, so Saloni sees it was asked after work started.
 // Paused by ORDER_CANCEL_DISABLED=true (its own switch: cancellations keep working while new orders are paused).
 var CANCEL_REQUESTED_STATUS = "Cancellation requested";
+var CANCEL_NOTE_PREFIX = "Customer asked to cancel";
 
 function cancelFromPost_(event) {
   var body;
@@ -834,14 +838,16 @@ function requestOrderCancellation_(requestId) {
     var notesColumn = headers["Staff notes"];
     var before = String(target.values[statusColumn] == null ? "" : target.values[statusColumn]).trim();
     if (before === CANCEL_REQUESTED_STATUS) return { ok: true, already: true };
+    var notes = String(target.values[notesColumn] == null ? "" : target.values[notesColumn]);
+    var open = before === "" || before === "New request";
+    if (!open && notes.indexOf(CANCEL_NOTE_PREFIX) !== -1) return { ok: true, already: true };
 
     var now = new Date();
-    var line = "Customer asked to cancel on " + Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " IST via My orders";
-    var notes = String(target.values[notesColumn] == null ? "" : target.values[notesColumn]);
-    // Only these two cells are written; every other column keeps its value.
+    var line = CANCEL_NOTE_PREFIX + " on " + Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " IST via My orders";
+    // Only Staff notes (and Status, when it was still open) are written; every other column keeps its value.
     sheet.getRange(target.number, notesColumn + 1).setValue(neutralizeForSheet_(notes ? notes + " | " + line : line));
-    sheet.getRange(target.number, statusColumn + 1).setValue(CANCEL_REQUESTED_STATUS);
-    alert = { requestId: requestId, values: target.values, headers: headers, statusBefore: before };
+    if (open) sheet.getRange(target.number, statusColumn + 1).setValue(CANCEL_REQUESTED_STATUS);
+    alert = { requestId: requestId, values: target.values, headers: headers, statusBefore: before, statusKept: !open };
     return { ok: true };
   } finally {
     lock.releaseLock();
@@ -863,13 +869,14 @@ function sendCancellationAlert_(alert, properties) {
     : String(received || "-");
   MailApp.sendEmail({
     to: to,
-    subject: "Cancellation request: " + product + " \u2013 " + alertFirstName_({ customerName: cell("Customer name") }),
+    subject: "Cancellation request: " + product + " \u2013 " + alertFirstName_({ customerName: cell("Customer name") }) + (alert.statusKept ? " (status: " + alert.statusBefore + ")" : ""),
     body: [
       "A customer asked to cancel this order from My orders. Nothing has been cancelled yet.",
       "Request ID: " + alert.requestId,
       "Product: " + product + " x " + cell("Quantity"),
       "Received: " + receivedText,
       "Status before this request: " + (alert.statusBefore || "-"),
+      alert.statusKept ? "Status was not changed because the order is already past New request. Please contact the customer." : "Status is now: " + CANCEL_REQUESTED_STATUS,
       "Orders sheet: " + orderSheetUrl_(properties)
     ].join("\n")
   });
