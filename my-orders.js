@@ -4,6 +4,9 @@
  * Nothing personal is stored: no phone, email, address, PIN, images or referral code.
  * "Cancel order" only ASKS Saloni to cancel: it posts the request ID to the same Apps Script URL the order form uses
  * (action=cancel) and, once the server confirms, remembers that as cancelRequestedAt on the stored entry.
+ * Opening the dialog asks the same URL for the live order status (action=status): the server answers with one fixed code
+ * per request ID (read from the Status column Saloni updates by hand), which is stored as status/statusCheckedAt so the
+ * last known status still shows when the check fails. The shopper never sees Saloni's own Status wording.
  */
 (function () {
   "use strict";
@@ -18,8 +21,20 @@
   var REQUEST_ID = /^[A-Za-z0-9_.:-]{1,80}$/;
   var IMAGE_PATH = /^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:webp|jpe?g|png)$/i;
   var FULFILLMENT_LABELS = { shipping: "Shipping", pickup: "Pickup in Ajmer" };
-  var STATUS_TEXT = "Request sent — Saloni will contact you to confirm";
-  var CANCEL_STATUS_TEXT = "Cancellation requested — Saloni will confirm";
+  // The fixed codes action=status can answer with (Code.gs orderStatusCode_), and what the shopper reads for each.
+  var STATUS_LABELS = {
+    received: "Request sent — Saloni will contact you to confirm",
+    confirmed: "Confirmed by Saloni",
+    in_progress: "Being made",
+    ready: "Ready to ship",
+    dispatched: "Dispatched",
+    delivered: "Delivered",
+    cancel_requested: "Cancellation requested — Saloni will confirm",
+    cancelled: "Cancelled"
+  };
+  var PICKUP_LABELS = { ready: "Ready for pickup in Ajmer", delivered: "Picked up" };
+  var STATUS_CHECK_GAP_MS = 60 * 1000;
+  var STATUS_TIMEOUT_MS = 15000;
   var CANCEL_FAILED_TEXT = "Could not send the request. Please try again or call/WhatsApp Saloni.";
   var CANCEL_TIMEOUT_MS = 25000;
   // The server only accepts request IDs of this shape (Code.gs ORDER_REQUEST_ID_PATTERN); older or odd IDs get no button.
@@ -34,6 +49,7 @@
     if (trimmed.length > maxLength || (required && !trimmed)) return null;
     return trimmed;
   }
+  function isStatusCode(code) { return typeof code === "string" && Object.prototype.hasOwnProperty.call(STATUS_LABELS, code); }
   function wholeNumber(value, min, max) {
     return typeof value === "number" && value % 1 === 0 && value >= min && value <= max;
   }
@@ -62,6 +78,12 @@
       var asked = entry.cancelRequestedAt;
       if (typeof asked !== "number" || asked % 1 !== 0 || asked < at - CLOCK_SKEW_MS || asked > now + CLOCK_SKEW_MS) return null;
       valid.cancelRequestedAt = asked;
+    }
+    // A last known status is optional and never worth dropping the order for: an unknown code or odd time is just ignored.
+    var checked = entry.statusCheckedAt;
+    if (isStatusCode(entry.status) && typeof checked === "number" && checked % 1 === 0 && checked >= at - CLOCK_SKEW_MS && checked <= now + CLOCK_SKEW_MS) {
+      valid.status = entry.status;
+      valid.statusCheckedAt = checked;
     }
     return valid;
   }
@@ -145,23 +167,51 @@
     return url && url.indexOf("REPLACE_WITH_") === -1 ? url : "";
   }
   // A text/plain JSON body is a "simple" request (no preflight), like postJson in order-form.js. Resolves with the parsed
-  // answer; rejects on a network error, a non-JSON answer, or when nothing has answered after CANCEL_TIMEOUT_MS.
-  function requestCancellation(requestId) {
+  // answer; rejects on a network error, a non-JSON answer, or when nothing has answered after timeoutMs.
+  function postAction(action, body, timeoutMs) {
     var url = execUrl();
     if (!url || typeof window.fetch !== "function") return Promise.reject(new Error("not configured"));
     var controller = typeof window.AbortController === "function" ? new window.AbortController() : null;
-    var timer = typeof window.setTimeout === "function" ? window.setTimeout(function () { if (controller) controller.abort(); }, CANCEL_TIMEOUT_MS) : null;
+    var timer = typeof window.setTimeout === "function" ? window.setTimeout(function () { if (controller) controller.abort(); }, timeoutMs) : null;
     function stopTimer() { if (timer !== null && typeof window.clearTimeout === "function") window.clearTimeout(timer); }
-    var init = { method: "POST", credentials: "omit", body: JSON.stringify({ requestId: requestId }) };
+    var init = { method: "POST", credentials: "omit", body: JSON.stringify(body) };
     if (controller) init.signal = controller.signal;
     try {
-      return window.fetch(url + "?action=cancel", init)
+      return window.fetch(url + "?action=" + action, init)
         .then(function (response) { return response.json(); })
         .then(function (data) { stopTimer(); return data; }, function (error) { stopTimer(); throw error; });
     } catch (error) {
       stopTimer();
       return Promise.reject(error);
     }
+  }
+  function requestCancellation(requestId) { return postAction("cancel", { requestId: requestId }, CANCEL_TIMEOUT_MS); }
+
+  // What the shopper reads for an order. A cancellation the shopper asked for shows as requested until Saloni's status moves
+  // past "sent" or "confirmed" (a later Cancelled, Being made, Dispatched, ... wins, because that is what really happened).
+  function effectiveStatus(order) {
+    var code = isStatusCode(order.status) ? order.status : "received";
+    if (order.cancelRequestedAt && (code === "received" || code === "confirmed")) return "cancel_requested";
+    return code;
+  }
+  function statusLabel(order) {
+    var code = effectiveStatus(order);
+    return order.fulfillment === "pickup" && PICKUP_LABELS.hasOwnProperty(code) ? PICKUP_LABELS[code] : STATUS_LABELS[code];
+  }
+  // Remember the codes the server sent. Unknown ids and unknown codes are ignored.
+  function storeStatuses(statuses) {
+    if (!statuses || typeof statuses !== "object" || Array.isArray(statuses)) return;
+    var now = Date.now();
+    var orders = read();
+    var changed = false;
+    orders.forEach(function (order) {
+      if (!Object.prototype.hasOwnProperty.call(statuses, order.requestId) || !isStatusCode(statuses[order.requestId])) return;
+      order.status = statuses[order.requestId];
+      order.statusCheckedAt = now;
+      changed = true;
+    });
+    var store = storage();
+    if (changed && store) write(store, orders);
   }
 
   // --- the dialog ---
@@ -171,6 +221,9 @@
   var emptyElement = document.getElementById("my-orders-empty");
   var contactElement = document.getElementById("my-orders-contact");
   var opener = null;
+  var views = [];
+  var lastStatusCheckAt = 0;
+  var statusInFlight = false;
   var leaveFocusAlone = false;
   // The same history pattern as the order and lightbox dialogs in script.js: opening adds one history entry, so
   // the phone Back button closes the dialog; closing any other way steps that entry back so none is left behind.
@@ -251,10 +304,26 @@
     card.appendChild(items);
     card.appendChild(element("p", "my-order-meta", FULFILLMENT_LABELS[order.fulfillment]));
     if (order.notes) card.appendChild(element("p", "my-order-notes", "Your notes: " + order.notes));
-    var status = element("p", "my-order-status", order.cancelRequestedAt ? CANCEL_STATUS_TEXT : STATUS_TEXT);
-    card.appendChild(status);
-    if (!order.cancelRequestedAt && CANCELLABLE_ID.test(order.requestId) && execUrl() && typeof window.fetch === "function") card.appendChild(cancelControls(order, status));
+    var view = { order: order, card: card, status: element("p", "my-order-status"), cancel: null };
+    card.appendChild(view.status);
+    views.push(view);
+    paint(view);
     return card;
+  }
+  // The status line (text and colour) and, only while Saloni has not started work, the Cancel order controls.
+  function paint(view) {
+    var order = view.order;
+    var code = effectiveStatus(order);
+    view.status.className = "my-order-status is-" + code.replace(/_/g, "-");
+    view.status.textContent = statusLabel(order);
+    var canCancel = (code === "received" || code === "confirmed") && !order.cancelRequestedAt && CANCELLABLE_ID.test(order.requestId) && execUrl() && typeof window.fetch === "function";
+    if (canCancel && !view.cancel) {
+      view.cancel = cancelControls(view);
+      view.card.appendChild(view.cancel);
+    } else if (!canCancel && view.cancel) {
+      if (view.cancel.parentNode) view.cancel.parentNode.removeChild(view.cancel);
+      view.cancel = null;
+    }
   }
   function plainButton(className, label) {
     var node = element("button", className, label);
@@ -264,7 +333,8 @@
   function clearChildren(node) { while (node.firstChild) node.removeChild(node.firstChild); }
   // Cancel order -> in-place confirm -> request. The confirm takes the button's place, so the card keeps its height.
   // Focus goes to the confirm's safe choice, then back to the button (Keep order, failure) or the status (success).
-  function cancelControls(order, status) {
+  function cancelControls(view) {
+    var order = view.order;
     var wrap = element("div", "my-order-cancel");
     var feedback = element("p", "my-order-feedback");
     feedback.setAttribute("aria-live", "polite");
@@ -309,10 +379,10 @@
           if (sent) {
             // The server has it. Storage trouble must not turn that into an error: the status still shows.
             markCancelRequested(order.requestId);
-            status.textContent = CANCEL_STATUS_TEXT;
-            status.setAttribute("tabindex", "-1");
-            if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
-            focusHere(status);
+            order.cancelRequestedAt = order.cancelRequestedAt || Date.now();
+            view.status.setAttribute("tabindex", "-1");
+            paint(view);
+            focusHere(view.status);
           } else {
             say(CANCEL_FAILED_TEXT, true);
             showButton(true);
@@ -326,11 +396,35 @@
   }
   function render() {
     var orders = read();
+    views = [];
     while (listElement.firstChild) listElement.removeChild(listElement.firstChild);
     orders.forEach(function (order) { listElement.appendChild(renderOrder(order)); });
     emptyElement.hidden = orders.length > 0;
     listElement.hidden = !orders.length;
     contactElement.hidden = !orders.length;
+  }
+  // Ask for the live status of every remembered order, at most once a minute. The answer is stored and painted in place (an open
+  // cancel confirm stays open); any failure is silent and the last known status stays on screen.
+  function refreshStatuses() {
+    if (statusInFlight || !execUrl()) return;
+    var now = Date.now();
+    if (lastStatusCheckAt && now - lastStatusCheckAt < STATUS_CHECK_GAP_MS && now >= lastStatusCheckAt) return;
+    var ids = read().map(function (order) { return order.requestId; }).filter(function (id) { return CANCELLABLE_ID.test(id); }).slice(0, MAX_ORDERS);
+    if (!ids.length) return;
+    statusInFlight = true;
+    lastStatusCheckAt = now;
+    postAction("status", { requestIds: ids }, STATUS_TIMEOUT_MS).then(function (reply) {
+      statusInFlight = false;
+      if (!reply || reply.ok !== true || !reply.statuses || typeof reply.statuses !== "object") return;
+      storeStatuses(reply.statuses);
+      views.forEach(function (view) {
+        var code = Object.prototype.hasOwnProperty.call(reply.statuses, view.order.requestId) ? reply.statuses[view.order.requestId] : null;
+        if (!isStatusCode(code)) return;
+        view.order.status = code;
+        view.order.statusCheckedAt = Date.now();
+        paint(view);
+      });
+    }, function () { statusInFlight = false; });
   }
   // A cancel confirm sits low in a scrolling panel, so its buttons are focused with scrolling on.
   function focusIfPossible(target, scrollIntoView) {
@@ -346,6 +440,7 @@
     pushHistory();
     if (!dialog.open) dialog.showModal();
     focusIfPossible(closeButton);
+    refreshStatuses();
     return true;
   }
   function openFromLink(link, event) {

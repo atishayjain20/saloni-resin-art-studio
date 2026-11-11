@@ -191,3 +191,27 @@ What the server does (`requestOrderCancellation_` in `apps-script/Code.gs`): und
 Kill switch: set the script property `ORDER_CANCEL_DISABLED=true` to pause cancellation requests (the reply is `{ok:false, error:"paused"}` and the page shows the failure message with the phone and WhatsApp hint). It is separate from `ORDER_FORM_DISABLED`: cancellation requests keep working while new orders are paused.
 
 Release order: **deploy the new Apps Script version first** (Deploy, Manage deployments, edit the existing deployment, New version, so the `/exec` URL stays the same), then merge and publish Pages. Pages published first would show a Cancel order button that always fails. Acceptance: place one clearly marked test order, open My orders, press Cancel order, confirm, then check the `Orders` row (Status and Staff notes) and the email; press it again after reloading and confirm there is no second email. Rollback: restore the previous Pages commit (the old page simply has no button); the extra Apps Script action is harmless to old pages. Cache version `20261165` is shared by every page, so all pages pick up `my-orders.js` and `styles.css` together.
+
+## My orders: live order status release note
+
+**My orders** now shows where each order is, read from the `Status` column of the `Orders` sheet that Saloni already updates by hand. When the dialog opens, the page asks the same `/exec` URL (`?action=status`, text/plain JSON `{requestIds:[...]}`, at most 50 IDs) once for all remembered orders, and at most once a minute. The server (`statusFromPost_` in `apps-script/Code.gs`) reads the sheet once, takes no lock, writes nothing, and answers `{ok:true, statuses:{<requestId>: <code>}}` only for IDs it finds. It never returns the Status words, `Staff notes` or any customer data, only one of eight fixed codes. The browser stores the code and the check time (`status`, `statusCheckedAt`) on each remembered order, so the last known status still shows before the answer arrives, after a reload, and when the check fails (no error is shown).
+
+Status words Saloni can type in the `Status` column (not case-sensitive; spaces at the ends are ignored), and what the shopper sees:
+
+| Type in the sheet | Code | Shopper sees |
+|---|---|---|
+| (blank), `New request` | `received` | Request sent — Saloni will contact you to confirm |
+| `Confirmed`, `Accepted` | `confirmed` | Confirmed by Saloni |
+| `In progress`, `Making`, `In making`, `Preparing` | `in_progress` | Being made |
+| `Ready`, `Ready for pickup` | `ready` | Ready to ship (pickup orders: Ready for pickup in Ajmer) |
+| `Dispatched`, `Shipped`, `Out for delivery` | `dispatched` | Dispatched |
+| `Delivered`, `Completed`, `Picked up` | `delivered` | Delivered (pickup orders: Picked up) |
+| `Cancellation requested` (set by the Cancel order button) | `cancel_requested` | Cancellation requested — Saloni will confirm |
+| any text containing `cancel` (`Cancelled`, `Canceled`, ...) | `cancelled` | Cancelled |
+| anything else (including `Test` and Saloni's own notes) | `in_progress` | Being made |
+
+So Saloni's own wording stays private: a status she words differently reads as "Being made". The **Cancel order** button is shown only while the order reads "Request sent" or "Confirmed by Saloni" and no cancellation was requested; for every other status it is hidden. After a successful cancel request the order reads "Cancellation requested" until Saloni's status moves past `Confirmed` (then her status shows). The sheet is the source of truth: a shopper who is offline sees the last status this browser saw.
+
+Kill switch: set the script property `ORDER_STATUS_DISABLED=true` to pause status checks (the reply is `{ok:false, error:"paused"}`; pages quietly keep each order's last known status). It is separate from `ORDER_CANCEL_DISABLED` and `ORDER_FORM_DISABLED`.
+
+Release order: **deploy the new Apps Script version first** (Deploy, Manage deployments, edit the existing deployment, New version, so the `/exec` URL stays the same), then merge and publish Pages. Pages published first would still work: the check fails quietly and orders keep showing "Request sent". Acceptance: place one clearly marked test order, open My orders (it reads "Request sent"), type `Confirmed` in its `Status` cell, reopen My orders after a minute and check it reads "Confirmed by Saloni"; try `Shipped` (Cancel order disappears). Rollback: restore the previous Pages commit (old pages simply never ask); the extra Apps Script action is harmless to old pages. Cache version `20261167` is shared by every page.

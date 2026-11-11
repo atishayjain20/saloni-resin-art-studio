@@ -47,7 +47,7 @@ function createStorage(initial = {}) {
 
 const EXEC_URL = "https://script.google.test/exec";
 
-function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false } = {}) {
+function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false, statusImpl = null, clock = null } = {}) {
   const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "nav-toggle"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id === "my-orders-list" ? "ol" : "div", id)]));
   const dialog = elements.get("my-orders-dialog");
@@ -75,25 +75,37 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   const popstateListeners = [];
   const windowObject = { localStorage: storage, document: documentObject, history, location: { href: "https://saloniresinart.com/" }, addEventListener(type, listener) { if (type === "popstate") popstateListeners.push(listener); } };
   // fetch is a stub that records the call; each test decides what it answers. Timers are manual so the 25 s limit can be fired.
+  // Status checks (action=status) are recorded apart, so the cancel tests keep counting only their own calls.
+  // By default the status check answers "not available" and changes nothing.
   const fetchCalls = [];
+  const statusCalls = [];
+  const statusTimers = [];
   const timers = [];
   const aborts = [];
-  if (!noFetch) windowObject.fetch = (url, init) => { fetchCalls.push({ url, init }); return (fetchImpl || (() => Promise.resolve({ json: () => Promise.resolve({ ok: true }) })))(url, init); };
+  if (!noFetch) windowObject.fetch = (url, init) => {
+    if (String(url).endsWith("?action=status")) { statusCalls.push({ url, init }); return (statusImpl || jsonReply({ ok: false, error: "paused" }))(url, init); }
+    fetchCalls.push({ url, init }); return (fetchImpl || (() => Promise.resolve({ json: () => Promise.resolve({ ok: true }) })))(url, init);
+  };
   windowObject.AbortController = function () { this.signal = { aborted: false }; this.abort = () => { this.signal.aborted = true; aborts.push(this); }; };
-  windowObject.setTimeout = (callback, delay) => { timers.push({ callback, delay, cleared: false }); return timers.length; };
-  windowObject.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].cleared = true; };
+  windowObject.setTimeout = (callback, delay) => {
+    if (delay === 15000) { statusTimers.push({ callback, delay, cleared: false }); return -statusTimers.length; }
+    timers.push({ callback, delay, cleared: false }); return timers.length;
+  };
+  windowObject.clearTimeout = (id) => { const timer = id < 0 ? statusTimers[-id - 1] : timers[id - 1]; if (timer) timer.cleared = true; };
   // Animation frames run at once unless a test wants to see what happens between them.
   const frames = [];
   windowObject.requestAnimationFrame = (callback) => { if (manualFrames) frames.push(callback); else callback(); return frames.length; };
   const flushFrame = () => { const due = frames.splice(0); due.forEach((callback) => callback()); return due.length; };
   const popstate = (state) => { if (history) history.state = state; popstateListeners.forEach((listener) => listener({ state })); };
-  const context = { console, document: documentObject, window: windowObject, Date, JSON, Math, Number, String, Array, Object, RegExp };
+  // A test clock moves Date.now() and "now" dates; real Date otherwise.
+  const FakeDate = clock ? class extends Date { constructor(...args) { if (args.length) super(...args); else super(clock.now); } static now() { return clock.now; } } : Date;
+  const context = { console, document: documentObject, window: windowObject, Date: FakeDate, JSON, Math, Number, String, Array, Object, RegExp };
   vm.createContext(context);
   vm.runInContext(source, context, { filename: "my-orders.js" });
   const real = windowObject.saloniMyOrders;
   // Arrays made inside the vm context have another prototype; hand the tests plain objects.
   const api = Object.assign({}, real, { list: () => JSON.parse(JSON.stringify(real.list())) });
-  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject, history, popstate, flushFrame, fetchCalls, timers, aborts };
+  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject, history, popstate, flushFrame, fetchCalls, statusCalls, statusTimers, timers, aborts };
 }
 
 const order = (overrides = {}) => Object.assign({
@@ -672,4 +684,290 @@ test("blocked storage does not turn a sent request into an error", async () => {
   button(card, "Yes, ask to cancel").dispatch("click");
   await settle();
   assert.match(text(card), /Cancellation requested — Saloni will confirm/);
+});
+
+// --- live order status (action=status) ---
+const ID_A = "request-aaaaaaaaaa";
+const ID_B = "request-bbbbbbbbbb";
+const ID_C = "request-cccccccccc";
+const statusReply = (statuses) => jsonReply({ ok: true, statuses });
+const cardFor = (runtime, id) => runtime.elements.get("my-orders-list").children.find((card) => text(card).includes(id));
+const statusOf = (card) => byClass(card, "my-order-status");
+function withOrders(options = {}, fulfilments = {}) {
+  const runtime = makeRuntime(options);
+  [ID_A, ID_B, ID_C].forEach((id, index) => runtime.api.save(order({ requestId: id, fulfillment: fulfilments[id] || "shipping", at: index })));
+  return runtime;
+}
+const openDialog = (runtime) => runtime.link.dispatch("click", { button: 0 });
+const closeDialog = (runtime) => { runtime.dialog.close(); runtime.popstate(null); };
+
+test("opening the dialog sends exactly one action=status request with every stored request ID, and nothing else", async () => {
+  const runtime = withOrders();
+  runtime.api.save(order({ requestId: "request-1" }));
+  openDialog(runtime);
+  await settle();
+  assert.equal(runtime.statusCalls.length, 1);
+  const call = runtime.statusCalls[0];
+  assert.equal(call.url, EXEC_URL + "?action=status");
+  assert.equal(call.init.method, "POST");
+  assert.equal(call.init.credentials, "omit");
+  assert.equal(call.init.headers, undefined, "a simple request: no preflight");
+  assert.deepEqual(Object.keys(JSON.parse(call.init.body)), ["requestIds"]);
+  assert.deepEqual(JSON.parse(call.init.body).requestIds.sort(), [ID_A, ID_B, ID_C], "ids the server would refuse are not sent");
+  assert.equal(runtime.fetchCalls.length, 0);
+  assert.equal(runtime.statusTimers[0].delay, 15000);
+  assert.ok(call.init.signal);
+});
+
+test("no status request without orders, without a usable request ID, or without a server address", () => {
+  const empty = makeRuntime(); openDialog(empty);
+  const short = makeRuntime(); short.api.save(order({ requestId: "request-1" })); openDialog(short);
+  const unconfigured = withOrders({ execUrl: null }); openDialog(unconfigured);
+  const noFetch = withOrders({ noFetch: true }); openDialog(noFetch);
+  for (const runtime of [empty, short, unconfigured, noFetch]) assert.equal(runtime.statusCalls.length, 0);
+});
+
+test("each order shows its own status text and a coloured badge class, set through textContent", async () => {
+  const runtime = withOrders({ statusImpl: statusReply({ [ID_A]: "confirmed", [ID_B]: "in_progress", [ID_C]: "dispatched" }) });
+  openDialog(runtime);
+  await settle();
+  assert.equal(text(statusOf(cardFor(runtime, ID_A))), "Confirmed by Saloni");
+  assert.equal(text(statusOf(cardFor(runtime, ID_B))), "Being made");
+  assert.equal(text(statusOf(cardFor(runtime, ID_C))), "Dispatched");
+  assert.equal(statusOf(cardFor(runtime, ID_A)).className, "my-order-status is-confirmed");
+  assert.equal(statusOf(cardFor(runtime, ID_B)).className, "my-order-status is-in-progress");
+  assert.equal(statusOf(cardFor(runtime, ID_C)).className, "my-order-status is-dispatched");
+});
+
+test("every status code has its shopper wording, with pickup variants for ready and delivered", async () => {
+  const wording = {
+    received: ["Request sent — Saloni will contact you to confirm", "Request sent — Saloni will contact you to confirm"],
+    confirmed: ["Confirmed by Saloni", "Confirmed by Saloni"],
+    in_progress: ["Being made", "Being made"],
+    ready: ["Ready to ship", "Ready for pickup in Ajmer"],
+    dispatched: ["Dispatched", "Dispatched"],
+    delivered: ["Delivered", "Picked up"],
+    cancel_requested: ["Cancellation requested — Saloni will confirm", "Cancellation requested — Saloni will confirm"],
+    cancelled: ["Cancelled", "Cancelled"],
+  };
+  for (const [code, [shipping, pickup]] of Object.entries(wording)) {
+    const runtime = makeRuntime({ statusImpl: statusReply({ [ID_A]: code, [ID_B]: code }) });
+    runtime.api.save(order({ requestId: ID_A, fulfillment: "shipping" }));
+    runtime.api.save(order({ requestId: ID_B, fulfillment: "pickup" }));
+    openDialog(runtime);
+    await settle();
+    assert.equal(text(statusOf(cardFor(runtime, ID_A))), shipping, code + " shipping");
+    assert.equal(text(statusOf(cardFor(runtime, ID_B))), pickup, code + " pickup");
+  }
+});
+
+test("the answer is stored as status and statusCheckedAt, and an order the server did not list keeps its last known status", async () => {
+  const runtime = withOrders({ statusImpl: statusReply({ [ID_A]: "ready" }) });
+  const before = Date.now();
+  openDialog(runtime);
+  await settle();
+  const entries = stored(runtime.storage).orders;
+  const a = entries.find((entry) => entry.requestId === ID_A);
+  assert.equal(a.status, "ready");
+  assert.ok(a.statusCheckedAt >= before && a.statusCheckedAt <= Date.now());
+  assert.equal("status" in entries.find((entry) => entry.requestId === ID_B), false);
+  assert.equal(text(statusOf(cardFor(runtime, ID_B))), "Request sent — Saloni will contact you to confirm");
+});
+
+test("the last known status shows at once on open, before the check answers, and after a reload", async () => {
+  let release;
+  const first = withOrders({ statusImpl: statusReply({ [ID_A]: "dispatched", [ID_B]: "cancelled" }) });
+  openDialog(first);
+  await settle();
+  const reloaded = makeRuntime({ storage: first.storage, statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  openDialog(reloaded);
+  assert.equal(text(statusOf(cardFor(reloaded, ID_A))), "Dispatched");
+  assert.equal(text(statusOf(cardFor(reloaded, ID_B))), "Cancelled");
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [ID_A]: "delivered" } }) });
+  await settle();
+  assert.equal(text(statusOf(cardFor(reloaded, ID_A))), "Delivered");
+  assert.equal(text(statusOf(cardFor(reloaded, ID_B))), "Cancelled");
+});
+
+test("a failed, paused, malformed or timed-out check keeps the last known status and shows no error", async () => {
+  const seeded = withOrders({ statusImpl: statusReply({ [ID_A]: "confirmed", [ID_B]: "dispatched" }) });
+  openDialog(seeded);
+  await settle();
+  const replies = [
+    () => Promise.reject(new Error("offline")),
+    jsonReply({ ok: false, error: "paused" }),
+    jsonReply({ ok: false, error: "unconfirmed" }),
+    jsonReply({ ok: true }),
+    jsonReply({ ok: true, statuses: [] }),
+    jsonReply(null),
+    () => Promise.resolve({ json: () => Promise.reject(new Error("not json")) }),
+    jsonReply({ ok: true, statuses: { [ID_A]: "<img src=x onerror=alert(1)>", [ID_B]: "shipped", [ID_C]: 7 } }),
+  ];
+  for (const statusImpl of replies) {
+    const runtime = makeRuntime({ storage: seeded.storage, statusImpl });
+    openDialog(runtime);
+    await settle();
+    assert.equal(runtime.statusCalls.length, 1);
+    assert.equal(text(statusOf(cardFor(runtime, ID_A))), "Confirmed by Saloni");
+    assert.equal(text(statusOf(cardFor(runtime, ID_B))), "Dispatched");
+    assert.equal(text(statusOf(cardFor(runtime, ID_C))), "Request sent — Saloni will contact you to confirm");
+    assert.equal(byClass(runtime.elements.get("my-orders-list"), "is-error"), null);
+    assert.doesNotMatch(text(runtime.elements.get("my-orders-list")), /could not|error|try again/i);
+  }
+  const hung = makeRuntime({ storage: seeded.storage, statusImpl: () => new Promise(() => {}) });
+  openDialog(hung);
+  hung.statusTimers[0].callback();
+  assert.equal(hung.aborts.length, 1);
+  assert.equal(text(statusOf(cardFor(hung, ID_A))), "Confirmed by Saloni");
+});
+
+test("a stored status or time that is not valid is ignored, and the order itself stays", () => {
+  const now = Date.now();
+  const entry = (id, extra) => Object.assign({ at: now - 1000 }, order({ requestId: id }), extra);
+  const storage = createStorage({ [KEY]: JSON.stringify({ version: 1, orders: [
+    entry("good-status-id-1", { status: "dispatched", statusCheckedAt: now - 10 }),
+    entry("bad-code-id-1234", { status: "shipped", statusCheckedAt: now - 10 }),
+    entry("bad-proto-id-123", { status: "constructor", statusCheckedAt: now - 10 }),
+    entry("bad-type-id-1234", { status: 3, statusCheckedAt: now - 10 }),
+    entry("bad-time-id-1234", { status: "ready", statusCheckedAt: "now" }),
+    entry("no-time-id-12345", { status: "ready" }),
+    entry("future-id-123456", { status: "ready", statusCheckedAt: now + 10 * DAY }),
+  ] }) });
+  const listed = makeRuntime({ storage }).api.list();
+  assert.equal(listed.length, 7);
+  const by = (id) => listed.find((item) => item.requestId === id);
+  assert.equal(by("good-status-id-1").status, "dispatched");
+  for (const id of ["bad-code-id-1234", "bad-proto-id-123", "bad-type-id-1234", "bad-time-id-1234", "no-time-id-12345", "future-id-123456"]) {
+    assert.equal(by(id).status, undefined, id);
+    assert.equal(by(id).statusCheckedAt, undefined, id);
+  }
+});
+
+test("save never writes a status, even if the summary carries one", () => {
+  const { api, storage } = makeRuntime();
+  api.save(order({ requestId: CANCEL_ID, status: "delivered", statusCheckedAt: Date.now() }));
+  assert.deepEqual(Object.keys(stored(storage).orders[0]).sort(), ["at", "fulfillment", "items", "notes", "requestId"]);
+});
+
+test("Cancel order is offered only while the status is received or confirmed", async () => {
+  const codes = { received: true, confirmed: true, in_progress: false, ready: false, dispatched: false, delivered: false, cancel_requested: false, cancelled: false };
+  for (const [code, offered] of Object.entries(codes)) {
+    const runtime = makeRuntime({ statusImpl: statusReply({ [CANCEL_ID]: code }) });
+    runtime.api.save(order({ requestId: CANCEL_ID }));
+    openDialog(runtime);
+    const card = runtime.elements.get("my-orders-list").children[0];
+    assert.ok(button(card, "Cancel order"), "offered before the answer");
+    await settle();
+    assert.equal(Boolean(button(card, "Cancel order")), offered, code);
+    assert.equal(Boolean(byClass(card, "my-order-cancel")), offered, code + " wrapper");
+  }
+});
+
+test("a stored dispatched or cancelled status hides Cancel order from the first paint", () => {
+  for (const status of ["dispatched", "cancelled", "delivered"]) {
+    const now = Date.now();
+    const storage = createStorage({ [KEY]: JSON.stringify({ version: 1, orders: [Object.assign({ at: now - 1000, status, statusCheckedAt: now - 10 }, order({ requestId: CANCEL_ID }))] }) });
+    const runtime = makeRuntime({ storage });
+    openDialog(runtime);
+    assert.equal(button(runtime.elements.get("my-orders-list").children[0], "Cancel order"), null, status);
+  }
+});
+
+test("a status that arrives while the cancel confirm is open leaves the confirm alone, and one that ends cancelling closes it", async () => {
+  let release;
+  const runtime = withOrder({ statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  button(runtime.card, "Cancel order").dispatch("click");
+  assert.ok(button(runtime.card, "Yes, ask to cancel"));
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [CANCEL_ID]: "confirmed" } }) });
+  await settle();
+  assert.ok(button(runtime.card, "Yes, ask to cancel"), "still open for a confirmed order");
+  assert.equal(text(statusOf(runtime.card)), "Confirmed by Saloni");
+  const late = withOrder({ statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  button(late.card, "Cancel order").dispatch("click");
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [CANCEL_ID]: "dispatched" } }) });
+  await settle();
+  assert.equal(button(late.card, "Yes, ask to cancel"), null);
+  assert.equal(button(late.card, "Cancel order"), null);
+  assert.equal(text(statusOf(late.card)), "Dispatched");
+});
+
+test("after a successful cancel request the status is cancel_requested locally, even when a late check still says received or confirmed", async () => {
+  for (const late of ["received", "confirmed"]) {
+    let release;
+    const runtime = withOrder({ fetchImpl: jsonReply({ ok: true }), statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+    button(runtime.card, "Cancel order").dispatch("click");
+    button(runtime.card, "Yes, ask to cancel").dispatch("click");
+    await settle();
+    assert.equal(text(statusOf(runtime.card)), "Cancellation requested — Saloni will confirm");
+    assert.equal(statusOf(runtime.card).className, "my-order-status is-cancel-requested");
+    release({ json: () => Promise.resolve({ ok: true, statuses: { [CANCEL_ID]: late } }) });
+    await settle();
+    assert.equal(text(statusOf(runtime.card)), "Cancellation requested — Saloni will confirm", late);
+    assert.equal(button(runtime.card, "Cancel order"), null);
+    const reopened = makeRuntime({ storage: runtime.storage });
+    openDialog(reopened);
+    assert.match(text(reopened.elements.get("my-orders-list")), /Cancellation requested — Saloni will confirm/);
+  }
+});
+
+test("once Saloni's status moves past confirmed, her status wins over the shopper's cancellation request", async () => {
+  const now = Date.now();
+  const storage = createStorage({ [KEY]: JSON.stringify({ version: 1, orders: [Object.assign({ at: now - 1000, cancelRequestedAt: now - 500 }, order({ requestId: CANCEL_ID }))] }) });
+  for (const [code, wording] of [["cancelled", "Cancelled"], ["dispatched", "Dispatched"], ["in_progress", "Being made"]]) {
+    const runtime = makeRuntime({ storage: createStorage({ [KEY]: storage.data[KEY] }), statusImpl: statusReply({ [CANCEL_ID]: code }) });
+    openDialog(runtime);
+    await settle();
+    assert.equal(text(statusOf(runtime.elements.get("my-orders-list").children[0])), wording);
+  }
+});
+
+test("one status check per open: reopening within a minute reuses the last known status, a check never overlaps, and a minute later it asks again", async () => {
+  const clock = { now: Date.now() };
+  let release;
+  const runtime = withOrders({ clock, statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  openDialog(runtime);
+  closeDialog(runtime);
+  openDialog(runtime);
+  assert.equal(runtime.statusCalls.length, 1, "no overlap while the first check is pending");
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [ID_A]: "confirmed" } }) });
+  await settle();
+  closeDialog(runtime);
+  clock.now += 30 * 1000;
+  openDialog(runtime);
+  await settle();
+  assert.equal(runtime.statusCalls.length, 1, "within 60 s");
+  assert.equal(text(statusOf(cardFor(runtime, ID_A))), "Confirmed by Saloni");
+  closeDialog(runtime);
+  clock.now += 31 * 1000;
+  openDialog(runtime);
+  await settle();
+  assert.equal(runtime.statusCalls.length, 2, "after 60 s");
+});
+
+test("a status answer that arrives after the dialog was closed is still remembered", async () => {
+  let release;
+  const runtime = withOrders({ statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  openDialog(runtime);
+  closeDialog(runtime);
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [ID_B]: "ready" } }) });
+  await settle();
+  assert.equal(stored(runtime.storage).orders.find((entry) => entry.requestId === ID_B).status, "ready");
+});
+
+test("blocked storage does not stop the status from showing", async () => {
+  const data = {};
+  const flaky = { getItem: (key) => (key in data ? data[key] : null), setItem(key, value) { if (this.deny) throw new Error("quota"); data[key] = String(value); }, removeItem() {}, deny: false };
+  const runtime = makeRuntime({ storage: flaky, statusImpl: statusReply({ [ID_A]: "ready" }) });
+  runtime.api.save(order({ requestId: ID_A, fulfillment: "pickup" }));
+  flaky.deny = true;
+  openDialog(runtime);
+  await settle();
+  assert.equal(text(statusOf(cardFor(runtime, ID_A))), "Ready for pickup in Ajmer");
+});
+
+test("the status badge has a style for every status, and no markup is built from the server's answer", () => {
+  for (const code of ["received", "confirmed", "in-progress", "ready", "dispatched", "delivered", "cancel-requested", "cancelled"]) {
+    assert.match(css, new RegExp("\\.my-order-status\\.is-" + code + "\\b"), code);
+  }
+  assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML|outerHTML/);
 });
