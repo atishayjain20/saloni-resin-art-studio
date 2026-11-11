@@ -47,7 +47,7 @@ function createStorage(initial = {}) {
 
 const EXEC_URL = "https://script.google.test/exec";
 
-function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false, statusImpl = null, clock = null } = {}) {
+function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false, statusImpl = null, clock = null, navigator = undefined } = {}) {
   const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "nav-toggle"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id === "my-orders-list" ? "ol" : "div", id)]));
   const dialog = elements.get("my-orders-dialog");
@@ -61,6 +61,7 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
     readyState: "complete",
     getElementById: (id) => elements.get(id) || null,
     createElement: (tag) => new FakeElement(tag),
+    createElementNS: (ns, tag) => { const node = new FakeElement(tag); node.namespace = ns; return node; },
     querySelectorAll: (selector) => (selector === "[data-my-orders-open]" ? [link] : []),
     activeElement: null,
   };
@@ -73,7 +74,7 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
     back() { this.backs += 1; },
   };
   const popstateListeners = [];
-  const windowObject = { localStorage: storage, document: documentObject, history, location: { href: "https://saloniresinart.com/" }, addEventListener(type, listener) { if (type === "popstate") popstateListeners.push(listener); } };
+  const windowObject = { localStorage: storage, document: documentObject, navigator, history, location: { href: "https://saloniresinart.com/" }, addEventListener(type, listener) { if (type === "popstate") popstateListeners.push(listener); } };
   // fetch is a stub that records the call; each test decides what it answers. Timers are manual so the 25 s limit can be fired.
   // Status checks (action=status) are recorded apart, so the cancel tests keep counting only their own calls.
   // By default the status check answers "not available" and changes nothing.
@@ -1117,24 +1118,41 @@ const withAdvanceOrder = (reply, options = {}) => {
   return runtime;
 };
 const payLinks = (card) => find(card, (element) => element.tagName === "A" && element.className.split(" ").includes("my-order-pay"));
-// The "Other UPI app" link is the plain upi:// one; null when no pay buttons show at all.
-const payLink = (card) => payLinks(card).find((element) => element.getAttribute("href").startsWith("upi://")) || null;
+// The Pay with links carry their app in the accessible name ("Pay ₹500 with Google Pay"); the visible face is an icon.
+const payApp = (link) => /^Pay ₹\d+ with (.+)$/.exec(link.getAttribute("aria-label"))[1];
+const payLink = (card) => payLinks(card)[0] || null;
+const payHrefs = (card) => Object.fromEntries(payLinks(card).map((link) => [payApp(link), link.getAttribute("href")]));
 const PARAMS = "pa=saloni.art%40okhdfcbank&pn=Saloni%20Resin%20Art&am=500.00&cu=INR&tn=Saloni%20order%20abcd1234";
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const ANDROID_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
 const advanceBox = (card) => byClass(card, "my-order-advance");
 
-test("a confirmed order with an advance shows the amount, a Pay with choice of four apps with every UPI field encoded, and a copy option", async () => {
-  const runtime = withAdvanceOrder(advanceReply("confirmed", ADV));
+test("a confirmed order with an advance shows the amount, a Pay with choice of app icons with every UPI field encoded, and a copy option", async () => {
+  const runtime = withAdvanceOrder(advanceReply("confirmed", ADV), { navigator: { userAgent: ANDROID_UA, platform: "Linux armv8l" } });
   await settle();
   const links = payLinks(runtime.card);
-  assert.deepEqual(links.map(text), ["Google Pay", "PhonePe", "Paytm", "Other UPI app"]);
   assert.deepEqual(links.map((link) => link.getAttribute("href")), [
-    "tez://upi/pay?" + PARAMS, "phonepe://pay?" + PARAMS, "paytmmp://pay?" + PARAMS, "upi://pay?" + PARAMS,
+    "tez://upi/pay?" + PARAMS, "phonepe://pay?" + PARAMS, "paytmmp://pay?" + PARAMS,
+    "intent://pay?" + PARAMS + "#Intent;scheme=upi;package=com.whatsapp;end",
   ]);
-  assert.deepEqual(links.map((link) => link.getAttribute("aria-label")), ["Pay ₹500 with Google Pay", "Pay ₹500 with PhonePe", "Pay ₹500 with Paytm", "Pay ₹500 with another UPI app"]);
+  assert.deepEqual(links.map((link) => link.getAttribute("aria-label")), ["Pay ₹500 with Google Pay", "Pay ₹500 with PhonePe", "Pay ₹500 with Paytm", "Pay ₹500 with WhatsApp"]);
+  assert.deepEqual(links.map(text), ["", "", "", ""], "the buttons show icons, not app names");
+  for (const link of links) {
+    const icons = find(link, (element) => element.tagName === "SVG");
+    assert.equal(icons.length, 1);
+    assert.equal(icons[0].getAttribute("aria-hidden"), "true");
+    assert.equal(icons[0].getAttribute("focusable"), "false");
+    assert.equal(icons[0].getAttribute("viewBox"), "0 0 24 24");
+    assert.match(icons[0].getAttribute("fill"), /^#[0-9A-Fa-f]{6}$/);
+    const paths = find(icons[0], (element) => element.tagName === "PATH");
+    assert.equal(paths.length, 1);
+    assert.match(paths[0].getAttribute("d"), /^M[\d.\sA-Za-z,-]+$/);
+  }
+  assert.deepEqual(links.map((link) => find(link, (element) => element.tagName === "SVG")[0].getAttribute("fill")), ["#4285F4", "#5F259F", "#20336B", "#25D366"]);
   assert.match(text(advanceBox(runtime.card)), /Pay with/);
-  assert.match(text(advanceBox(runtime.card)), /If nothing opens, that app isn.t installed — choose another or copy the UPI ID\./);
+  assert.doesNotMatch(text(advanceBox(runtime.card)), /If nothing opens|isn.t installed|choose another/);
+  assert.doesNotMatch(text(advanceBox(runtime.card)), /Other UPI app/i);
+  assert.equal(links.some((link) => link.getAttribute("href").startsWith("upi://")), false, "no plain upi:// link");
   assert.equal(button(runtime.card, "Pay advance ₹500"), null);
   assert.equal(advanceBox(runtime.card).hidden, false);
   assert.match(text(advanceBox(runtime.card)), /Advance to pay: ₹500/);
@@ -1151,18 +1169,20 @@ test("the UPI link encodes odd payee names and cannot be bent by them", async ()
   const runtime = withAdvanceOrder(advanceReply("confirmed", { amount: 1200, payee: "a.b-c_d9@ybl", name: "Saloni & Co. =x?y#z ₹" }));
   await settle();
   const odd = "pa=a.b-c_d9%40ybl&pn=Saloni%20%26%20Co.%20%3Dx%3Fy%23z%20%E2%82%B9&am=1200.00&cu=INR&tn=Saloni%20order%20abcd1234";
-  assert.deepEqual(payLinks(runtime.card).map((link) => link.getAttribute("href").split("?")[1]), [odd, odd, odd, odd]);
-  for (const link of payLinks(runtime.card)) {
-    const href = link.getAttribute("href");
+  const hrefs = Object.values(payHrefs(runtime.card));
+  assert.equal(hrefs.length, 3, "Google Pay, PhonePe, Paytm (no WhatsApp: unknown device is not Android)");
+  assert.deepEqual(hrefs.map((href) => href.split("?")[1]), [odd, odd, odd]);
+  for (const href of hrefs) {
     assert.equal(href.split("?").length, 2);
     assert.equal(new URLSearchParams(href.split("?")[1]).get("pn"), "Saloni & Co. =x?y#z ₹");
     assert.equal(new URLSearchParams(href.split("?")[1]).size, 5);
   }
+  const android = withAdvanceOrder(advanceReply("confirmed", { amount: 1200, payee: "a.b-c_d9@ybl", name: "Saloni & Co. =x?y#z ₹" }), { navigator: { userAgent: ANDROID_UA } });
+  await settle();
+  assert.equal(payHrefs(android.card).WhatsApp, "intent://pay?" + odd + "#Intent;scheme=upi;package=com.whatsapp;end");
 });
 
-test("Google Pay uses gpay:// on iPhone and iPad, and tez:// on Android and when the device is unknown; the other links do not change", async () => {
-  const gpay = (card) => payLinks(card)[0].getAttribute("href");
-  const others = (card) => payLinks(card).slice(1).map((link) => link.getAttribute("href"));
+test("Google Pay uses gpay:// on iPhone and iPad, and tez:// on Android and when the device is unknown; PhonePe and Paytm do not change", async () => {
   const devices = [
     [{ userAgent: IPHONE_UA }, "gpay://upi/pay?"],
     [{ userAgent: "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15", platform: "iPad" }, "gpay://upi/pay?"],
@@ -1173,14 +1193,43 @@ test("Google Pay uses gpay:// on iPhone and iPad, and tez:// on Android and when
     [undefined, "tez://upi/pay?"],
   ];
   for (const [nav, prefix] of devices) {
-    const runtime = makeRuntime({ statusImpl: advanceReply("confirmed", ADV) });
-    runtime.windowObject.navigator = nav;
+    const runtime = makeRuntime({ statusImpl: advanceReply("confirmed", ADV), navigator: nav });
     runtime.api.save(order({ requestId: ADV_ID }));
     openDialog(runtime);
     await settle();
     const card = runtime.elements.get("my-orders-list").children[0];
-    assert.equal(gpay(card), prefix + PARAMS, JSON.stringify(nav));
-    assert.deepEqual(others(card), ["phonepe://pay?" + PARAMS, "paytmmp://pay?" + PARAMS, "upi://pay?" + PARAMS], JSON.stringify(nav));
+    const hrefs = payHrefs(card);
+    assert.equal(hrefs["Google Pay"], prefix + PARAMS, JSON.stringify(nav));
+    assert.equal(hrefs.PhonePe, "phonepe://pay?" + PARAMS, JSON.stringify(nav));
+    assert.equal(hrefs.Paytm, "paytmmp://pay?" + PARAMS, JSON.stringify(nav));
+  }
+});
+
+test("WhatsApp Pay is offered only on Android, as an intent to the UPI scheme for the WhatsApp package", async () => {
+  const WA = "intent://pay?" + PARAMS + "#Intent;scheme=upi;package=com.whatsapp;end";
+  const devices = [
+    [{ userAgent: ANDROID_UA, platform: "Linux armv8l" }, true],
+    [{ userAgent: IPHONE_UA }, false],
+    [{ userAgent: "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15", platform: "iPad" }, false],
+    [{ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.5 Safari/605.1.15", platform: "MacIntel", maxTouchPoints: 5 }, false],
+    [{ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126", platform: "MacIntel", maxTouchPoints: 0 }, false],
+    [{}, false],
+    [undefined, false],
+  ];
+  for (const [nav, shown] of devices) {
+    const runtime = makeRuntime({ statusImpl: advanceReply("confirmed", ADV), navigator: nav });
+    runtime.api.save(order({ requestId: ADV_ID }));
+    openDialog(runtime);
+    await settle();
+    const card = runtime.elements.get("my-orders-list").children[0];
+    const hrefs = payHrefs(card);
+    assert.deepEqual(Object.keys(hrefs), shown ? ["Google Pay", "PhonePe", "Paytm", "WhatsApp"] : ["Google Pay", "PhonePe", "Paytm"], JSON.stringify(nav));
+    assert.equal(hrefs.WhatsApp, shown ? WA : undefined, JSON.stringify(nav));
+    assert.doesNotMatch(text(card), /WhatsApp Pay|Other UPI/, JSON.stringify(nav));
+    assert.equal(Object.values(hrefs).some((href) => href.startsWith("upi://")), false, JSON.stringify(nav));
+    assert.match(text(advanceBox(card)), /Or pay ₹500 to\s+saloni\.art@okhdfcbank/);
+    assert.ok(button(card, "Copy UPI ID"));
+    assert.doesNotMatch(text(advanceBox(card)), /If nothing opens/);
   }
 });
 
@@ -1334,5 +1383,7 @@ test("my-orders.js builds the advance with text nodes only and keeps the UPI sha
   assert.equal(pattern(source), pattern(server));
   assert.match(css, /\.my-order-pay\b/);
   assert.match(css, /\.my-order-pay-choice\b/);
+  assert.match(css, /\.my-order-pay:focus-visible/);
+  assert.doesNotMatch(css, /my-order-pay-hint/);
   assert.match(css, /\.my-order-advance\b/);
 });

@@ -519,11 +519,14 @@ dialog.my-orders-dialog::backdrop { background: rgba(42, 14, 31, .72); }
 .my-order-advance-amount { margin: 0; color: var(--ink); font-size: .95rem; font-weight: 800; }
 .my-order-advance-alt, .my-order-advance-note { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; overflow-wrap: anywhere; }
 .my-order-upi-id { color: var(--ink); user-select: all; }
-.my-order-pay, .my-order-copy { min-height: 2.75rem; justify-content: center; }
+.my-order-copy { min-height: 2.75rem; justify-content: center; }
 .my-order-pay-label { margin: 0; color: var(--ink); font-size: .85rem; font-weight: 700; }
-.my-order-pay-hint { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
-.my-order-pay-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; width: 100%; }
-.my-order-pay-choice .my-order-pay { justify-content: center; padding-inline: .5rem; text-align: center; }
+.my-order-pay-choice { display: flex; flex-wrap: wrap; gap: .6rem; width: 100%; }
+.my-order-pay { display: grid; place-items: center; flex: 0 0 auto; width: 3.5rem; height: 3.5rem; border: 1px solid var(--line); border-radius: .9rem; background: #fff; transition: border-color 180ms ease, transform 180ms ease; }
+.my-order-pay svg { display: block; width: 1.75rem; height: 1.75rem; }
+.my-order-pay:hover { border-color: var(--ink); }
+.my-order-pay:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; border-color: var(--ink); }
+.my-order-pay:active { transform: scale(.96); }
 .my-order-copy-feedback:empty { display: none; }
 .order-dialog-panel { position: relative; width: 100%; max-height: calc(100dvh - 2rem); overflow: auto; overscroll-behavior: contain; padding: clamp(2.8rem, 4vw, 3.5rem) clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 1.5rem); border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }
 .order-dialog-close-form { position: sticky; z-index: 2; top: 0; display: flex; justify-content: flex-end; height: 44px; margin: -2.8rem -1rem 1rem; }
