@@ -1126,6 +1126,7 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 .page-form { min-width: 0; padding: clamp(1rem, 3vw, 1.6rem); border: 1px solid var(--line); border-radius: 1.2rem; background: var(--paper); color: var(--ink); box-shadow: var(--shadow); }
 .page-form > .panel-label { margin: 0 0 .8rem; color: var(--rose-ink); }
 .page-form noscript .status { margin: .8rem 0 0; }
+:is(#partner-form, #corporate-form) :is(input, select, textarea, .status) { scroll-margin-top: 9rem; }
 :is(#partner-form, #corporate-form) label:has(> input[type="checkbox"]) { grid-template-columns: auto minmax(0, 1fr); align-items: start; column-gap: .6rem; font-weight: 500; line-height: 1.45; }
 :is(#partner-form, #corporate-form) input[type="checkbox"] { width: 1.3rem; min-height: 1.3rem; margin: .1rem 0 0; accent-color: var(--rose-ink); }
 :is(#partner-form, #corporate-form) .field-error { grid-column: 1 / -1; }
