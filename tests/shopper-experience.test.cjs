@@ -213,19 +213,20 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261163">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261163" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261163" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261164">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261164" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261164" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261164" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
   for (const page of ["index.html", "partners/index.html", "corporate-gifting/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html", "reviews/index.html"]) {
     const source = fs.readFileSync(path.join(root, page), "utf8");
-    const versions = [...source.matchAll(/(?:styles\.css|script\.js|customizer\.js|order-form\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
+    const versions = [...source.matchAll(/(?:styles\.css|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261163"], page);
+    assert.deepEqual([...new Set(versions)], ["20261164"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261163/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261164/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -601,6 +602,7 @@ test("menu and footer links use accessible local icons", () => {
   assert.match(nav, /data-customizer-open>Design a frame <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
   assert.match(nav, /Corporate orders <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift[\s\S]*<\/svg> <span aria-hidden="true">↗<\/span>/);
   assert.match(nav, /href="partners\/">Partner Circle <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#heart[\s\S]*<\/svg> <span aria-hidden="true">↗<\/span>/);
+  assert.match(nav, /<a href="#my-orders-dialog" data-my-orders-open>My orders <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gem[\s\S]*<\/svg><\/a>/);
   const footer = html.match(/<div class="footer-links">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(footer, /data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
   assert.match(footer, /href="resin-photo-frames\/">Photo frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
@@ -864,12 +866,12 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("footer trust strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Design a frame", "Corporate orders", "Partner Circle"].forEach((label) => {
+  ["Gifts", "Design a frame", "Corporate orders", "Partner Circle", "My orders"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
   ["Bestsellers", "Marriage gifts", "Couple keepsakes", "Resin frames"].forEach((label) => assert.doesNotMatch(nav, new RegExp(`>${label}(?:\\s|<)`)));
   assert.doesNotMatch(nav, />Order\s*<\/a>/);
-  assert.equal((nav.match(/<a\b/g) || []).length, 4);
+  assert.equal((nav.match(/<a\b/g) || []).length, 5);
   const hero = section("hero");
   const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
   const trustStrip = footer.match(/<ul class="hero-trust-strip"[\s\S]*?<\/ul>/)?.[0] || "";

@@ -47,10 +47,11 @@
     }
   </script>
   <title>Custom Resin Art &amp; Gifts | Saloni Resin Art Studio</title>
-  <link rel="stylesheet" href="styles.css?v=20261163">
-  <script class="order-form-script" src="order-form.js?v=20261163" defer></script>
-  <script class="site-script" src="script.js?v=20261163" defer></script>
-  <script class="customizer-script" src="customizer.js?v=20261163" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261164">
+  <script class="order-form-script" src="order-form.js?v=20261164" defer></script>
+  <script class="site-script" src="script.js?v=20261164" defer></script>
+  <script class="my-orders-script" src="my-orders.js?v=20261164" defer></script>
+  <script class="customizer-script" src="customizer.js?v=20261164" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -119,6 +120,7 @@
         <a href="#customizer" data-customizer-open>Design a frame <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#frame"></use></svg></a>
         <a href="corporate-gifting/">Corporate orders <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#gift"></use></svg> <span aria-hidden="true">↗</span></a>
         <a href="partners/">Partner Circle <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#heart"></use></svg> <span aria-hidden="true">↗</span></a>
+        <a href="#my-orders-dialog" data-my-orders-open>My orders <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#gem"></use></svg></a>
       </nav>
     </div>
     <nav class="category-tabs" aria-label="Gift categories"><div class="category-tabs-list">
@@ -997,7 +999,7 @@
         <button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button>
         <button class="button button-line order-continue-request" id="order-continue-request" type="button" aria-controls="order-dialog" hidden>Continue your request</button>
       </div>
-      <details class="privacy-details" id="privacy-details"><summary>Privacy details</summary><p>Order details and an optional image are stored in the studio’s private Google Sheet and restricted Drive folder for handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. Partner attribution and private commission records are retained for payout records. Customer reviews (first name, optional city, rating, comment and photos) are public on the home page and are kept until removed; ask for removal through @saloniresin_art_studio or 8209238541. Request correction or deletion through <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p></details>
+      <details class="privacy-details" id="privacy-details"><summary>Privacy details</summary><p>Order details and an optional image are stored in the studio’s private Google Sheet and restricted Drive folder for handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. A short summary of each confirmed request (items, notes and request ID) is kept only in this browser for 30 days for My orders; it has no phone number, email or address. Partner attribution and private commission records are retained for payout records. Customer reviews (first name, optional city, rating, comment and photos) are public on the home page and are kept until removed; ask for removal through @saloniresin_art_studio or 8209238541. Request correction or deletion through <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p></details>
     </section>
 
     <section class="home-reviews shell" id="customer-reviews" aria-labelledby="home-reviews-title">
@@ -1120,7 +1122,7 @@
           </div>
           <details class="privacy-details" id="order-privacy-details">
             <summary>Privacy details</summary>
-            <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
+            <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. A short summary of each confirmed request (items, notes and request ID) is kept only in this browser for 30 days for My orders; it has no phone number, email or address. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
           </details>
         </form>
       </div>
@@ -1142,6 +1144,34 @@
       </ul>
     </div>
   </footer>
+
+  <dialog class="my-orders-dialog" id="my-orders-dialog" aria-labelledby="my-orders-title">
+    <div class="my-orders-panel">
+      <form method="dialog" class="order-dialog-close-form">
+        <button class="order-dialog-close" id="my-orders-close" type="submit" aria-label="Close my orders"><span aria-hidden="true">×</span></button>
+      </form>
+      <h2 class="my-orders-title" id="my-orders-title">My orders</h2>
+      <p class="my-orders-note">Orders are saved only in this browser for 30 days.</p>
+      <div class="my-orders-empty" id="my-orders-empty" hidden>
+        <p>No orders on this device in the last 30 days.</p>
+        <a class="button button-dark" href="#catalogue-filters" data-browse-all>Browse gifts</a>
+      </div>
+      <ol class="my-orders-list" id="my-orders-list"></ol>
+      <div class="my-orders-contact" id="my-orders-contact" hidden>
+        <p>Questions about an order? Quote its request ID to Saloni.</p>
+        <a class="button button-line" href="tel:+918209238541">Call 8209238541</a>
+        <a class="button button-whatsapp" href="https://wa.me/918209238541?text=Hi%20Saloni%2C%20I%27d%20like%20to%20ask%20about%20my%20order." target="_blank" rel="noopener">Message on WhatsApp</a>
+      </div>
+      <div class="my-orders-clear" id="my-orders-clear-area" hidden>
+        <button class="button button-line" id="my-orders-clear" type="button">Remove these from this device</button>
+        <div class="my-orders-confirm" id="my-orders-confirm" role="group" aria-label="Confirm removing orders" hidden>
+          <p>Remove all orders saved on this device? This cannot be undone.</p>
+          <button class="button button-dark" id="my-orders-confirm-yes" type="button">Yes, remove</button>
+          <button class="button button-line" id="my-orders-confirm-no" type="button">Keep them</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <dialog class="diwali-greeting" id="diwali-greeting" aria-labelledby="diwali-greeting-title">
     <form method="dialog" class="lightbox-close-form">
