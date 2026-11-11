@@ -1116,16 +1116,26 @@ const withAdvanceOrder = (reply, options = {}) => {
   runtime.card = runtime.elements.get("my-orders-list").children[0];
   return runtime;
 };
-const payLink = (card) => find(card, (element) => element.tagName === "A" && element.className.split(" ").includes("my-order-pay"))[0] || null;
+const payLinks = (card) => find(card, (element) => element.tagName === "A" && element.className.split(" ").includes("my-order-pay"));
+// The "Other UPI app" link is the plain upi:// one; null when no pay buttons show at all.
+const payLink = (card) => payLinks(card).find((element) => element.getAttribute("href").startsWith("upi://")) || null;
+const PARAMS = "pa=saloni.art%40okhdfcbank&pn=Saloni%20Resin%20Art&am=500.00&cu=INR&tn=Saloni%20order%20abcd1234";
+const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+const ANDROID_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
 const advanceBox = (card) => byClass(card, "my-order-advance");
 
-test("a confirmed order with an advance shows the amount, a Pay advance link with every UPI field encoded, and a copy option", async () => {
+test("a confirmed order with an advance shows the amount, a Pay with choice of four apps with every UPI field encoded, and a copy option", async () => {
   const runtime = withAdvanceOrder(advanceReply("confirmed", ADV));
   await settle();
-  const link = payLink(runtime.card);
-  assert.ok(link, "Pay advance link");
-  assert.equal(text(link), "Pay advance ₹500");
-  assert.equal(link.getAttribute("href"), "upi://pay?pa=saloni.art%40okhdfcbank&pn=Saloni%20Resin%20Art&am=500.00&cu=INR&tn=Saloni%20order%20abcd1234");
+  const links = payLinks(runtime.card);
+  assert.deepEqual(links.map(text), ["Google Pay", "PhonePe", "Paytm", "Other UPI app"]);
+  assert.deepEqual(links.map((link) => link.getAttribute("href")), [
+    "tez://upi/pay?" + PARAMS, "phonepe://pay?" + PARAMS, "paytmmp://pay?" + PARAMS, "upi://pay?" + PARAMS,
+  ]);
+  assert.deepEqual(links.map((link) => link.getAttribute("aria-label")), ["Pay ₹500 with Google Pay", "Pay ₹500 with PhonePe", "Pay ₹500 with Paytm", "Pay ₹500 with another UPI app"]);
+  assert.match(text(advanceBox(runtime.card)), /Pay with/);
+  assert.match(text(advanceBox(runtime.card)), /If nothing opens, that app isn.t installed — choose another or copy the UPI ID\./);
+  assert.equal(button(runtime.card, "Pay advance ₹500"), null);
   assert.equal(advanceBox(runtime.card).hidden, false);
   assert.match(text(advanceBox(runtime.card)), /Advance to pay: ₹500/);
   assert.match(text(advanceBox(runtime.card)), /Or pay ₹500 to\s+saloni\.art@okhdfcbank\s+in any UPI app and add “Saloni order abcd1234” as the note\./);
@@ -1140,11 +1150,38 @@ test("a confirmed order with an advance shows the amount, a Pay advance link wit
 test("the UPI link encodes odd payee names and cannot be bent by them", async () => {
   const runtime = withAdvanceOrder(advanceReply("confirmed", { amount: 1200, payee: "a.b-c_d9@ybl", name: "Saloni & Co. =x?y#z ₹" }));
   await settle();
-  const href = payLink(runtime.card).getAttribute("href");
-  assert.equal(href, "upi://pay?pa=a.b-c_d9%40ybl&pn=Saloni%20%26%20Co.%20%3Dx%3Fy%23z%20%E2%82%B9&am=1200.00&cu=INR&tn=Saloni%20order%20abcd1234");
-  assert.equal(href.split("?").length, 2);
-  assert.equal(new URLSearchParams(href.split("?")[1]).get("pn"), "Saloni & Co. =x?y#z ₹");
-  assert.equal(new URLSearchParams(href.split("?")[1]).size, 5);
+  const odd = "pa=a.b-c_d9%40ybl&pn=Saloni%20%26%20Co.%20%3Dx%3Fy%23z%20%E2%82%B9&am=1200.00&cu=INR&tn=Saloni%20order%20abcd1234";
+  assert.deepEqual(payLinks(runtime.card).map((link) => link.getAttribute("href").split("?")[1]), [odd, odd, odd, odd]);
+  for (const link of payLinks(runtime.card)) {
+    const href = link.getAttribute("href");
+    assert.equal(href.split("?").length, 2);
+    assert.equal(new URLSearchParams(href.split("?")[1]).get("pn"), "Saloni & Co. =x?y#z ₹");
+    assert.equal(new URLSearchParams(href.split("?")[1]).size, 5);
+  }
+});
+
+test("Google Pay uses gpay:// on iPhone and iPad, and tez:// on Android and when the device is unknown; the other links do not change", async () => {
+  const gpay = (card) => payLinks(card)[0].getAttribute("href");
+  const others = (card) => payLinks(card).slice(1).map((link) => link.getAttribute("href"));
+  const devices = [
+    [{ userAgent: IPHONE_UA }, "gpay://upi/pay?"],
+    [{ userAgent: "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15", platform: "iPad" }, "gpay://upi/pay?"],
+    [{ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.5 Safari/605.1.15", platform: "MacIntel", maxTouchPoints: 5 }, "gpay://upi/pay?"],
+    [{ userAgent: ANDROID_UA, platform: "Linux armv8l" }, "tez://upi/pay?"],
+    [{ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126", platform: "MacIntel", maxTouchPoints: 0 }, "tez://upi/pay?"],
+    [{}, "tez://upi/pay?"],
+    [undefined, "tez://upi/pay?"],
+  ];
+  for (const [nav, prefix] of devices) {
+    const runtime = makeRuntime({ statusImpl: advanceReply("confirmed", ADV) });
+    runtime.windowObject.navigator = nav;
+    runtime.api.save(order({ requestId: ADV_ID }));
+    openDialog(runtime);
+    await settle();
+    const card = runtime.elements.get("my-orders-list").children[0];
+    assert.equal(gpay(card), prefix + PARAMS, JSON.stringify(nav));
+    assert.deepEqual(others(card), ["phonepe://pay?" + PARAMS, "paytmmp://pay?" + PARAMS, "upi://pay?" + PARAMS], JSON.stringify(nav));
+  }
 });
 
 test("Copy UPI ID copies the payee and says so, or says it could not", async () => {
@@ -1183,7 +1220,8 @@ test("no Pay button without an advance, or when the advance is not exactly what 
   for (const advance of bad) {
     const runtime = withAdvanceOrder(advanceReply("confirmed", advance));
     await settle();
-    assert.equal(payLink(runtime.card), null, JSON.stringify(advance));
+    assert.equal(payLinks(runtime.card).length, 0, JSON.stringify(advance));
+    assert.doesNotMatch(text(runtime.card), /Pay with/);
     assert.equal(advanceBox(runtime.card).hidden, true, JSON.stringify(advance));
     assert.equal(button(runtime.card, "Copy UPI ID"), null);
     assert.equal(text(statusOf(runtime.card)), "Confirmed by Saloni");
@@ -1201,14 +1239,14 @@ test("a missing or odd payee name falls back to the studio name, and an odd requ
   shortId.api.save(order({ requestId: "request-1" }));
   openDialog(shortId);
   await settle();
-  assert.equal(payLink(shortId.elements.get("my-orders-list").children[0]), null);
+  assert.equal(payLinks(shortId.elements.get("my-orders-list").children[0]).length, 0);
 });
 
 test("an advance shows only while the order reads Confirmed", async () => {
   for (const code of ["received", "in_progress", "ready", "dispatched", "delivered", "cancel_requested", "cancel_declined", "cancelled", "advance_paid"]) {
     const runtime = withAdvanceOrder(advanceReply(code, ADV));
     await settle();
-    assert.equal(payLink(runtime.card), null, code);
+    assert.equal(payLinks(runtime.card).length, 0, code);
   }
   // A shopper who already asked to cancel does not get a Pay button while the sheet still says Confirmed.
   const storage = createStorage();
@@ -1218,7 +1256,7 @@ test("an advance shows only while the order reads Confirmed", async () => {
   const runtime = makeRuntime({ storage, statusImpl: advanceReply("confirmed", ADV) });
   openDialog(runtime);
   await settle();
-  assert.equal(payLink(runtime.elements.get("my-orders-list").children[0]), null);
+  assert.equal(payLinks(runtime.elements.get("my-orders-list").children[0]).length, 0);
 });
 
 test("advance received reads Advance received, with no Pay button, no copy option and no Cancel order", async () => {
@@ -1226,7 +1264,7 @@ test("advance received reads Advance received, with no Pay button, no copy optio
   await settle();
   assert.equal(text(statusOf(runtime.card)), "Advance received — thank you");
   assert.equal(statusOf(runtime.card).className, "my-order-status is-advance-paid");
-  assert.equal(payLink(runtime.card), null);
+  assert.equal(payLinks(runtime.card).length, 0);
   assert.equal(button(runtime.card, "Copy UPI ID"), null);
   assert.equal(button(runtime.card, "Cancel order"), null);
   assert.equal(byClass(runtime.card, "my-order-cancel"), null);
@@ -1244,7 +1282,7 @@ test("the advance is never stored: not the amount, not the UPI ID, not the name"
   const planted = stored(runtime.storage); planted.orders[0].advance = ADV; planted.orders[0].status = "confirmed";
   const fresh = makeRuntime({ storage: createStorage({ [KEY]: JSON.stringify(planted) }), statusImpl: () => new Promise(() => {}) });
   openDialog(fresh);
-  assert.equal(payLink(fresh.elements.get("my-orders-list").children[0]), null, "a reload shows no button until the server answers");
+  assert.equal(payLinks(fresh.elements.get("my-orders-list").children[0]).length, 0, "a reload shows no button until the server answers");
   assert.equal("advance" in fresh.api.list()[0], false);
 });
 
@@ -1265,7 +1303,7 @@ test("the button stays when the dialog is reopened within the minute, and goes w
   clock.now += 2 * 60 * 1000;
   openDialog(runtime);
   await settle();
-  assert.equal(payLink(runtime.elements.get("my-orders-list").children[0]), null, "Saloni took the amount away");
+  assert.equal(payLinks(runtime.elements.get("my-orders-list").children[0]).length, 0, "Saloni took the amount away");
   closeDialog(runtime);
   clock.now += 2 * 60 * 1000;
   openDialog(runtime);
@@ -1285,7 +1323,7 @@ test("when the sheet moves from confirmed to advance received, a reopened dialog
   openDialog(runtime);
   await settle();
   const card = runtime.elements.get("my-orders-list").children[0];
-  assert.equal(payLink(card), null);
+  assert.equal(payLinks(card).length, 0);
   assert.equal(text(statusOf(card)), "Advance received — thank you");
 });
 
@@ -1295,5 +1333,6 @@ test("my-orders.js builds the advance with text nodes only and keeps the UPI sha
   const pattern = (text) => /UPI_PAYEE(?:_PATTERN)? = (\/\^.*\$\/);/.exec(text)[1];
   assert.equal(pattern(source), pattern(server));
   assert.match(css, /\.my-order-pay\b/);
+  assert.match(css, /\.my-order-pay-choice\b/);
   assert.match(css, /\.my-order-advance\b/);
 });
