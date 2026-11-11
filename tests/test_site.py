@@ -483,8 +483,6 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(f"<dt>Size</dt><dd>{size}</dd>", card)
                 self.assertEqual(card[:card.index("<dl")].count("<p"), 2)
 
-        nav = re.search(r'<nav class="site-nav"[\s\S]*?</nav>', self.html).group(0)
-        self.assertRegex(nav, r'<a href="#marriage-gifts" data-category-shortcut="marriage">Marriage gifts <svg class="category-icon"[\s\S]*?#heart')
         self.assertIn('<a class="category-tab" href="#marriage-gifts" data-category-shortcut="marriage" data-category-tab="marriage">Marriage</a>', self.html)
         self.assertIn('<option value="marriage">Marriage gifts</option>', self.html)
         script = (ROOT / "script.js").read_text(encoding="utf-8")
@@ -498,12 +496,14 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(
             nav,
             r'<a href="#catalogue-filters" data-browse-all>Gifts[\s\S]*?'
-            r'<a href="#catalogue-filters" data-category-shortcut="bestsellers">Bestsellers[\s\S]*?#gem[\s\S]*?'
-            r'<a href="#romantic-keepsakes" data-category-shortcut="couple">Couple keepsakes[\s\S]*?'
-            r'<a href="#studio-art" data-category-shortcut="frames">Resin frames[\s\S]*?'
             r'<a href="#customizer" data-customizer-open>Design a frame[\s\S]*?'
-            r'<a href="corporate-gifting/">Corporate orders',
+            r'<a href="corporate-gifting/">Corporate orders[\s\S]*?'
+            r'<a href="partners/">Partner Circle',
         )
+        # The owner removed these shortcuts from the menu; the category tabs below the header still cover them.
+        for label in ("Bestsellers", "Marriage gifts", "Couple keepsakes", "Resin frames"):
+            self.assertNotIn(">" + label + " <", nav)
+        self.assertEqual(nav.count("<a "), 4)
         self.assertNotIn('nav-cta', nav)
         self.assertNotIn('href="#process"', nav)
         self.assertNotIn(">The process<", nav)
