@@ -2,6 +2,8 @@
  * "My orders": a short record of the requests this browser has sent, kept in localStorage for 30 days.
  * order-form.js calls window.saloniMyOrders.save(summary) only after the server confirms a request.
  * Nothing personal is stored: no phone, email, address, PIN, images or referral code.
+ * "Cancel order" only ASKS Saloni to cancel: it posts the request ID to the same Apps Script URL the order form uses
+ * (action=cancel) and, once the server confirms, remembers that as cancelRequestedAt on the stored entry.
  */
 (function () {
   "use strict";
@@ -17,6 +19,11 @@
   var IMAGE_PATH = /^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:webp|jpe?g|png)$/i;
   var FULFILLMENT_LABELS = { shipping: "Shipping", pickup: "Pickup in Ajmer" };
   var STATUS_TEXT = "Request sent — Saloni will contact you to confirm";
+  var CANCEL_STATUS_TEXT = "Cancellation requested — Saloni will confirm";
+  var CANCEL_FAILED_TEXT = "Could not send the request. Please try again or call/WhatsApp Saloni.";
+  var CANCEL_TIMEOUT_MS = 25000;
+  // The server only accepts request IDs of this shape (Code.gs ORDER_REQUEST_ID_PATTERN); older or odd IDs get no button.
+  var CANCELLABLE_ID = /^[A-Za-z0-9_-]{12,80}$/;
 
   function storage() {
     try { return window.localStorage || null; } catch (error) { return null; }
@@ -50,7 +57,13 @@
       if (typeof item.image !== "string" || (item.image !== "" && !IMAGE_PATH.test(item.image))) return null;
       items.push({ name: name, quantity: item.quantity, price: price, image: item.image });
     }
-    return { requestId: entry.requestId, at: at, items: items, fulfillment: entry.fulfillment, notes: notes };
+    var valid = { requestId: entry.requestId, at: at, items: items, fulfillment: entry.fulfillment, notes: notes };
+    if (entry.cancelRequestedAt !== undefined) {
+      var asked = entry.cancelRequestedAt;
+      if (typeof asked !== "number" || asked % 1 !== 0 || asked < at - CLOCK_SKEW_MS || asked > now + CLOCK_SKEW_MS) return null;
+      valid.cancelRequestedAt = asked;
+    }
+    return valid;
   }
 
   function newestFirst(orders) {
@@ -113,10 +126,42 @@
     return write(store, newestFirst([clean].concat(orders)).slice(0, MAX_ORDERS));
   }
 
-  function clear() {
+  // Remember that the server took the cancellation request for this order. Returns false when nothing could be stored.
+  function markCancelRequested(requestId) {
     var store = storage();
-    if (!store) return;
-    try { store.removeItem(STORAGE_KEY); } catch (error) {}
+    if (!store) return false;
+    var changed = false;
+    var orders = read();
+    orders.forEach(function (order) {
+      if (order.requestId === requestId && !order.cancelRequestedAt) { order.cancelRequestedAt = Date.now(); changed = true; }
+    });
+    return changed ? write(store, orders) : false;
+  }
+
+  // The same address the order form posts to; the form's embed element carries it.
+  function execUrl() {
+    var embed = document.getElementById("order-form-embed");
+    var url = embed ? String(embed.getAttribute("data-order-form-url") || "") : "";
+    return url && url.indexOf("REPLACE_WITH_") === -1 ? url : "";
+  }
+  // A text/plain JSON body is a "simple" request (no preflight), like postJson in order-form.js. Resolves with the parsed
+  // answer; rejects on a network error, a non-JSON answer, or when nothing has answered after CANCEL_TIMEOUT_MS.
+  function requestCancellation(requestId) {
+    var url = execUrl();
+    if (!url || typeof window.fetch !== "function") return Promise.reject(new Error("not configured"));
+    var controller = typeof window.AbortController === "function" ? new window.AbortController() : null;
+    var timer = typeof window.setTimeout === "function" ? window.setTimeout(function () { if (controller) controller.abort(); }, CANCEL_TIMEOUT_MS) : null;
+    function stopTimer() { if (timer !== null && typeof window.clearTimeout === "function") window.clearTimeout(timer); }
+    var init = { method: "POST", credentials: "omit", body: JSON.stringify({ requestId: requestId }) };
+    if (controller) init.signal = controller.signal;
+    try {
+      return window.fetch(url + "?action=cancel", init)
+        .then(function (response) { return response.json(); })
+        .then(function (data) { stopTimer(); return data; }, function (error) { stopTimer(); throw error; });
+    } catch (error) {
+      stopTimer();
+      return Promise.reject(error);
+    }
   }
 
   // --- the dialog ---
@@ -125,11 +170,6 @@
   var listElement = document.getElementById("my-orders-list");
   var emptyElement = document.getElementById("my-orders-empty");
   var contactElement = document.getElementById("my-orders-contact");
-  var clearArea = document.getElementById("my-orders-clear-area");
-  var clearButton = document.getElementById("my-orders-clear");
-  var confirmElement = document.getElementById("my-orders-confirm");
-  var confirmYes = document.getElementById("my-orders-confirm-yes");
-  var confirmNo = document.getElementById("my-orders-confirm-no");
   var opener = null;
   var leaveFocusAlone = false;
   // The same history pattern as the order and lightbox dialogs in script.js: opening adds one history entry, so
@@ -211,8 +251,78 @@
     card.appendChild(items);
     card.appendChild(element("p", "my-order-meta", FULFILLMENT_LABELS[order.fulfillment]));
     if (order.notes) card.appendChild(element("p", "my-order-notes", "Your notes: " + order.notes));
-    card.appendChild(element("p", "my-order-status", STATUS_TEXT));
+    var status = element("p", "my-order-status", order.cancelRequestedAt ? CANCEL_STATUS_TEXT : STATUS_TEXT);
+    card.appendChild(status);
+    if (!order.cancelRequestedAt && CANCELLABLE_ID.test(order.requestId) && execUrl() && typeof window.fetch === "function") card.appendChild(cancelControls(order, status));
     return card;
+  }
+  function plainButton(className, label) {
+    var node = element("button", className, label);
+    node.setAttribute("type", "button");
+    return node;
+  }
+  function clearChildren(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+  // Cancel order -> in-place confirm -> request. The confirm takes the button's place, so the card keeps its height.
+  // Focus goes to the confirm's safe choice, then back to the button (Keep order, failure) or the status (success).
+  function cancelControls(order, status) {
+    var wrap = element("div", "my-order-cancel");
+    var feedback = element("p", "my-order-feedback");
+    feedback.setAttribute("aria-live", "polite");
+    var actions = element("div", "my-order-actions");
+    wrap.appendChild(feedback);
+    wrap.appendChild(actions);
+    var sending = false;
+    function say(message, isError) {
+      feedback.className = "my-order-feedback" + (isError ? " is-error" : "");
+      feedback.textContent = message;
+    }
+    function focusHere(target) { if (dialog.open) focusIfPossible(target, true); }
+    function showButton(moveFocus) {
+      clearChildren(actions);
+      var cancel = plainButton("button button-line my-order-cancel-button", "Cancel order");
+      cancel.addEventListener("click", showConfirm);
+      actions.appendChild(cancel);
+      if (moveFocus) focusHere(cancel);
+    }
+    function showConfirm() {
+      say("", false);
+      clearChildren(actions);
+      var group = element("div", "my-order-confirm");
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", "Confirm cancellation request");
+      group.appendChild(element("p", "my-order-confirm-text", "Ask Saloni to cancel this order?"));
+      var yes = plainButton("button button-dark", "Yes, ask to cancel");
+      var keep = plainButton("button button-line", "Keep order");
+      group.appendChild(yes);
+      group.appendChild(keep);
+      actions.appendChild(group);
+      keep.addEventListener("click", function () { if (!sending) showButton(true); });
+      yes.addEventListener("click", function () {
+        if (sending) return;
+        sending = true;
+        yes.disabled = true;
+        keep.disabled = true;
+        group.setAttribute("aria-busy", "true");
+        say("Sending your request…", false);
+        requestCancellation(order.requestId).then(function (reply) { return Boolean(reply) && reply.ok === true; }, function () { return false; }).then(function (sent) {
+          sending = false;
+          if (sent) {
+            // The server has it. Storage trouble must not turn that into an error: the status still shows.
+            markCancelRequested(order.requestId);
+            status.textContent = CANCEL_STATUS_TEXT;
+            status.setAttribute("tabindex", "-1");
+            if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+            focusHere(status);
+          } else {
+            say(CANCEL_FAILED_TEXT, true);
+            showButton(true);
+          }
+        });
+      });
+      focusHere(keep);
+    }
+    showButton(false);
+    return wrap;
   }
   function render() {
     var orders = read();
@@ -221,10 +331,8 @@
     emptyElement.hidden = orders.length > 0;
     listElement.hidden = !orders.length;
     contactElement.hidden = !orders.length;
-    clearArea.hidden = !orders.length;
-    confirmElement.hidden = true;
   }
-  // The confirm step sits low in a scrolling panel, so its buttons are focused with scrolling on.
+  // A cancel confirm sits low in a scrolling panel, so its buttons are focused with scrolling on.
   function focusIfPossible(target, scrollIntoView) {
     if (!target || typeof target.focus !== "function") return;
     if (scrollIntoView) target.focus(); else target.focus({ preventScroll: true });
@@ -251,7 +359,7 @@
     raf.call(window, function () { raf.call(window, function () { open(link); }); });
   }
 
-  if (dialog && listElement && emptyElement && contactElement && clearArea && clearButton && confirmElement && confirmYes && confirmNo) {
+  if (dialog && listElement && emptyElement && contactElement) {
     Array.prototype.forEach.call(document.querySelectorAll("[data-my-orders-open]"), function (link) {
       link.addEventListener("click", function (event) { openFromLink(link, event); });
     });
@@ -290,20 +398,7 @@
         try { window.history.back(); } catch (error) {}
       }
     });
-    clearButton.addEventListener("click", function () {
-      confirmElement.hidden = false;
-      focusIfPossible(confirmNo, true);
-    });
-    confirmNo.addEventListener("click", function () {
-      confirmElement.hidden = true;
-      focusIfPossible(clearButton, true);
-    });
-    confirmYes.addEventListener("click", function () {
-      clear();
-      render();
-      focusIfPossible(closeButton);
-    });
   }
 
-  window.saloniMyOrders = { save: save, list: read, clear: clear, open: open };
+  window.saloniMyOrders = { save: save, list: read, open: open };
 }());
