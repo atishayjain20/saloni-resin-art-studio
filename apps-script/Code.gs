@@ -38,6 +38,10 @@ var PARTNER_ORDER_HEADERS = [
   "Payout batch ID", "Payout date"
 ];
 var ORDER_HEADERS = LEGACY_ORDER_HEADERS.concat(PARTNER_ORDER_HEADERS);
+// Saloni types these two by hand (see the README, "Advance payment by UPI"). They sit after the partner columns, so every
+// older column keeps its position. setupAdvancePayments() adds them; the three layouts below are the only ones accepted.
+var ADVANCE_ORDER_HEADERS = ["Advance amount", "Advance status"];
+var ORDER_HEADERS_WITH_ADVANCE = ORDER_HEADERS.concat(ADVANCE_ORDER_HEADERS);
 var PARTNER_APPLICATION_HEADERS = [
   "Application ID", "Received at", "Applicant name", "Business name", "Category", "City / service area",
   "Phone / WhatsApp", "Email", "Instagram / website", "Typical customers", "Referral plan", "Rules accepted",
@@ -327,7 +331,7 @@ function purgeExpiredOrdersAt_(now) {
   var deletedRows = 0;
   expiredRows.sort(function (left, right) { return right.rowNumber - left.rowNumber; });
   expiredRows.forEach(function (record) {
-    if (orderColumns === ORDER_HEADERS.length && (String(record.row[26] || "").trim() || String(record.row[27] || "").trim())) {
+    if (orderColumns >= ORDER_HEADERS.length && (String(record.row[26] || "").trim() || String(record.row[27] || "").trim())) {
       try {
         ensureCommissionRecord_(record.row, record.requestId, properties, runAt);
       } catch (ledgerError) {
@@ -748,9 +752,11 @@ function submitOrder(form) {
       referenceFile = createReferenceFile_(payload);
       var receivedAt = new Date();
       var rowNumber = Number(sheet.getLastRow && sheet.getLastRow()) + 1;
-      var row = schemaLength === ORDER_HEADERS.length
+      var row = schemaLength >= ORDER_HEADERS.length
         ? rowForPayload_(payload, fingerprint, receivedAt, referenceFile, attribution || { active: false }, rowNumber)
         : rowForPayload_(payload, fingerprint, receivedAt, referenceFile);
+      // The advance cells (last two columns, when the sheet has them) start empty: Saloni types them.
+      while (row.length < schemaLength) row.push("");
       sheet.appendRow(row);
       newOrder = { receivedAt: receivedAt, referenceFile: referenceFile };
       return {
@@ -883,17 +889,59 @@ function orderStatuses_(requestIds) {
   if (!count) return { ok: false, error: "invalid" };
   var sheet = openOrderSheet_(properties);
   var statuses = {};
+  var advances = {};
+  var advanceCount = 0;
   var rows = sheet.getLastRow() - 1;
   if (rows > 0) {
     var statusColumn = LEGACY_ORDER_HEADERS.indexOf("Status");
-    // One read of the Request ID .. Status columns; the schema check in openOrderSheet_ has already pinned the header order.
-    var values = sheet.getRange(2, 1, rows, statusColumn + 1).getValues();
+    // The advance columns exist only on the newest layout, and the kill switch stops reading them.
+    var withAdvance = !isTrue_(properties.getProperty("UPI_ADVANCE_DISABLED")) && orderSchemaLength_(sheet) === ORDER_HEADERS_WITH_ADVANCE.length;
+    var amountColumn = ORDER_HEADERS.length;
+    var payee = withAdvance ? upiPayee_(properties) : null;
+    // One read of the Request ID .. Status columns (to Advance status when the sheet has it); the schema check in
+    // openOrderSheet_ has already pinned the header order.
+    var values = sheet.getRange(2, 1, rows, withAdvance ? ORDER_HEADERS_WITH_ADVANCE.length : statusColumn + 1).getValues();
     for (var row = 0; row < values.length; row += 1) {
       var id = String(values[row][0]);
-      if (has(wanted, id) && !has(statuses, id)) statuses[id] = orderStatusCode_(values[row][statusColumn]);
+      if (!has(wanted, id) || has(statuses, id)) continue;
+      var code = orderStatusCode_(values[row][statusColumn]);
+      if (withAdvance) {
+        var paid = advanceIsPaid_(values[row][amountColumn + 1]);
+        if (paid && (code === "received" || code === "confirmed" || code === "in_progress")) {
+          code = "advance_paid";
+        } else if (!paid && payee && code === "confirmed") {
+          var amount = advanceAmount_(values[row][amountColumn]);
+          if (amount) { advances[id] = { amount: amount, payee: payee.id, name: payee.name }; advanceCount += 1; }
+        }
+      }
+      statuses[id] = code;
     }
   }
-  return { ok: true, statuses: statuses };
+  var reply = { ok: true, statuses: statuses };
+  if (advanceCount) reply.advance = advances;
+  return reply;
+}
+
+// The receiving UPI ID Saloni sets in the script properties UPI_PAYEE_ID and UPI_PAYEE_NAME. Null until a valid ID is set.
+var UPI_PAYEE_PATTERN = /^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9.-]{1,64}$/;
+function upiPayee_(properties) {
+  var id = String(properties.getProperty("UPI_PAYEE_ID") || "").trim();
+  if (!UPI_PAYEE_PATTERN.test(id)) return null;
+  var name = String(properties.getProperty("UPI_PAYEE_NAME") || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60).trim();
+  return { id: id, name: name || "Saloni Resin Art Studio" };
+}
+
+// The advance Saloni typed, as whole rupees 1..200000, or 0. A number, "500", the rupee sign or "Rs" or "INR" before it, and
+// "500.00" are fine; anything else (decimals, commas, words, 0, a number out of range) is no advance at all.
+function advanceAmount_(cell) {
+  var match = /^(?:\u20B9|rs\.?|inr)?\s*([1-9][0-9]{0,5})(?:\.0{1,2})?$/i.exec(String(cell == null ? "" : cell).trim());
+  var amount = match ? Number(match[1]) : 0;
+  return amount >= 1 && amount <= 200000 ? amount : 0;
+}
+
+// "Paid" or "Received" (any case, more words after it allowed, e.g. "Paid - UPI 123"). "Not paid" and "Partially paid" are not.
+function advanceIsPaid_(cell) {
+  return /^(?:paid|received)(?![A-Za-z0-9])/i.test(String(cell == null ? "" : cell).trim());
 }
 
 // The Status words Saloni types, as the fixed codes the site understands. Anything she words differently reads as "in_progress",
@@ -1077,6 +1125,27 @@ function setupOrderAlertQueue() {
   installOrderAlertTrigger_();
   // Set only after the trigger exists, so orders never queue without a sender.
   PropertiesService.getScriptProperties().setProperty("ORDER_ALERT_QUEUE_READY", "true");
+}
+
+// Public so it shows in the editor Run menu; run once as the owner after deploying. Adds the "Advance amount" and "Advance status"
+// headers to the Orders sheet (the partner columns first, if the sheet is still on the old layout). Never touches order rows,
+// and no web request can reach it: a visitor has an empty active user.
+function setupAdvancePayments() {
+  var active = String(Session.getActiveUser().getEmail() || "");
+  if (!active || active !== String(Session.getEffectiveUser().getEmail() || "")) {
+    throw new Error("Run this from the Apps Script editor as the owner.");
+  }
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to start advance payment setup.");
+  try {
+    var sheet = openOrderSheet_(PropertiesService.getScriptProperties());
+    var changed = migrateAdvanceSchema_(sheet);
+    var result = { orderColumns: orderSchemaLength_(sheet), changed: changed };
+    console.log(JSON.stringify(result));
+    return result;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function orderSheetUrl_(properties) {
@@ -2075,7 +2144,7 @@ function setupPartnerProgram_() {
   });
   if (!protectPartnerOrderColumns_(orderSheet)) throw new Error("Unable to protect order partner columns.");
   if (properties.setProperty) properties.setProperty(PARTNER_PROGRAM_READY_PROPERTY, "true");
-  return { orderColumns: ORDER_HEADERS.length, tabs: tabs.map(function (entry) { return entry[0]; }) };
+  return { orderColumns: orderSchemaLength_(orderSheet), tabs: tabs.map(function (entry) { return entry[0]; }) };
 }
 
 function protectPartnerOrderColumns_(sheet) {
@@ -2232,13 +2301,15 @@ function correctOrderAttribution_(requestId, referralCode, reason) {
   if (!lock.tryLock(10000)) throw new Error("Unable to correct order attribution.");
   try {
     var sheet = openOrderSheet_(properties);
-    if (orderSchemaLength_(sheet) !== ORDER_HEADERS.length) migrateOrdersSchema_(sheet);
+    if (orderSchemaLength_(sheet) < ORDER_HEADERS.length) migrateOrdersSchema_(sheet);
     var values = sheet.getDataRange().getValues();
     var headers = headerIndex_(values[0].map(String));
     var target = null;
     for (var row = 1; row < values.length; row += 1) if (String(values[row][0]) === String(requestId)) target = { row: row + 1, values: values[row] };
     if (!target) throw new Error("Order was not found.");
     while (target.values.length < ORDER_HEADERS.length) target.values.push("");
+    // Only the legacy and partner columns are rewritten; the advance cells (a newer layout) are never touched here.
+    target.values = target.values.slice(0, ORDER_HEADERS.length);
     var existingStatus = commissionStatus_(target.values[headers["Commission status"]]);
     if (existingStatus === "Paid" || existingStatus === "Void" || frozenCommissionExists_(requestId, properties)) throw new Error("The order commission is frozen.");
     var partner = resolveReferralForOrder_(referralCode, properties);
@@ -2689,7 +2760,9 @@ function ensureSchema_(sheet) {
     return LEGACY_ORDER_HEADERS.length;
   }
   var columns = Number(sheet.getLastColumn && sheet.getLastColumn()) || LEGACY_ORDER_HEADERS.length;
-  var expected = columns === LEGACY_ORDER_HEADERS.length ? LEGACY_ORDER_HEADERS : columns === ORDER_HEADERS.length ? ORDER_HEADERS : null;
+  var expected = columns === LEGACY_ORDER_HEADERS.length ? LEGACY_ORDER_HEADERS
+    : columns === ORDER_HEADERS.length ? ORDER_HEADERS
+    : columns === ORDER_HEADERS_WITH_ADVANCE.length ? ORDER_HEADERS_WITH_ADVANCE : null;
   if (!expected) throw new Error("Order sheet schema does not match the allowlist.");
   var existing = sheet.getRange(1, 1, 1, expected.length).getValues()[0].map(String);
   if (existing.join("\u001f") !== expected.join("\u001f")) throw new Error("Order sheet schema does not match the allowlist.");
@@ -2698,13 +2771,31 @@ function ensureSchema_(sheet) {
 
 function migrateOrdersSchema_(sheet) {
   var columns = ensureSchema_(sheet);
-  if (columns === ORDER_HEADERS.length) return false;
+  if (columns >= ORDER_HEADERS.length) return false;
   var maxColumns = Number(sheet.getMaxColumns && sheet.getMaxColumns()) || columns;
   if (maxColumns < ORDER_HEADERS.length) sheet.insertColumnsAfter(maxColumns, ORDER_HEADERS.length - maxColumns);
   var range = sheet.getRange(1, columns + 1, 1, PARTNER_ORDER_HEADERS.length);
   range.setValues([PARTNER_ORDER_HEADERS]);
   if (sheet.getRange(1, 1, 1, ORDER_HEADERS.length).getValues()[0].map(String).join("\u001f") !== ORDER_HEADERS.join("\u001f")) {
     throw new Error("Order sheet migration could not verify the appended headers.");
+  }
+  return true;
+}
+
+// Adds the two advance headers after the partner columns, and the partner columns first when the sheet is still on the legacy
+// layout. Headers only: no data row is read or written. Safe to run twice (the second run changes nothing).
+function migrateAdvanceSchema_(sheet) {
+  var columns = ensureSchema_(sheet);
+  if (columns === ORDER_HEADERS_WITH_ADVANCE.length) return false;
+  if (columns < ORDER_HEADERS.length) {
+    migrateOrdersSchema_(sheet);
+    columns = ensureSchema_(sheet);
+  }
+  var maxColumns = Number(sheet.getMaxColumns && sheet.getMaxColumns()) || columns;
+  if (maxColumns < ORDER_HEADERS_WITH_ADVANCE.length) sheet.insertColumnsAfter(maxColumns, ORDER_HEADERS_WITH_ADVANCE.length - maxColumns);
+  sheet.getRange(1, columns + 1, 1, ADVANCE_ORDER_HEADERS.length).setValues([ADVANCE_ORDER_HEADERS]);
+  if (sheet.getRange(1, 1, 1, ORDER_HEADERS_WITH_ADVANCE.length).getValues()[0].map(String).join("\u001f") !== ORDER_HEADERS_WITH_ADVANCE.join("\u001f")) {
+    throw new Error("Order sheet migration could not verify the advance headers.");
   }
   return true;
 }

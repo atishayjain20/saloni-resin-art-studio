@@ -683,7 +683,7 @@ function partnerRuntime(options = {}) {
   const spreadsheet = { getSpreadsheetTimeZone: () => options.sheetTimezone || "UTC", getSheetByName: (name) => sheets[name] || null, insertSheet: (name) => { const headers = name === applicationTab ? applicationHeaders : name === partnerTab ? partnerHeaders : commissionHeaders; const created = sheet(name, headers, []); sheets[name] = created; return created; } };
   const properties = { values, getProperty: (key) => values[key] || "", setProperty: (key, value) => { values[key] = String(value); } };
   const utilities = { getUuid: () => "00000000-0000-4000-8000-000000000000", formatDate: (date, timezone, pattern) => { formatDateCalls.push({ date, timezone, pattern }); const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, year: "numeric", month: "2-digit" }).formatToParts(new Date(date)); const year = parts.find((part) => part.type === "year").value; const month = parts.find((part) => part.type === "month").value; return `${year}-${month}`; }, newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(String(value))) }), DigestAlgorithm: { SHA_256: "SHA-256" }, computeDigest: (_algorithm, bytes) => Array.from(require("node:crypto").createHash("sha256").update(Buffer.from(bytes)).digest()).map((byte) => byte > 127 ? byte - 256 : byte) };
-  const context = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array, Intl, Utilities: utilities, PropertiesService: { getScriptProperties: () => properties }, LockService: { getScriptLock: () => lock }, SpreadsheetApp: { openById: () => spreadsheet, ProtectionType: { RANGE: "RANGE" } }, Session: { getScriptTimeZone: () => options.scriptTimezone || "UTC", getActiveUser: () => ({ getEmail: () => "owner@example.com" }), getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) }, ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }) }, UrlFetchApp: { fetch: () => { fetchCalls.count += 1; throw new Error("no reCAPTCHA request is expected"); } } };
+  const context = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array, Intl, Utilities: utilities, PropertiesService: { getScriptProperties: () => properties }, LockService: { getScriptLock: () => lock }, SpreadsheetApp: { openById: () => spreadsheet, ProtectionType: { RANGE: "RANGE" } }, Session: { getScriptTimeZone: () => options.scriptTimezone || "UTC", getActiveUser: () => ({ getEmail: () => options.activeEmail === undefined ? "owner@example.com" : options.activeEmail }), getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) }, ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }) }, UrlFetchApp: { fetch: () => { fetchCalls.count += 1; throw new Error("no reCAPTCHA request is expected"); } } };
   if (options.partnerLookupThrows) context.SpreadsheetApp.openById = () => { throw new Error("sheet unavailable"); };
   vm.createContext(context);
   vm.runInContext(code, context, { filename: "Code.gs" });
@@ -747,4 +747,133 @@ test("action=seed still renders the partner form for pages cached before the cha
   runtime.context.HtmlService = { createTemplateFromFile: (name) => { templateName = name; return { evaluate: () => page }; }, XFrameOptionsMode: { ALLOWALL: "ALLOWALL" } };
   runtime.context.doPost({ parameter: { action: "seed", mode: "partner", seed: JSON.stringify({ applicationId: "application-cached" }) } });
   assert.equal(templateName, "PartnerForm");
+});
+
+// --- Advance payment by UPI: the two extra order columns, and every writer on the three layouts ---
+const ADVANCE_HEADERS = ["Advance amount", "Advance status"];
+const advanceLayout = () => partnerRuntime({ migrated: true }).orderSheet.headers.concat(ADVANCE_HEADERS);
+const legacyRow = (id, status) => { const row = new Array(26).fill(""); row[0] = id; row[2] = new Date("2026-10-01"); row[14] = "Asha"; row[24] = status; row[25] = "note " + id; return row; };
+
+test("setupAdvancePayments appends the two headers to the partner layout, never touches a row, and is idempotent", () => {
+  const rows = [referredOrderRow({ commissionStatus: "Pending" }), referredOrderRow({ commissionStatus: "Pending" })];
+  rows[1][0] = "request-654321";
+  const runtime = partnerRuntime({ migrated: true, orderRows: rows });
+  const before = runtime.orderSheet.rows.map((row) => row.slice());
+  const result = runtime.context.setupAdvancePayments();
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), { orderColumns: 39, changed: true });
+  assert.deepEqual(runtime.orderSheet.headers, advanceLayout());
+  assert.deepEqual(runtime.orderSheet.insertions, [{ after: 37, count: 2 }]);
+  assert.deepEqual(runtime.orderSheet.rows, before);
+  assert.equal(JSON.stringify(runtime.orderSheet.writePayloads), JSON.stringify([{ method: "setValues", values: [ADVANCE_HEADERS] }]), "only the header cells were written");
+  assert.equal(runtime.properties.values.PARTNER_PROGRAM_CONFIGURED || "", "", "the partner program is not switched on by this");
+  assert.equal(runtime.lock.held, false);
+
+  const again = runtime.context.setupAdvancePayments();
+  assert.deepEqual(JSON.parse(JSON.stringify(again)), { orderColumns: 39, changed: false });
+  assert.deepEqual(runtime.orderSheet.insertions, [{ after: 37, count: 2 }]);
+  assert.equal(runtime.orderSheet.writePayloads.length, 1);
+  assert.deepEqual(runtime.orderSheet.rows, before);
+});
+
+test("setupAdvancePayments runs the partner migration first on a legacy sheet and keeps its rows", () => {
+  const rows = [legacyRow("request-legacy-1", "Confirmed"), legacyRow("request-legacy-2", "")];
+  const runtime = partnerRuntime({ orderRows: rows, orderMaxColumns: 26 });
+  const before = runtime.orderSheet.rows.map((row) => row.slice());
+  assert.equal(runtime.context.setupAdvancePayments().orderColumns, 39);
+  assert.deepEqual(runtime.orderSheet.insertions, [{ after: 26, count: 11 }, { after: 37, count: 2 }]);
+  assert.deepEqual(runtime.orderSheet.headers, advanceLayout());
+  assert.deepEqual(runtime.orderSheet.rows, before);
+  assert.ok(runtime.orderSheet.writePayloads.every((payload) => payload.method === "setValues" && payload.values.length === 1 && payload.values[0].every((cell) => typeof cell === "string")), "header writes only");
+  assert.equal(runtime.context.setupAdvancePayments().changed, false);
+});
+
+test("setupAdvancePayments uses spare sheet columns and skips insertion when there is room", () => {
+  const enough = partnerRuntime({ migrated: true, orderMaxColumns: 45 });
+  enough.context.setupAdvancePayments();
+  assert.deepEqual(enough.orderSheet.insertions, []);
+  assert.deepEqual(enough.orderSheet.headers, advanceLayout());
+  const spare = partnerRuntime({ migrated: true, orderMaxColumns: 38 });
+  spare.context.setupAdvancePayments();
+  assert.deepEqual(spare.orderSheet.insertions, [{ after: 38, count: 1 }]);
+});
+
+test("setupAdvancePayments refuses a sheet with unknown headers or extra columns and writes nothing", () => {
+  const wrong = ["Wrong Request ID"].concat(advanceLayout().slice(1, 37));
+  const invalid = partnerRuntime({ orderHeaders: wrong, migrated: true });
+  assert.throws(() => invalid.context.setupAdvancePayments(), /schema/i);
+  assert.deepEqual(invalid.orderSheet.insertions, []);
+  assert.deepEqual(invalid.orderSheet.headers, wrong);
+  const handAdded = partnerRuntime({ orderHeaders: advanceLayout().concat(["Notes 2"]) });
+  assert.throws(() => handAdded.context.setupAdvancePayments(), /schema/i);
+  assert.equal(handAdded.orderSheet.writePayloads.length, 0);
+  const oneColumn = partnerRuntime({ orderHeaders: partnerRuntime({ migrated: true }).orderSheet.headers.concat(["Advance amount"]) });
+  assert.throws(() => oneColumn.context.setupAdvancePayments(), /schema/i);
+  const failed = partnerRuntime({ migrated: true, failOrderColumnInsertion: true, orderRows: [referredOrderRow()] });
+  const headers = failed.orderSheet.headers.slice();
+  assert.throws(() => failed.context.setupAdvancePayments(), /column insertion failed/i);
+  assert.deepEqual(failed.orderSheet.headers, headers);
+  assert.equal(failed.lock.held, false, "the lock is released after a failure");
+});
+
+test("setupAdvancePayments is owner-only and needs the script lock", () => {
+  for (const activeEmail of ["", "visitor@example.com"]) {
+    const runtime = partnerRuntime({ migrated: true, activeEmail });
+    assert.throws(() => runtime.context.setupAdvancePayments(), /editor as the owner/);
+    assert.equal(runtime.lock.calls, 0);
+    assert.deepEqual(runtime.orderSheet.insertions, []);
+  }
+  const busy = partnerRuntime({ migrated: true, lockAvailable: false });
+  assert.throws(() => busy.context.setupAdvancePayments(), /Unable to start advance payment setup/);
+  assert.deepEqual(busy.orderSheet.insertions, []);
+});
+
+test("the advance setup is never run by a web request or by ordinary sheet access", () => {
+  const lines = code.split("\n").map((line) => line.trim()).filter((line) => !line.startsWith("//"));
+  assert.deepEqual(lines.filter((line) => line.includes("setupAdvancePayments(")), ["function setupAdvancePayments() {"]);
+  assert.deepEqual(lines.filter((line) => line.includes("migrateAdvanceSchema_(")), ["var changed = migrateAdvanceSchema_(sheet);", "function migrateAdvanceSchema_(sheet) {"]);
+});
+
+test("retention, sync and correction keep working on the advance layout, and correction never writes the advance cells", () => {
+  const row = referredOrderRow({ commissionStatus: "Pending", rate: 0.05 }).concat([500, "Paid"]);
+  const partners = [["partner-1", "AJMERPHOTO01", "Studio", "Asha", "photographer", "Ajmer", "8209238541", "asha@example.com", "https://example.com", 0.05, "Active", new Date("2026-10-01"), "https://saloniresinart.com/?ref=AJMERPHOTO01", "", ""], ["partner-2", "NEWCODE01", "New Studio", "Nina", "photographer", "Ajmer", "8209238542", "nina@example.com", "https://example.com", 0.07, "Active", new Date("2026-10-01"), "https://saloniresinart.com/?ref=NEWCODE01", "", ""]];
+  const runtime = partnerRuntime({ orderHeaders: advanceLayout(), orderRows: [row], partnerRows: partners });
+  assert.equal(runtime.context.setupPartnerProgram().orderColumns, 39);
+  assert.equal(runtime.orderSheet.insertions.length, 0);
+  assert.equal(runtime.context.syncOrderCommission_("request-123456").status, "Eligible");
+
+  const result = runtime.context.correctOrderAttribution_("request-123456", "NEWCODE01", "staff correction");
+  assert.equal(result.referralCode, "NEWCODE01");
+  const written = runtime.orderSheet.writePayloads.filter((payload) => payload.method === "setValues" && payload.values[0].length > 20).pop();
+  assert.equal(written.values[0].length, 37, "only the legacy and partner columns are rewritten");
+  assert.equal(runtime.orderSheet.rows[0][26], "NEWCODE01");
+  assert.equal(runtime.orderSheet.rows[0][37], 500);
+  assert.equal(runtime.orderSheet.rows[0][38], "Paid");
+  assert.equal(runtime.orderSheet.rows[0].length, 39);
+});
+
+test("retention archives the commission of a referred order on the advance layout before removing the row", () => {
+  const runtime = partnerRuntime({ orderHeaders: advanceLayout(), orderRows: [referredOrderRow({ commissionStatus: "Pending" }).concat([500, "Paid"])] });
+  runtime.context.setupPartnerProgram();
+  runtime.context.purgeExpiredOrdersAt_(new Date("2027-01-01"));
+  assert.equal(runtime.orderSheet.rows.length, 0, "the expired row is removed");
+  assert.equal(runtime.commissionRows.length, 1, "its commission was archived first");
+  assert.equal(runtime.commissionRows[0][0], "commission-request-123456");
+});
+
+test("retention on the advance layout still keeps a referred order whose commission conflicts", () => {
+  const row = referredOrderRow().concat(["500", ""]);
+  const runtime = partnerRuntime({ orderHeaders: advanceLayout(), orderRows: [row], commissionRows: [["commission-request-123456", "wrong-partner", "Studio", "2026-10", "catalogue", 1000, 0.05, 50, "Pending", "", "", "", ""]] });
+  runtime.context.setupPartnerProgram();
+  assert.throws(() => runtime.context.purgeExpiredOrdersAt_(new Date("2027-01-01")), /Retention cleanup failed/);
+  assert.equal(runtime.orderSheet.rows.length, 1);
+});
+
+test("retention on the advance layout deletes a plain expired order and keeps a recent one", () => {
+  const old = legacyRow("request-old-123456", "Confirmed").concat(new Array(11).fill(""), [500, ""]);
+  const recent = legacyRow("request-new-123456", "Confirmed").concat(new Array(11).fill(""), [300, "Paid"]);
+  recent[2] = new Date("2026-12-30");
+  const runtime = partnerRuntime({ orderHeaders: advanceLayout(), orderRows: [old, recent] });
+  runtime.context.purgeExpiredOrdersAt_(new Date("2027-01-01"));
+  assert.deepEqual(runtime.orderSheet.rows.map((row) => row[0]), ["request-new-123456"]);
+  assert.equal(runtime.orderSheet.rows[0][37], 300);
 });
