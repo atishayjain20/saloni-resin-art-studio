@@ -1656,7 +1656,6 @@
 
   function initOrderRequestFlow() {
     var embed = document.getElementById("order-form-embed");
-    var frame = document.getElementById("order-form-frame");
     var status = document.getElementById("order-form-status");
     var continueOrderButton = document.getElementById("order-continue-request");
     var orderDialog = document.getElementById("order-dialog");
@@ -1682,15 +1681,13 @@
     var catalogueCartOrder = document.getElementById("catalogue-cart-order");
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
-    var requestedMode = embed ? embed.getAttribute("data-form-mode") : "";
-    // The order, partner and corporate forms are built into their pages, so only the review form still uses an iframe.
-    if (!embed || !status || (!frame && requestedMode === "review")) return;
+    // The order form is built into the page; the partner, corporate and review forms have their own script (public-forms.js).
+    if (!embed || !status) return;
     var orderFormElement = document.getElementById("order-form");
     var orderFormIntro = document.getElementById("order-form-intro");
     var orderUrl = embed.getAttribute("data-order-form-url") || "";
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
-    var PARENT_ORIGIN = "https://saloniresinart.com";
-    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "review" ? "review" : "order" };
+    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, previewSnapshot: null, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: "order" };
     var orderDialogEnabled = Boolean(orderDialog && typeof orderDialog.showModal === "function");
     var orderDialogHistoryActive = false;
     var orderDialogHistoryBackPending = false;
@@ -1699,15 +1696,13 @@
     var orderDialogOpener = null;
     var pendingOrderDialogOpener = null;
     var pendingMobileCustomizerOpener = null;
-    var ORDER_FORM_LOADING_TIMEOUT = 12000;
-    var ORDER_FORM_LOAD_SETTLE_TIMEOUT = 2500;
 
     function requestId() {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
       return "request-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
     }
 
-    function channelNonce() {
+    function captureNonce() {
       if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
       if (window.crypto && window.crypto.getRandomValues) {
         var bytes = new Uint8Array(16);
@@ -1715,18 +1710,6 @@
         return Array.prototype.map.call(bytes, function (byte) { return byte.toString(16).padStart(2, "0"); }).join("");
       }
       return "";
-    }
-
-    function previewOrigin(origin) {
-      if (typeof origin !== "string" || !origin) return "";
-      if (typeof URL === "undefined") return "";
-      try {
-        var parsed = new URL(origin);
-        if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.port || parsed.pathname !== "/" || parsed.search || parsed.hash || !/^n-[a-z0-9-]+-script\.googleusercontent\.com$/i.test(parsed.hostname)) return "";
-        return parsed.origin === origin || parsed.origin + ":443" === origin ? parsed.origin : "";
-      } catch (error) {
-        return "";
-      }
     }
 
     function previewIdentityPart(value) {
@@ -1745,73 +1728,6 @@
     function usablePreviewSnapshot(snapshot) {
       var dimensions = snapshot && snapshot.dimensions;
       return Boolean(snapshot && usablePreviewDetails(snapshot.summary, dimensions) && snapshot.blob && typeof snapshot.blob.size === "number" && snapshot.blob.size > 0 && snapshot.blob.size <= 5 * 1024 * 1024 && typeof snapshot.blob.type === "string" && ["image/jpeg", "image/png"].indexOf(snapshot.blob.type.toLowerCase()) !== -1);
-    }
-
-    function clearOrderLoadingTimer() {
-      if (frameState.loadingTimer && window.clearTimeout) window.clearTimeout(frameState.loadingTimer);
-      frameState.loadingTimer = null;
-    }
-
-    function loadingStatusMarkup(copy) {
-      return '<span class="order-form-spinner" aria-hidden="true"></span><span>' + copy + '</span>';
-    }
-
-    function startOrderFormLoading(identity) {
-      clearOrderLoadingTimer();
-      frameState.loading = true;
-      frameState.loadingNonce = identity.nonce;
-      frameState.loadingRequestId = identity.requestId;
-      status.innerHTML = loadingStatusMarkup("Preparing the request form…");
-      status.hidden = false;
-      status.setAttribute("aria-busy", "true");
-      var loadingNonce = identity.nonce;
-      var loadingRequestId = identity.requestId;
-      frameState.loadingTimer = window.setTimeout(function () {
-        if (!frameState.loading || frameState.loadingNonce !== loadingNonce || frameState.loadingRequestId !== loadingRequestId || frameState.nonce !== loadingNonce || frameState.requestId !== loadingRequestId) return;
-        frameState.loading = false;
-        frameState.loadingTimer = null;
-        status.innerHTML = "The request form is taking longer than expected. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
-        status.hidden = false;
-        status.removeAttribute("aria-busy");
-      }, ORDER_FORM_LOADING_TIMEOUT);
-    }
-
-    function finishOrderFormLoading() {
-      clearOrderLoadingTimer();
-      frameState.loading = false;
-      frameState.loadingNonce = "";
-      frameState.loadingRequestId = "";
-      status.hidden = true;
-      status.removeAttribute("aria-busy");
-    }
-
-    function replaceOrderFormFrame(identity) {
-      var previousFrame = frame;
-      var nextFrame = previousFrame.cloneNode ? previousFrame.cloneNode(false) : document.createElement("iframe");
-      nextFrame.id = previousFrame.id || "order-form-frame";
-      if (previousFrame.getAttribute && nextFrame.setAttribute) {
-        ["title", "loading"].forEach(function (attribute) {
-          var value = previousFrame.getAttribute(attribute);
-          if (value) nextFrame.setAttribute(attribute, value);
-        });
-      }
-      nextFrame.name = "saloni-order-form-frame-" + (++frameState.frameSequence);
-      nextFrame.hidden = true;
-      if (previousFrame.parentNode && previousFrame.parentNode.replaceChild) previousFrame.parentNode.replaceChild(nextFrame, previousFrame);
-      frame = nextFrame;
-      // A visible load only ends presentation loading; it does not establish a trusted message sender.
-      nextFrame.addEventListener("load", function () {
-        if (frame !== nextFrame || !frameState.loaded || frameState.nonce !== identity.nonce || frameState.requestId !== identity.requestId) return;
-        nextFrame.hidden = false;
-        if (!frameState.loading || frameState.loadingNonce !== identity.nonce || frameState.loadingRequestId !== identity.requestId) return;
-        // Keep the loader until the form reports ready; if it never does, stop after a short settle time.
-        clearOrderLoadingTimer();
-        frameState.loadingTimer = window.setTimeout(function () {
-          if (!frameState.loading || frameState.loadingNonce !== identity.nonce || frameState.loadingRequestId !== identity.requestId) return;
-          finishOrderFormLoading();
-        }, ORDER_FORM_LOAD_SETTLE_TIMEOUT);
-      });
-      return nextFrame;
     }
 
     function isOrderDialogHistoryState(state) {
@@ -1881,65 +1797,13 @@
     });
 
     function invalidateChannel() {
-      clearOrderLoadingTimer();
-      status.removeAttribute("aria-busy");
-      if (frameState.activeCaptcha) {
-        if (frameState.activeCaptcha.timer) window.clearTimeout(frameState.activeCaptcha.timer);
-        if (frameState.activeCaptcha.port && frameState.activeCaptcha.port.close) frameState.activeCaptcha.port.close();
-      }
-      frameState.loading = false;
-      frameState.loadingNonce = "";
-      frameState.loadingRequestId = "";
-      frameState.activeCaptcha = null;
       frameState.nonce = "";
       frameState.requestId = "";
       frameState.pendingCustomizerRequestId = "";
       frameState.customizerFallback = null;
-      frameState.siteKey = "";
       frameState.previewSnapshot = null;
-      frameState.pinnedSender = null;
-      frameState.pinnedOrigin = "";
       frameState.customizerHandoff = false;
       frameState.catalogueSeedKey = "";
-    }
-
-    function postCaptchaResult(request, ok, token) {
-      if (frameState.activeCaptcha !== request) return;
-      frameState.activeCaptcha = null;
-      if (request.timer) window.clearTimeout(request.timer);
-      try {
-        request.port.postMessage({ type: "saloni-order-captcha-response", nonce: frameState.nonce, attemptId: request.attemptId, ok: ok === true, token: ok ? token : "" });
-      } catch (error) {}
-      if (request.port.close) request.port.close();
-    }
-
-    function executeParentCaptcha(request) {
-      function execute() {
-        if (frameState.activeCaptcha !== request || !window.grecaptcha || !window.grecaptcha.ready) { postCaptchaResult(request, false, ""); return; }
-        try {
-          window.grecaptcha.ready(function () {
-            if (frameState.activeCaptcha !== request) return;
-            try {
-              var captchaAction = "review_submission";
-              var result = window.grecaptcha.execute(frameState.siteKey, { action: captchaAction });
-              if (!result || typeof result.then !== "function") { postCaptchaResult(request, false, ""); return; }
-              result.then(function (token) {
-                postCaptchaResult(request, typeof token === "string" && token.length > 0, token);
-              }).catch(function () { postCaptchaResult(request, false, ""); });
-            } catch (error) { postCaptchaResult(request, false, ""); }
-          });
-        } catch (error) { postCaptchaResult(request, false, ""); }
-      }
-      if (window.grecaptcha && window.grecaptcha.ready) { execute(); return; }
-      if (!frameState.siteKey) { postCaptchaResult(request, false, ""); return; }
-      var script = document.createElement("script");
-      script.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(frameState.siteKey);
-      script.async = true; script.defer = true;
-      script.onload = execute;
-      script.onerror = function () { postCaptchaResult(request, false, ""); };
-      var parent = document.head || document.body;
-      if (!parent || !parent.appendChild) { postCaptchaResult(request, false, ""); return; }
-      parent.appendChild(script);
     }
 
     if (orderDialogEnabled) {
@@ -2040,7 +1904,7 @@
       }
       var heightParts = parts(source.height, source.heightUnit);
       var widthParts = parts(source.width, source.widthUnit);
-      var repeatProfile = frameState.mode === "order" ? readRepeatProfile() : null;
+      var repeatProfile = readRepeatProfile();
       var seed = {
         sourceKind: source.sourceKind || "catalogue", sourceId: source.sourceId || "",
         productName: source.productName || "", requestStage: "quote", quantity: source.quantity || "1", dimensionFormat: "feet-inches",
@@ -2068,13 +1932,12 @@
         invalidateChannel();
         status.innerHTML = "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
         status.hidden = false;
-        status.removeAttribute("aria-busy");
         return false;
       }
       invalidateChannel();
       frameState.sourceKind = String(seed.sourceKind || "");
       frameState.customizerHandoff = customizerHandoff === true || frameState.sourceKind.toLowerCase() === "customizer";
-      var requestIdentity = identity || { requestId: seed.requestId || requestId(), nonce: channelNonce() };
+      var requestIdentity = identity || { requestId: seed.requestId || requestId(), nonce: captureNonce() };
       frameState.nonce = requestIdentity.nonce;
       frameState.requestId = seed.requestId || requestIdentity.requestId;
       if (!frameState.nonce) {
@@ -2090,42 +1953,15 @@
       if (previewExpected !== false && previewSnapshot && usablePreviewSnapshot(previewSnapshot) && previewSnapshot.requestId === frameState.requestId && previewSnapshot.nonce === frameState.nonce && previewSnapshot.mode === frameState.mode) frameState.previewSnapshot = previewSnapshot;
       seed.formMode = frameState.mode;
       if (String(seed.sourceKind || "").toLowerCase() === "customizer") seed.previewExpected = previewExpected !== false;
-      if (frameState.mode === "order") {
-        // The order form is part of this page: it opens at once and only Send talks to Google.
-        if (!orderFormElement || !window.saloniOrderForm || typeof window.saloniOrderForm.open !== "function") {
-          invalidateChannel();
-          status.innerHTML = "The request form could not load. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
-          status.hidden = false;
-          return false;
-        }
-        status.hidden = true;
-        status.removeAttribute("aria-busy");
-        window.saloniOrderForm.open(seed, { previewBlob: frameState.previewSnapshot ? frameState.previewSnapshot.blob : null, onSent: saveRepeatProfile });
-        frameState.loaded = true;
-        if (continueOrderButton) continueOrderButton.hidden = false;
-        if (orderDialogEnabled) openOrderDialog(opener, true);
-        else if (shouldScroll !== false) scrollToForm();
-        return true;
+      // The order form is part of this page: it opens at once and only Send talks to Google.
+      if (!orderFormElement || !window.saloniOrderForm || typeof window.saloniOrderForm.open !== "function") {
+        invalidateChannel();
+        status.innerHTML = "The request form could not load. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+        status.hidden = false;
+        return false;
       }
-      seed.channelNonce = frameState.nonce;
-      var frameIdentity = { nonce: frameState.nonce, requestId: frameState.requestId };
-      var requestFrame = replaceOrderFormFrame(frameIdentity);
-      if (orderDialogEnabled) startOrderFormLoading(frameIdentity);
-      else status.hidden = true;
-      // POST action=seed targets the fresh iframe for this request.
-      var postForm = document.createElement("form");
-      postForm.method = "POST";
-      postForm.action = orderUrl;
-      postForm.target = requestFrame.name;
-      postForm.setAttribute("aria-hidden", "true");
-      var action = document.createElement("input");
-      action.type = "hidden"; action.name = "action"; action.value = "seed";
-      var modeField = document.createElement("input");
-      modeField.type = "hidden"; modeField.name = "mode"; modeField.value = frameState.mode;
-      var seedField = document.createElement("input");
-      seedField.type = "hidden"; seedField.name = "seed"; seedField.value = JSON.stringify(seed);
-      postForm.appendChild(action); postForm.appendChild(modeField); postForm.appendChild(seedField);
-      document.body.appendChild(postForm); postForm.submit(); postForm.remove();
+      status.hidden = true;
+      window.saloniOrderForm.open(seed, { previewBlob: frameState.previewSnapshot ? frameState.previewSnapshot.blob : null, onSent: saveRepeatProfile });
       frameState.loaded = true;
       if (continueOrderButton) continueOrderButton.hidden = false;
       if (orderDialogEnabled) openOrderDialog(opener, true);
@@ -2145,25 +1981,10 @@
       invalidateChannel();
       frameState.loaded = false;
       frameState.sourceKind = "";
-      if (frame) frame.hidden = true;
       if (orderFormElement) orderFormElement.hidden = true;
       if (orderFormIntro) orderFormIntro.hidden = true;
       if (continueOrderButton) continueOrderButton.hidden = true;
       clearSelectedProductSummary();
-    }
-
-    function isCurrentFormSource(source) {
-      if (!source || !frame) return false;
-      if (source === frame.contentWindow || source === frameState.pinnedSender) return true;
-      var current = source;
-      for (var depth = 0; depth < 8; depth += 1) {
-        var parent;
-        try { parent = current.parent; } catch (error) { return false; }
-        if (!parent || parent === current) return false;
-        if (parent === frame.contentWindow) return true;
-        current = parent;
-      }
-      return false;
     }
 
     function chooseSource(source, options) {
@@ -2175,55 +1996,9 @@
       return submitSeed(seed, true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected, options.opener, options.customizerHandoff);
     }
 
-    window.addEventListener("message", function (event) {
-      var data = event.data || {};
-      if (!frameState.loaded || !frameState.nonce || data.nonce !== frameState.nonce || !event.source || !event.origin || event.origin === "null") return;
-      var messageOrigin = previewOrigin(event.origin);
-      if (!messageOrigin) return;
-      if (data.type === "saloni-order-form-ready") {
-        // Apps Script may deliver the form message from a nested child WindowProxy.
-        if (!isCurrentFormSource(event.source)) return;
-        if (!frameState.pinnedSender) {
-          frameState.pinnedSender = event.source;
-          frameState.pinnedOrigin = messageOrigin;
-        }
-        if (event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin) return;
-        if (typeof data.siteKey === "string" && data.siteKey.length > 0 && data.siteKey.length <= 200) frameState.siteKey = data.siteKey;
-        finishOrderFormLoading();
-        return;
-      }
-      if (!isCurrentFormSource(event.source) || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin || data.type !== "saloni-order-captcha-request" || typeof data.attemptId !== "string" || !event.ports || !event.ports[0] || frameState.activeCaptcha) return;
-      var request = { attemptId: data.attemptId, port: event.ports[0], timer: null };
-      frameState.activeCaptcha = request;
-      request.timer = window.setTimeout(function () { postCaptchaResult(request, false, ""); }, 30000);
-      executeParentCaptcha(request);
-    });
-
-    // The review form is seeded at once; the form itself shows its paused message when new reviews are off.
-    // A product popup star links here with ?product=...&rating=...; both are re-checked before they reach the form.
-    function reviewQueryValue(name) {
-      var match = new RegExp("[?&]" + name + "=([^&#]*)").exec(String(window.location && window.location.search || ""));
-      if (!match) return "";
-      try { return decodeURIComponent(match[1].replace(/\+/g, " ")); } catch (error) { return ""; }
-    }
-
     var REPEAT_PROFILE_STORAGE_KEY = "saloniRepeatProfile";
     var REPEAT_PROFILE_VERSION = 1;
     var REPEAT_PROFILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-    if (frameState.mode === "review") {
-      var reviewSeed = { sourceKind: "review", sourceId: "review", productName: "", reviewId: requestId() };
-      var productHint = reviewQueryValue("product");
-      var ratingHint = reviewQueryValue("rating");
-      if (/^catalogue:[A-Za-z0-9_.-]{1,160}$/.test(productHint)) reviewSeed.productId = productHint;
-      if (/^[1-5]$/.test(ratingHint)) reviewSeed.rating = ratingHint;
-      // A shopper who ordered on this device starts with their first name filled in; they can still change it.
-      var savedProfile = readRepeatProfile();
-      var savedFirstName = savedProfile ? savedProfile.customerName.split(/\s+/)[0] : "";
-      if (savedFirstName.length >= 2 && savedFirstName.length <= 40 && !/[0-9@<>]/.test(savedFirstName)) reviewSeed.firstName = savedFirstName;
-      submitSeed(reviewSeed, false);
-      return;
-    }
 
     var selectedCatalogueItems = [];
     var catalogueButtons = [];
@@ -2790,7 +2565,7 @@
       resetCatalogueSelection();
       clearSelectedProductSummary();
       clearCustomizerFallback();
-      var identity = { requestId: requestId(), nonce: channelNonce() };
+      var identity = { requestId: requestId(), nonce: captureNonce() };
       if (!identity.requestId || !identity.nonce || typeof window.saloniCustomizerCapture !== "function") {
         reportCustomizerFailure(null, identity);
         notifyCustomizerRequestOutcome("failure");

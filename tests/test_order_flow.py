@@ -15,7 +15,7 @@ class OrderFlowContractTests(unittest.TestCase):
         cls.code = (ROOT / "apps-script" / "Code.gs").read_text(encoding="utf-8") if (ROOT / "apps-script" / "Code.gs").exists() else ""
         cls.form = (ROOT / "apps-script" / "Form.html").read_text(encoding="utf-8") if (ROOT / "apps-script" / "Form.html").exists() else ""
 
-    def test_page_builds_the_order_form_in_and_only_the_other_forms_use_a_seeded_iframe(self):
+    def test_page_builds_the_order_form_in_and_no_page_uses_a_seeded_iframe(self):
         self.assertIn('id="order-form-embed"', self.html)
         self.assertRegex(self.html, r'<form id="order-form" novalidate hidden>')
         self.assertNotIn("<iframe", self.html[self.html.index('id="order-dialog"'):self.html.index("</dialog>", self.html.index('id="order-dialog"'))])
@@ -27,11 +27,13 @@ class OrderFlowContractTests(unittest.TestCase):
         self.assertIn('postJson("referral"', order_form)
         self.assertIn('credentials: "omit"', order_form)
         self.assertNotIn("google.script.run", order_form)
-        self.assertIn("action=seed", self.script)
-        self.assertIn('seedField.name = "seed"', self.script)
-        self.assertIn('method = "POST"', self.script)
-        self.assertIn("var frame = document.getElementById(\"order-form-frame\")", self.script)
-        self.assertNotIn("orderFrame.addEventListener(\"resize\"", self.script)
+        # No page posts a seed to Apps Script or embeds its form any more; action=seed stays on the server only for pages cached earlier.
+        for gone in ("action=seed", 'seedField.name = "seed"', "order-form-frame", "createElement(\"iframe\")", "MessageChannel", "event.ports[0]"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, self.script)
+        for page in ("index.html", "partners/index.html", "corporate-gifting/index.html", "reviews/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html"):
+            with self.subTest(page=page):
+                self.assertNotIn("<iframe", (ROOT / page).read_text(encoding="utf-8"))
 
     def test_order_form_uses_the_verified_apps_script_endpoint(self):
         self.assertIn(
@@ -71,7 +73,7 @@ class OrderFlowContractTests(unittest.TestCase):
         self.assertIn("5 MB", self.form)
         self.assertIn("Google", self.form)
 
-    def test_captcha_uses_the_parent_origin_channel_and_combined_dimensions(self):
+    def test_legacy_form_keeps_the_parent_origin_channel_for_cached_pages_and_combined_dimensions(self):
         for field in ("heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart"):
             with self.subTest(field=field):
                 self.assertRegex(self.form, rf'name=["\']{field}["\']')
@@ -80,8 +82,7 @@ class OrderFlowContractTests(unittest.TestCase):
         self.assertNotIn("window.parent.postMessage", self.form)
         self.assertIn("https://saloniresinart.com", self.form)
         self.assertNotIn("grecaptcha.execute", self.form)
-        self.assertIn("event.ports[0]", self.script)
-        self.assertIn("https://saloniresinart.com", self.script)
+        self.assertNotIn("event.ports[0]", self.script)
         self.assertIn("CAPTCHA_MIN_SCORE", self.code)
         self.assertIn("order_request", self.code)
         self.assertIn("saloniresinart.com", self.code)
