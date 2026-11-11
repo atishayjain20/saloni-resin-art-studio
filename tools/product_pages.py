@@ -3,12 +3,14 @@
 
     python3 tools/product_pages.py
 
-Run it from anywhere after adding, renaming or removing a catalogue card in index.html.
+Run it from anywhere after adding, renaming or removing a catalogue card in index.html
+(run tools/share_images.py first: it makes the preview JPEGs this script points to).
 Link previews (WhatsApp, Facebook, X) come from crawlers that run no JavaScript, so each
 product gets p/<slug>/index.html with its own Open Graph tags. Visitors are sent on to
 /?product=<slug>#<section> where script.js opens that product's popup.
 
 It also:
+  * points og:image at assets/share/<slug>.jpg and reads its width and height from the JPEG,
   * stamps data-product-slug on each card's photo link in index.html (script.js reads it),
   * rewrites sitemap.xml so it lists every product page after the site's own pages,
   * deletes p/<slug>/ folders of products that no longer exist.
@@ -145,16 +147,28 @@ def esc(value):
     return html.escape(value, quote=True)
 
 
-def render_page(card, slug):
+def jpeg_size(path):
+    """(width, height) from the first start-of-frame header of a JPEG, baseline or progressive."""
+    data = Path(path).read_bytes()
+    index = 2
+    while data[:2] == b"\xff\xd8" and index + 9 < len(data):
+        if data[index] != 0xFF:
+            index += 1
+            continue
+        if data[index + 1] in (0xC0, 0xC1, 0xC2):
+            return int.from_bytes(data[index + 7:index + 9], "big"), int.from_bytes(data[index + 5:index + 7], "big")
+        index += 2 + int.from_bytes(data[index + 2:index + 4], "big")
+    raise SystemExit("Not a JPEG: " + str(path))
+
+
+def render_page(card, slug, share_size):
     url = "%s/%s/%s/" % (SITE, PAGE_DIR, slug)
     target = "/?product=%s#%s" % (slug, card["section"])
     title = "%s | %s" % (card["name"], STUDIO)
     desc = description(card)
-    image = "%s/assets/%s" % (SITE, card["file"])
+    image = "%s/assets/share/%s.jpg" % (SITE, slug)
     alt = card["alt"] or card["name"]
-    size = ""
-    if card["width"].isdigit() and card["height"].isdigit():
-        size = '  <meta property="og:image:width" content="%s">\n  <meta property="og:image:height" content="%s">\n' % (card["width"], card["height"])
+    size = '  <meta property="og:image:width" content="%d">\n  <meta property="og:image:height" content="%d">\n' % share_size
     return """<!doctype html>
 <html lang="en">
 <head>
@@ -194,7 +208,7 @@ def render_page(card, slug):
 """.format(
         title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
         redirect=json.dumps(target), target=esc(target), name=esc(card["name"]), file=esc(card["file"]),
-        dims=' width="%s" height="%s"' % (card["width"], card["height"]) if size else "",
+        dims=' width="%s" height="%s"' % (card["width"], card["height"]) if card["width"].isdigit() and card["height"].isdigit() else "",
     )
 
 
@@ -222,11 +236,18 @@ def sitemap_with_products(sitemap, slugs):
     return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + body + "</urlset>\n"
 
 
-def build(index_html, sitemap):
+def share_size(root, slug):
+    path = Path(root) / "assets" / "share" / (slug + ".jpg")
+    if not path.is_file():
+        raise SystemExit("Missing %s: run tools/share_images.py first" % path.relative_to(root))
+    return jpeg_size(path)
+
+
+def build(index_html, sitemap, root=ROOT):
     """(index.html with slugs, {relative path: page}, sitemap.xml) for the cards in index_html."""
     cards = parse_cards(index_html)
     slugs = assign_slugs(cards)
-    pages = {"%s/%s/index.html" % (PAGE_DIR, slug): render_page(card, slug) for card, slug in zip(cards, slugs)}
+    pages = {"%s/%s/index.html" % (PAGE_DIR, slug): render_page(card, slug, share_size(root, slug)) for card, slug in zip(cards, slugs)}
     return stamp(index_html, cards, slugs), pages, sitemap_with_products(sitemap, slugs)
 
 

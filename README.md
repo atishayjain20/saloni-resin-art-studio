@@ -161,13 +161,14 @@ After the real photo, a product preview can show AI concept images made with Gem
 
 Every catalogue product has its own share link, `https://saloniresinart.com/p/<slug>/`, for example `/p/jewel-glow-tealight/`. WhatsApp, Facebook and X build link previews from crawlers that run no JavaScript, so each link is a small static page (`p/<slug>/index.html`) with that product's own photo, name, price and size in its Open Graph tags. A visitor who opens it is sent straight to `/?product=<slug>#<section>`, where `script.js` opens that product's popup (an unknown slug just shows the normal home page). The popup has a **Share** button: it uses the phone's share sheet when there is one, otherwise it offers Share on WhatsApp and Copy link.
 
-The pages, the `data-product-slug` on each card's photo link in `index.html`, and the product entries in `sitemap.xml` are generated. After you add, rename or remove a catalogue card (or change its photo, price, size or description line), run:
+The pages, the `data-product-slug` on each card's photo link in `index.html`, and the product entries in `sitemap.xml` are generated. After you add, rename or remove a catalogue card (or change its photo, price, size or description line), run these two steps and commit the result:
 
 ```
-python3 tools/product_pages.py
+/tmp/share-venv/bin/python tools/share_images.py   # preview JPEGs in assets/share/<slug>.jpg
+python3 tools/product_pages.py                     # pages, data-product-slug and sitemap.xml
 ```
 
-and commit the result. It needs only Python 3, no extra packages. The slug comes from the product name (`Jewel Glow Tealight` becomes `jewel-glow-tealight`); if two names give the same slug, the later card gets a 4-letter suffix. Renaming a product changes its slug, so links already shared for the old name stop working; avoid renaming a product that has been shared. `python3 -m unittest discover -s tests` fails with "run python3 tools/product_pages.py" when the pages are out of step with `index.html`, so a stale page cannot be published by accident. `reviews/products.json` is separate and still follows the card photo file name.
+The preview image of every product is a JPEG (WhatsApp shows these most reliably): RGB on white, progressive, quality 80 or a little lower to stay under 250 KB, the photo's own shape (never cropped), shortest side at least 600 px and longest at most 1200 px. `share_images.py` needs Pillow, which is not a site dependency, so use a scratch virtual environment (`python3 -m venv /tmp/share-venv && /tmp/share-venv/bin/pip install pillow`); it only reads the photos in `assets/` and deletes share images of products that no longer exist. `product_pages.py` needs only Python 3, no extra packages, and reads each JPEG's width and height for the `og:image:width`/`height` tags. The slug comes from the product name (`Jewel Glow Tealight` becomes `jewel-glow-tealight`); if two names give the same slug, the later card gets a 4-letter suffix. Renaming a product changes its slug, so links already shared for the old name stop working; avoid renaming a product that has been shared. `python3 -m unittest discover -s tests` fails with "run python3 tools/product_pages.py" when the pages are out of step with `index.html`, so a stale page or share image cannot be published by accident (the test also fails for a share image with no product). `reviews/products.json` is separate and still follows the card photo file name.
 
 ## In-page order form release note
 

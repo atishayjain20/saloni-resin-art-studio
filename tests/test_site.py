@@ -2312,6 +2312,23 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertLessEqual(len(actual), 300)
 
 
+def jpeg_frame(path):
+    """Marker, size and component count from the first JPEG start-of-frame header (0xC2 means progressive)."""
+    data = path.read_bytes()
+    if data[:2] != b"\xff\xd8":
+        raise AssertionError(f"Not a JPEG file: {path}")
+    index = 2
+    while index + 9 < len(data):
+        if data[index] != 0xFF:
+            index += 1
+            continue
+        marker = data[index + 1]
+        if marker in (0xC0, 0xC1, 0xC2):
+            return {"marker": marker, "size": (int.from_bytes(data[index + 7:index + 9], "big"), int.from_bytes(data[index + 5:index + 7], "big")), "components": data[index + 9]}
+        index += 2 + int.from_bytes(data[index + 2:index + 4], "big")
+    raise AssertionError(f"Missing JPEG frame header: {path}")
+
+
 def load_product_pages_tool():
     import importlib.util
     spec = importlib.util.spec_from_file_location("product_pages", ROOT / "tools" / "product_pages.py")
@@ -2422,6 +2439,34 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertEqual((ROOT / relative).read_text(encoding="utf-8"), expected, relative + " is stale: run python3 tools/product_pages.py")
         self.assertEqual(len(pages), len(self.products))
 
+    def test_every_share_image_is_a_sized_progressive_jpeg_that_matches_its_page_tags(self):
+        # WhatsApp is the main target: every preview image is a JPEG of a safe size and weight, never cropped.
+        by_slug = dict(zip(self.slugs, self.products))
+        for slug, product in by_slug.items():
+            path = ROOT / "assets" / "share" / (slug + ".jpg")
+            self.assertTrue(path.is_file(), slug + ": run tools/share_images.py")
+            frame = jpeg_frame(path)
+            self.assertEqual(frame["marker"], 0xC2, slug + " is progressive")
+            self.assertEqual(frame["components"], 3, slug + " is RGB")
+            width, height = frame["size"]
+            self.assertGreaterEqual(min(width, height), 600, slug)
+            self.assertLessEqual(max(width, height), 1200, slug)
+            self.assertLess(path.stat().st_size, 300 * 1024, slug)
+            _, tags = self.page(slug)
+            self.assertEqual((tags.meta["og:image:width"], tags.meta["og:image:height"]), (str(width), str(height)), slug)
+            source = ROOT / "assets" / re.sub(r"^catalogue:", "", product["id"])
+            source_width, source_height = webp_dimensions(source) if source.suffix == ".webp" else jpeg_dimensions(source)
+            self.assertLess(abs(width / height - source_width / source_height), 0.01, slug + " keeps the photo's own shape (no crop)")
+
+    def test_share_images_have_no_orphans(self):
+        on_disk = sorted(path.name for path in (ROOT / "assets" / "share").iterdir() if not path.name.startswith("."))
+        self.assertEqual(on_disk, sorted(slug + ".jpg" for slug in self.slugs), "a share image with no product (or a product without one)")
+
+    def test_share_image_tool_is_separate_and_the_page_tool_stays_standard_library_only(self):
+        self.assertTrue((ROOT / "tools" / "share_images.py").is_file())
+        self.assertIn("PIL", (ROOT / "tools" / "share_images.py").read_text(encoding="utf-8"))
+        self.assertNotRegex(self.tool_path.read_text(encoding="utf-8"), r"(?m)^\s*(?:from|import)\s+PIL\b")
+
     def test_each_page_has_the_products_own_preview_tags(self):
         by_slug = dict(zip(self.slugs, self.products))
         for slug, product in by_slug.items():
@@ -2435,10 +2480,10 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertEqual(tags.meta["twitter:title"], title, slug)
             self.assertEqual(tags.links["canonical"], url, slug)
             self.assertEqual(tags.meta["og:url"], url, slug)
-            image = self.SITE + "/assets/" + file_name
+            image = self.SITE + "/assets/share/" + slug + ".jpg"
             self.assertEqual(tags.meta["og:image"], image, slug)
             self.assertEqual(tags.meta["twitter:image"], image, slug)
-            self.assertTrue((ROOT / "assets" / file_name).is_file(), slug + " image is missing")
+            self.assertTrue((ROOT / "assets" / file_name).is_file(), slug + " source photo is missing")
             self.assertTrue(tags.meta["og:image:alt"].strip(), slug)
             self.assertEqual(tags.meta["twitter:image:alt"], tags.meta["og:image:alt"], slug)
             self.assertEqual(tags.meta["twitter:card"], "summary_large_image", slug)
@@ -2456,7 +2501,7 @@ class ProductSharePageTests(unittest.TestCase):
         self.assertEqual(tags.meta["og:title"], "Jewel Glow Tealight | Saloni Resin Art Studio")
         self.assertTrue(tags.meta["og:description"].startswith("₹249 · 4 in. "), tags.meta["og:description"])
         self.assertIn("Rich colour and golden flecks for a festive corner", tags.meta["og:description"])
-        self.assertEqual(tags.meta["og:image"], "https://saloniresinart.com/assets/diwali-jewel-glow-tealight.jpg")
+        self.assertEqual(tags.meta["og:image"], "https://saloniresinart.com/assets/share/jewel-glow-tealight.jpg")
         self.assertEqual(tags.meta["og:image:alt"], "Jewel-toned resin tealight holder with golden flecks")
         _, range_tags = self.page("happy-diwali-glow")
         self.assertTrue(range_tags.meta["og:description"].startswith("₹250–₹400 · "), range_tags.meta["og:description"])
