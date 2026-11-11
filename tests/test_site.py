@@ -2185,9 +2185,9 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertRegex(self.page, r'<section[^>]*id="write"')
         # The review form is built into the page: no Apps Script iframe, no seed post, and no connection to Google until the form is used.
         self.assertNotIn("preconnect", self.page)
-        for gone in ("<iframe", "order-form-embed", "order-form-frame", "order-form-status", "data-form-mode", "Loading the review form", "recaptcha/api.js"):
+        for gone in ("<iframe", "order-form-embed", "order-form-frame", "order-form-status", "data-form-mode", "Loading the review form", "recaptcha/api.js", "data-captcha-site-key"):
             self.assertNotIn(gone, self.page)
-        self.assertRegex(self.page, r'<form id="review-form"[^>]*data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"[^>]*data-captcha-site-key="6Lcyc_YtAAAAAH9NRP14nKWeaeVcIBXs5PwrhmT3"[^>]*data-products-url="products.json"')
+        self.assertRegex(self.page, r'<form id="review-form"[^>]*data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"[^>]*data-products-url="products.json"')
         self.assertIn('<noscript>', self.page)
         self.assertNotIn("data-intake-ready", self.page)
         self.assertIn('<a class="skip-link" href="#main-content">', self.page)

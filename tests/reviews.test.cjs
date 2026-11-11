@@ -232,16 +232,19 @@ function reviewRow(overrides = {}) {
   return [v.id, v.at, v.status, v.rating, v.productId, v.productName, v.firstName, v.city, v.comment, v.photos, v.consent, v.fingerprint, v.notes];
 }
 
-test("a review with no captcha token is still refused", () => {
+test("a review submits without a captcha token and never calls reCAPTCHA", () => {
   const runtime = makeRuntime();
-  assert.match(runtime.context.submitReview(validForm({ captchaToken: "" })).errors.captcha, /Captcha/);
+  const form = validForm(); delete form.captchaToken;
+  assert.equal(runtime.context.submitReview(form).ok, true);
+  assert.equal(runtime.context.submitReview(validForm({ reviewId: "review-other-12345", captchaToken: "left-over-token" })).ok, true);
+  assert.equal(runtime.rows.length, 3);
+  assert.equal(runtime.state.captchaCalls, 0);
 });
 
-test("review mode, captcha action and kill switch are bounded", () => {
+test("review mode and kill switch are bounded", () => {
   const runtime = makeRuntime();
   assert.equal(runtime.context.boundedMode_("review"), "review");
   assert.equal(runtime.context.boundedMode_("unknown"), "order");
-  assert.equal(runtime.context.REVIEW_CAPTCHA_ACTION, "review_submission");
   assert.equal(runtime.context.REVIEWS_READY_PROPERTY, "REVIEWS_CONFIGURED");
   assert.deepEqual(plain(runtime.context.REVIEW_STATUSES), ["Published", "Hidden", "Removed"]);
   assert.deepEqual(plain(runtime.context.REVIEW_HEADERS), REVIEW_HEADERS);
@@ -249,9 +252,6 @@ test("review mode, captcha action and kill switch are bounded", () => {
   assert.equal(seed.reviewId, "review-seed-12345");
   assert.equal(seed.comment, undefined);
   assert.match(runtime.context.parseSeed_("{}").reviewId, /^[0-9a-f-]{36}$/);
-  const wrongAction = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 } });
-  assert.match(wrongAction.context.submitReview(validForm()).errors.captcha, /Captcha/);
-  assert.equal(wrongAction.state.appendCalls, 0);
   const paused = makeRuntime({ properties: { REVIEWS_DISABLED: "true" } });
   const result = paused.context.submitReview(validForm({ photos: [photo(makeJpeg())] }));
   assert.equal(result.ok, false);
@@ -332,7 +332,7 @@ test("action=review saves one review for a valid JSON body, with photos, and rep
   assert.equal(runtime.rows.length, 2);
   assert.equal(runtime.rows[1][9].split(",").length, 2);
   assert.equal(runtime.state.createFileCalls, 2);
-  assert.equal(runtime.state.captchaCalls, 1);
+  assert.equal(runtime.state.captchaCalls, 0);
   const replay = reviewPost(runtime, body);
   assert.equal(replay.ok, true);
   assert.equal(runtime.rows.length, 2);
@@ -343,23 +343,18 @@ test("action=review saves one review for a valid JSON body, with photos, and rep
   assert.equal(runtime.rows.length, 2);
 });
 
-test("action=review refuses a missing or failed captcha with no row and no stored photo", () => {
+test("action=review saves with a missing or left-over captcha token, with photos, and never calls reCAPTCHA", () => {
   const withPhoto = { photos: [photo(makeJpeg())] };
   const missing = makeRuntime();
-  assert.match(reviewPost(missing, postedReview(Object.assign({ captchaToken: "" }, withPhoto))).errors.captcha, /Captcha/);
-  const absent = makeRuntime();
   const body = postedReview(withPhoto); delete body.captchaToken;
-  assert.match(reviewPost(absent, body).errors.captcha, /Captcha/);
-  const rejected = makeRuntime({ captchaResponse: { success: false, hostname: "saloniresinart.com", action: "review_submission", score: 0.9 } });
-  assert.match(reviewPost(rejected, postedReview(withPhoto)).errors.captcha, /Captcha/);
-  const wrongAction = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "product_rating", score: 0.9 } });
-  assert.match(reviewPost(wrongAction, postedReview(withPhoto)).errors.captcha, /Captcha/);
-  const wrongHost = makeRuntime({ captchaResponse: { success: true, hostname: "localhost", action: "review_submission", score: 0.9 } });
-  assert.match(reviewPost(wrongHost, postedReview(withPhoto)).errors.captcha, /Captcha/);
-  [missing, absent, rejected, wrongAction, wrongHost].forEach((runtime) => {
-    assert.equal(runtime.rows.length, 1, "no row");
-    assert.equal(runtime.state.createFileCalls, 0, "no stored photo");
-    assert.equal(runtime.state.appendCalls, 0);
+  assert.equal(reviewPost(missing, body).ok, true);
+  const stale = makeRuntime();
+  assert.equal(reviewPost(stale, postedReview(Object.assign({ captchaToken: "left-over-token" }, withPhoto))).ok, true);
+  [missing, stale].forEach((runtime) => {
+    assert.equal(runtime.rows.length, 2, "one row saved");
+    assert.equal(runtime.state.createFileCalls, 1, "one stored photo");
+    assert.equal(runtime.state.captchaCalls, 0);
+    assert.equal(JSON.stringify(runtime.rows[1]).includes("left-over-token"), false);
   });
 });
 
@@ -944,7 +939,6 @@ const reviewPage = fs.readFileSync(path.join(root, "reviews", "index.html"), "ut
 const formsScript = fs.readFileSync(path.join(root, "public-forms.js"), "utf8");
 const legacyFormHtml = fs.readFileSync(path.join(root, "apps-script", "ReviewForm.html"), "utf8");
 const REVIEW_EXEC_URL = "https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec";
-const REVIEW_SITE_KEY = "6Lcyc_YtAAAAAH9NRP14nKWeaeVcIBXs5PwrhmT3";
 const formMarkup = (reviewPage.match(/<form id="review-form"[\s\S]*?<\/form>/) || [""])[0];
 
 class FormElement {
@@ -988,16 +982,7 @@ function makeFormRuntime(options = {}) {
   elements.get("rating-group").appendChild = (child) => errorHost.appendChild(child);
   fields.productId.value = "studio";
   const status = elements.get("form-status");
-  const timers = []; const fetches = []; const productFetches = []; const executions = []; const scripts = []; const canvases = []; const revoked = [];
-  const captchaState = { token: null, reject: false };
-  const recaptcha = {
-    ready: (callback) => callback(),
-    execute: (siteKey, request) => {
-      executions.push({ siteKey, action: request.action });
-      if (captchaState.reject) return Promise.reject(new Error("captcha failed"));
-      return Promise.resolve(captchaState.token === null ? "token-" + executions.length : captchaState.token);
-    },
-  };
+  const timers = []; const fetches = []; const productFetches = []; const scripts = []; const canvases = []; const revoked = [];
   const imageBehaviour = options.image || { width: 4000, height: 3000 };
   const pendingImages = [];
   class FakeImage {
@@ -1029,12 +1014,12 @@ function makeFormRuntime(options = {}) {
       });
     },
   };
-  if (options.captcha !== "lazy") windowObject.grecaptcha = recaptcha;
+  Object.defineProperty(windowObject, "grecaptcha", { get() { throw new Error("reCAPTCHA must not be touched"); } });
   const head = { appendChild(script) { script.parentNode = head; scripts.push(script); return script; }, removeChild(script) { scripts.splice(scripts.indexOf(script), 1); } };
   const documentObject = {
     head,
     getElementById: (id) => elements.get(id) || errors.find((element) => element.id === id) || null,
-    querySelector: (selector) => (/recaptcha/.test(selector) ? scripts.find((script) => /recaptcha/.test(script.src || "")) || null : null),
+    querySelector: () => { throw new Error("no script lookup is expected"); },
     createElement(tag) {
       const element = new FormElement(tag);
       if (tag === "canvas") {
@@ -1057,11 +1042,10 @@ function makeFormRuntime(options = {}) {
   vm.createContext(context);
   vm.runInContext(formsScript, context, { filename: "public-forms.js" });
   const runtime = {
-    imageBehaviour, pendingImages, elements, fields, form, fieldsets, status, timers, fetches, productFetches, executions, scripts, captchaState, canvases, revoked, errors,
+    imageBehaviour, pendingImages, elements, fields, form, fieldsets, status, timers, fetches, productFetches, scripts, canvases, revoked, errors,
     previews: elements.get("photo-previews"), fileInput: elements.get("review-photos"), another: elements.get("another-button"), submitButton: elements.get("submit-button"), productHint: elements.get("product-hint"), windowObject,
     get submissions() { return fetches.map((entry) => entry.body); },
     submit: async () => { form.dispatch("submit"); await settle(); },
-    finishScript(ok) { if (ok) windowObject.grecaptcha = recaptcha; scripts.slice().forEach((script) => script.dispatch(ok ? "load" : "error")); return settle(); },
     timeout: () => timers.filter((timer) => timer.delay === 30000 && !timer.cleared).pop().fn(),
   };
   return runtime;
@@ -1076,21 +1060,23 @@ function addPhotos(runtime, files) {
   runtime.fileInput.dispatch("change");
 }
 const jpegFile = (size = 3 * 1024 * 1024) => ({ type: "image/jpeg", size, name: "IMG_0001.jpg" });
-const TOKEN_FREE = (body) => { const copy = Object.assign({}, body); delete copy.captchaToken; return copy; };
 
 test("the review form is built into the page: no iframe, no seed, no frame messaging, no Google connection at load", () => {
   assert.ok(formMarkup);
-  assert.match(formMarkup, new RegExp('<form id="review-form"[^>]*data-order-form-url="' + REVIEW_EXEC_URL.replace(/[./]/g, "\\$&") + '"[^>]*data-captcha-site-key="' + REVIEW_SITE_KEY + '"'));
+  assert.match(formMarkup, new RegExp('<form id="review-form"[^>]*data-order-form-url="' + REVIEW_EXEC_URL.replace(/[./]/g, "\\$&") + '"[^>]*data-products-url="products\\.json"[^>]*novalidate>'));
+  assert.doesNotMatch(formMarkup, /data-captcha-site-key|grecaptcha/i);
+  assert.doesNotMatch(reviewPage, /protected by reCAPTCHA|google\.com\/recaptcha/i);
   assert.match(formMarkup, /data-products-url="products\.json"/);
   assert.doesNotMatch(reviewPage, /<iframe|order-form-embed|order-form-frame|data-form-mode|order-form-status|preconnect|googleusercontent|recaptcha\/api\.js/);
   assert.match(reviewPage, /<script class="site-script" src="\.\.\/script\.js\?v=\d+" defer><\/script>\s*<script class="public-forms-script" src="\.\.\/public-forms\.js\?v=\d+" defer><\/script>/);
   assert.match(reviewPage, /<noscript>[\s\S]*8209238541[\s\S]*<\/noscript>/);
+  assert.doesNotMatch(formsScript, /recaptcha|captcha/i);
   assert.doesNotMatch(formsScript, /postMessage|MessageChannel|google\.script|window\.top|window\.parent|PARENT_ORIGIN|innerHTML/);
   assert.match(formMarkup, /id="form-status"[^>]*tabindex="-1"/);
 });
 
-test("opening the review page sends nothing to Google: no post, no reCAPTCHA script, no timer, and the review ID is ready", async () => {
-  const runtime = makeFormRuntime({ captcha: "lazy" });
+test("opening the review page sends nothing to Google: no post, no script, no timer, and the review ID is ready", async () => {
+  const runtime = makeFormRuntime();
   await settle();
   assert.equal(runtime.fetches.length, 0);
   assert.equal(runtime.scripts.length, 0);
@@ -1100,32 +1086,21 @@ test("opening the review page sends nothing to Google: no post, no reCAPTCHA scr
   assert.equal(runtime.form.hidden, false);
 });
 
-test("the reCAPTCHA script loads once, the first time the form is focused", async () => {
-  const runtime = makeFormRuntime({ captcha: "lazy" });
-  runtime.form.dispatch("focusin");
-  runtime.form.dispatch("focusin");
-  assert.equal(runtime.scripts.length, 1);
-  assert.equal(runtime.scripts[0].src, "https://www.google.com/recaptcha/api.js?render=" + REVIEW_SITE_KEY);
-  await runtime.finishScript(true);
-  runtime.form.dispatch("focusin");
-  assert.equal(runtime.scripts.length, 1);
-  assert.equal(runtime.fetches.length, 0);
-});
-
-test("Submit before the script finished loading waits for it, then sends one JSON post with a fresh token", async () => {
-  const runtime = makeFormRuntime({ captcha: "lazy" });
+test("focusing the form loads nothing, and Submit sends one JSON post at once with no token", async () => {
+  const runtime = makeFormRuntime();
   fillReviewForm(runtime);
-  await runtime.submit();
-  assert.equal(runtime.scripts.length, 1, "Submit loads the script itself when the form was never focused");
-  assert.equal(runtime.fetches.length, 0, "no post until the captcha token exists");
+  runtime.form.dispatch("focusin");
+  assert.equal(runtime.scripts.length, 0);
+  assert.equal(runtime.fetches.length, 0);
+  runtime.form.dispatch("submit");
+  assert.equal(runtime.fetches.length, 1, "the post is made in the same tick as the click, with nothing to wait for");
+  await settle();
+  assert.equal(runtime.scripts.length, 0);
   assert.equal(runtime.submitButton.disabled, true);
-  await runtime.finishScript(true);
-  assert.deepEqual(runtime.executions, [{ siteKey: REVIEW_SITE_KEY, action: "review_submission" }]);
-  assert.equal(runtime.fetches.length, 1);
   assert.equal(runtime.fetches[0].url, REVIEW_EXEC_URL + "?action=review");
   assert.equal(runtime.fetches[0].init.method, "POST");
   assert.equal(runtime.fetches[0].init.credentials, "omit");
-  assert.equal(runtime.fetches[0].body.captchaToken, "token-1");
+  assert.equal(Object.hasOwn(runtime.fetches[0].body, "captchaToken"), false);
 });
 
 test("the form starts on the product and rating from the address, and the saved first name, only when they are valid", async () => {
@@ -1163,7 +1138,7 @@ test("the review form has the specified fields and no consent checkbox, consent 
   assert.match(formMarkup, /name="city" maxlength="60"/);
   assert.match(formMarkup, /name="comment" maxlength="800"/);
   assert.match(formMarkup, /type="file"[^>]*accept="image\/jpeg,image\/png"[^>]*multiple/);
-  assert.doesNotMatch(formMarkup, /publicConsent|public-consent|<input[^>]*type="checkbox"|class="consent"|I agree that|Reviews stay until removed|Show my review|captchaToken/);
+  assert.doesNotMatch(formMarkup, /publicConsent|public-consent|<input[^>]*type="checkbox"|class="consent"|I agree that|Reviews stay until removed|Show my review/);
   assert.match(formMarkup, /Reviews are public on the home page\./);
   assert.match(formMarkup, /Post review/);
   assert.match(formMarkup, /Write another review/);
@@ -1193,7 +1168,6 @@ test("the form checks the rating, names, comment and contact details before send
   fillReviewForm(runtime, { rating: "", firstName: "A1", city: "Ajmer 305001", comment: "short" });
   await runtime.submit();
   assert.equal(runtime.fetches.length, 0);
-  assert.equal(runtime.executions.length, 0);
   assert.deepEqual(runtime.errors.map((error) => error.id).sort(), ["city-error", "comment-error", "firstName-error", "rating-error"]);
   assert.equal(runtime.submitButton.disabled, false);
   assert.match(runtime.status.textContent, /Please correct the highlighted fields/);
@@ -1206,12 +1180,12 @@ test("the form checks the rating, names, comment and contact details before send
   }
 });
 
-test("a valid review is posted with a fresh captcha token and the exact payload shape", async () => {
+test("a valid review is posted with the exact payload shape and no token", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
   await runtime.submit();
   assert.equal(runtime.fetches.length, 1);
-  assert.deepEqual(runtime.submissions[0], { reviewId: runtime.fields.reviewId.value, productId: "studio", rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", photos: [], captchaToken: "token-1" });
+  assert.deepEqual(runtime.submissions[0], { reviewId: runtime.fields.reviewId.value, productId: "studio", rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", photos: [] });
   await runtime.submit();
   assert.equal(runtime.fetches.length, 1, "Submit is ignored while a request is in flight");
 });
@@ -1237,29 +1211,7 @@ test("review success thanks the first name, says where the review shows and offe
   assert.equal(runtime.another.hidden, true);
 });
 
-test("a missing, rejected or unloadable captcha shows the captcha message, keeps entries and photos, and sends nothing", async () => {
-  const empty = makeFormRuntime(); empty.captchaState.token = "";
-  const rejected = makeFormRuntime(); rejected.captchaState.reject = true;
-  const noScript = makeFormRuntime({ captcha: "lazy" });
-  for (const runtime of [empty, rejected, noScript]) { fillReviewForm(runtime); addPhotos(runtime, [jpegFile()]); }
-  await empty.submit(); await rejected.submit(); await noScript.submit();
-  await noScript.finishScript(false);
-  for (const runtime of [empty, rejected, noScript]) {
-    assert.match(runtime.status.textContent, /Captcha verification is required/);
-    assert.equal(runtime.status.focused, true);
-    assert.equal(runtime.fetches.length, 0);
-    assert.equal(runtime.submitButton.disabled, false);
-    assert.equal(runtime.fields.firstName.value, "Asha Kumari");
-    assert.equal(runtime.previews.children.length, 1);
-  }
-  assert.equal(noScript.scripts.length, 0, "a script that failed to load is removed so a later try can load it again");
-  empty.captchaState.token = null;
-  await empty.submit();
-  assert.equal(empty.fetches.length, 1, "the next try works");
-  assert.equal(empty.fetches[0].body.photos.length, 1);
-});
-
-test("a failed or unreadable answer keeps the entries and photos; the retry is the same review with a new token", async () => {
+test("a failed or unreadable answer keeps the entries and photos; the retry is the same review", async () => {
   for (const failure of ["network", "unconfirmed", "invalid", "html"]) {
     const runtime = makeFormRuntime({ html: failure === "html" });
     fillReviewForm(runtime);
@@ -1277,8 +1229,7 @@ test("a failed or unreadable answer keeps the entries and photos; the retry is t
     await runtime.submit();
     assert.equal(runtime.fetches.length, 2);
     assert.equal(runtime.fetches[1].body.reviewId, id, "the retry is the same review, so the server can recognise it");
-    assert.notEqual(runtime.fetches[1].body.captchaToken, runtime.fetches[0].body.captchaToken, "a new token for each Submit");
-    assert.deepEqual(TOKEN_FREE(runtime.fetches[1].body), TOKEN_FREE(runtime.fetches[0].body));
+    assert.deepEqual(runtime.fetches[1].body, runtime.fetches[0].body);
     assert.equal(runtime.fetches[1].body.photos.length, 2);
   }
 });
@@ -1296,13 +1247,6 @@ test("after 30 seconds it says it could not confirm, keeps the entries, and a la
   await runtime.fetches[0].respond({ ok: true, reviewId: runtime.fields.reviewId.value });
   assert.equal(runtime.status.textContent, message, "a stale success is ignored");
   assert.equal(runtime.fieldsets.some((fieldset) => fieldset.hidden), false);
-  const early = makeFormRuntime({ captcha: "lazy" });
-  fillReviewForm(early);
-  await early.submit();
-  early.timeout();
-  assert.match(early.status.textContent, /Unable to verify the review yet/);
-  await early.finishScript(true);
-  assert.equal(early.fetches.length, 0, "a send that has been given up on is never made");
 });
 
 test("entries changed while an earlier review is unconfirmed are not resent under the old ID, and Write another recovers", async () => {
@@ -1329,12 +1273,12 @@ test("an unconfirmed review is retried with the exact original details and stale
   fillReviewForm(runtime);
   addPhotos(runtime, [jpegFile()]);
   await runtime.submit();
-  const original = TOKEN_FREE(runtime.submissions[0]);
+  const original = runtime.submissions[0];
   runtime.timeout();
   assert.match(runtime.status.textContent, /could not confirm/i);
   await runtime.submit();
   assert.equal(runtime.fetches.length, 2);
-  assert.deepEqual(TOKEN_FREE(runtime.submissions[1]), original);
+  assert.deepEqual(runtime.submissions[1], original);
   await runtime.fetches[0].respond({ ok: true });
   assert.match(runtime.status.textContent, /checking/i, "the first request's late answer does not finish the retry");
   await runtime.fetches[1].respond({ ok: true, reviewId: original.reviewId });
@@ -1360,9 +1304,9 @@ test("server field errors land on the right field and keep the form open for a f
   const rating = makeFormRuntime();
   fillReviewForm(rating);
   await rating.submit();
-  await rating.fetches[0].respond({ ok: false, errors: { captcha: "Captcha verification failed. Please try again.", rating: "Choose a rating from 1 to 5 stars." } });
+  await rating.fetches[0].respond({ ok: false, errors: { form: "The studio's daily review limit has been reached. Please try again tomorrow.", rating: "Choose a rating from 1 to 5 stars." } });
   assert.ok(rating.errors.some((error) => error.id === "rating-error"));
-  assert.equal(rating.status.textContent, "Captcha verification failed. Please try again.");
+  assert.equal(rating.status.textContent, "The studio's daily review limit has been reached. Please try again tomorrow.");
 });
 
 test("photos are redrawn on a white canvas, shrunk until at most 1 MB, and the original is never sent", async () => {
@@ -1457,7 +1401,6 @@ test("Submit while photos are still being prepared asks the shopper to wait", as
   await runtime.submit();
   assert.match(runtime.status.textContent, /photos are still being prepared/);
   assert.equal(runtime.fetches.length, 0);
-  assert.equal(runtime.executions.length, 0);
 });
 
 test("the legacy Apps Script review form still ships for pages cached before this change", () => {

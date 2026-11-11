@@ -23,7 +23,6 @@ test("exposes only bounded referral validation and application submission", () =
   vm.runInContext(code, context, { filename: "Code.gs" });
   assert.equal(typeof context.validateReferralCode, "function");
   assert.equal(typeof context.submitPartnerApplication, "function");
-  assert.match(code, /PARTNER_APPLICATION_CAPTCHA_ACTION/);
   assert.match(code, /Partner Commissions/);
   assert.match(code, /Commission rate snapshot/);
   assert.match(code, /function approvePartner_\(/);
@@ -139,9 +138,14 @@ test("retention keeps the source order when a commission conflict cannot be reco
   assert.equal(runtime.orderSheet.rows.length, 1);
 });
 
-test("a partner application with no captcha token is still refused", () => {
-  const runtime = partnerRuntime();
-  assert.match(runtime.context.submitPartnerApplication(Object.assign(applicationForm(), { captchaToken: "" })).errors.captcha, /Captcha/);
+test("a partner application submits without a captcha token and never calls reCAPTCHA", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const form = applicationForm(); delete form.captchaToken;
+  assert.equal(runtime.context.submitPartnerApplication(form).ok, true);
+  assert.equal(runtime.applicationRows.length, 1);
+  const stale = partnerRuntime({ applicationRows: [], partnerRows: [], properties: { CAPTCHA_SECRET: "secret", CAPTCHA_MIN_SCORE: "0.5" } });
+  assert.equal(stale.context.submitPartnerApplication(applicationForm({ captchaToken: "left-over-token" })).ok, true);
+  assert.equal(runtime.fetchCalls.count + stale.fetchCalls.count, 0);
 });
 
 test("applications, setup, and protection use the configured default contract", () => {
@@ -149,9 +153,6 @@ test("applications, setup, and protection use the configured default contract", 
   const application = applicationForm();
   assert.equal(runtime.context.submitPartnerApplication(application).ok, true);
   assert.equal(runtime.applicationRows.length, 1);
-  const wrongAction = partnerRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 } });
-  assert.match(wrongAction.context.submitPartnerApplication(application).errors.captcha, /Captcha/);
-  assert.equal(wrongAction.applicationRows.length, 0);
   assert.equal(runtime.context.setupPartnerProgram().orderColumns, 37);
   assert.equal(runtime.properties.values.PARTNER_PROGRAM_CONFIGURED, "true");
   assert.equal(runtime.context.partnerProgramConfigured_(runtime.properties), true);
@@ -581,17 +582,15 @@ test("referral codes fall back to the applicant name, then to PARTNER", () => {
   assert.match(trimmed.referralCode, /^WEDDINGP[A-Z0-9]{4}$/);
 });
 
-test("disabled, captcha, validation and daily-cap paths create no partner", () => {
+test("disabled, validation and daily-cap paths create no partner", () => {
   const disabled = partnerRuntime({ applicationRows: [], partnerRows: [], properties: { PARTNER_FORM_DISABLED: "true" } });
   assert.match(disabled.context.submitPartnerApplication(applicationForm()).errors.form, /paused/i);
-  const captcha = partnerRuntime({ applicationRows: [], partnerRows: [], captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 } });
-  assert.match(captcha.context.submitPartnerApplication(applicationForm()).errors.captcha, /Captcha/);
   const invalid = partnerRuntime({ applicationRows: [], partnerRows: [] });
   assert.ok(invalid.context.submitPartnerApplication(Object.assign(applicationForm(), { phone: "1" })).errors.phone);
   const capped = partnerRuntime({ partnerRows: [], properties: { PARTNER_DAILY_ACCEPTANCE_CAP: "1" }, applicationRows: [["old-application", new Date(), "Asha", "Asha Studio", "photographer", "Ajmer", "8209238541", "asha@example.com", "https://example.com", "Families", "Plan", true, "Pending", "", "", "fingerprint", ""]] });
   assert.match(capped.context.submitPartnerApplication(applicationForm()).errors.form, /limit/i);
-  [disabled, captcha, invalid, capped].forEach((runtime) => assert.equal(runtime.partnerRows.length, 0));
-  assert.equal(disabled.applicationRows.length + captcha.applicationRows.length + invalid.applicationRows.length, 0);
+  [disabled, invalid, capped].forEach((runtime) => assert.equal(runtime.partnerRows.length, 0));
+  assert.equal(disabled.applicationRows.length + invalid.applicationRows.length, 0);
   assert.equal(capped.applicationRows.length, 1);
 });
 
@@ -608,8 +607,8 @@ test("an auto-approved partner can still be paused and the page says the link co
   assert.match(page, /monthly.*manual payout/i);
 });
 
-function applicationForm() {
-  return { applicationId: "application-123456", applicantName: "Asha", businessName: "Asha Studio", category: "photographer", serviceArea: "Ajmer", phone: "8209238541", email: "asha@example.com", website: "https://example.com", typicalCustomers: "Families", referralPlan: "I will share stories", rulesAccepted: "true", captchaToken: "token" };
+function applicationForm(overrides = {}) {
+  return Object.assign({ applicationId: "application-123456", applicantName: "Asha", businessName: "Asha Studio", category: "photographer", serviceArea: "Ajmer", phone: "8209238541", email: "asha@example.com", website: "https://example.com", typicalCustomers: "Families", referralPlan: "I will share stories", rulesAccepted: "true", captchaToken: "token" }, overrides);
 }
 
 function applicationRow() {
@@ -626,7 +625,7 @@ function referredOrderRow(overrides = {}) {
 }
 
 function partnerRuntime(options = {}) {
-  const values = Object.assign({ ORDER_SHEET_ID: "sheet", ORDER_SHEET_TAB: "Orders", CAPTCHA_SECRET: "secret", CAPTCHA_MIN_SCORE: "0.5" }, options.properties || {});
+  const values = Object.assign({ ORDER_SHEET_ID: "sheet", ORDER_SHEET_TAB: "Orders" }, options.properties || {});
   const legacyHeaders = ["Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID", "Product name", "Quantity", "Height value", "Height unit", "Height (in)", "Width value", "Width unit", "Width (in)", "Design details", "Customer name", "Phone", "Email", "Fulfilment", "Shipping address", "City", "State", "PIN", "Requested date", "Reference file link", "Status", "Staff notes"];
   const fullHeaders = legacyHeaders.concat(["Referral code", "Partner ID", "Partner name snapshot", "Final product subtotal", "Payment status", "Delivery status", "Commission rate snapshot", "Commission amount", "Commission status", "Payout batch ID", "Payout date"]);
   const applicationHeaders = ["Application ID", "Received at", "Applicant name", "Business name", "Category", "City / service area", "Phone / WhatsApp", "Email", "Instagram / website", "Typical customers", "Referral plan", "Rules accepted", "Status", "Review notes", "Reviewed at", "Payload fingerprint", "Partner ID"];
@@ -640,6 +639,7 @@ function partnerRuntime(options = {}) {
   const protections = [];
   const lock = { calls: 0, held: false, tryLock: () => { lock.calls += 1; if (options.lockAvailable === false || lock.held) return false; lock.held = true; return true; }, releaseLock() { lock.held = false; } };
   const formatDateCalls = [];
+  const fetchCalls = { count: 0 };
   function sheetCellValue(value) {
     if (typeof value !== "string") return value;
     if (/^'\d{4}-\d{2}$/.test(value)) return value.slice(1);
@@ -683,11 +683,11 @@ function partnerRuntime(options = {}) {
   const spreadsheet = { getSpreadsheetTimeZone: () => options.sheetTimezone || "UTC", getSheetByName: (name) => sheets[name] || null, insertSheet: (name) => { const headers = name === applicationTab ? applicationHeaders : name === partnerTab ? partnerHeaders : commissionHeaders; const created = sheet(name, headers, []); sheets[name] = created; return created; } };
   const properties = { values, getProperty: (key) => values[key] || "", setProperty: (key, value) => { values[key] = String(value); } };
   const utilities = { getUuid: () => "00000000-0000-4000-8000-000000000000", formatDate: (date, timezone, pattern) => { formatDateCalls.push({ date, timezone, pattern }); const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, year: "numeric", month: "2-digit" }).formatToParts(new Date(date)); const year = parts.find((part) => part.type === "year").value; const month = parts.find((part) => part.type === "month").value; return `${year}-${month}`; }, newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(String(value))) }), DigestAlgorithm: { SHA_256: "SHA-256" }, computeDigest: (_algorithm, bytes) => Array.from(require("node:crypto").createHash("sha256").update(Buffer.from(bytes)).digest()).map((byte) => byte > 127 ? byte - 256 : byte) };
-  const context = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array, Intl, Utilities: utilities, PropertiesService: { getScriptProperties: () => properties }, LockService: { getScriptLock: () => lock }, SpreadsheetApp: { openById: () => spreadsheet, ProtectionType: { RANGE: "RANGE" } }, Session: { getScriptTimeZone: () => options.scriptTimezone || "UTC", getActiveUser: () => ({ getEmail: () => "owner@example.com" }), getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) }, ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }) }, UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 }) }) } };
+  const context = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array, Intl, Utilities: utilities, PropertiesService: { getScriptProperties: () => properties }, LockService: { getScriptLock: () => lock }, SpreadsheetApp: { openById: () => spreadsheet, ProtectionType: { RANGE: "RANGE" } }, Session: { getScriptTimeZone: () => options.scriptTimezone || "UTC", getActiveUser: () => ({ getEmail: () => "owner@example.com" }), getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) }, ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }) }, UrlFetchApp: { fetch: () => { fetchCalls.count += 1; throw new Error("no reCAPTCHA request is expected"); } } };
   if (options.partnerLookupThrows) context.SpreadsheetApp.openById = () => { throw new Error("sheet unavailable"); };
   vm.createContext(context);
   vm.runInContext(code, context, { filename: "Code.gs" });
-  return { context, properties, orderSheet, applicationRows: applicationSheet.rows, partnerRows: partnerSheet.rows, protections, lock, commissionRows: commissionSheet.rows, commissionSheet, formatDateCalls };
+  return { context, properties, orderSheet, applicationRows: applicationSheet.rows, partnerRows: partnerSheet.rows, protections, lock, commissionRows: commissionSheet.rows, commissionSheet, formatDateCalls, fetchCalls };
 }
 
 // --- JSON partner endpoint used by the Partner Circle form built into the site ---
@@ -710,17 +710,14 @@ test("action=partner submits a valid application once and returns the referral l
   assert.equal(runtime.partnerRows.length, 1);
 });
 
-test("action=partner still requires a captcha token that verifies for the partner action", () => {
+test("action=partner submits without a captcha token, ignores a left-over one and never calls reCAPTCHA", () => {
   const missing = partnerRuntime({ applicationRows: [], partnerRows: [] });
   const body = applicationForm(); delete body.captchaToken;
-  assert.match(partnerPost(missing, body).errors.captcha, /Captcha/);
-  const rejected = partnerRuntime({ applicationRows: [], partnerRows: [], captchaResponse: { success: false, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 } });
-  assert.match(partnerPost(rejected, applicationForm()).errors.captcha, /Captcha/);
-  const wrongAction = partnerRuntime({ applicationRows: [], partnerRows: [], captchaResponse: { success: true, hostname: "saloniresinart.com", action: "corporate_enquiry", score: 0.9 } });
-  assert.match(partnerPost(wrongAction, applicationForm()).errors.captcha, /Captcha/);
-  const wrongHost = partnerRuntime({ applicationRows: [], partnerRows: [], captchaResponse: { success: true, hostname: "localhost", action: "partner_application", score: 0.9 } });
-  assert.match(partnerPost(wrongHost, applicationForm()).errors.captcha, /Captcha/);
-  [missing, rejected, wrongAction, wrongHost].forEach((runtime) => { assert.equal(runtime.applicationRows.length, 0); assert.equal(runtime.partnerRows.length, 0); });
+  assert.equal(partnerPost(missing, body).ok, true);
+  const stale = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  assert.equal(partnerPost(stale, applicationForm({ captchaToken: "left-over-token" })).ok, true);
+  [missing, stale].forEach((runtime) => { assert.equal(runtime.applicationRows.length, 1); assert.equal(runtime.fetchCalls.count, 0); });
+  assert.equal(missing.applicationRows[0].includes("left-over-token") || stale.applicationRows[0].includes("left-over-token"), false);
 });
 
 test("action=partner keeps validation, the kill switch and drops unknown fields", () => {

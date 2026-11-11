@@ -15,8 +15,8 @@ const browserScript = fs.readFileSync(path.join(__dirname, "..", "script.js"), "
 function makeRuntime(options = {}) {
   const headers = (options.headers || ["Enquiry ID", "Received at", "Organisation name", "Contact name", "Phone / WhatsApp", "Email", "Enquiry type", "Occasion", "Approximate quantity", "Budget range", "Required date", "Delivery scope", "Brief", "Privacy accepted", "Status", "Staff notes", "Payload fingerprint"]).slice();
   const rows = (options.rows || []).map((row) => row.slice());
-  const properties = Object.assign({ ORDER_SHEET_ID: "sheet", CORPORATE_PROGRAM_CONFIGURED: "true", CAPTCHA_SECRET: "secret", CAPTCHA_MIN_SCORE: "0.5" }, options.properties || {});
-  const state = { appendCalls: 0, deletedRows: [], captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "corporate_enquiry", score: 0.9 }, lock: options.lockAvailable !== false };
+  const properties = Object.assign({ ORDER_SHEET_ID: "sheet", CORPORATE_PROGRAM_CONFIGURED: "true" }, options.properties || {});
+  const state = { appendCalls: 0, fetchCalls: 0, deletedRows: [], lock: options.lockAvailable !== false };
   const protections = [];
   const sheet = {
     getLastRow: () => rows.length + 1,
@@ -48,7 +48,7 @@ function makeRuntime(options = {}) {
     LockService: { getScriptLock: () => ({ tryLock: () => state.lock, releaseLock: () => {} }) },
     SpreadsheetApp: { ProtectionType: { RANGE: "RANGE" }, openById: () => ({ getSheetByName: () => sheet }) },
     Session: { getScriptTimeZone: () => "UTC", getActiveUser: () => ({ getEmail: () => options.activeEmail || "" }), getEffectiveUser: () => ({ getEmail: () => options.effectiveEmail || "" }) },
-    UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(state.captchaResponse) }) },
+    UrlFetchApp: { fetch: () => { state.fetchCalls += 1; throw new Error("no reCAPTCHA request is expected"); } },
     ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }) },
   };
   vm.createContext(context);
@@ -65,7 +65,7 @@ function validForm(overrides = {}) {
   }, overrides);
 }
 
-test("corporate mode and CAPTCHA action are explicitly bounded", () => {
+test("corporate mode is explicitly bounded", () => {
   const runtime = makeRuntime();
   assert.equal(runtime.context.boundedMode_("corporate"), "corporate");
   assert.equal(runtime.context.boundedMode_("unknown"), "order");
@@ -75,8 +75,17 @@ test("corporate mode and CAPTCHA action are explicitly bounded", () => {
   assert.equal(seed.organisationName, undefined);
   assert.equal(seed.deliveryScope, undefined);
   assert.equal(Object.keys(runtime.context.validateCorporateEnquiry_(runtime.context.collectCorporateEnquiry_(validForm()))).length, 0);
-  const wrongAction = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 } });
-  assert.match(wrongAction.context.submitCorporateEnquiry(validForm()).errors.captcha, /Captcha/);
+});
+
+test("a corporate enquiry submits without a captcha token and never calls reCAPTCHA", () => {
+  const runtime = makeRuntime();
+  const form = validForm(); delete form.captchaToken;
+  assert.equal(runtime.context.submitCorporateEnquiry(form).ok, true);
+  const stale = makeRuntime();
+  assert.equal(stale.context.submitCorporateEnquiry(validForm({ captchaToken: "left-over-token" })).ok, true);
+  assert.equal(runtime.state.fetchCalls + stale.state.fetchCalls, 0);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(stale.rows.length, 1);
 });
 
 test("corporate validation enforces allowlists, date, quantity, consent and field limits", () => {
@@ -188,7 +197,7 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   // The review form (later in the same script) reads the saved first name; the corporate form and the shared kit use no browser storage.
   const corporateScript = formScript.slice(0, formScript.indexOf("function initReview")) ;
   assert.doesNotMatch(formMarkup + corporateScript, /localStorage|sessionStorage/);
-  assert.match(formScript, /corporate_enquiry/);
+  assert.doesNotMatch(formScript + formMarkup, /captcha/i);
 });
 
 test("corporate page names resin-art gifts and keeps a compact studio photo strip", () => {
@@ -232,17 +241,14 @@ test("action=corporate saves one enquiry for a valid JSON body and replays safel
   assert.match(corporatePost(runtime, validForm({ brief: "A different brief that is long enough to be valid." })).errors.enquiryId, /conflict/i);
 });
 
-test("action=corporate still requires a captcha token that verifies for the corporate action", () => {
+test("action=corporate submits without a captcha token, ignores a left-over one and never calls reCAPTCHA", () => {
   const missing = makeRuntime();
   const body = validForm(); delete body.captchaToken;
-  assert.match(corporatePost(missing, body).errors.captcha, /Captcha/);
-  const rejected = makeRuntime({ captchaResponse: { success: false, hostname: "saloniresinart.com", action: "corporate_enquiry", score: 0.9 } });
-  assert.match(corporatePost(rejected, validForm()).errors.captcha, /Captcha/);
-  const wrongAction = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 } });
-  assert.match(corporatePost(wrongAction, validForm()).errors.captcha, /Captcha/);
-  const wrongHost = makeRuntime({ captchaResponse: { success: true, hostname: "localhost", action: "corporate_enquiry", score: 0.9 } });
-  assert.match(corporatePost(wrongHost, validForm()).errors.captcha, /Captcha/);
-  [missing, rejected, wrongAction, wrongHost].forEach((runtime) => assert.equal(runtime.state.appendCalls, 0));
+  assert.equal(corporatePost(missing, body).ok, true);
+  const stale = makeRuntime();
+  assert.equal(corporatePost(stale, validForm({ captchaToken: "left-over-token" })).ok, true);
+  [missing, stale].forEach((runtime) => { assert.equal(runtime.state.appendCalls, 1); assert.equal(runtime.state.fetchCalls, 0); });
+  assert.equal(JSON.stringify(stale.rows[0]).includes("left-over-token"), false);
 });
 
 test("action=corporate keeps validation, the kill switch and drops unknown fields", () => {
