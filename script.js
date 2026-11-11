@@ -361,9 +361,9 @@
       }
       fetchPublicReviews(productReviewsUrl, function (data) {
         productReviewsRefreshing = false;
-        if (!data && saved) { productReviewsWaiters = []; return; }
+        if (!data && saved) { productReviewsWaiters = []; productReviewsWaiting = false; return; }
         // Same feed as the saved copy: renew the copy and leave what is on screen alone.
-        if (data && saved && JSON.stringify(data) === JSON.stringify(saved)) { saveReviews(productReviewsUrl, data); productReviewsWaiters = []; return; }
+        if (data && saved && JSON.stringify(data) === JSON.stringify(saved)) { saveReviews(productReviewsUrl, data); productReviewsWaiters = []; productReviewsWaiting = false; return; }
         productReviewsFailed = !data;
         productReviewsData = data || { reviews: [] };
         if (data) saveReviews(productReviewsUrl, data);
@@ -2641,12 +2641,14 @@
     }
 
     // Seed the order form in the background shortly after the cart settles, so Order now can open it instantly.
-    function scheduleCatalogueSelectionPrepare() {
+    // onlyIfIdle: an automatic prepare that must never replace a form the shopper already has.
+    function scheduleCatalogueSelectionPrepare(onlyIfIdle) {
       cancelScheduledCataloguePrepare();
-      if (!configured || !selectedCatalogueItems.length) return;
+      if (!configured || !selectedCatalogueItems.length || (onlyIfIdle && frameState.loaded)) return;
       frameState.catalogueSeedTimer = window.setTimeout(function () {
         frameState.catalogueSeedTimer = null;
         if (orderDialogEnabled && orderDialog.open) return;
+        if (onlyIfIdle && frameState.loaded) return;
         prepareCatalogueSelection();
       }, CATALOGUE_PREPARE_DELAY_MS);
     }
@@ -2788,7 +2790,7 @@
       var savedCartObserver = new IntersectionObserver(function (entries) {
         if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
         savedCartObserver.disconnect();
-        scheduleCatalogueSelectionPrepare();
+        scheduleCatalogueSelectionPrepare(true);
       }, { rootMargin: "300px 0px" });
       savedCartObserver.observe(catalogueSelection);
     }

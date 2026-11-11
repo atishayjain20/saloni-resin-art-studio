@@ -1382,6 +1382,38 @@ test("a saved cart is prepared when its section nears the screen, not on every p
   assert.equal(flow.orderDialog.open, true);
 });
 
+test("scrolling to a saved cart never replaces a form the shopper already opened and closed", () => {
+  const observers = [];
+  const flow = runFlow({ storage: savedCartStorage(), observers });
+  flow.premiumQuoteButtons[0].dispatch("click");
+  assert.equal(flow.orderDialog.open, true);
+  assert.equal(flow.posted.length, 1);
+  const quoteRequestId = submittedSeed(flow.posted).requestId;
+  flow.orderDialog.close();
+  assert.equal(flow.continueOrder.hidden, false, "Continue your request is offered");
+  const observer = observers.find((item) => item.targets.includes(flow.catalogueSelection));
+  observer.callback([{ isIntersecting: true }], observer);
+  assert.equal(flow.pendingCataloguePrepares().length, 0, "nothing is scheduled while a form already exists");
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 1, "no second seed replaces the quote form");
+  flow.continueOrder.dispatch("click");
+  assert.equal(flow.orderDialog.open, true);
+  assert.equal(flow.posted.length, 1);
+  assert.equal(submittedSeed(flow.posted).requestId, quoteRequestId, "Continue your request still opens the quote form");
+});
+
+test("a saved cart prepare that is waiting is dropped when another form is opened first", () => {
+  const observers = [];
+  const flow = runFlow({ storage: savedCartStorage(), observers });
+  const observer = observers.find((item) => item.targets.includes(flow.catalogueSelection));
+  observer.callback([{ isIntersecting: true }], observer);
+  assert.equal(flow.pendingCataloguePrepares().length, 1);
+  flow.premiumQuoteButtons[0].dispatch("click");
+  flow.orderDialog.close();
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 1, "only the quote seed was sent");
+});
+
 test("an empty cart or a browser without IntersectionObserver never prepares a saved cart on load", () => {
   const observers = [];
   const empty = runFlow({ observers });
