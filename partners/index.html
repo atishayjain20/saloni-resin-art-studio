@@ -14,8 +14,9 @@
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
   <title>Partner Circle | Saloni Resin Art Studio</title>
-  <link rel="stylesheet" href="../styles.css?v=20261160">
-  <script class="site-script" src="../script.js?v=20261160" defer></script>
+  <link rel="stylesheet" href="../styles.css?v=20261161">
+  <script class="site-script" src="../script.js?v=20261161" defer></script>
+  <script class="public-forms-script" src="../public-forms.js?v=20261161" defer></script>
 </head>
 <body class="partner-page">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -62,11 +63,34 @@
     </section>
     <section class="partner-apply shell" id="apply" aria-labelledby="apply-title">
       <div class="partner-apply-copy"><p class="eyebrow">Start here</p><h2 id="apply-title">Apply to join the Circle.</h2><p>Do not send bank or UPI details, identity documents, passwords, or payment credentials here. Saloni will contact partners privately about payout details.</p></div>
-      <div class="order-panel order-form-panel" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec" data-form-mode="partner">
+      <div class="page-form">
         <p class="panel-label">Partner application</p>
-        <p class="panel-note">The application opens below. Your entries stay in the form if a verification or network retry is needed.</p>
-        <div class="order-form-status" id="order-form-status" role="status" aria-live="polite">Loading the partner application…</div>
-        <iframe id="order-form-frame" name="saloni-partner-form-frame" title="Saloni Resin Art Studio partner application form" loading="lazy" hidden></iframe>
+        <form id="partner-form" aria-label="Partner application" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec" data-captcha-site-key="6Lcyc_YtAAAAAH9NRP14nKWeaeVcIBXs5PwrhmT3" novalidate>
+          <fieldset><legend>About you</legend><div class="grid">
+            <label for="applicant-name">Your name <input id="applicant-name" name="applicantName" maxlength="120" autocomplete="name" required></label>
+            <label for="business-name">Business or public name <input id="business-name" name="businessName" maxlength="160" autocomplete="organization" required></label>
+            <label for="category">Your category <select id="category" name="category" required><option value="">Choose one</option><option>Photographer</option><option>Planner</option><option>Decorator</option><option>Florist</option><option>Gift shop</option><option>Creator</option><option>Other</option></select></label>
+            <label for="service-area">City or service area <input id="service-area" name="serviceArea" maxlength="160" autocomplete="address-level2" required></label>
+            <label for="phone">Phone or WhatsApp <input id="phone" name="phone" maxlength="40" autocomplete="tel" inputmode="tel" required></label>
+            <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
+            <label for="website">Instagram or website (optional) <input id="website" name="website" maxlength="500" type="url" inputmode="url" placeholder="https://"></label>
+          </div></fieldset>
+          <fieldset><legend>Your referrals</legend>
+            <label for="typical-customers">Who do you usually help? <textarea id="typical-customers" name="typicalCustomers" maxlength="1000" required></textarea></label>
+            <label for="referral-plan">How would you share Saloni's work? <textarea id="referral-plan" name="referralPlan" maxlength="1000" required></textarea></label>
+          </fieldset>
+          <fieldset><legend>Consent</legend>
+            <div class="hint"><strong>Partner Circle rules:</strong> you get your referral link right after you apply, and Saloni may pause or close a partnership; eligible commission is 10% of the final product subtotal excluding shipping after payment and delivery; review and payout happen monthly by hand; cancelled, refunded, duplicate, test, self-referred, and void orders earn nothing; supported basic personalisation is free when the design allows it; a paused or closed code stops new credit without rewriting past orders. <a href="#rules">Read the full rules</a>.</div>
+            <label><input id="rules-accepted" name="rulesAccepted" type="checkbox" value="true" required> I accept these Partner Circle rules and the privacy notice. I understand commission review and payout are manual.</label>
+            <p class="hint">Please do not send bank or UPI details, identity documents, passwords, or payment credentials here.</p>
+          </fieldset>
+          <input id="application-id" name="applicationId" type="hidden">
+          <p id="form-status" class="status" role="status" aria-live="polite"></p>
+          <div id="referral-result" class="referral-result" hidden></div>
+          <div class="actions"><button id="submit-button" type="submit">Send application</button><button id="another-button" type="button" hidden>Start another application</button></div>
+          <p class="privacy">Application contact details are kept in the studio's private Google Sheet for review. Pending, rejected, and withdrawn applications follow a status-based 90-day cleanup; approved application details are copied to the private Partners tab and then removed from the application tab within 7 days. Active partner contact details remain while the relationship is active. Retained commission and payout records are private business records.</p>
+        </form>
+        <noscript><p class="status error">This form needs JavaScript. To apply without it, call Saloni at <a href="tel:+918209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.</p></noscript>
       </div>
     </section>
   </main>

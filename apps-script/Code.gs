@@ -90,9 +90,11 @@ function doPost(event) {
   var action = String(parameters.action || "");
   var mode = boundedMode_(parameters.mode);
   if (action === "rate") return ContentService.createTextOutput(JSON.stringify(submitQuickRating_(parameters))).setMimeType(ContentService.MimeType.JSON);
-  // The order form now lives in the site itself and talks to these two JSON actions; "seed" below stays so older cached pages keep working.
+  // The order, partner and corporate forms live in the site itself and talk to these JSON actions; "seed" below stays so older cached pages keep working.
   if (action === "order") return json_(orderFromPost_(event));
   if (action === "referral") return json_(referralFromPost_(event));
+  if (action === "partner") return json_(partnerFromPost_(event));
+  if (action === "corporate") return json_(corporateFromPost_(event));
   if (action === "seed") {
     var seed = parseSeed_(parameters.seed);
     seed.formMode = mode;
@@ -151,6 +153,28 @@ function orderFromPost_(event) {
     return { ok: false, error: "unconfirmed" };
   }
 }
+
+var PARTNER_POST_FIELDS = [
+  "applicationId", "applicantName", "businessName", "category", "serviceArea", "phone", "email", "website",
+  "typicalCustomers", "referralPlan", "rulesAccepted", "captchaToken"
+];
+var CORPORATE_POST_FIELDS = [
+  "enquiryId", "organisationName", "contactName", "phone", "email", "enquiryType", "occasion", "approximateQuantity",
+  "budgetRange", "requiredDate", "deliveryScope", "brief", "privacyAccepted", "captchaToken"
+];
+
+// The Partner Circle and Corporate pages post JSON too. Only the fields the submit function reads are copied; the captcha check,
+// validation, caps, kill switches, lock and replay handling all stay inside submitPartnerApplication / submitCorporateEnquiry.
+function submitFromPost_(event, fields, submit) {
+  var body;
+  try { body = postedJson_(event); } catch (parseError) { return { ok: false, error: "invalid" }; }
+  var form = {};
+  fields.forEach(function (field) { if (body[field] !== undefined && body[field] !== null) form[field] = body[field]; });
+  try { return submit(form); } catch (error) { return { ok: false, error: "unconfirmed" }; }
+}
+
+function partnerFromPost_(event) { return submitFromPost_(event, PARTNER_POST_FIELDS, submitPartnerApplication); }
+function corporateFromPost_(event) { return submitFromPost_(event, CORPORATE_POST_FIELDS, submitCorporateEnquiry); }
 
 function referralFromPost_(event) {
   try { return validateReferralCode(postedJson_(event).code); } catch (error) { return { status: "error", code: "" }; }

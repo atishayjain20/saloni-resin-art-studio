@@ -1626,9 +1626,9 @@ test("a review announced by the pinned form triggers no feed fetch and no second
   assert.equal(page.posted.length, 1, "the success message in the iframe is not replaced");
 });
 
-test("the Reviews page keeps the other form modes and the page chrome untouched", () => {
-  assert.match(siteScript, /requestedMode === "partner" \|\| requestedMode === "corporate" \|\| requestedMode === "review"/);
-  assert.match(siteScript, /frameState\.mode === "review" \? "review_submission"/);
+test("the Reviews page is the only page left on the iframe form path and the page chrome is untouched", () => {
+  assert.match(siteScript, /!frame && requestedMode === "review"/);
+  assert.match(siteScript, /var captchaAction = "review_submission"/);
   assert.doesNotMatch(siteScript, /loadReviewPage|REVIEW_CONTACT|saloni-review-submitted/, "the review-page list and its reload are gone");
   assert.match(siteScript, /\n  function renderReviews\(data\)/, "the list renderer is shared at the top level");
   assert.doesNotThrow(() => new vm.Script(siteScript));
