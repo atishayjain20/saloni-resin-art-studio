@@ -296,11 +296,12 @@
       if (customizer) input.setAttribute("required", "required"); else input.removeAttribute("required");
     });
   }
-  function productImagePath() {
-    // The seed now comes from this page, so a plain image file name is enough; ids such as general-custom-gift have no photo.
-    var match = /^catalogue:([A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:webp|jpe?g|png))$/i.exec(String(seed.sourceId || ""));
+  // A plain image file name is enough; ids such as general-custom-gift have no photo.
+  function catalogueImagePath(sourceId) {
+    var match = /^catalogue:([A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:webp|jpe?g|png))$/i.exec(String(sourceId || ""));
     return match ? "assets/" + match[1] : "";
   }
+  function productImagePath() { return catalogueImagePath(seed.sourceId); }
   function applyProductContext() {
     var bundle = isBundle();
     if (bundle) {
@@ -579,6 +580,30 @@
     setStatus(general || message, "error");
     focusFirstError(errors);
   }
+  // What "My orders" keeps about a confirmed request: no contact details, address, images or referral code.
+  function myOrderSummary(result) {
+    var items;
+    var notes;
+    if (isBundle() && bundleItems.length) {
+      items = sortedBundleItems(bundleItems).map(function (item) {
+        return { name: item.productName, quantity: bundleQuantity(item), price: item.price, image: catalogueImagePath(item.sourceId) };
+      });
+      notes = bundleNotesFromField(value("designDetails"));
+    } else {
+      var quantity = Number(value("quantity"));
+      items = [{ name: value("productName").trim(), quantity: Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 1, price: String(seed.price || "").trim(), image: catalogueImagePath(seed.sourceId) }];
+      // The field starts with the pre-filled design text; only what the shopper added is their note.
+      var details = value("designDetails");
+      var prefilled = String(seed.designDetails || "");
+      notes = prefilled && details.indexOf(prefilled) === 0 ? details.slice(prefilled.length) : details === prefilled ? "" : details;
+    }
+    return { requestId: String(result && result.requestId || value("requestId")), items: items, fulfillment: value("fulfillment"), notes: String(notes || "").trim().slice(0, 300).trim() };
+  }
+  function saveMyOrder(result) {
+    var store = window.saloniMyOrders;
+    if (!store || typeof store.save !== "function") return;
+    try { store.save(myOrderSummary(result)); } catch (error) {}
+  }
   function showSuccess(result, attempt) {
     if (attempt && !isCurrent(attempt)) return;
     restoreSubmitState(attempt);
@@ -589,6 +614,7 @@
     if (onSent) {
       try { onSent(repeatProfileFromForm()); } catch (error) {}
     }
+    saveMyOrder(result);
     // A visual "it worked" moment, so shoppers know without reading; the status text stays the accessible message.
     if (celebration) celebration.hidden = false;
     setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed." + referralMessage + " Request ID: " + result.requestId, "success");

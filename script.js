@@ -1909,7 +1909,7 @@
         sourceKind: source.sourceKind || "catalogue", sourceId: source.sourceId || "",
         productName: source.productName || "", requestStage: "quote", quantity: source.quantity || "1", dimensionFormat: "feet-inches",
         heightFeet: heightParts ? heightParts.feet : "", heightInchesPart: heightParts ? heightParts.inches : "", widthFeet: widthParts ? widthParts.feet : "", widthInchesPart: widthParts ? widthParts.inches : "",
-        height: source.height || "", heightUnit: source.heightUnit || "",
+        price: source.price || "", height: source.height || "", heightUnit: source.heightUnit || "",
         width: source.width || "", widthUnit: source.widthUnit || "", designDetails: source.designDetails || "",
         customerName: repeatProfile ? repeatProfile.customerName : "", phone: repeatProfile ? repeatProfile.phone : "", email: "", fulfillment: repeatProfile ? repeatProfile.fulfillment : "shipping", shippingAddress: repeatProfile ? repeatProfile.shippingAddress : "", city: repeatProfile ? repeatProfile.city : "", state: repeatProfile ? repeatProfile.state : "", pin: repeatProfile ? repeatProfile.pin : "", requestedDate: "", referralCode: readReferralCode()
       };

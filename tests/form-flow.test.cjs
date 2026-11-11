@@ -1497,3 +1497,111 @@ test("the success celebration is decorative, animated, and still for reduced mot
   assert.match(html, /@keyframes success-draw/);
   assert.match(html, /@media \(prefers-reduced-motion: reduce\)[^@]*\.success-celebration[^}]*animation:\s*none/);
 });
+
+// --- My orders: the form hands a confirmed order summary to window.saloniMyOrders.save ---
+function watchMyOrders(runtime) {
+  const saved = [];
+  runtime.windowObject.saloniMyOrders = { save(summary) { saved.push(JSON.parse(JSON.stringify(summary))); return true; } };
+  return saved;
+}
+
+test("My orders: a confirmed single catalogue request is saved once with its name, quantity, photo, price, fulfilment and typed notes", async () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp", seedOverrides: { price: "Rs 899" } });
+  const saved = watchMyOrders(runtime);
+  fillValid(runtime.fields);
+  runtime.fields.quantity.value = "2";
+  runtime.fields.designDetails.value = "Details\n  Please add the name Asha  ";
+  runtime.fields.email.value = "private@example.com";
+  runtime.fields.referralCode.value = "FRIEND10";
+  submitOrderForm(runtime);
+  assert.equal(saved.length, 0, "nothing is saved while the request is still being sent");
+  await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0], {
+    requestId: "request-seed",
+    items: [{ name: "Test frame", quantity: 2, price: "Rs 899", image: "assets/romantic-heart-trinket-tray.webp" }],
+    fulfillment: "pickup",
+    notes: "Please add the name Asha",
+  });
+});
+
+test("My orders: a cart order saves every item of the bundle with its own thumbnail and edited quantity", async () => {
+  const runtime = cartRuntime();
+  const saved = watchMyOrders(runtime);
+  const quantity = runtime.elements.get("bundle-items").children[1].querySelector("input");
+  quantity.value = "3"; quantity.dispatch("change");
+  runtime.fields.designDetails.value = "Warm colours";
+  runtime.fields.designDetails.dispatch("input");
+  await submitAndSend(runtime);
+  await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0].items, [
+    { name: "One", quantity: 1, price: "249", image: "assets/one.webp" },
+    { name: "Two", quantity: 3, price: "399", image: "assets/two.webp" },
+  ]);
+  assert.equal(saved[0].notes, "Warm colours");
+});
+
+test("My orders: general and customizer requests save the product name shown in the form, with no photo", async () => {
+  for (const options of [{ sourceId: "catalogue:general-custom-gift", productName: "Custom gift enquiry" }, { sourceKind: "customizer", sourceId: "customizer:resin-frame", productName: "Custom resin frame", previewExpected: false }]) {
+    const runtime = makeFormRuntime(options);
+    const saved = watchMyOrders(runtime);
+    fillValid(runtime.fields);
+    runtime.fields.productName.value = options.productName;
+    runtime.fields.designDetails.value = "Details";
+    submitOrderForm(runtime);
+    await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+    assert.equal(saved.length, 1);
+    assert.deepEqual(saved[0].items, [{ name: options.productName, quantity: 1, price: "", image: "" }]);
+    assert.equal(saved[0].notes, "", "the pre-filled design text is not the shopper's note");
+  }
+});
+
+test("My orders: nothing is saved when the send fails, is unconfirmed, or the server returns field errors", async () => {
+  const outcomes = [
+    (runtime) => runtime.callbacks[0].failure(new Error("network")),
+    (runtime) => runtime.callbacks[0].success({ ok: false }),
+    (runtime) => runtime.callbacks[0].success({ errors: { phone: "bad" } }),
+    (runtime) => runtime.callbacks[0].success(null),
+  ];
+  for (const outcome of outcomes) {
+    const runtime = makeFormRuntime();
+    const saved = watchMyOrders(runtime);
+    fillValid(runtime.fields);
+    submitOrderForm(runtime);
+    await outcome(runtime);
+    assert.equal(saved.length, 0);
+  }
+});
+
+test("My orders: the saved summary carries no phone, email, address, PIN, image data or referral code, and a storage error never breaks the success screen", async () => {
+  const runtime = makeFormRuntime();
+  const saved = watchMyOrders(runtime);
+  fillValid(runtime.fields);
+  Object.assign(runtime.fields.shippingAddress, { value: "61 Hathi Bhata" });
+  runtime.fields.email.value = "private@example.com";
+  runtime.fields.referralCode.value = "FRIEND10";
+  submitOrderForm(runtime);
+  await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now", referralCode: "FRIEND10" });
+  const text = JSON.stringify(saved[0]);
+  assert.deepEqual(Object.keys(saved[0]).sort(), ["fulfillment", "items", "notes", "requestId"]);
+  for (const secret of ["8209238541", "private@example.com", "Hathi", "305001", "FRIEND10", "A Customer"]) assert.ok(!text.includes(secret), secret);
+
+  const throwing = makeFormRuntime();
+  throwing.windowObject.saloniMyOrders = { save() { throw new Error("storage denied"); } };
+  fillValid(throwing.fields);
+  submitOrderForm(throwing);
+  await throwing.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(throwing.elements.get("success-celebration").hidden, false);
+  assert.match(throwing.status.textContent, /Request received/);
+});
+
+test("My orders: notes are trimmed and capped at 300 characters", async () => {
+  const runtime = makeFormRuntime({ seedOverrides: { designDetails: "" } });
+  const saved = watchMyOrders(runtime);
+  fillValid(runtime.fields);
+  runtime.fields.designDetails.value = "  " + "n".repeat(500) + "  ";
+  submitOrderForm(runtime);
+  await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(saved[0].notes, "n".repeat(300));
+});

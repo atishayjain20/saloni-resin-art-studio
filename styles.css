@@ -468,6 +468,32 @@ dialog.lightbox-dialog:not([open]) { display: none; }
 dialog.order-dialog:not([open]) { display: none; }
 dialog.order-dialog { width: min(760px, calc(100vw - 2rem)); max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); padding: 0; border: 0; background: transparent; color: var(--ink); }
 dialog.order-dialog::backdrop { background: rgba(42, 14, 31, .72); }
+dialog.my-orders-dialog:not([open]) { display: none; }
+dialog.my-orders-dialog { width: min(680px, calc(100vw - 2rem)); max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); padding: 0; border: 0; background: transparent; color: var(--ink); }
+dialog.my-orders-dialog::backdrop { background: rgba(42, 14, 31, .72); }
+.my-orders-panel { position: relative; width: 100%; max-height: calc(100dvh - 2rem); overflow: auto; overscroll-behavior: contain; padding: clamp(2.8rem, 4vw, 3.5rem) clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 1.5rem); border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }
+.my-orders-title { margin: 0 0 .5rem; color: var(--ink); font: 500 clamp(1.6rem, 4vw, 2.2rem)/1.1 var(--display); }
+.my-orders-note, .my-orders-empty p, .my-orders-contact p, .my-orders-confirm p { margin: 0 0 .8rem; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+.my-orders-empty { padding: 1rem 0 .5rem; }
+.my-orders-list { display: grid; gap: .9rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.my-order { padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .9rem; background: #fff; }
+.my-order-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .2rem .8rem; margin-bottom: .6rem; font-size: .78rem; }
+.my-order-time { color: var(--ink); font-weight: 800; }
+.my-order-id { min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.my-order-items { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
+.my-order-item { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.my-orders-thumb { flex: none; display: block; width: 3.5rem; height: 3.5rem; object-fit: cover; border-radius: .6rem; background: #fffaf4; }
+.my-order-item-copy { display: grid; min-width: 0; gap: .1rem; }
+.my-order-item-name { color: var(--ink); font-size: .9rem; font-weight: 800; overflow-wrap: anywhere; }
+.my-order-item-detail { color: var(--muted); font-size: .8rem; }
+.my-order-meta, .my-order-notes, .my-order-status { margin: .6rem 0 0; font-size: .8rem; line-height: 1.45; overflow-wrap: anywhere; }
+.my-order-meta { color: var(--ink); font-weight: 800; }
+.my-order-notes { color: var(--muted); }
+.my-order-status { color: var(--rose-ink); font-weight: 800; }
+.my-orders-contact, .my-orders-clear { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.my-orders-contact p, .my-orders-confirm p { flex: 1 1 100%; margin: 0; }
+.my-orders-confirm { display: flex; flex: 1 1 100%; flex-wrap: wrap; gap: .6rem; }
+.my-orders-contact[hidden], .my-orders-clear[hidden], .my-orders-confirm[hidden], .my-orders-empty[hidden], .my-orders-list[hidden] { display: none; }
 .order-dialog-panel { position: relative; width: 100%; max-height: calc(100dvh - 2rem); overflow: auto; overscroll-behavior: contain; padding: clamp(2.8rem, 4vw, 3.5rem) clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 1.5rem); border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }
 .order-dialog-close-form { position: sticky; z-index: 2; top: 0; display: flex; justify-content: flex-end; height: 44px; margin: -2.8rem -1rem 1rem; }
 .order-dialog-close { position: static; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--ivory); color: var(--ink); font-size: 1.4rem; line-height: 1; }
@@ -689,7 +715,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
     padding: 0;
     border: 0;
     background: transparent;
-  }
+  }  .my-orders-contact .button, .my-orders-clear > .button, .my-orders-confirm .button { flex: 1 1 100%; justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -924,6 +950,7 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   dialog.order-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; overflow: hidden; }
   .order-dialog-panel { display: flex; flex-direction: column; width: 100%; height: 100dvh; max-height: 100dvh; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); border-radius: 0; box-shadow: none; }
   .order-dialog-close-form { position: static; flex: 0 0 auto; height: auto; min-height: 44px; margin: 0; padding: .3rem .6rem; }
+  .my-orders-panel { padding: 0 .9rem .9rem; }
   .order-dialog .order-panel { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; padding: 0 .9rem .9rem; border-radius: 0; background: var(--paper); color: var(--ink); }
   .order-dialog .order-panel .panel-label { margin-bottom: .35rem; color: var(--rose-ink); }
   .order-dialog .selected-product-summary { grid-template-columns: 3.5rem minmax(0, 1fr); gap: .7rem; margin-bottom: .7rem; padding-bottom: .7rem; border-bottom-color: var(--line); }
