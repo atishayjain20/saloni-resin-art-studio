@@ -398,6 +398,7 @@ function makeRuntime(options = {}) {
       state.fileCreates += 1;
       return {
         getUrl: () => "https://drive.google.test/file",
+        getId: () => "file-id-1",
         setTrashed: () => { state.trashed += 1; if (options.cleanupThrows) throw new Error("cleanup failed"); },
       };
     },
@@ -432,10 +433,35 @@ function makeRuntime(options = {}) {
       MimeType: { JSON: "JSON" },
       createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }),
     },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => properties[key] || "" }) },
-    LockService: { getScriptLock: () => lock },
+    PropertiesService: { getScriptProperties: () => ({
+      getProperty: (key) => properties[key] || "",
+      setProperty: (key, value) => {
+        if (options.setPropertyThrows && String(key).startsWith("ORDER_ALERT_Q_")) throw new Error("property write failed");
+        properties[key] = String(value);
+      },
+      deleteProperty: (key) => {
+        if (options.deletePropertyThrows) throw new Error("property delete failed");
+        delete properties[key];
+      },
+      getKeys: () => Object.keys(properties),
+      getProperties: () => Object.assign({}, properties),
+    }) },
+    LockService: {
+      getScriptLock: () => lock,
+      getUserLock: () => ({
+        tryLock: () => { state.userLockTries = (state.userLockTries || 0) + 1; return options.userLockAvailable !== false; },
+        releaseLock: () => { state.userLockReleased = (state.userLockReleased || 0) + 1; },
+      }),
+    },
     SpreadsheetApp: { openById: () => ({ getSheetByName: () => sheet }) },
-    DriveApp: { getFolderById: () => folder, Access: { PRIVATE: "PRIVATE" } },
+    DriveApp: {
+      getFolderById: () => folder, Access: { PRIVATE: "PRIVATE" },
+      getFileById: (id) => {
+        state.fileLookups = (state.fileLookups || []).concat(id);
+        if (options.referenceFileMissing) throw new Error("File not found");
+        return { getUrl: () => "https://drive.google.test/file" };
+      },
+    },
     Drive: { Files: { remove: (id) => {
       state.driveDeletes.push(id);
       if (options.driveDeleteThrows) throw new Error("file delete failed");
@@ -449,6 +475,7 @@ function makeRuntime(options = {}) {
       newTrigger: (handler) => {
         const builder = {
           timeBased() { return builder; },
+          everyMinutes(minutes) { state.triggerConfig = Object.assign(state.triggerConfig || {}, { handler, everyMinutes: minutes }); return builder; },
           everyDays(days) { state.triggerConfig = Object.assign(state.triggerConfig || {}, { handler, everyDays: days }); return builder; },
           atHour(hour) { state.triggerConfig = Object.assign(state.triggerConfig || {}, { atHour: hour }); return builder; },
           create() { state.triggerCreates += 1; (options.triggers || (options.triggers = [])).push({ getHandlerFunction: () => handler }); return options.triggers.at(-1); },
@@ -458,7 +485,7 @@ function makeRuntime(options = {}) {
     },
     MailApp: { sendEmail: (message) => {
       state.emails.push({ message, lockHeld: state.locked });
-      if (options.mailThrows) throw new Error("mail failed");
+      if (options.mailThrows) throw new Error(typeof options.mailThrows === "string" ? options.mailThrows : "mail failed");
     } },
     UrlFetchApp: { fetch: (url, params) => {
       if (String(url).startsWith("https://api.callmebot.com/")) {
@@ -497,7 +524,7 @@ function makeRuntime(options = {}) {
   };
   vm.createContext(runtimeContext);
   vm.runInContext(source, runtimeContext, { filename: "Code.gs" });
-  return { context: runtimeContext, state, rows, headers };
+  return { context: runtimeContext, state, rows, headers, properties };
 }
 
 function retentionRow(requestId, receivedAt, referenceFileLink = "") {
@@ -1095,6 +1122,210 @@ test("testOrderAlerts refuses a web visitor or a different user and sends nothin
   }
   const runtime = makeRuntime();
   assert.equal(/testOrderAlerts/.test(runtime.context.doGet.toString() + runtime.context.doPost.toString()), false);
+});
+
+// --- Queued order alerts (alerts sent by a 1-minute trigger, not during the shopper's request) ---
+const QUEUE_PREFIX = "ORDER_ALERT_Q_";
+const queueKeys = (runtime) => Object.keys(runtime.properties).filter((key) => key.startsWith(QUEUE_PREFIX));
+const QUEUED_PROPERTIES = Object.assign({ ORDER_ALERT_QUEUE_READY: "true" }, ALERT_PROPERTIES);
+
+function queuedJob(runtime, requestId, overrides = {}) {
+  const payload = runtime.context.collectPayload_(alertForm({ requestId }));
+  const stored = {};
+  for (const [name, value] of Object.entries(payload)) if (name !== "referenceImage") stored[name] = value;
+  return JSON.stringify(Object.assign({ p: stored, r: "2026-11-10T08:00:00.000Z", f: "", a: 0, w: 0 }, overrides));
+}
+
+test("queue mode: a new order stores one alert property and sends nothing during the request", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES });
+  const result = runtime.context.submitOrder(alertForm({ referenceImage: imageBlob() }));
+  assert.equal(result.ok, true);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.emails.length, 0);
+  assert.equal(runtime.state.whatsappFetches.length, 0);
+  assert.deepEqual(queueKeys(runtime), [QUEUE_PREFIX + "request-1234567890"]);
+  const job = JSON.parse(runtime.properties[QUEUE_PREFIX + "request-1234567890"]);
+  assert.equal(job.p.customerName, "Priya Sharma");
+  assert.equal(job.f, "file-id-1");
+  assert.equal(job.a, 0);
+  assert.ok(!isNaN(Date.parse(job.r)));
+  assert.equal("referenceImage" in job.p, false);
+});
+
+test("not-ready mode sends the alerts immediately as before and queues nothing", () => {
+  for (const flag of [{}, { ORDER_ALERT_QUEUE_READY: "false" }, { ORDER_ALERT_QUEUE_READY: "" }]) {
+    const runtime = makeRuntime({ properties: Object.assign({}, ALERT_PROPERTIES, flag) });
+    assert.equal(runtime.context.submitOrder(alertForm()).ok, true);
+    assert.equal(runtime.state.emails.length, 1);
+    assert.equal(runtime.state.whatsappFetches.length, 1);
+    assert.equal(queueKeys(runtime).length, 0);
+  }
+});
+
+test("a failed property write falls back to an immediate alert and the order still succeeds", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES, setPropertyThrows: true });
+  const result = runtime.context.submitOrder(alertForm());
+  assert.equal(result.ok, true);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.emails.length, 1);
+  assert.equal(runtime.state.whatsappFetches.length, 1);
+  assert.equal(queueKeys(runtime).length, 0);
+});
+
+test("more than 30 queued alerts means the trigger is broken, so new orders send immediately", () => {
+  const properties = Object.assign({}, QUEUED_PROPERTIES);
+  for (let index = 0; index < 31; index += 1) properties[QUEUE_PREFIX + "old-request-" + index] = "{}";
+  const runtime = makeRuntime({ properties });
+  assert.equal(runtime.context.submitOrder(alertForm()).ok, true);
+  assert.equal(runtime.state.emails.length, 1);
+  assert.equal(queueKeys(runtime).length, 31);
+  const atLimit = Object.assign({}, QUEUED_PROPERTIES);
+  for (let index = 0; index < 30; index += 1) atLimit[QUEUE_PREFIX + "old-request-" + index] = "{}";
+  const queued = makeRuntime({ properties: atLimit });
+  queued.context.submitOrder(alertForm());
+  assert.equal(queued.state.emails.length, 0);
+  assert.equal(queueKeys(queued).length, 31);
+});
+
+test("a replay of the same request never queues or sends a second alert", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES });
+  assert.equal(runtime.context.submitOrder(alertForm()).ok, true);
+  assert.equal(queueKeys(runtime).length, 1);
+  const first = runtime.properties[queueKeys(runtime)[0]];
+  runtime.context.sendQueuedOrderAlerts_();
+  assert.equal(runtime.state.emails.length, 1);
+  assert.equal(runtime.context.submitOrder(alertForm()).ok, true);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(queueKeys(runtime).length, 0);
+  assert.equal(runtime.state.emails.length, 1);
+  assert.ok(first);
+});
+
+test("the sender emails the full details, then deletes the property, oldest order first", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES, folderFiles: [] });
+  runtime.properties[QUEUE_PREFIX + "newer-request-2"] = queuedJob(runtime, "newer-request-2", { r: "2026-11-10T09:00:00.000Z", f: "file-9" });
+  runtime.properties[QUEUE_PREFIX + "older-request-1"] = queuedJob(runtime, "older-request-1");
+  assert.equal(runtime.context.sendQueuedOrderAlerts_(), 2);
+  assert.equal(runtime.state.emails.length, 2);
+  assert.match(runtime.state.emails[0].message.body, /Request ID: older-request-1/);
+  assert.match(runtime.state.emails[1].message.body, /Request ID: newer-request-2/);
+  assert.match(runtime.state.emails[0].message.body, /Customer: Priya Sharma/);
+  assert.match(runtime.state.emails[0].message.body, /Ship to: 12 Secret Lane, Jaipur, Rajasthan, 302001/);
+  assert.match(runtime.state.emails[1].message.body, /Reference image: https:\/\/drive\.google\.test\/file/);
+  assert.equal(runtime.state.whatsappFetches.length, 2);
+  assert.equal(queueKeys(runtime).length, 0);
+  assert.equal(runtime.properties.ORDER_ALERT_QUEUE_READY, "true", "flag and other settings are never touched");
+  assert.equal(runtime.properties.ORDER_ALERT_EMAIL, "saloni@example.com");
+  assert.equal(runtime.context.sendQueuedOrderAlerts_(), 0);
+  assert.equal(runtime.state.emails.length, 2, "nothing is sent twice");
+});
+
+test("end to end: queue during submit, the sender then sends exactly one email and one WhatsApp", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES });
+  runtime.context.submitOrder(alertForm());
+  runtime.context.sendQueuedOrderAlerts_();
+  runtime.context.sendQueuedOrderAlerts_();
+  assert.equal(runtime.state.emails.length, 1);
+  assert.equal(runtime.state.whatsappFetches.length, 1);
+  assert.equal(runtime.state.emails[0].message.to, "saloni@example.com");
+  assert.match(runtime.state.emails[0].message.subject, /New order: Resin photo frame/);
+});
+
+test("an email failure keeps the alert, counts the attempt, and gives up after 5 tries", () => {
+  const options = { properties: QUEUED_PROPERTIES, mailThrows: true };
+  const runtime = makeRuntime(options);
+  runtime.properties[QUEUE_PREFIX + "request-failing-1"] = queuedJob(runtime, "request-failing-1");
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    assert.equal(runtime.context.sendQueuedOrderAlerts_(), 0);
+    const job = JSON.parse(runtime.properties[QUEUE_PREFIX + "request-failing-1"]);
+    assert.equal(job.a, attempt);
+  }
+  assert.equal(runtime.state.whatsappFetches.length, 1, "WhatsApp is best effort and is not repeated on retries");
+  runtime.context.sendQueuedOrderAlerts_();
+  assert.equal(queueKeys(runtime).length, 0, "customer details are not kept forever");
+  assert.ok(runtime.state.logs.some((line) => /Gave up on order alert request-/.test(line)));
+  assert.equal(runtime.state.logs.some((line) => /Priya|9876543210|Secret Lane/.test(line)), false);
+  assert.equal(runtime.state.emails.length, 5);
+});
+
+test("a retry after a failure sends once and then removes the alert", () => {
+  const options = { properties: QUEUED_PROPERTIES, mailThrows: true };
+  const runtime = makeRuntime(options);
+  runtime.properties[QUEUE_PREFIX + "request-retry-12"] = queuedJob(runtime, "request-retry-12");
+  runtime.context.sendQueuedOrderAlerts_();
+  assert.equal(queueKeys(runtime).length, 1);
+  options.mailThrows = false;
+  assert.equal(runtime.context.sendQueuedOrderAlerts_(), 1);
+  assert.equal(queueKeys(runtime).length, 0);
+});
+
+test("a mail quota error keeps every alert, does not count an attempt, and stops the run", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES, mailThrows: "Service invoked too many times for one day: email." });
+  runtime.properties[QUEUE_PREFIX + "request-quota-01"] = queuedJob(runtime, "request-quota-01");
+  runtime.properties[QUEUE_PREFIX + "request-quota-02"] = queuedJob(runtime, "request-quota-02", { r: "2026-11-10T08:05:00.000Z" });
+  assert.equal(runtime.context.sendQueuedOrderAlerts_(), 0);
+  assert.equal(runtime.state.emails.length, 1, "stops after the first quota error");
+  assert.equal(queueKeys(runtime).length, 2);
+  assert.equal(JSON.parse(runtime.properties[QUEUE_PREFIX + "request-quota-01"]).a, 0);
+});
+
+test("a missing reference file still sends the alert, without the link", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES, referenceFileMissing: true });
+  runtime.properties[QUEUE_PREFIX + "request-nofile-01"] = queuedJob(runtime, "request-nofile-01", { f: "gone-file" });
+  assert.equal(runtime.context.sendQueuedOrderAlerts_(), 1);
+  assert.deepEqual(runtime.state.fileLookups, ["gone-file"]);
+  assert.equal(runtime.state.emails.length, 1);
+  assert.doesNotMatch(runtime.state.emails[0].message.body, /Reference image/);
+  assert.equal(queueKeys(runtime).length, 0);
+});
+
+test("an unreadable queued alert is dropped without blocking the others", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES });
+  runtime.properties[QUEUE_PREFIX + "request-broken-1"] = "not json";
+  runtime.properties[QUEUE_PREFIX + "request-good-001"] = queuedJob(runtime, "request-good-001");
+  assert.equal(runtime.context.sendQueuedOrderAlerts_(), 1);
+  assert.equal(queueKeys(runtime).length, 0);
+});
+
+test("the sender skips the run when another run holds the lock, and uses a lock that never blocks orders", () => {
+  const runtime = makeRuntime({ properties: QUEUED_PROPERTIES, userLockAvailable: false });
+  runtime.properties[QUEUE_PREFIX + "request-locked-01"] = queuedJob(runtime, "request-locked-01");
+  assert.equal(runtime.context.sendQueuedOrderAlerts_(), 0);
+  assert.equal(runtime.state.emails.length, 0);
+  assert.equal(queueKeys(runtime).length, 1);
+  assert.equal(runtime.state.locked, false, "the order script lock is never taken by the sender");
+  const free = makeRuntime({ properties: QUEUED_PROPERTIES });
+  free.properties[QUEUE_PREFIX + "request-free-0001"] = queuedJob(free, "request-free-0001");
+  free.context.sendQueuedOrderAlerts_();
+  assert.equal(free.state.userLockReleased, 1);
+});
+
+test("setupOrderAlertQueue installs exactly one 1-minute trigger and then sets the ready flag", () => {
+  const options = { triggers: [], activeEmail: "owner@example.com", effectiveEmail: "owner@example.com" };
+  const runtime = makeRuntime(options);
+  runtime.context.setupOrderAlertQueue();
+  runtime.context.setupOrderAlertQueue();
+  assert.equal(runtime.state.triggerCreates, 1);
+  assert.equal(runtime.state.triggerConfig.handler, "sendQueuedOrderAlerts_");
+  assert.equal(runtime.state.triggerConfig.everyMinutes, 1);
+  assert.equal(runtime.properties.ORDER_ALERT_QUEUE_READY, "true");
+  assert.deepEqual(JSON.parse(JSON.stringify(runtime.state.requiredScopes[0].scopes)), [
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.send_mail",
+    "https://www.googleapis.com/auth/script.external_request",
+  ]);
+});
+
+test("setupOrderAlertQueue refuses a web visitor or another user and changes nothing", () => {
+  for (const emails of [{ activeEmail: "", effectiveEmail: "owner@example.com" }, { activeEmail: "stranger@example.com", effectiveEmail: "owner@example.com" }]) {
+    const runtime = makeRuntime(Object.assign({ triggers: [] }, emails));
+    assert.throws(() => runtime.context.setupOrderAlertQueue(), /Run this from the Apps Script editor as the owner\./);
+    assert.equal(runtime.state.triggerCreates, 0);
+    assert.equal(runtime.properties.ORDER_ALERT_QUEUE_READY, undefined);
+    assert.equal(runtime.state.requiredScopes, undefined);
+  }
+  const runtime = makeRuntime();
+  assert.equal(/setupOrderAlertQueue|sendQueuedOrderAlerts_/.test(runtime.context.doGet.toString() + runtime.context.doPost.toString()), false);
 });
 
 // --- JSON order endpoint used by the order form built into the site ---

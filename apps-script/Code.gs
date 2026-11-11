@@ -793,7 +793,7 @@ function submitOrder(form) {
   } finally {
     lock.releaseLock();
     // Alerts run after the lock is released and never throw or change the result.
-    if (newOrder) notifyNewOrder_(payload, newOrder.receivedAt, newOrder.referenceFile, properties);
+    if (newOrder) dispatchOrderAlert_(payload, newOrder.receivedAt, newOrder.referenceFile, properties);
   }
 }
 
@@ -802,6 +802,141 @@ var ORDER_ALERT_WHATSAPP_PHONE = "918209238541";
 function notifyNewOrder_(payload, receivedAt, referenceFile, properties) {
   try { sendWhatsAppAlert_(payload, properties); } catch (whatsappError) { console.error("WhatsApp order alert failed."); }
   try { sendEmailAlert_(payload, receivedAt, referenceFile, properties); } catch (emailError) { console.error("Email order alert failed."); }
+}
+
+// --- Queued order alerts -------------------------------------------------
+// With ORDER_ALERT_QUEUE_READY=true a saved order only writes one small script property and a 1-minute
+// trigger sends the alert. Any other value (or any queueing problem) sends the alert straight away.
+var ORDER_ALERT_QUEUE_PREFIX = "ORDER_ALERT_Q_"; // not "ORDER_ALERT_": ORDER_ALERT_EMAIL / _QUEUE_READY share that start
+var ORDER_ALERT_QUEUE_LIMIT = 30;
+var ORDER_ALERT_MAX_ATTEMPTS = 5;
+var ORDER_ALERT_BATCH = 20;
+var ORDER_ALERT_FIELDS = ["requestId", "requestStage", "sourceKind", "productName", "quantity", "dimensionFormat",
+  "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "height", "heightUnit", "width", "widthUnit",
+  "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin",
+  "requestedDate", "referralCode"];
+
+function dispatchOrderAlert_(payload, receivedAt, referenceFile, properties) {
+  var queued = false;
+  try { queued = enqueueOrderAlert_(payload, receivedAt, referenceFile, properties); } catch (queueError) {
+    console.error("Could not queue the order alert; sending it now.");
+  }
+  if (!queued) notifyNewOrder_(payload, receivedAt, referenceFile, properties);
+}
+
+// Returns true only when the alert is safely stored for the trigger.
+function enqueueOrderAlert_(payload, receivedAt, referenceFile, properties) {
+  if (!isTrue_(properties.getProperty("ORDER_ALERT_QUEUE_READY"))) return false;
+  var pending = properties.getKeys().filter(function (key) { return key.indexOf(ORDER_ALERT_QUEUE_PREFIX) === 0; });
+  if (pending.length > ORDER_ALERT_QUEUE_LIMIT) return false; // the trigger is probably broken
+  var stored = {};
+  ORDER_ALERT_FIELDS.forEach(function (name) { stored[name] = payload[name]; });
+  properties.setProperty(ORDER_ALERT_QUEUE_PREFIX + payload.requestId, JSON.stringify({
+    p: stored, r: receivedAt.toISOString(), f: referenceFile ? String(referenceFile.getId()) : "", a: 0, w: 0
+  }));
+  return true;
+}
+
+function isMailQuotaError_(error) {
+  return /quota|too many times|limit exceeded/i.test(String(error && error.message || error));
+}
+
+// Time-driven (every minute). Trade-off: a queued alert is deleted only AFTER the email was accepted, so a
+// crash between send and delete can repeat one email (never lose one). After ORDER_ALERT_MAX_ATTEMPTS failures
+// the alert is dropped and logged; the order itself is always in the Sheet.
+function sendQueuedOrderAlerts_() {
+  var lock = LockService.getUserLock(); // not the script lock: sending must never block order intake
+  if (!lock.tryLock(1000)) return 0;
+  var sent = 0;
+  try {
+    var properties = PropertiesService.getScriptProperties();
+    var all = properties.getProperties();
+    var jobs = [];
+    Object.keys(all).forEach(function (key) {
+      if (key.indexOf(ORDER_ALERT_QUEUE_PREFIX) !== 0) return;
+      var job;
+      try { job = JSON.parse(all[key]); } catch (parseError) { job = null; }
+      if (!job || !job.p || !job.r) {
+        console.error("Dropped an unreadable queued order alert.");
+        properties.deleteProperty(key);
+        return;
+      }
+      jobs.push({ key: key, job: job });
+    });
+    jobs.sort(function (a, b) { return a.job.r < b.job.r ? -1 : a.job.r > b.job.r ? 1 : 0; });
+    for (var index = 0; index < jobs.length && index < ORDER_ALERT_BATCH; index += 1) {
+      var outcome = sendQueuedOrderAlert_(jobs[index].key, jobs[index].job, properties);
+      if (outcome === "sent") sent += 1;
+      if (outcome === "quota") break; // every further send would fail too; keep the rest for next minute
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return sent;
+}
+
+function sendQueuedOrderAlert_(key, job, properties) {
+  var payload = collectPayload_(job.p);
+  var receivedAt = new Date(job.r);
+  var referenceFile = null;
+  if (job.f) {
+    try { referenceFile = DriveApp.getFileById(job.f); } catch (fileError) { referenceFile = null; }
+  }
+  if (!job.w) {
+    try { sendWhatsAppAlert_(payload, properties); } catch (whatsappError) { console.error("WhatsApp order alert failed."); }
+    job.w = 1; // best effort and never repeated, so a retried email cannot repeat the WhatsApp message
+  }
+  try {
+    sendEmailAlert_(payload, receivedAt, referenceFile, properties);
+  } catch (emailError) {
+    if (isMailQuotaError_(emailError)) {
+      console.error("Email quota reached; queued order alerts wait for the next run.");
+      properties.setProperty(key, JSON.stringify(job));
+      return "quota";
+    }
+    job.a = Number(job.a || 0) + 1;
+    if (job.a >= ORDER_ALERT_MAX_ATTEMPTS) {
+      console.error("Gave up on order alert " + String(payload.requestId).slice(0, 8) + " after " + job.a + " tries. The order is in the Orders sheet.");
+      properties.deleteProperty(key);
+      return "gaveup";
+    }
+    console.error("Email order alert failed (try " + job.a + "); it will be retried.");
+    properties.setProperty(key, JSON.stringify(job));
+    return "retry";
+  }
+  try { properties.deleteProperty(key); } catch (deleteError) { console.error("Order alert was sent but could not be removed from the queue."); }
+  return "sent";
+}
+
+function installOrderAlertTrigger_() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to install the order alert trigger.");
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var index = 0; index < triggers.length; index += 1) {
+      if (triggers[index].getHandlerFunction() === "sendQueuedOrderAlerts_") return false;
+    }
+    ScriptApp.newTrigger("sendQueuedOrderAlerts_").timeBased().everyMinutes(1).create();
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Public so it shows in the editor Run menu; run once as the owner. Web visitors have an empty active user.
+function setupOrderAlertQueue() {
+  var active = String(Session.getActiveUser().getEmail() || "");
+  if (!active || active !== String(Session.getEffectiveUser().getEmail() || "")) {
+    throw new Error("Run this from the Apps Script editor as the owner.");
+  }
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, [
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.send_mail",
+    "https://www.googleapis.com/auth/script.external_request"
+  ]);
+  installOrderAlertTrigger_();
+  // Set only after the trigger exists, so orders never queue without a sender.
+  PropertiesService.getScriptProperties().setProperty("ORDER_ALERT_QUEUE_READY", "true");
 }
 
 function orderSheetUrl_(properties) {

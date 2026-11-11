@@ -61,6 +61,17 @@ When a new order is saved, Saloni gets a WhatsApp message (free CallMeBot API) a
 2. In **Project Settings → Script properties**, set `WHATSAPP_CALLMEBOT_KEY` to that key. Optional: `WHATSAPP_CALLMEBOT_PHONE` (default `918209238541`, country code first, no `+`) and `ORDER_ALERT_EMAIL` (default: the script owner's email). With no key, WhatsApp is skipped and email still goes out.
 3. In the Apps Script editor choose `testOrderAlerts` in the Run menu → Run → approve the permission prompt; a TEST WhatsApp and email should arrive. It only works when the owner runs it from the editor.
 
+#### Faster orders: alerts sent by a 1-minute trigger
+
+By default the alert is sent while the shopper waits. To answer the shopper straight away, the alert can be queued and sent by a time-driven trigger within about 1 minute:
+
+1. After deploying, open the Apps Script editor, choose `setupOrderAlertQueue` in the Run menu and run it once as the owner. Approve the permission prompt (triggers, send email, external requests). It installs one trigger (every minute, no duplicates) and then sets the script property `ORDER_ALERT_QUEUE_READY=true`. Until then, deploying the code changes nothing.
+2. Each new order is saved first; its alert is stored as a script property named `ORDER_ALERT_Q_<request id>`. The trigger `sendQueuedOrderAlerts_` sends the oldest first and deletes each one after the email was accepted. Replays queue nothing.
+3. Switch back: set `ORDER_ALERT_QUEUE_READY` to anything other than `true` (or delete it). New orders then send alerts immediately again. Leave the trigger in place so alerts already queued still go out.
+4. Safe fallbacks: if the property cannot be written, or 31 or more alerts are already waiting (the trigger is probably broken), that order sends its alert immediately.
+5. Trade-off: a failed email is retried every minute, up to 5 tries, then logged ("Gave up on order alert ...") and dropped; the order is always in the Orders sheet. A mail quota error keeps the alerts and retries next minute without counting a try. If the script stops after the email is sent but before the property is deleted, that one email may repeat. WhatsApp is best effort and sent once.
+6. Privacy: while an alert waits, the customer's name, phone, email, address and design notes sit in an owner-only script property. It is deleted as soon as the alert is sent (or given up), so it is normally there for about a minute. The reference image is never copied, only its Drive file id.
+
 The WhatsApp text passes through a third party, so it has only the product, quantity, the customer's first name, "Pickup in Ajmer" or the city, a short request code, and the Orders sheet link. It never has the phone, email, address, or design notes; the email has the full details.
 
 ### Corporate Gifting setup, migration, and rollback
