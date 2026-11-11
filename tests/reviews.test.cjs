@@ -939,68 +939,67 @@ test("the 90-day order retention never touches review rows or review photos", ()
   assert.deepEqual(runtime.fileById[FILE_A].sharing, ["ANYONE_WITH_LINK", "VIEW"]);
 });
 
-// ---- ReviewForm.html (iframe form) ----
-const formHtml = fs.existsSync(path.join(root, "apps-script", "ReviewForm.html")) ? fs.readFileSync(path.join(root, "apps-script", "ReviewForm.html"), "utf8") : "";
+// ---- the review form built into reviews/index.html (public-forms.js) ----
+const reviewPage = fs.readFileSync(path.join(root, "reviews", "index.html"), "utf8");
+const formsScript = fs.readFileSync(path.join(root, "public-forms.js"), "utf8");
+const legacyFormHtml = fs.readFileSync(path.join(root, "apps-script", "ReviewForm.html"), "utf8");
+const REVIEW_EXEC_URL = "https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec";
+const REVIEW_SITE_KEY = "6Lcyc_YtAAAAAH9NRP14nKWeaeVcIBXs5PwrhmT3";
+const formMarkup = (reviewPage.match(/<form id="review-form"[\s\S]*?<\/form>/) || [""])[0];
 
 class FormElement {
   constructor(id, name, value = "") {
     Object.assign(this, { id, name: name || id, value, textContent: "", hidden: false, disabled: false, checked: false, className: "", listeners: {}, attributes: {}, children: [], parentNode: null, focused: false, files: [] });
   }
-  addEventListener(type, listener) { this.listeners[type] = listener; }
-  dispatch(type, event = {}) { if (this.listeners[type]) this.listeners[type](Object.assign({ target: this }, event)); }
+  addEventListener(type, listener) { (this.listeners[type] = this.listeners[type] || []).push(listener); }
+  dispatch(type, event = {}) { (this.listeners[type] || []).forEach((listener) => listener(Object.assign({ target: this, preventDefault() {} }, event))); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
-  getAttribute(name) { return this.attributes[name] || ""; }
+  getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : ""; }
   removeAttribute(name) { delete this.attributes[name]; }
   appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
   removeChild(child) { this.children = this.children.filter((item) => item !== child); return child; }
   get firstChild() { return this.children[0] || null; }
-  remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((child) => child !== this); }
+  remove() { if (this.parentNode && this.parentNode.removeChild) this.parentNode.removeChild(this); }
   focus() { this.focused = true; }
 }
-class FormPort {
-  constructor() { this.peer = null; this.onmessage = null; this.closed = false; }
-  postMessage(data) { if (!this.closed && this.peer && this.peer.onmessage) this.peer.onmessage({ data }); }
-  close() { this.closed = true; }
-}
-class FormChannel { constructor() { this.port1 = new FormPort(); this.port2 = new FormPort(); this.port1.peer = this.port2; this.port2.peer = this.port1; } }
 
 function makeFormRuntime(options = {}) {
-  assert.ok(formHtml, "apps-script/ReviewForm.html must exist");
-  const sourceScript = formHtml.match(/<script>\n([\s\S]*?)\n<\/script>/)[1]
-    .replace(/<\?!= reviewsPausedJson \?>/g, options.paused ? "true" : "false")
-    .replace(/<\?!= captchaEnabledJson \?>/g, "true")
-    .replace(/<\?!= captchaSiteKeyJson \?>/g, JSON.stringify("site-key"));
-  const ids = ["seed-data", "review-products-data", "form-status", "submit-button", "another-button", "paused-message", "product-id", "product-hint", "rating-group", "review-photos", "photo-previews", "review-form"];
+  assert.ok(formMarkup, "reviews/index.html must contain the review form");
+  const ids = ["form-status", "submit-button", "another-button", "product-id", "product-hint", "rating-group", "review-photos", "photo-previews", "review-form"];
   const elements = new Map(ids.map((id) => [id, new FormElement(id)]));
-  const fields = { productId: elements.get("product-id"), rating: new FormElement("rating"), firstName: new FormElement("first-name", "firstName"), city: new FormElement("city", "city"), comment: new FormElement("comment", "comment"), reviewId: new FormElement("review-id", "reviewId"), captchaToken: new FormElement("captcha-token", "captchaToken"), photos: elements.get("review-photos") };
+  const fields = { productId: elements.get("product-id"), rating: new FormElement("rating"), firstName: new FormElement("first-name", "firstName"), city: new FormElement("city", "city"), comment: new FormElement("comment", "comment"), reviewId: new FormElement("review-id", "reviewId"), photos: elements.get("review-photos") };
   fields.productId.name = "productId"; fields.photos.name = "photos"; fields.rating.name = "rating";
-  fields.rating.setAttribute = fields.rating.setAttribute.bind(fields.rating);
-  ["product-hint", "paused-message", "another-button"].forEach((id) => { elements.get(id).hidden = true; });
+  ["product-hint", "another-button"].forEach((id) => { elements.get(id).hidden = true; });
   const form = elements.get("review-form");
+  const formAttributes = formMarkup.match(/<form\b([^>]*)>/)[1];
+  for (const match of formAttributes.matchAll(/([\w:-]+)="([^"]*)"/g)) form.setAttribute(match[1], match[2]);
   form.elements = fields;
   const fieldsets = [new FormElement("details"), new FormElement("photos-fieldset")];
   const errors = [];
+  const errorHost = { appendChild(child) { child.parentNode = this; errors.push(child); return child; }, removeChild(child) { const index = errors.indexOf(child); if (index >= 0) errors.splice(index, 1); return child; } };
   form.querySelectorAll = (selector) => {
     if (selector === "[aria-invalid]") return Object.values(fields).filter((field) => field.getAttribute("aria-invalid"));
-    if (selector === ".field-error") return errors;
+    if (selector === ".field-error") return errors.slice();
     if (selector === "fieldset, #submit-button") return fieldsets.concat([elements.get("submit-button")]);
     return [];
   };
   form.reset = () => { ["productId", "rating", "firstName", "city", "comment"].forEach((name) => { fields[name].value = name === "productId" ? "studio" : ""; }); };
-  Object.values(fields).forEach((field) => { field.parentNode = { children: [], appendChild(child) { errors.push(child); } }; });
-  elements.get("rating-group").appendChild = (child) => { errors.push(child); return child; };
+  Object.values(fields).forEach((field) => { field.parentNode = errorHost; });
+  elements.get("rating-group").appendChild = (child) => errorHost.appendChild(child);
   fields.productId.value = "studio";
-  elements.get("seed-data").textContent = JSON.stringify(Object.assign({ reviewId: "review-seed-123456", channelNonce: "nonce-seed-123456" }, options.seed));
-  elements.get("review-products-data").textContent = options.products === undefined ? JSON.stringify(DEFAULT_PRODUCTS) : JSON.stringify(options.products);
   const status = elements.get("form-status");
-  status.setAttribute("tabindex", "-1");
-  const timers = []; const submissions = []; const callbacks = []; const parentMessages = []; const canvases = []; const revoked = [];
-  const run = {
-    withSuccessHandler(callback) { this.success = callback; return this; },
-    withFailureHandler(callback) { this.failure = callback; return this; },
-    submitReview(value) { submissions.push(JSON.parse(JSON.stringify(value))); callbacks.push({ success: this.success, failure: this.failure }); return this; },
+  const timers = []; const fetches = []; const productFetches = []; const executions = []; const scripts = []; const canvases = []; const revoked = [];
+  const captchaState = { token: null, reject: false };
+  const recaptcha = {
+    ready: (callback) => callback(),
+    execute: (siteKey, request) => {
+      executions.push({ siteKey, action: request.action });
+      if (captchaState.reject) return Promise.reject(new Error("captcha failed"));
+      return Promise.resolve(captchaState.token === null ? "token-" + executions.length : captchaState.token);
+    },
   };
   const imageBehaviour = options.image || { width: 4000, height: 3000 };
+  const pendingImages = [];
   class FakeImage {
     set src(value) {
       this._src = value;
@@ -1009,17 +1008,33 @@ function makeFormRuntime(options = {}) {
     }
   }
   const encoder = options.encoder || ((quality) => (quality > 0.7 ? 1500000 : 800000));
-  const pendingImages = [];
+  const store = Object.assign({}, options.storage);
   const windowObject = {
     crypto: { randomUUID: (() => { let count = 0; return () => "review-attempt-" + (++count) + "-abcdef"; })() },
-    MessageChannel: FormChannel, Image: FakeImage,
+    Image: FakeImage, location: { search: options.search || "" },
     atob: (text) => Buffer.from(text, "base64").toString("binary"), btoa: (text) => Buffer.from(text, "binary").toString("base64"),
     URL: { createObjectURL: () => "blob:original-photo", revokeObjectURL: (url) => revoked.push(url) },
-    setTimeout(callback) { timers.push(callback); return timers.length; }, clearTimeout() {},
-    top: { postMessage(message, targetOrigin, ports) { parentMessages.push({ message, targetOrigin, port: ports && ports[0] }); } },
+    setTimeout(fn, delay) { timers.push({ fn, delay, cleared: false }); return timers.length; },
+    clearTimeout(id) { if (timers[id - 1]) timers[id - 1].cleared = true; },
+    localStorage: options.storage ? { getItem: (key) => (Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null) } : undefined,
+    // Two kinds of request only: the same-site product list, and the JSON post to the web app.
+    fetch(url, init) {
+      if (url === "products.json") {
+        productFetches.push(url);
+        if (options.products === null || options.productsFail) return Promise.reject(new Error("offline"));
+        return Promise.resolve({ ok: options.productsStatus ? false : true, json: () => Promise.resolve(options.products === undefined ? DEFAULT_PRODUCTS : options.products) });
+      }
+      return new Promise((resolve, reject) => {
+        fetches.push({ url, init, body: JSON.parse(init.body), respond: async (result) => { resolve({ json: () => (options.html ? Promise.reject(new SyntaxError("Unexpected token <")) : Promise.resolve(result)) }); await settle(); }, fail: async (error = new Error("network")) => { reject(error); await settle(); } });
+      });
+    },
   };
+  if (options.captcha !== "lazy") windowObject.grecaptcha = recaptcha;
+  const head = { appendChild(script) { script.parentNode = head; scripts.push(script); return script; }, removeChild(script) { scripts.splice(scripts.indexOf(script), 1); } };
   const documentObject = {
-    getElementById: (id) => elements.get(id) || null,
+    head,
+    getElementById: (id) => elements.get(id) || errors.find((element) => element.id === id) || null,
+    querySelector: (selector) => (/recaptcha/.test(selector) ? scripts.find((script) => /recaptcha/.test(script.src || "")) || null : null),
     createElement(tag) {
       const element = new FormElement(tag);
       if (tag === "canvas") {
@@ -1038,206 +1053,318 @@ function makeFormRuntime(options = {}) {
       return element;
     },
   };
-  const context = { console, document: documentObject, window: windowObject, google: { script: { run } }, Math, JSON, Date, Array, Object, String, Number, Boolean, RegExp };
+  const context = { console, document: documentObject, window: windowObject, Promise, Math, JSON, Date, Array, Object, String, Number, Boolean, RegExp };
   vm.createContext(context);
-  vm.runInContext(sourceScript, context, { filename: "ReviewForm.html" });
-  return { imageBehaviour, pendingImages, elements, fields, form, fieldsets, status, timers, submissions, callbacks, parentMessages, canvases, revoked, previews: elements.get("photo-previews"), fileInput: elements.get("review-photos"), errors };
+  vm.runInContext(formsScript, context, { filename: "public-forms.js" });
+  const runtime = {
+    imageBehaviour, pendingImages, elements, fields, form, fieldsets, status, timers, fetches, productFetches, executions, scripts, captchaState, canvases, revoked, errors,
+    previews: elements.get("photo-previews"), fileInput: elements.get("review-photos"), another: elements.get("another-button"), submitButton: elements.get("submit-button"), productHint: elements.get("product-hint"), windowObject,
+    get submissions() { return fetches.map((entry) => entry.body); },
+    submit: async () => { form.dispatch("submit"); await settle(); },
+    finishScript(ok) { if (ok) windowObject.grecaptcha = recaptcha; scripts.slice().forEach((script) => script.dispatch(ok ? "load" : "error")); return settle(); },
+    timeout: () => timers.filter((timer) => timer.delay === 30000 && !timer.cleared).pop().fn(),
+  };
+  return runtime;
 }
 
 function fillReviewForm(runtime, overrides = {}) {
   const values = Object.assign({ rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", productId: "studio" }, overrides);
   Object.keys(values).forEach((name) => { runtime.fields[name].value = values[name]; });
 }
-function respondReviewCaptcha(runtime, index, overrides = {}) {
-  const request = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request")[index];
-  assert.ok(request, "captcha request should exist");
-  request.port.postMessage(Object.assign({ type: "saloni-order-captcha-response", nonce: request.message.nonce, attemptId: request.message.attemptId, ok: true, token: "captcha-token" }, overrides));
-}
 function addPhotos(runtime, files) {
   runtime.fileInput.files = files;
   runtime.fileInput.dispatch("change");
 }
 const jpegFile = (size = 3 * 1024 * 1024) => ({ type: "image/jpeg", size, name: "IMG_0001.jpg" });
+const TOKEN_FREE = (body) => { const copy = Object.assign({}, body); delete copy.captchaToken; return copy; };
 
-test("the review form script parses and announces itself to the parent with its mode", () => {
-  assert.ok(formHtml);
-  const sourceScript = formHtml.match(/<script>\n([\s\S]*?)\n<\/script>/)[1].replace(/<\?!= \w+ \?>/g, "true");
-  assert.doesNotThrow(() => new vm.Script(sourceScript));
-  assert.match(formHtml, /id="form-status"[^>]*tabindex="-1"/);
-  assert.match(formHtml, /<seedScript|<script id="seed-data" type="application\/json"><\?!= seedJson \?><\/script>/);
-  const runtime = makeFormRuntime();
-  assert.equal(runtime.fields.reviewId.value, "review-seed-123456");
-  const ready = runtime.parentMessages.find((entry) => entry.message.type === "saloni-order-form-ready");
-  assert.equal(ready.message.mode, "review");
-  assert.equal(ready.targetOrigin, "https://saloniresinart.com");
+test("the review form is built into the page: no iframe, no seed, no frame messaging, no Google connection at load", () => {
+  assert.ok(formMarkup);
+  assert.match(formMarkup, new RegExp('<form id="review-form"[^>]*data-order-form-url="' + REVIEW_EXEC_URL.replace(/[./]/g, "\\$&") + '"[^>]*data-captcha-site-key="' + REVIEW_SITE_KEY + '"'));
+  assert.match(formMarkup, /data-products-url="products\.json"/);
+  assert.doesNotMatch(reviewPage, /<iframe|order-form-embed|order-form-frame|data-form-mode|order-form-status|preconnect|googleusercontent|recaptcha\/api\.js/);
+  assert.match(reviewPage, /<script class="site-script" src="\.\.\/script\.js\?v=\d+" defer><\/script>\s*<script class="public-forms-script" src="\.\.\/public-forms\.js\?v=\d+" defer><\/script>/);
+  assert.match(reviewPage, /<noscript>[\s\S]*8209238541[\s\S]*<\/noscript>/);
+  assert.doesNotMatch(formsScript, /postMessage|MessageChannel|google\.script|window\.top|window\.parent|PARENT_ORIGIN|innerHTML/);
+  assert.match(formMarkup, /id="form-status"[^>]*tabindex="-1"/);
 });
 
-test("the form starts on the product and rating from the seed only when they are valid", () => {
-  const runtime = makeFormRuntime({ seed: { productId: DEFAULT_PRODUCTS[1].id, rating: "4" } });
-  assert.equal(runtime.fields.productId.value, DEFAULT_PRODUCTS[1].id);
-  assert.equal(runtime.fields.rating.value, "4");
-  const unknown = makeFormRuntime({ seed: { productId: "catalogue:not-a-product.jpg", rating: "7" } });
-  assert.equal(unknown.fields.productId.value, "studio");
-  assert.equal(unknown.fields.rating.value, "");
-  assert.equal(runtime.fields.firstName.value, "");
-  const named = makeFormRuntime({ seed: { firstName: "Asha" } });
-  assert.equal(named.fields.firstName.value, "Asha");
-  const noList = makeFormRuntime({ products: null, seed: { productId: DEFAULT_PRODUCTS[1].id, rating: "5" } });
+test("opening the review page sends nothing to Google: no post, no reCAPTCHA script, no timer, and the review ID is ready", async () => {
+  const runtime = makeFormRuntime({ captcha: "lazy" });
+  await settle();
+  assert.equal(runtime.fetches.length, 0);
+  assert.equal(runtime.scripts.length, 0);
+  assert.equal(runtime.timers.length, 0);
+  assert.deepEqual(runtime.productFetches, ["products.json"], "only the same-site product list is read");
+  assert.match(runtime.fields.reviewId.value, /^review-attempt-1-/);
+  assert.equal(runtime.form.hidden, false);
+});
+
+test("the reCAPTCHA script loads once, the first time the form is focused", async () => {
+  const runtime = makeFormRuntime({ captcha: "lazy" });
+  runtime.form.dispatch("focusin");
+  runtime.form.dispatch("focusin");
+  assert.equal(runtime.scripts.length, 1);
+  assert.equal(runtime.scripts[0].src, "https://www.google.com/recaptcha/api.js?render=" + REVIEW_SITE_KEY);
+  await runtime.finishScript(true);
+  runtime.form.dispatch("focusin");
+  assert.equal(runtime.scripts.length, 1);
+  assert.equal(runtime.fetches.length, 0);
+});
+
+test("Submit before the script finished loading waits for it, then sends one JSON post with a fresh token", async () => {
+  const runtime = makeFormRuntime({ captcha: "lazy" });
+  fillReviewForm(runtime);
+  await runtime.submit();
+  assert.equal(runtime.scripts.length, 1, "Submit loads the script itself when the form was never focused");
+  assert.equal(runtime.fetches.length, 0, "no post until the captcha token exists");
+  assert.equal(runtime.submitButton.disabled, true);
+  await runtime.finishScript(true);
+  assert.deepEqual(runtime.executions, [{ siteKey: REVIEW_SITE_KEY, action: "review_submission" }]);
+  assert.equal(runtime.fetches.length, 1);
+  assert.equal(runtime.fetches[0].url, REVIEW_EXEC_URL + "?action=review");
+  assert.equal(runtime.fetches[0].init.method, "POST");
+  assert.equal(runtime.fetches[0].init.credentials, "omit");
+  assert.equal(runtime.fetches[0].body.captchaToken, "token-1");
+});
+
+test("the form starts on the product and rating from the address, and the saved first name, only when they are valid", async () => {
+  const hinted = makeFormRuntime({ search: "?product=" + encodeURIComponent(DEFAULT_PRODUCTS[1].id) + "&rating=4" });
+  await settle();
+  assert.equal(hinted.fields.productId.value, DEFAULT_PRODUCTS[1].id);
+  assert.equal(hinted.fields.rating.value, "4");
+  assert.equal(hinted.fields.firstName.value, "");
+  for (const search of ["?product=catalogue%3Anot-a-product.jpg&rating=7", "?product=%3Cscript%3E&rating=9", "?product=catalogue%3Aa%2Fb&rating=0", ""]) {
+    const unknown = makeFormRuntime({ search });
+    await settle();
+    assert.equal(unknown.fields.productId.value, "studio", search);
+    assert.equal(unknown.fields.rating.value, "", search);
+  }
+  const noList = makeFormRuntime({ products: null, search: "?product=" + encodeURIComponent(DEFAULT_PRODUCTS[1].id) + "&rating=5" });
+  await settle();
   assert.equal(noList.fields.productId.value, "studio");
   assert.equal(noList.fields.rating.value, "5");
+  const profile = (customerName, expiresAt = Date.now() + 24 * 60 * 60 * 1000) => ({ saloniRepeatProfile: JSON.stringify({ version: 1, expiresAt, profile: { customerName, phone: "98765 43210", fulfillment: "pickup", pin: "305001" } }) });
+  assert.equal(makeFormRuntime({ storage: profile("  Asha Sharma ") }).fields.firstName.value, "Asha");
+  assert.equal(makeFormRuntime().fields.firstName.value, "");
+  assert.equal(makeFormRuntime({ storage: profile("Asha Sharma", Date.now() - 1000) }).fields.firstName.value, "");
+  assert.equal(makeFormRuntime({ storage: profile("A Sharma") }).fields.firstName.value, "");
+  assert.equal(makeFormRuntime({ storage: profile("asha@mail.com") }).fields.firstName.value, "");
+  assert.equal(makeFormRuntime({ storage: { saloniRepeatProfile: "not json" } }).fields.firstName.value, "");
+  assert.equal(makeFormRuntime({ storage: { saloniRepeatProfile: JSON.stringify({ version: 2, expiresAt: Date.now() + 1000, profile: { customerName: "Asha" } }) } }).fields.firstName.value, "");
 });
 
 test("the review form has the specified fields and no consent checkbox, consent text or intro", () => {
-  for (const name of ["productId", "rating", "firstName", "city", "comment", "reviewId", "captchaToken", "photos"]) assert.match(formHtml, new RegExp('name="' + name + '"'));
-  assert.equal((formHtml.match(/type="radio" name="rating"/g) || []).length, 5);
-  assert.match(formHtml, /<option value="studio">The studio in general<\/option>/);
-  assert.match(formHtml, /name="firstName" maxlength="40" autocomplete="given-name"/);
-  assert.match(formHtml, /First name \(shown publicly\)/);
-  assert.match(formHtml, /name="city" maxlength="60"/);
-  assert.match(formHtml, /name="comment" maxlength="800"/);
-  assert.match(formHtml, /type="file"[^>]*accept="image\/jpeg,image\/png"[^>]*multiple/);
-  assert.doesNotMatch(formHtml, /publicConsent|public-consent|<input[^>]*type="checkbox"|class="consent"|I agree that|Reviews stay until removed|Show my review/);
-  assert.doesNotMatch(formHtml, /class="intro"|Tell others about your Saloni resin art|appears on the Reviews page/);
-  assert.match(formHtml, /Reviews are public on the home page\./);
-  assert.doesNotMatch(formHtml, /public on the Reviews page|saloni-review-submitted|notifyParent/);
-  assert.doesNotMatch(formHtml, /Do not include phone numbers|Location data is removed/);
-  assert.match(formHtml, /Post review/);
-  assert.match(formHtml, /Write another review/);
-  assert.doesNotMatch(formHtml, /name="(phone|email)"|localStorage|sessionStorage|innerHTML/);
+  for (const name of ["productId", "rating", "firstName", "city", "comment", "reviewId", "photos"]) assert.match(formMarkup, new RegExp('name="' + name + '"'));
+  assert.equal((formMarkup.match(/type="radio" name="rating"/g) || []).length, 5);
+  assert.match(formMarkup, /<option value="studio">The studio in general<\/option>/);
+  assert.match(formMarkup, /name="firstName" maxlength="40" autocomplete="given-name"/);
+  assert.match(formMarkup, /First name \(shown publicly\)/);
+  assert.match(formMarkup, /name="city" maxlength="60"/);
+  assert.match(formMarkup, /name="comment" maxlength="800"/);
+  assert.match(formMarkup, /type="file"[^>]*accept="image\/jpeg,image\/png"[^>]*multiple/);
+  assert.doesNotMatch(formMarkup, /publicConsent|public-consent|<input[^>]*type="checkbox"|class="consent"|I agree that|Reviews stay until removed|Show my review|captchaToken/);
+  assert.match(formMarkup, /Reviews are public on the home page\./);
+  assert.match(formMarkup, /Post review/);
+  assert.match(formMarkup, /Write another review/);
+  assert.doesNotMatch(formMarkup, /name="(phone|email)"|localStorage|sessionStorage|innerHTML/);
+  assert.match(formMarkup, /id="product-hint"[^>]*hidden/);
 });
 
-test("product choices come from the server list through text nodes, with a hint when the list is missing", () => {
+test("product choices come from the same-site list through text nodes, with a hint when the list is missing", async () => {
   const runtime = makeFormRuntime({ products: [{ id: "catalogue:a.jpg", name: "<img src=x onerror=alert(1)>" }, { id: 5, name: "bad" }] });
+  await settle();
   const group = runtime.fields.productId.children[0];
   assert.equal(group.label, "Products");
   assert.equal(group.children.length, 1);
   assert.equal(group.children[0].textContent, "<img src=x onerror=alert(1)>");
   assert.equal(group.children[0].value, "catalogue:a.jpg");
-  assert.equal(runtime.elements.get("product-hint").hidden, true);
-  const missing = makeFormRuntime({ products: null });
-  assert.equal(missing.fields.productId.children.length, 0);
-  assert.equal(missing.elements.get("product-hint").hidden, false);
-  const paused = makeFormRuntime({ paused: true });
-  assert.equal(paused.form.hidden, true);
-  assert.equal(paused.elements.get("paused-message").hidden, false);
-  assert.match(formHtml, /New reviews are paused right now\./);
+  assert.equal(runtime.productHint.hidden, true);
+  for (const options of [{ products: null }, { productsStatus: 500 }, { products: {} }]) {
+    const missing = makeFormRuntime(options);
+    await settle();
+    assert.equal(missing.fields.productId.children.length, 0, JSON.stringify(options));
+    assert.equal(missing.productHint.hidden, false);
+  }
 });
 
-test("the form checks the rating, names, comment and contact details before sending", () => {
+test("the form checks the rating, names, comment and contact details before sending", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime, { rating: "", firstName: "A1", city: "Ajmer 305001", comment: "short" });
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.submissions.length, 0);
-  assert.equal(runtime.parentMessages.filter((entry) => entry.message.type === "saloni-order-captcha-request").length, 0);
+  await runtime.submit();
+  assert.equal(runtime.fetches.length, 0);
+  assert.equal(runtime.executions.length, 0);
   assert.deepEqual(runtime.errors.map((error) => error.id).sort(), ["city-error", "comment-error", "firstName-error", "rating-error"]);
+  assert.equal(runtime.submitButton.disabled, false);
+  assert.match(runtime.status.textContent, /Please correct the highlighted fields/);
   for (const comment of ["Mail me at asha@example.com please", "Call 820 923 8541 for details", "Visit www.example.com now"]) {
     const again = makeFormRuntime();
     fillReviewForm(again, { comment });
-    again.form.dispatch("submit", { preventDefault() {} });
-    assert.equal(again.submissions.length, 0, comment);
+    await again.submit();
+    assert.equal(again.fetches.length, 0, comment);
     assert.ok(again.errors.some((error) => error.id === "comment-error"));
   }
 });
 
-test("a valid review is sent with the parent captcha token and the exact payload shape", () => {
+test("a valid review is posted with a fresh captcha token and the exact payload shape", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  const request = runtime.parentMessages.find((entry) => entry.message.type === "saloni-order-captcha-request");
-  assert.equal(request.message.mode, "review");
-  assert.equal(request.message.nonce, "nonce-seed-123456");
-  respondReviewCaptcha(runtime, 0);
-  assert.equal(runtime.submissions.length, 1);
-  assert.deepEqual(runtime.submissions[0], { reviewId: "review-seed-123456", productId: "studio", rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", photos: [], captchaToken: "captcha-token" });
+  await runtime.submit();
+  assert.equal(runtime.fetches.length, 1);
+  assert.deepEqual(runtime.submissions[0], { reviewId: runtime.fields.reviewId.value, productId: "studio", rating: "5", firstName: "Asha Kumari", city: "Ajmer", comment: "Lovely resin frame, arrived safely and looks beautiful.", photos: [], captchaToken: "token-1" });
+  await runtime.submit();
+  assert.equal(runtime.fetches.length, 1, "Submit is ignored while a request is in flight");
 });
 
-test("review success thanks the first name, says where the review shows and offers another review", () => {
+test("review success thanks the first name, says where the review shows and offers another review", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
-  runtime.callbacks[0].success({ ok: true, reviewId: "review-seed-123456", receivedAt: "now", status: "Published" });
+  await runtime.submit();
+  const first = runtime.fields.reviewId.value;
+  await runtime.fetches[0].respond({ ok: true, reviewId: first, receivedAt: "now", status: "Published" });
   assert.equal(runtime.status.textContent, "Thank you, Asha. Your review now shows on the home page of saloniresinart.com.");
   assert.equal(runtime.status.className, "status success");
+  assert.equal(runtime.status.focused, true);
   assert.equal(runtime.fieldsets.every((fieldset) => fieldset.hidden), true);
-  assert.equal(runtime.elements.get("another-button").hidden, false);
-  assert.equal(runtime.parentMessages.some((entry) => entry.message.type === "saloni-review-submitted"), false, "the parent no longer listens, so nothing is posted");
-  runtime.elements.get("another-button").dispatch("click");
-  assert.notEqual(runtime.fields.reviewId.value, "review-seed-123456");
+  assert.equal(runtime.submitButton.hidden, true);
+  assert.equal(runtime.another.hidden, false);
+  runtime.another.dispatch("click");
+  assert.notEqual(runtime.fields.reviewId.value, first);
   assert.equal(runtime.status.textContent, "");
   assert.equal(runtime.fieldsets.some((fieldset) => fieldset.hidden), false);
+  assert.equal(runtime.submitButton.hidden, false);
+  assert.equal(runtime.another.hidden, true);
 });
 
-test("the review form rejects a wrong nonce or attempt, ignores stale success and offers conflict recovery", () => {
+test("a missing, rejected or unloadable captcha shows the captcha message, keeps entries and photos, and sends nothing", async () => {
+  const empty = makeFormRuntime(); empty.captchaState.token = "";
+  const rejected = makeFormRuntime(); rejected.captchaState.reject = true;
+  const noScript = makeFormRuntime({ captcha: "lazy" });
+  for (const runtime of [empty, rejected, noScript]) { fillReviewForm(runtime); addPhotos(runtime, [jpegFile()]); }
+  await empty.submit(); await rejected.submit(); await noScript.submit();
+  await noScript.finishScript(false);
+  for (const runtime of [empty, rejected, noScript]) {
+    assert.match(runtime.status.textContent, /Captcha verification is required/);
+    assert.equal(runtime.status.focused, true);
+    assert.equal(runtime.fetches.length, 0);
+    assert.equal(runtime.submitButton.disabled, false);
+    assert.equal(runtime.fields.firstName.value, "Asha Kumari");
+    assert.equal(runtime.previews.children.length, 1);
+  }
+  assert.equal(noScript.scripts.length, 0, "a script that failed to load is removed so a later try can load it again");
+  empty.captchaState.token = null;
+  await empty.submit();
+  assert.equal(empty.fetches.length, 1, "the next try works");
+  assert.equal(empty.fetches[0].body.photos.length, 1);
+});
+
+test("a failed or unreadable answer keeps the entries and photos; the retry is the same review with a new token", async () => {
+  for (const failure of ["network", "unconfirmed", "invalid", "html"]) {
+    const runtime = makeFormRuntime({ html: failure === "html" });
+    fillReviewForm(runtime);
+    addPhotos(runtime, [jpegFile(), jpegFile()]);
+    await runtime.submit();
+    const id = runtime.fetches[0].body.reviewId;
+    if (failure === "network") await runtime.fetches[0].fail(); else await runtime.fetches[0].respond(failure === "html" ? {} : { ok: false, error: failure });
+    assert.match(runtime.status.textContent, /could not confirm the review/i, failure);
+    assert.doesNotMatch(runtime.status.textContent, /Thank you/);
+    assert.equal(runtime.status.focused, true);
+    assert.equal(runtime.submitButton.disabled, false);
+    assert.equal(runtime.fieldsets.some((fieldset) => fieldset.hidden), false, "the form stays open");
+    assert.equal(runtime.fields.comment.value, "Lovely resin frame, arrived safely and looks beautiful.");
+    assert.equal(runtime.previews.children.length, 2, "photos are kept");
+    await runtime.submit();
+    assert.equal(runtime.fetches.length, 2);
+    assert.equal(runtime.fetches[1].body.reviewId, id, "the retry is the same review, so the server can recognise it");
+    assert.notEqual(runtime.fetches[1].body.captchaToken, runtime.fetches[0].body.captchaToken, "a new token for each Submit");
+    assert.deepEqual(TOKEN_FREE(runtime.fetches[1].body), TOKEN_FREE(runtime.fetches[0].body));
+    assert.equal(runtime.fetches[1].body.photos.length, 2);
+  }
+});
+
+test("after 30 seconds it says it could not confirm, keeps the entries, and a late answer is ignored", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0, { nonce: "wrong-nonce" });
-  respondReviewCaptcha(runtime, 0, { attemptId: "wrong-attempt" });
-  assert.equal(runtime.submissions.length, 0);
-  respondReviewCaptcha(runtime, 0);
-  const original = runtime.submissions[0];
-  runtime.fields.comment.value = "Edited while the first request was pending, still long enough.";
-  runtime.timers[0]();
-  assert.match(runtime.status.textContent, /changed while an earlier review/i);
-  assert.equal(runtime.elements.get("another-button").hidden, false);
-  const before = runtime.status.textContent;
-  runtime.callbacks[0].success({ ok: true, reviewId: original.reviewId, receivedAt: "late" });
-  assert.equal(runtime.status.textContent, before);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.submissions.length, 1, "a changed payload must not be sent under the old ID");
-  runtime.elements.get("another-button").dispatch("click");
-  assert.notEqual(runtime.fields.reviewId.value, original.reviewId);
+  await runtime.submit();
+  assert.equal(runtime.timers.filter((timer) => timer.delay === 30000).length, 1);
+  runtime.timeout();
+  assert.match(runtime.status.textContent, /could not confirm the review/i);
+  assert.equal(runtime.status.focused, true);
+  assert.equal(runtime.submitButton.disabled, false);
+  const message = runtime.status.textContent;
+  await runtime.fetches[0].respond({ ok: true, reviewId: runtime.fields.reviewId.value });
+  assert.equal(runtime.status.textContent, message, "a stale success is ignored");
+  assert.equal(runtime.fieldsets.some((fieldset) => fieldset.hidden), false);
+  const early = makeFormRuntime({ captcha: "lazy" });
+  fillReviewForm(early);
+  await early.submit();
+  early.timeout();
+  assert.match(early.status.textContent, /Unable to verify the review yet/);
+  await early.finishScript(true);
+  assert.equal(early.fetches.length, 0, "a send that has been given up on is never made");
 });
 
-test("an uncertain review retry resends the same snapshot and stale callbacks cannot control it", () => {
+test("entries changed while an earlier review is unconfirmed are not resent under the old ID, and Write another recovers", async () => {
+  const runtime = makeFormRuntime();
+  fillReviewForm(runtime);
+  await runtime.submit();
+  const original = runtime.submissions[0];
+  runtime.fields.comment.value = "Edited while the first request was pending, still long enough.";
+  runtime.timeout();
+  assert.match(runtime.status.textContent, /changed while an earlier review/i);
+  assert.equal(runtime.another.hidden, false);
+  const before = runtime.status.textContent;
+  await runtime.fetches[0].respond({ ok: true, reviewId: original.reviewId, receivedAt: "late" });
+  assert.equal(runtime.status.textContent, before);
+  await runtime.submit();
+  assert.equal(runtime.fetches.length, 1, "a changed payload must not be sent under the old ID");
+  runtime.another.dispatch("click");
+  assert.notEqual(runtime.fields.reviewId.value, original.reviewId);
+  assert.equal(runtime.fields.comment.value, "");
+});
+
+test("an unconfirmed review is retried with the exact original details and stale answers cannot control the retry", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
   addPhotos(runtime, [jpegFile()]);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
-  const original = runtime.submissions[0];
-  runtime.timers[0]();
+  await runtime.submit();
+  const original = TOKEN_FREE(runtime.submissions[0]);
+  runtime.timeout();
   assert.match(runtime.status.textContent, /could not confirm/i);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 1);
-  assert.equal(runtime.submissions.length, 2);
-  assert.deepEqual(runtime.submissions[1], Object.assign({}, original));
-  runtime.callbacks[0].success({ ok: true });
-  assert.match(runtime.status.textContent, /checking/i);
-  runtime.callbacks[1].success({ ok: true });
+  await runtime.submit();
+  assert.equal(runtime.fetches.length, 2);
+  assert.deepEqual(TOKEN_FREE(runtime.submissions[1]), original);
+  await runtime.fetches[0].respond({ ok: true });
+  assert.match(runtime.status.textContent, /checking/i, "the first request's late answer does not finish the retry");
+  await runtime.fetches[1].respond({ ok: true, reviewId: original.reviewId });
   assert.match(runtime.status.textContent, /Thank you, Asha/);
-  const failing = makeFormRuntime();
-  fillReviewForm(failing);
-  failing.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(failing, 0);
-  failing.callbacks[0].failure(new Error("network"));
-  assert.match(failing.status.textContent, /could not confirm/i);
-  assert.equal(failing.status.focused, true);
-  const captchaFailure = makeFormRuntime();
-  fillReviewForm(captchaFailure);
-  captchaFailure.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(captchaFailure, 0, { ok: false, token: "" });
-  assert.match(captchaFailure.status.textContent, /Captcha verification is required/);
-  assert.equal(captchaFailure.submissions.length, 0);
 });
 
-test("server field errors land on the right field and keep the form open for a fix", () => {
+test("server field errors land on the right field and keep the form open for a fix; a form message shows in the status", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
-  runtime.callbacks[0].success({ ok: false, errors: { comment: "Please remove phone numbers, emails and web links from your review." } });
+  await runtime.submit();
+  await runtime.fetches[0].respond({ ok: false, errors: { comment: "Please remove phone numbers, emails and web links from your review." } });
   assert.ok(runtime.errors.some((error) => error.id === "comment-error" && /remove phone numbers/.test(error.textContent)));
   assert.equal(runtime.fields.comment.focused, true);
   assert.equal(runtime.fieldsets.some((fieldset) => fieldset.hidden), false);
+  assert.equal(runtime.submitButton.disabled, false);
   runtime.fields.comment.value = "Fixed, and a bit longer than ten characters.";
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 1);
-  assert.equal(runtime.submissions.length, 2);
+  await runtime.submit();
+  assert.equal(runtime.errors.length, 0, "old errors are cleared on the next Submit");
+  assert.equal(runtime.fetches.length, 2);
+  await runtime.fetches[1].respond({ ok: false, errors: { form: "New reviews are paused right now. Please contact Saloni directly." } });
+  assert.equal(runtime.status.textContent, "New reviews are paused right now. Please contact Saloni directly.");
+  assert.equal(runtime.status.className, "status error");
+  const rating = makeFormRuntime();
+  fillReviewForm(rating);
+  await rating.submit();
+  await rating.fetches[0].respond({ ok: false, errors: { captcha: "Captcha verification failed. Please try again.", rating: "Choose a rating from 1 to 5 stars." } });
+  assert.ok(rating.errors.some((error) => error.id === "rating-error"));
+  assert.equal(rating.status.textContent, "Captcha verification failed. Please try again.");
 });
 
-test("photos are redrawn on a white canvas, shrunk until at most 1 MB, and the original is never sent", () => {
+test("photos are redrawn on a white canvas, shrunk until at most 1 MB, and the original is never sent", async () => {
   const runtime = makeFormRuntime();
   addPhotos(runtime, [jpegFile(), { type: "image/png", size: 2000000, name: "shot.png" }]);
   assert.equal(runtime.canvases.length, 2);
@@ -1251,11 +1378,10 @@ test("photos are redrawn on a white canvas, shrunk until at most 1 MB, and the o
   assert.equal(runtime.previews.children.length, 2);
   assert.equal(runtime.previews.children[0].children[1].textContent, "Remove");
   fillReviewForm(runtime);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
+  await runtime.submit();
   const sent = runtime.submissions[0];
   assert.equal(sent.photos.length, 2);
-  sent.photos.forEach((item) => { assert.equal(item.type, "image/jpeg"); assert.equal(item.data, makeJpeg({ size: 800000 }).toString("base64")); });
+  sent.photos.forEach((item) => { assert.deepEqual(Object.keys(item).sort(), ["data", "type"]); assert.equal(item.type, "image/jpeg"); assert.equal(item.data, makeJpeg({ size: 800000 }).toString("base64")); });
   assert.doesNotMatch(JSON.stringify(sent), /blob:|IMG_0001|shot\.png/);
   const small = makeFormRuntime({ image: { width: 800, height: 600 }, encoder: () => 90000 });
   addPhotos(small, [jpegFile()]);
@@ -1263,7 +1389,7 @@ test("photos are redrawn on a white canvas, shrunk until at most 1 MB, and the o
   assert.deepEqual(small.canvases[0].qualities, [0.85]);
 });
 
-test("a photo that cannot be prepared is rejected, never sent as the original", () => {
+test("a photo that cannot be prepared is rejected, never sent as the original", async () => {
   const cases = [
     [{ noCanvas: true }, [jpegFile()]],
     [{ toDataUrlThrows: true }, [jpegFile()]],
@@ -1277,8 +1403,7 @@ test("a photo that cannot be prepared is rejected, never sent as the original", 
     assert.ok(runtime.errors.some((error) => error.id === "photos-error" && /could not be prepared; try another photo or post without photos/.test(error.textContent)), JSON.stringify(options));
     assert.equal(runtime.previews.children.length, 0);
     fillReviewForm(runtime);
-    runtime.form.dispatch("submit", { preventDefault() {} });
-    respondReviewCaptcha(runtime, 0);
+    await runtime.submit();
     assert.deepEqual(runtime.submissions[0].photos, []);
   }
   const wrongType = makeFormRuntime();
@@ -1294,7 +1419,7 @@ test("a photo that cannot be prepared is rejected, never sent as the original", 
   assert.equal(exact.canvases.length, 1);
 });
 
-test("more than three photos are rejected and a photo can be removed before sending", () => {
+test("more than three photos are rejected and a photo can be removed before sending", async () => {
   const runtime = makeFormRuntime();
   addPhotos(runtime, [jpegFile(), jpegFile(), jpegFile(), jpegFile()]);
   assert.equal(runtime.previews.children.length, 0);
@@ -1307,22 +1432,35 @@ test("more than three photos are rejected and a photo can be removed before send
   addPhotos(runtime, [jpegFile()]);
   assert.equal(runtime.previews.children.length, 2);
   fillReviewForm(runtime);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
+  await runtime.submit();
   assert.equal(runtime.submissions[0].photos.length, 2);
 });
 
-test("a photo change after an uncertain send is treated as a changed payload", () => {
+test("a photo change after an uncertain send is treated as a changed payload", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
   addPhotos(runtime, [jpegFile()]);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
-  runtime.timers[0]();
+  await runtime.submit();
+  runtime.timeout();
   runtime.previews.children[0].children[1].dispatch("click");
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.submissions.length, 1);
+  await runtime.submit();
+  assert.equal(runtime.fetches.length, 1);
   assert.match(runtime.status.textContent, /Write another review/);
+});
+
+test("Submit while photos are still being prepared asks the shopper to wait", async () => {
+  const runtime = makeFormRuntime();
+  runtime.imageBehaviour.defer = true;
+  addPhotos(runtime, [jpegFile()]);
+  fillReviewForm(runtime);
+  await runtime.submit();
+  assert.match(runtime.status.textContent, /photos are still being prepared/);
+  assert.equal(runtime.fetches.length, 0);
+  assert.equal(runtime.executions.length, 0);
+});
+
+test("the legacy Apps Script review form still ships for pages cached before this change", () => {
+  assert.match(legacyFormHtml, /submitReview/);
 });
 
 // ---- script.js on the Reviews page ----
@@ -1361,17 +1499,14 @@ function runReviewsPage(options = {}) {
   const posted = []; const fetchCalls = []; const timers = []; const executed = []; const deferred = [];
   const elements = new Map();
   const embed = new DomNode("div", "order-form-embed", true);
-  if (!options.home) embed.attributes["data-form-mode"] = "review";
   embed.attributes["data-order-form-url"] = options.configured === false ? "https://script.google.test/REPLACE_WITH_ID/exec" : "https://script.google.test/exec";
-  const frame = new DomNode("iframe", "order-form-frame", true); frame.name = "order-frame"; frame.hidden = true;
-  frame.parentNode = { replaceChild(next, previous) { elements.set(next.id, next); next.parentNode = this; previous.parentNode = null; } };
   const status = new DomNode("div", "order-form-status", true);
   const summary = new DomNode("p", "reviews-summary"); summary.hidden = true;
   const reviewsStatus = new DomNode("p", "reviews-status"); reviewsStatus.textContent = "Loading reviews…";
   const list = new DomNode("ul", "reviews-list");
   const section = new DomNode("section", "customer-reviews");
-  // Only the home page has the reviews section; the write page has none.
-  (options.home ? [embed, frame, status, summary, reviewsStatus, list, section] : [embed, frame, status]).forEach((element) => elements.set(element.id, element));
+  // Only the home page has the reviews section and the order form container; the write page has neither.
+  (options.home ? [embed, status, summary, reviewsStatus, list, section] : []).forEach((element) => elements.set(element.id, element));
   let response = options.body;
   const windowObject = {
     location: { href: "https://saloniresinart.com/" + (options.home ? "" : "reviews/") + (options.search || ""), search: options.search || "" }, matchMedia: () => ({ matches: false }), crypto: { randomUUID: (() => { let n = 0; return () => "request-" + (++n); })() },
@@ -1409,67 +1544,19 @@ function runReviewsPage(options = {}) {
   vm.createContext(context);
   vm.runInContext(siteScript, context, { filename: "script.js" });
   documentObject.ready();
-  const seedOf = () => JSON.parse(posted.at(-1).children.find((child) => child.name === "seed").value);
-  return { elements, status, summary, reviewsStatus, list, section, observers, posted, fetchCalls, timers, executed, windowObject, store, deferred, seedOf, setResponse: (value) => { response = value; }, frame: () => elements.get("order-form-frame") };
+  return { elements, status, summary, reviewsStatus, list, section, observers, posted, fetchCalls, timers, executed, windowObject, store, deferred, setResponse: (value) => { response = value; } };
 }
 const openBody = (reviews = [sampleReview()], extra = {}) => Object.assign({ ok: true, intake: "open", summary: { count: reviews.length, average: 4 }, reviews }, extra);
 
-test("the Reviews page seeds the review form at once, without reading the feed first", () => {
+test("the write page runs script.js without any form, frame or feed work", async () => {
   const page = runReviewsPage({ body: openBody() });
-  assert.equal(page.fetchCalls.length, 0, "no feed fetch before or after the form starts");
-  assert.equal(page.posted.length, 1, "the form is seeded in the same turn the page starts");
-  const seed = page.seedOf();
-  assert.equal(seed.sourceKind, "review");
-  assert.equal(seed.formMode, "review");
-  assert.equal(seed.productName, "");
-  assert.match(seed.reviewId, /^request-\d+$/);
-  assert.equal(page.posted[0].children.find((child) => child.name === "mode").value, "review");
-  assert.equal(page.posted[0].action, "https://script.google.test/exec");
-  assert.equal(page.list.children.length, 0, "the write page no longer renders a review list");
-});
-
-test("the Reviews page passes a valid product and rating from the address into the form seed", () => {
-  const page = runReviewsPage({ search: "?product=catalogue%3Adiwali-jewel-glow-tealight.jpg&rating=4" });
-  const seed = page.seedOf();
-  assert.equal(seed.productId, "catalogue:diwali-jewel-glow-tealight.jpg");
-  assert.equal(seed.rating, "4");
-  const bad = runReviewsPage({ search: "?product=%3Cscript%3E&rating=9" });
-  assert.equal(bad.seedOf().productId, undefined);
-  assert.equal(bad.seedOf().rating, undefined);
-  const dotted = runReviewsPage({ search: "?product=catalogue%3Aa%2Fb&rating=0" });
-  assert.equal(dotted.seedOf().productId, undefined);
-  assert.equal(dotted.seedOf().rating, undefined);
+  await settle();
+  assert.equal(page.fetchCalls.length, 0, "no feed fetch on the write page");
+  assert.equal(page.posted.length, 0, "no seed is posted to Google");
+  assert.equal(page.list.children.length, 0);
 });
 
 const repeatProfile = (customerName, expiresAt = Date.now() + 24 * 60 * 60 * 1000) => ({ saloniRepeatProfile: JSON.stringify({ version: 1, expiresAt, profile: { customerName, phone: "98765 43210", fulfillment: "pickup", pin: "305001" } }) });
-
-test("the Reviews page fills the first name from the saved order details, and only a valid one", () => {
-  assert.equal(runReviewsPage({ storage: repeatProfile("  Asha Sharma ") }).seedOf().firstName, "Asha");
-  assert.equal(runReviewsPage().seedOf().firstName, undefined);
-  assert.equal(runReviewsPage({ storage: repeatProfile("Asha Sharma", Date.now() - 1000) }).seedOf().firstName, undefined);
-  assert.equal(runReviewsPage({ storage: repeatProfile("A Sharma") }).seedOf().firstName, undefined);
-  assert.equal(runReviewsPage({ storage: repeatProfile("asha@mail.com") }).seedOf().firstName, undefined);
-  assert.equal(runReviewsPage({ storage: { saloniRepeatProfile: "not json" } }).seedOf().firstName, undefined);
-});
-
-test("the Reviews page with an unconfigured backend shows the calm not-configured message and no form", () => {
-  const page = runReviewsPage({ configured: false });
-  assert.equal(page.posted.length, 0);
-  assert.equal(page.fetchCalls.length, 0);
-  assert.equal(page.frame().hidden, true);
-  assert.equal(page.status.hidden, false);
-  assert.match(page.status.textContent, /not configured for this preview yet/);
-  assert.match(page.status.innerHTML, /href="tel:\+918209238541"/);
-});
-
-test("the Reviews page seeds the form even when the feed would say intake is paused; the form shows its own paused message", async () => {
-  const page = runReviewsPage({ body: openBody([sampleReview()], { intake: "paused" }) });
-  await settle();
-  assert.equal(page.posted.length, 1);
-  assert.equal(page.fetchCalls.length, 0);
-  assert.equal(page.list.children.length, 0);
-  assert.match(formHtml, /id="paused-message"[^>]*hidden/);
-});
 
 test("the home page reads the feed without custom headers only when the reviews section nears the viewport", async () => {
   const page = runReviewsPage({ home: true, observer: true, body: openBody([sampleReview(), sampleReview({ id: "review-sample-0002", rating: 5 })], { summary: { count: 2, average: 4.5 } }) });
@@ -1710,35 +1797,7 @@ test("the home page still lists reviews when the feed says new reviews are pause
   assert.equal(page.posted.length, 0);
 });
 
-test("the review form uses the review_submission captcha action through the pinned sender", async () => {
-  const page = runReviewsPage({});
-  const nonce = page.seedOf().channelNonce;
-  const frame = page.frame();
-  page.windowObject.messageListener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce, siteKey: "site-key", mode: "review" }, ports: [] });
-  const sent = [];
-  const port = { postMessage: (message) => sent.push(message), close() {} };
-  page.windowObject.messageListener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-order-captcha-request", nonce, attemptId: "attempt-1", mode: "review" }, ports: [port] });
-  await settle();
-  assert.deepEqual(plain(page.executed), [{ action: "review_submission" }]);
-  assert.equal(sent[0].ok, true);
-  assert.equal(sent[0].attemptId, "attempt-1");
-});
-
-test("a review announced by the pinned form triggers no feed fetch and no second seed", async () => {
-  const page = runReviewsPage({});
-  const nonce = page.seedOf().channelNonce;
-  const frame = page.frame();
-  const listener = page.windowObject.messageListener;
-  listener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce, siteKey: "site-key" }, ports: [] });
-  listener({ origin: ORIGIN, source: frame.contentWindow, data: { type: "saloni-review-submitted", nonce }, ports: [] });
-  await settle();
-  assert.equal(page.fetchCalls.length, 0, "an old form that still announces a review changes nothing");
-  assert.equal(page.posted.length, 1, "the success message in the iframe is not replaced");
-});
-
-test("the Reviews page is the only page left on the iframe form path and the page chrome is untouched", () => {
-  assert.match(siteScript, /!frame && requestedMode === "review"/);
-  assert.match(siteScript, /var captchaAction = "review_submission"/);
+test("script.js keeps the shared review-list renderer and has no review-page list or reload code", () => {
   assert.doesNotMatch(siteScript, /loadReviewPage|REVIEW_CONTACT|saloni-review-submitted/, "the review-page list and its reload are gone");
   assert.match(siteScript, /\n  function renderReviews\(data\)/, "the list renderer is shared at the top level");
   assert.doesNotThrow(() => new vm.Script(siteScript));
@@ -1759,7 +1818,7 @@ const markersOf = (buffer) => {
   return found;
 };
 
-test("B1: the real WebKit canvas JPEG (Exif and Photoshop blocks) is stripped by the form and accepted by the server", () => {
+test("B1: the real WebKit canvas JPEG (Exif and Photoshop blocks) is stripped by the form and accepted by the server", async () => {
   const original = Buffer.from(WEBKIT_JPEG, "base64");
   assert.ok(markersOf(original).includes(0xe1) && markersOf(original).includes(0xed), "fixture is real WebKit output");
   const server = makeRuntime();
@@ -1769,8 +1828,7 @@ test("B1: the real WebKit canvas JPEG (Exif and Photoshop blocks) is stripped by
   assert.equal(runtime.previews.children.length, 1);
   assert.equal(runtime.errors.length, 0);
   fillReviewForm(runtime);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
+  await runtime.submit();
   const sent = Buffer.from(runtime.submissions[0].photos[0].data, "base64");
   const markers = markersOf(sent);
   assert.deepEqual(markers.filter((marker) => marker >= 0xe1 && marker <= 0xef || marker === 0xfe), []);
@@ -1782,7 +1840,7 @@ test("B1: the real WebKit canvas JPEG (Exif and Photoshop blocks) is stripped by
   assert.equal(accepted.ok, true);
 });
 
-test("B1: the form drops APP1 to APP15 and COM segments, keeps the others, and measures the stripped size", () => {
+test("B1: the form drops APP1 to APP15 and COM segments, keeps the others, and measures the stripped size", async () => {
   const extra = [[0xe2, "ICC_PROFILE\0abc"], [0xe1, Buffer.alloc(60000, 0x41)], [0xe1, Buffer.alloc(60000, 0x42)], [0xed, "Photoshop 3.0\0"], [0xee, "Adobe"], [0xef, "x"], [0xfe, "a comment with a secret"], [0xdb, Buffer.alloc(10, 1)]];
   const noisy = makeJpeg({ extra, size: 1024 * 1024 + 70000 });
   assert.ok(noisy.length > 1024 * 1024, "raw bytes are over 1 MB");
@@ -1790,8 +1848,7 @@ test("B1: the form drops APP1 to APP15 and COM segments, keeps the others, and m
   addPhotos(runtime, [jpegFile()]);
   assert.equal(runtime.canvases[0].qualities.length, 1, "the stripped size fits, so the first quality is used");
   fillReviewForm(runtime);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
+  await runtime.submit();
   const sent = Buffer.from(runtime.submissions[0].photos[0].data, "base64");
   assert.deepEqual(markersOf(sent).filter((marker) => marker !== 0xdb && marker !== 0xe0 && marker !== 0xda), [], "no APPn beyond APP0 or COM is left");
   assert.ok(markersOf(sent).includes(0xe0) && markersOf(sent).filter((marker) => marker === 0xdb).length === 1);
@@ -1878,17 +1935,16 @@ test("H3: a failing product list is cached for 60 seconds so requests do not ref
   assert.equal(good.state.cache.has("review-products-failed-v1"), false);
 });
 
-test("R5: Write another review while photos are preparing cannot leak old photos or break the counter", () => {
+test("R5: Write another review while photos are preparing cannot leak old photos or break the counter", async () => {
   const runtime = makeFormRuntime();
   fillReviewForm(runtime);
   addPhotos(runtime, [jpegFile()]);
-  runtime.form.dispatch("submit", { preventDefault() {} });
-  respondReviewCaptcha(runtime, 0);
-  runtime.callbacks[0].success({ ok: true });
+  await runtime.submit();
+  await runtime.fetches[0].respond({ ok: true });
   runtime.imageBehaviour.defer = true;
   addPhotos(runtime, [jpegFile(), jpegFile()]);
   assert.equal(runtime.pendingImages.length, 1);
-  runtime.elements.get("another-button").dispatch("click");
+  runtime.another.dispatch("click");
   runtime.imageBehaviour.defer = false;
   runtime.pendingImages.splice(0).forEach((finish) => finish());
   assert.equal(runtime.previews.children.length, 0, "stale callbacks add nothing to the new form");

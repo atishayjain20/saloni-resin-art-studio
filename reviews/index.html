@@ -20,10 +20,9 @@
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
   <title>Write a review | Saloni Resin Art Studio</title>
-  <link rel="preconnect" href="https://script.google.com">
-  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-  <link rel="stylesheet" href="../styles.css?v=20261161">
-  <script class="site-script" src="../script.js?v=20261161" defer></script>
+  <link rel="stylesheet" href="../styles.css?v=20261162">
+  <script class="site-script" src="../script.js?v=20261162" defer></script>
+  <script class="public-forms-script" src="../public-forms.js?v=20261162" defer></script>
 </head>
 <body class="reviews-page">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -40,10 +39,37 @@
     </section>
     <section class="reviews-write shell" id="write" aria-labelledby="reviews-title">
       <div class="reviews-write-copy"><p>Review the studio in general or one of the pieces.</p></div>
-      <div class="order-panel order-form-panel" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec" data-form-mode="review">
+      <div class="page-form">
         <p class="panel-label">Customer review</p>
-        <div class="order-form-status" id="order-form-status" role="status" aria-live="polite">Loading the review form…</div>
-        <iframe id="order-form-frame" name="saloni-review-form-frame" title="Saloni Resin Art Studio customer review form" hidden></iframe>
+        <form id="review-form" aria-label="Customer review" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec" data-captcha-site-key="6Lcyc_YtAAAAAH9NRP14nKWeaeVcIBXs5PwrhmT3" data-products-url="products.json" novalidate>
+          <fieldset><legend>Your review</legend>
+            <label for="product-id">What is your review about? <select id="product-id" name="productId"><option value="studio">The studio in general</option></select></label>
+            <p id="product-hint" class="hint" hidden>The product list is unavailable right now. You can still review the studio in general.</p>
+            <fieldset id="rating-group" class="rating-group"><legend>Rating</legend>
+              <div class="stars">
+                <label for="rating-1"><input id="rating-1" type="radio" name="rating" value="1"> 1 <span class="star" aria-hidden="true">★</span><span class="sr-only">star</span></label>
+                <label for="rating-2"><input id="rating-2" type="radio" name="rating" value="2"> 2 <span class="star" aria-hidden="true">★</span><span class="sr-only">stars</span></label>
+                <label for="rating-3"><input id="rating-3" type="radio" name="rating" value="3"> 3 <span class="star" aria-hidden="true">★</span><span class="sr-only">stars</span></label>
+                <label for="rating-4"><input id="rating-4" type="radio" name="rating" value="4"> 4 <span class="star" aria-hidden="true">★</span><span class="sr-only">stars</span></label>
+                <label for="rating-5"><input id="rating-5" type="radio" name="rating" value="5"> 5 <span class="star" aria-hidden="true">★</span><span class="sr-only">stars</span></label>
+              </div>
+            </fieldset>
+            <div class="grid">
+              <label for="first-name">First name (shown publicly) <input id="first-name" name="firstName" maxlength="40" autocomplete="given-name" required></label>
+              <label for="city">City (optional) <input id="city" name="city" maxlength="60" autocomplete="address-level2"></label>
+            </div>
+            <label for="comment">Your review <textarea id="comment" name="comment" maxlength="800" required placeholder="What did you order, and how did it feel to receive it?"></textarea></label>
+          </fieldset>
+          <fieldset><legend>Photos (optional)</legend>
+            <label for="review-photos">Add up to 3 photos (JPG or PNG) <input id="review-photos" name="photos" type="file" accept="image/jpeg,image/png" multiple></label>
+            <ul id="photo-previews" class="photo-previews" aria-label="Selected photos"></ul>
+          </fieldset>
+          <input id="review-id" name="reviewId" type="hidden">
+          <p id="form-status" class="status" role="status" aria-live="polite" tabindex="-1"></p>
+          <div class="actions"><button id="submit-button" type="submit">Post review</button><button id="another-button" type="button" hidden>Write another review</button></div>
+          <p class="privacy">Reviews are public on the home page. To remove yours, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
+        </form>
+        <noscript><p class="status error">This form needs JavaScript. To share a review without it, call Saloni at <a href="tel:+918209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.</p></noscript>
       </div>
     </section>
   </main>
