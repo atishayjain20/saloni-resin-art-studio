@@ -105,9 +105,9 @@ function createStorage(initial = {}) {
   };
 }
 
-const CATALOGUE_PREPARE_DELAY_MS = 600;
+const CATALOGUE_PREPARE_DELAY_MS = 300;
 
-function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "", diwaliOffer = false } = {}) {
+function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "", diwaliOffer = false, observers = null } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
@@ -368,6 +368,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     clearTimeout(id) { if (scheduledTimers[id - 1]) scheduledTimers[id - 1].cleared = true; },
     grecaptcha: { ready(callback) { callback(); }, execute() { return Promise.resolve("parent-token"); } },
   };
+  if (observers) windowObject.IntersectionObserver = class { constructor(callback, init) { this.callback = callback; this.init = init; this.targets = []; this.disconnected = false; observers.push(this); } observe(target) { this.targets.push(target); } unobserve() {} disconnect() { this.disconnected = true; } };
   if (diwaliOffer) elements.set("diwali-offer-bar", { id: "diwali-offer-bar", hidden: false });
   const documentObject = {
     documentElement: { classList: { add() {} } },
@@ -392,7 +393,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
       return element;
     },
   };
-  const context = { console, document: documentObject, window: windowObject, URL, IntersectionObserver: undefined, Date, Math };
+  const context = { console, document: documentObject, window: windowObject, URL, IntersectionObserver: windowObject.IntersectionObserver, Date, Math };
   vm.createContext(context);
   vm.runInContext(source, context, { filename: "script.js" });
   documentObject.ready();
@@ -1348,13 +1349,59 @@ test("adding to the cart seeds the order form in the background after a short pa
   const flow = runFlow();
   flow.catalogueButton.dispatch("click");
   assert.equal(flow.posted.length, 0, "nothing is sent until the cart settles");
-  assert.deepEqual(flow.pendingCataloguePrepares().map((timer) => timer.delay), [600]);
+  assert.deepEqual(flow.pendingCataloguePrepares().map((timer) => timer.delay), [300]);
   flow.flushCatalogueSeed();
   assert.equal(flow.posted.length, 1);
   assert.equal(flow.orderDialog.open, false, "the dialog stays closed");
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.sourceId, "catalogue:multi-item");
   assert.deepEqual(seed.bundleItems.map((item) => item.sourceId), ["catalogue:test-frame.png"]);
+});
+
+const savedCartStorage = () => createStorage({ saloniCatalogueCart: JSON.stringify({ version: 1, expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, items: [{ sourceId: "catalogue:test-frame.png", quantity: 2 }] }) });
+
+test("a saved cart is prepared when its section nears the screen, not on every page load", () => {
+  const observers = [];
+  const flow = runFlow({ storage: savedCartStorage(), observers });
+  assert.equal(flow.posted.length, 0, "no seed on page load");
+  assert.equal(flow.pendingCataloguePrepares().length, 0, "nothing is scheduled on page load");
+  const observer = observers.find((item) => item.targets.includes(flow.catalogueSelection));
+  assert.ok(observer, "the saved cart section is watched");
+  assert.match(observer.init.rootMargin, /^\d+px/);
+  observer.callback([{ isIntersecting: false }], observer);
+  assert.equal(flow.pendingCataloguePrepares().length, 0, "an entry that is not intersecting prepares nothing");
+  observer.callback([{ isIntersecting: true }], observer);
+  assert.equal(observer.disconnected, true);
+  assert.equal(flow.pendingCataloguePrepares().length, 1);
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 1);
+  assert.equal(flow.orderDialog.open, false, "the dialog stays closed");
+  assert.equal(submittedSeed(flow.posted).quantity, "2");
+  flow.catalogueCartOrder.dispatch("click");
+  assert.equal(flow.posted.length, 1, "Order now opens the prepared form without a second seed");
+  assert.equal(flow.orderDialog.open, true);
+});
+
+test("an empty cart or a browser without IntersectionObserver never prepares a saved cart on load", () => {
+  const observers = [];
+  const empty = runFlow({ observers });
+  assert.equal(observers.some((item) => item.targets.includes(empty.catalogueSelection)), false, "nothing to watch without saved items");
+  assert.equal(empty.posted.length, 0);
+  const plain = runFlow({ storage: savedCartStorage() });
+  assert.equal(plain.posted.length, 0);
+  assert.equal(plain.pendingCataloguePrepares().length, 0);
+});
+
+test("a saved cart section that is already near the screen prepares only once even if the cart then changes", () => {
+  const observers = [];
+  const flow = runFlow({ storage: savedCartStorage(), observers });
+  const observer = observers.find((item) => item.targets.includes(flow.catalogueSelection));
+  observer.callback([{ isIntersecting: true }], observer);
+  flow.generatedCatalogueButton.dispatch("click");
+  assert.equal(flow.pendingCataloguePrepares().length, 1, "the cart change replaces the pending seed");
+  flow.flushCatalogueSeed();
+  assert.equal(flow.posted.length, 1);
+  assert.equal(submittedSeed(flow.posted).bundleItems.length, 2);
 });
 
 test("rapid cart changes are debounced into one background seed of the final cart", () => {
