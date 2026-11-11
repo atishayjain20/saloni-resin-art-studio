@@ -91,6 +91,7 @@ function doPost(event) {
   // The order, partner, corporate and review forms live in the site itself and talk to these JSON actions; "seed" below stays so older cached pages keep working.
   if (action === "order") return json_(orderFromPost_(event));
   if (action === "cancel") return json_(cancelFromPost_(event));
+  if (action === "status") return json_(statusFromPost_(event));
   if (action === "referral") return json_(referralFromPost_(event));
   if (action === "partner") return json_(partnerFromPost_(event));
   if (action === "corporate") return json_(corporateFromPost_(event));
@@ -856,6 +857,60 @@ function requestOrderCancellation_(requestId) {
       try { sendCancellationAlert_(alert, properties); } catch (emailError) { console.error("Cancellation email failed."); }
     }
   }
+}
+
+// --- Order status for "My orders" ----------------------------------------
+// The shopper's browser sends the request IDs it remembers and gets back one fixed code per order found, read from the Status
+// column Saloni updates by hand. Only the code leaves the sheet: never the Status words, Staff notes or any customer data.
+// Read-only: no lock and no write. Paused by ORDER_STATUS_DISABLED=true (its own switch; the dialog then keeps the last known status).
+var STATUS_MAX_IDS = 50;
+
+function statusFromPost_(event) {
+  var body;
+  try { body = postedJson_(event); } catch (parseError) { return { ok: false, error: "invalid" }; }
+  try { return orderStatuses_(body.requestIds); } catch (error) { return { ok: false, error: "unconfirmed" }; }
+}
+
+function orderStatuses_(requestIds) {
+  var properties = PropertiesService.getScriptProperties();
+  if (isTrue_(properties.getProperty("ORDER_STATUS_DISABLED"))) return { ok: false, error: "paused" };
+  var has = function (map, key) { return Object.prototype.hasOwnProperty.call(map, key); };
+  var wanted = {};
+  var count = 0;
+  (Array.isArray(requestIds) ? requestIds.slice(0, STATUS_MAX_IDS) : []).forEach(function (id) {
+    if (typeof id === "string" && ORDER_REQUEST_ID_PATTERN.test(id) && !has(wanted, id)) { wanted[id] = true; count += 1; }
+  });
+  if (!count) return { ok: false, error: "invalid" };
+  var sheet = openOrderSheet_(properties);
+  var statuses = {};
+  var rows = sheet.getLastRow() - 1;
+  if (rows > 0) {
+    var statusColumn = LEGACY_ORDER_HEADERS.indexOf("Status");
+    // One read of the Request ID .. Status columns; the schema check in openOrderSheet_ has already pinned the header order.
+    var values = sheet.getRange(2, 1, rows, statusColumn + 1).getValues();
+    for (var row = 0; row < values.length; row += 1) {
+      var id = String(values[row][0]);
+      if (has(wanted, id) && !has(statuses, id)) statuses[id] = orderStatusCode_(values[row][statusColumn]);
+    }
+  }
+  return { ok: true, statuses: statuses };
+}
+
+// The Status words Saloni types, as the fixed codes the site understands. Anything she words differently reads as "in_progress",
+// so her own wording stays private.
+function orderStatusCode_(cell) {
+  var status = String(cell == null ? "" : cell).trim().toLowerCase();
+  if (status === "" || status === "new request") return "received";
+  if (status === "cancellation requested") return "cancel_requested";
+  // Saloni types "Cancellation declined" when she will not cancel; it must be checked before the "cancel" rule below.
+  if (status.indexOf("cancel") !== -1 && status.indexOf("declin") !== -1) return "cancel_declined";
+  // A plain "Declined" or "Rejected" means Saloni turned the order down, so the shopper sees Cancelled.
+  if (status.indexOf("cancel") !== -1 || status.indexOf("declin") !== -1 || status.indexOf("reject") !== -1) return "cancelled";
+  if (status === "confirmed" || status === "accepted") return "confirmed";
+  if (status === "ready" || status === "ready for pickup") return "ready";
+  if (status === "dispatched" || status === "shipped" || status === "out for delivery") return "dispatched";
+  if (status === "delivered" || status === "completed" || status === "picked up") return "delivered";
+  return "in_progress";
 }
 
 function sendCancellationAlert_(alert, properties) {

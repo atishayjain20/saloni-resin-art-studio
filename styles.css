@@ -489,7 +489,18 @@ dialog.my-orders-dialog::backdrop { background: rgba(42, 14, 31, .72); }
 .my-order-meta, .my-order-notes, .my-order-status { margin: .6rem 0 0; font-size: .8rem; line-height: 1.45; overflow-wrap: anywhere; }
 .my-order-meta { color: var(--ink); font-weight: 800; }
 .my-order-notes { color: var(--muted); }
-.my-order-status { color: var(--rose-ink); font-weight: 800; }
+.my-order-status, .my-order-status.is-received { width: fit-content; max-width: 100%; padding: .3rem .7rem; border-radius: 1rem; background: #fde3ee; color: var(--rose-ink); font-weight: 800; }
+.my-order-status.is-confirmed { background: #e0eefb; color: #0b4a7d; }
+.my-order-status.is-in-progress { background: #fff0d1; color: #6b4300; }
+.my-order-status.is-ready { background: #def3e4; color: #17612f; }
+.my-order-status.is-dispatched { background: #e4e9fb; color: #2c3f94; }
+.my-order-status.is-delivered { background: #d3efdc; color: #0f5226; }
+.my-order-status.is-cancel-requested { background: #fff0d1; color: #6b4300; }
+.my-order-status.is-cancel-declined { background: #def3e4; color: #17612f; }
+.my-order-status.is-cancelled { background: #ececec; color: #4a4a4a; }
+.my-order-note { margin: .5rem 0 0; font-size: .8rem; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; }
+.my-order-note[hidden] { display: none; }
+.my-order-note.is-error { color: #a41f33; font-weight: 800; }
 .my-orders-contact { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .my-orders-contact p { flex: 1 1 100%; margin: 0; }
 .my-order-cancel { margin-top: .7rem; }
