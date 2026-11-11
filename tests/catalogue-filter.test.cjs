@@ -977,5 +977,25 @@ test("a shared ?product= link does not disturb the ?type= and ?budget= filters",
   assert.equal(harness.priceFilter.value, "999");
   const urls = harness.windowObject.history.replacements;
   assert.match(urls[urls.length - 1] || "", /type=corporate&budget=999/);
-  assert.match(harness.windowObject.location.search, /product=slug-product-1/, "the product stays in the address so its popup can still open");
+  assert.doesNotMatch(harness.windowObject.location.search, /product=/, "the normalised address no longer carries the shared product");
+  assert.match(harness.windowObject.location.search, /ref=keep/);
+});
+
+test("choosing a category after a shared ?product= link writes an address without the product", () => {
+  const harness = createHarness({ url: "https://example.test/?product=slug-product-30#diwali" });
+  harness.typeFilter.value = "corporate";
+  harness.typeFilter.dispatch("change");
+  harness.applyButton.dispatch("click");
+  const writes = harness.windowObject.history.pushes.concat(harness.windowObject.history.replacements);
+  assert.ok(writes.length > 0);
+  writes.forEach((next) => assert.doesNotMatch(next, /product=/));
+  assert.doesNotMatch(harness.windowObject.location.search, /product=/);
+});
+
+test("removing ?product= from the address while the popup is open is not a catalogue change", () => {
+  const harness = createHarness({ url: "https://example.test/?product=slug-product-30#diwali" });
+  const shown = visibleCards(harness).length;
+  harness.windowObject.history.replaceState({}, "", "/#diwali");
+  harness.windowObject.listeners.popstate();
+  assert.equal(visibleCards(harness).length, shown, "Back from the popup must not re-collapse the sections");
 });

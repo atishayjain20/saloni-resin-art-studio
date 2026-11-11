@@ -395,6 +395,9 @@
     }
     var lightboxTriggers = document.querySelectorAll("[data-lightbox-trigger]");
     var openSharedProduct = null;
+    // Read now: the catalogue may tidy the address before the popup opens.
+    var sharedSlug = "";
+    try { sharedSlug = new URLSearchParams((window.location && window.location.search) || "").get("product") || ""; } catch (error) {}
     var lastTrigger = null;
     var lightboxItems = [];
     var lightboxIndex = 0;
@@ -798,7 +801,7 @@
         var url = slug ? productShareUrl(slug) : "";
         shareData = url ? { title: item.title, text: shareSummary(item.title, item.price), url: url } : null;
         shareBox.hidden = !shareData;
-        if (shareOptions) { shareOptions.hidden = true; shareButton.removeAttribute("aria-expanded"); }
+        if (shareOptions) { shareOptions.hidden = true; shareButton.setAttribute("aria-expanded", "false"); }
         if (shareStatus) shareStatus.textContent = "";
         if (!shareData) return;
         shareButton.setAttribute("aria-label", "Share " + item.title);
@@ -829,13 +832,21 @@
       });
 
       openSharedProduct = function () {
-        var slug = new URLSearchParams((window.location && window.location.search) || "").get("product");
-        if (!slug) return;
+        if (!sharedSlug) return;
         var match = null;
         lightboxTriggers.forEach(function (trigger) {
-          if (!match && trigger.getAttribute("data-product-slug") === slug) match = trigger;
+          if (!match && trigger.getAttribute("data-product-slug") === sharedSlug) match = trigger;
         });
         if (!match) return;
+        // Take ?product= out of the address (hash and other params stay) so a reload or a later category pick never
+        // reopens the popup. This is done before the popup's own history step, so Back still closes the popup and stays on the site.
+        try {
+          if (window.history && typeof window.history.replaceState === "function" && window.location && window.location.href) {
+            var clean = new URL(window.location.href);
+            clean.searchParams.delete("product");
+            window.history.replaceState(window.history.state, "", clean.pathname + clean.search + clean.hash);
+          }
+        } catch (error) {}
         // Back from the popup must leave the page where the link scrolled it, not where the browser saved it before the jump.
         if (window.history) window.history.scrollRestoration = "manual";
         openLightbox(match, match);
@@ -1463,7 +1474,7 @@
     function urlWithState(state, hash) {
       var url = new URL(currentUrl(), "https://saloniresinart.com/");
       var params = url.searchParams;
-      ["type", "budget", "page", "q", "view"].forEach(function (key) { params.delete(key); });
+      ["type", "budget", "page", "q", "view", "product"].forEach(function (key) { params.delete(key); });
       if (state && state.preview) {
         params.set("view", "preview");
         params.set("type", state.type || "all");
@@ -1590,7 +1601,14 @@
     // The search and hash the catalogue last applied. A dialog's own history step (order, lightbox, My orders)
     // fires popstate with the URL unchanged; re-applying it would collapse the shopper's open section and jump the page.
     var appliedLocation = "";
-    function locationKey() { return window.location ? (window.location.search || "") + (window.location.hash || "") : ""; }
+    // Without ?product=: a shared link drops it once its popup opens, which is not a change to the catalogue.
+    function locationKey() {
+      if (!window.location) return "";
+      var params = new URLSearchParams(window.location.search || "");
+      params.delete("product");
+      var search = params.toString();
+      return (search ? "?" + search : "") + (window.location.hash || "");
+    }
 
     function restoreFromLocation() {
       applyLocation();

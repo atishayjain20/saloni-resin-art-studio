@@ -27,7 +27,7 @@ test("share helpers build the product page URL and an encoded WhatsApp message",
   assert.equal(decodeURIComponent(api.whatsappShareUrl("Rose Tray", "", `${SITE}/p/rose-tray/`).split("text=")[1]), `Rose Tray – ${SITE}/p/rose-tray/`, "no price, no dangling dash");
 });
 
-function harness({ search = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false } = {}) {
+function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false } = {}) {
   const make = (extra = {}) => Object.assign({
     hidden: false, textContent: "", attributes: {}, listeners: {},
     addEventListener(type, listener) { this.listeners[type] = listener; },
@@ -66,14 +66,16 @@ function harness({ search = "", share, clipboard, withShare = true, slugs = { "j
   const navigator = {};
   if (withShare) navigator.share = (data) => { calls.share.push(data); return share ? share() : Promise.resolve(); };
   if (clipboard) navigator.clipboard = { writeText: (text) => { calls.clipboard.push(text); return clipboard(); } };
-  const windowObject = { navigator, history: { state: null, pushState(state, title, url) { pushes.push(url); this.state = state; } }, setTimeout(callback) { callback(); } };
-  if (!noLocation) windowObject.location = { search, href: "https://saloniresinart.com/" + search };
+  const order = [];
+  const replaces = [];
+  const windowObject = { navigator, history: { state: null, pushState(state, title, url) { order.push("push"); pushes.push(url); this.state = state; }, replaceState(state, title, url) { order.push("replace"); replaces.push(url); } }, setTimeout(callback) { callback(); } };
+  if (!noLocation) windowObject.location = { search, hash, href: "https://saloniresinart.com/" + search + hash };
   const documentObject = {
     getElementById: (id) => elements[id] || null,
     querySelectorAll: (selector) => (selector === "[data-lightbox-trigger]" ? triggers : []),
   };
-  const result = vm.runInNewContext(`(function () { ${helpers}${lightboxBlock}\n return { openSharedProduct: typeof openSharedProduct === "function" ? openSharedProduct : null }; })()`, { document: documentObject, window: windowObject, URLSearchParams });
-  return { elements, triggers, lightbox, image, pushes, calls, windowObject, openSharedProduct: result.openSharedProduct };
+  const result = vm.runInNewContext(`(function () { ${helpers}${lightboxBlock}\n return { openSharedProduct: typeof openSharedProduct === "function" ? openSharedProduct : null }; })()`, { document: documentObject, window: windowObject, URLSearchParams, URL });
+  return { elements, triggers, lightbox, image, pushes, replaces, order, calls, windowObject, openSharedProduct: result.openSharedProduct };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -94,12 +96,31 @@ test("?product=<slug> opens that product's own popup", () => {
   assert.equal(second.elements["lightbox-product-name"].textContent, "Jewel Glow Tealight");
 });
 
+test("opening a shared product takes ?product= out of the address (keeping the hash and other params) before the popup's own history step", () => {
+  const page = harness({ search: "?ref=ABC&product=jewel-glow-tealight&x=1", hash: "#diwali" });
+  page.openSharedProduct();
+  assert.deepEqual(page.replaces, ["/?ref=ABC&x=1#diwali"]);
+  assert.deepEqual(page.order, ["replace", "push"], "the base entry is cleaned first, so Back from the popup lands on the clean address and stays on the site");
+  const alone = harness({ search: "?product=mr-and-mrs-name-plate", hash: "#marriage-gifts" });
+  alone.openSharedProduct();
+  assert.deepEqual(alone.replaces, ["/#marriage-gifts"]);
+});
+
+test("the shared slug is read when the page loads, so the catalogue tidying the address first does not lose it", () => {
+  const page = harness({ search: "?product=jewel-glow-tealight" });
+  page.windowObject.location.search = "";
+  page.openSharedProduct();
+  assert.equal(page.lightbox.open, true);
+  assert.equal(page.elements["lightbox-product-name"].textContent, "Jewel Glow Tealight");
+});
+
 test("an unknown, empty or missing product leaves the home page as it is", () => {
   for (const search of ["?product=no-such-gift", "?product=", "?product=JEWEL-GLOW-TEALIGHT", "?type=diwali", "", "?product=__proto__"]) {
     const page = harness({ search });
     assert.doesNotThrow(() => page.openSharedProduct(), search);
     assert.notEqual(page.lightbox.open, true, search);
     assert.equal(page.pushes.length, 0, search);
+    assert.equal(page.replaces.length, 0, search + " leaves the address alone");
     assert.equal(page.windowObject.history.scrollRestoration, undefined, "a normal page keeps the browser's own scroll restoring");
   }
   const noLocation = harness({ noLocation: true });
@@ -117,6 +138,7 @@ test("the popup's Share button uses the phone's own share sheet when there is on
   const page = harness({ search: "?product=jewel-glow-tealight" });
   page.openSharedProduct();
   assert.equal(page.elements["lightbox-share"].hidden, false);
+  assert.equal(page.elements["lightbox-share-button"].attributes["aria-expanded"], "false");
   page.elements["lightbox-share-button"].listeners.click();
   assert.deepEqual(JSON.parse(JSON.stringify(page.calls.share)), [{ title: "Jewel Glow Tealight", text: "Jewel Glow Tealight – ₹249", url: `${SITE}/p/jewel-glow-tealight/` }]);
   await settle();
@@ -190,7 +212,7 @@ test("a card without a share page offers no Share button", () => {
 test("the popup markup has an accessible Share button, the two options and a polite status", () => {
   const dialog = html.match(/<dialog class="lightbox-dialog"[\s\S]*?<\/dialog>/)[0];
   assert.match(dialog, /<div class="lightbox-share" id="lightbox-share" hidden>/);
-  assert.match(dialog, /<button class="button button-line lightbox-share-button" id="lightbox-share-button" type="button" aria-controls="lightbox-share-options">Share<\/button>/);
+  assert.match(dialog, /<button class="button button-line lightbox-share-button" id="lightbox-share-button" type="button" aria-expanded="false" aria-controls="lightbox-share-options">Share<\/button>/);
   assert.match(dialog, /<div class="lightbox-share-options" id="lightbox-share-options" hidden>/);
   assert.match(dialog, /<a class="button button-whatsapp" id="lightbox-share-whatsapp" href="https:\/\/wa\.me\/" target="_blank" rel="noopener">Share on WhatsApp<\/a>/);
   assert.match(dialog, /<button class="button button-line" id="lightbox-share-copy" type="button">Copy link<\/button>/);
