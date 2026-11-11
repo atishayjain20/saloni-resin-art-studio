@@ -90,6 +90,9 @@ function doPost(event) {
   var action = String(parameters.action || "");
   var mode = boundedMode_(parameters.mode);
   if (action === "rate") return ContentService.createTextOutput(JSON.stringify(submitQuickRating_(parameters))).setMimeType(ContentService.MimeType.JSON);
+  // The order form now lives in the site itself and talks to these two JSON actions; "seed" below stays so older cached pages keep working.
+  if (action === "order") return json_(orderFromPost_(event));
+  if (action === "referral") return json_(referralFromPost_(event));
   if (action === "seed") {
     var seed = parseSeed_(parameters.seed);
     seed.formMode = mode;
@@ -105,6 +108,52 @@ function doPost(event) {
     return renderForm_({ seed: seed, mode: mode });
   }
   return renderForm_({ seed: blankSeed_(), mode: mode });
+}
+
+function json_(value) {
+  return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);
+}
+
+var ORDER_POST_FIELDS = [
+  "requestId", "requestStage", "sourceKind", "sourceId", "productName", "quantity", "dimensionFormat",
+  "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "height", "heightUnit", "width", "widthUnit",
+  "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin",
+  "requestedDate", "referralCode", "bundleSourceIds"
+];
+
+function postedJson_(event) {
+  var raw = event && event.postData && typeof event.postData.contents === "string" ? event.postData.contents : "";
+  var body = JSON.parse(raw);
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("invalid");
+  return body;
+}
+
+// Rebuild the form object submitOrder expects from a JSON body: only known fields are copied, and the optional image is size-checked as base64 before it is decoded.
+function orderFromPost_(event) {
+  var body;
+  try { body = postedJson_(event); } catch (parseError) { return { ok: false, error: "invalid" }; }
+  try {
+    var form = {};
+    ORDER_POST_FIELDS.forEach(function (field) { if (body[field] !== undefined && body[field] !== null) form[field] = body[field]; });
+    var image = body.referenceImage;
+    if (image !== undefined && image !== null) {
+      var type = image && typeof image === "object" ? String(image.type || "").toLowerCase() : "";
+      var data = image && typeof image === "object" && typeof image.data === "string" ? image.data : "";
+      if (["image/jpeg", "image/png"].indexOf(type) === -1) return validationFailure_({ referenceImage: "Attach one JPG or PNG image." });
+      if (data.length > Math.ceil(MAX_FILE_BYTES / 3) * 4) return validationFailure_({ referenceImage: "The reference image must be 5 MB or smaller." });
+      if (data.length) {
+        if (!/^[A-Za-z0-9+\/]*={0,2}$/.test(data) || data.length % 4 !== 0) return validationFailure_({ referenceImage: "Attach one JPG or PNG image." });
+        form.referenceImage = Utilities.newBlob(Utilities.base64Decode(data), type, type === "image/png" ? "reference.png" : "reference.jpg");
+      }
+    }
+    return submitOrder(form);
+  } catch (error) {
+    return { ok: false, error: "unconfirmed" };
+  }
+}
+
+function referralFromPost_(event) {
+  try { return validateReferralCode(postedJson_(event).code); } catch (error) { return { status: "error", code: "" }; }
 }
 
 // A product popup can suggest which piece and how many stars the review form starts on, and saved order details a first name; submitReview still validates all three.
