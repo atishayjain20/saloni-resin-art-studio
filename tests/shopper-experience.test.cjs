@@ -588,10 +588,9 @@ test("the row of category tiles under the hero is removed completely", () => {
 test("menu and footer links use accessible local icons", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
   assert.match(nav, /data-browse-all>Gifts <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift/);
-  assert.match(nav, /data-category-shortcut="couple">Couple keepsakes <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#heart/);
-  assert.match(nav, /data-category-shortcut="frames">Resin frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
   assert.match(nav, /data-customizer-open>Design a frame <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
   assert.match(nav, /Corporate orders <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#gift[\s\S]*<\/svg> <span aria-hidden="true">↗<\/span>/);
+  assert.match(nav, /href="partners\/">Partner Circle <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#heart[\s\S]*<\/svg> <span aria-hidden="true">↗<\/span>/);
   const footer = html.match(/<div class="footer-links">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(footer, /data-category-shortcut="frames">Resin art <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
   assert.match(footer, /href="resin-photo-frames\/">Photo frames <svg class="category-icon" aria-hidden="true" focusable="false">[\s\S]*#frame/);
@@ -861,11 +860,12 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("footer trust strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Bestsellers", "Marriage gifts", "Couple keepsakes", "Resin frames", "Design a frame", "Corporate orders"].forEach((label) => {
+  ["Gifts", "Design a frame", "Corporate orders", "Partner Circle"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
+  ["Bestsellers", "Marriage gifts", "Couple keepsakes", "Resin frames"].forEach((label) => assert.doesNotMatch(nav, new RegExp(`>${label}(?:\\s|<)`)));
   assert.doesNotMatch(nav, />Order\s*<\/a>/);
-  assert.equal((nav.match(/<a\b/g) || []).length, 7);
+  assert.equal((nav.match(/<a\b/g) || []).length, 4);
   const hero = section("hero");
   const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
   const trustStrip = footer.match(/<ul class="hero-trust-strip"[\s\S]*?<\/ul>/)?.[0] || "";
