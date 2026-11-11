@@ -15,10 +15,18 @@ class OrderFlowContractTests(unittest.TestCase):
         cls.code = (ROOT / "apps-script" / "Code.gs").read_text(encoding="utf-8") if (ROOT / "apps-script" / "Code.gs").exists() else ""
         cls.form = (ROOT / "apps-script" / "Form.html").read_text(encoding="utf-8") if (ROOT / "apps-script" / "Form.html").exists() else ""
 
-    def test_pages_embeds_a_single_post_seeded_order_form(self):
+    def test_page_builds_the_order_form_in_and_only_the_other_forms_use_a_seeded_iframe(self):
         self.assertIn('id="order-form-embed"', self.html)
-        self.assertRegex(self.html, r'<iframe[^>]+id="order-form-frame"')
+        self.assertRegex(self.html, r'<form id="order-form" novalidate hidden>')
+        self.assertNotIn("<iframe", self.html[self.html.index('id="order-dialog"'):self.html.index("</dialog>", self.html.index('id="order-dialog"'))])
         self.assertIn('data-order-form-url=', self.html)
+        self.assertRegex(self.html, r'<script class="order-form-script" src="order-form\.js\?v=\d+" defer></script>\s*<script class="site-script" src="script\.js')
+        order_form = (ROOT / "order-form.js").read_text(encoding="utf-8")
+        self.assertIn('"?action=" + action', order_form)
+        self.assertIn('postJson("order"', order_form)
+        self.assertIn('postJson("referral"', order_form)
+        self.assertIn('credentials: "omit"', order_form)
+        self.assertNotIn("google.script.run", order_form)
         self.assertIn("action=seed", self.script)
         self.assertIn('seedField.name = "seed"', self.script)
         self.assertIn('method = "POST"', self.script)

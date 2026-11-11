@@ -473,7 +473,6 @@ dialog.order-dialog::backdrop { background: rgba(42, 14, 31, .72); }
 .order-dialog-close { position: static; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--ivory); color: var(--ink); font-size: 1.4rem; line-height: 1; }
 .order-dialog-close:hover, .order-dialog-close:focus-visible { background: var(--ink); color: var(--ivory); }
 .order-dialog .order-panel { padding: clamp(1.2rem, 3vw, 2rem); border-radius: 1rem; box-shadow: none; }
-.order-dialog .order-form-panel iframe { min-height: min(900px, 64dvh); }
 .order-inline-fallback { display: grid; gap: .8rem; padding: clamp(1rem, 3vw, 1.5rem); border: 1px solid var(--line); border-radius: 1.2rem; background: var(--paper); }
 .order-inline-fallback > p { max-width: 48ch; margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.55; }
 .order-inline-fallback .panel-label { color: var(--cocoa); }
@@ -923,7 +922,7 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .lightbox-image { max-height: min(50vh, 460px); }
 }
 
-/* Phones: the order form fills the screen and the form iframe is the only scroll area. */
+/* Phones: the order form fills the screen and the form panel is the only scroll area. */
 @media (max-width: 767px) {
   dialog.order-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; overflow: hidden; }
   .order-dialog-panel { display: flex; flex-direction: column; width: 100%; height: 100dvh; max-height: 100dvh; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); border-radius: 0; box-shadow: none; }
@@ -936,7 +935,9 @@ html:not(.js) .catalogue-section-disclosure { display: none; }
   .order-dialog .order-form-status { margin-top: .5rem; border-color: var(--line); color: var(--muted); }
   .order-dialog .order-form-status a { color: var(--ink); }
   .order-dialog .order-form-status .order-general-request { border-color: var(--ink); color: var(--ink); }
-  .order-dialog .order-form-panel iframe { flex: 1 1 auto; min-height: 0; border-radius: 0; }
+  .order-dialog .order-form-panel { overflow-y: auto; overscroll-behavior: contain; }
+  .order-dialog .order-form-panel > * { flex-shrink: 0; }
+  .order-dialog-title { padding: 0 .9rem; }
 }
 
 @media (max-width: 840px) and (max-height: 620px) {
@@ -1049,6 +1050,77 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
   .reviews-write-copy { margin-bottom: 1.6rem; }
   .reviews-write .order-form-panel iframe { min-height: 1650px; }
 }
+
+/* The order form built into the dialog. Everything is scoped under #order-form so it cannot leak into the rest of the site. */
+.order-dialog-title { margin: 0 0 .5rem; color: var(--ink); font: 500 clamp(1.6rem, 4vw, 2.2rem)/1.1 var(--display); }
+.order-form-intro { margin: 0 0 1rem; color: var(--muted); font-size: .88rem; line-height: 1.5; }
+.order-dialog .order-panel { background: var(--paper); color: var(--ink); }
+.order-dialog .order-panel .panel-label { color: var(--rose-ink); }
+.order-dialog .selected-product-summary { border-bottom-color: var(--line); }
+.order-dialog .selected-product-summary h3 { color: var(--ink); }
+.order-dialog .selected-product-summary p:not(.panel-label) { color: var(--muted); }
+.order-dialog .order-form-status { border-color: var(--line); color: var(--muted); }
+.order-dialog .order-form-status a { color: var(--ink); }
+.order-dialog .order-form-status .order-general-request { border-color: var(--ink); color: var(--ink); }
+.order-dialog .order-final-quote-note { color: var(--muted); }
+.order-dialog .order-form-panel > .panel-label { display: none; }
+@media (min-width: 768px) { .order-dialog .order-form-panel { padding-inline: 0; } }
+#order-form { display: grid; gap: 1rem; color: #2b2020; }
+#order-form fieldset > :not(legend):not([hidden]) + * { margin-top: .85rem; }
+#order-form .hint, #order-form .privacy, #order-form .status, #order-form .field-error { font-size: .88rem; line-height: 1.5; }
+#order-form fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fff; }
+#order-form legend { padding: 0 .35rem; font-weight: 700; }
+#order-form .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+#order-form .product-context { margin: 0 0 1rem; }
+#order-form .product-context img { display: block; width: min(100%, 22rem); max-height: 16rem; object-fit: cover; border-radius: .7rem; }
+#order-form .bundle-items { display: grid; gap: .65rem; max-height: 15rem; margin: 0 0 1rem; padding: .7rem; overflow-y: auto; border: 1px solid #dccbc1; border-radius: .65rem; background: #fffaf4; }
+#order-form .bundle-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(6rem, 8rem); gap: .7rem; align-items: center; }
+#order-form .bundle-item-name { min-width: 0; overflow-wrap: anywhere; font-size: .86rem; font-weight: 700; }
+#order-form .bundle-item label { font-size: .76rem; }
+#order-form .reference-preview { display: block; width: min(100%, 18rem); max-height: 14rem; margin-top: .65rem; object-fit: contain; border: 1px solid #dccbc1; border-radius: .7rem; background: #fffaf4; }
+#order-form label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; }
+#order-form input, #order-form select, #order-form textarea, #order-form button { font: inherit; }
+#order-form input, #order-form select, #order-form textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; }
+#order-form input[readonly] { background: #f1e9e4; color: #5d4947; }
+#order-form textarea { min-height: 7rem; resize: vertical; }
+#order-form input:focus-visible, #order-form select:focus-visible, #order-form textarea:focus-visible, #order-form button:focus-visible, #order-form summary:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
+#order-form .dimension-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+#order-form .bundle-size { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+#order-form .bundle-size label { display: flex; flex-direction: column; justify-content: flex-end; gap: .35rem; font-size: .76rem; }
+#order-form .bundle-size input { min-height: 44px; padding-inline: .45rem; }
+#order-form .bundle-size .field-error { grid-column: 1 / -1; font-size: .8rem; }
+#order-form .bundle-size-item { margin-bottom: .75rem; }
+#order-form .shipping-fields { margin-top: .85rem; }
+#order-form .more-details > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; padding: .55rem 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fffaf4; color: #5d4947; font-weight: 700; cursor: pointer; list-style: none; }
+#order-form .more-details > summary::-webkit-details-marker { display: none; }
+#order-form .more-details > summary::after { content: ""; flex: none; width: .6rem; height: .6rem; margin-top: -.3rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s; }
+#order-form .more-details[open] > summary { margin-bottom: .6rem; }
+#order-form .more-details[open] > summary::after { margin-top: .3rem; transform: rotate(-135deg); }
+#order-form .more-details > fieldset { margin-bottom: 1rem; }
+#order-form .referral-disclosure { margin-top: .85rem; }
+#order-form .referral-disclosure summary { display: flex; align-items: center; min-height: 44px; padding: .3rem 0; color: #5d4947; font-weight: 700; cursor: pointer; }
+#order-form .referral-box { display: grid; gap: .65rem; margin-top: .65rem; }
+#order-form .field-error { margin: 0; color: #a41f33; }
+#order-form .actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; }
+#order-form button { min-height: 2.8rem; padding: .7rem 1rem; border: 1px solid #2b2020; border-radius: 999px; background: #2b2020; color: #fffaf4; font-weight: 750; cursor: pointer; }
+#order-form button.secondary { background: transparent; color: #2b2020; }
+#order-form button:disabled { cursor: wait; opacity: .6; }
+#order-form .status { min-height: 1.4rem; margin: 0; }
+#order-form .status.error { color: #a41f33; }
+#order-form .status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }
+#order-form .success-celebration { position: relative; display: grid; justify-items: center; gap: .4rem; padding: 1.2rem 0 .4rem; overflow: visible; }
+#order-form .success-check { animation: success-pop .45s cubic-bezier(.2,1.4,.5,1) both; }
+#order-form .success-check-circle { fill: #2f8f5b; stroke: #2f8f5b; stroke-width: 2; }
+#order-form .success-check-mark { fill: none; stroke: #fff; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: success-draw .4s .3s ease-out forwards; }
+#order-form .success-title { margin: 0; color: #24532f; font-size: 1.35rem; font-weight: 800; animation: success-pop .45s .15s both; }
+#order-form .confetti { position: absolute; top: 3.4rem; left: 50%; width: .55rem; height: .9rem; border-radius: 2px; background: var(--c); opacity: 0; animation: confetti-burst 1.1s var(--d) ease-out forwards; }
+@keyframes success-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes success-draw { to { stroke-dashoffset: 0; } }
+@keyframes confetti-burst { 0% { opacity: 1; transform: translate(-50%, 0) rotate(0); } 100% { opacity: 0; transform: translate(calc(-50% + var(--x)), var(--y)) rotate(var(--r)); } }
+@media (prefers-reduced-motion: reduce) { #order-form .more-details > summary::after { transition: none; } #order-form .success-celebration *, #order-form .success-celebration { animation: none !important; } #order-form .success-check-mark { stroke-dashoffset: 0; } #order-form .confetti { display: none; } }
+#order-form .privacy { margin: 0; padding: .75rem; border-left: 3px solid #c77d8b; color: #5d4947; }
+#order-form .privacy a { color: inherit; font-weight: 700; }
+@media (max-width: 560px) { #order-form .grid, #order-form .dimension-pair { grid-template-columns: 1fr; } }
 
 @media (min-width: 1024px) {
   body:has(#catalogue-selection) { --max: 1320px; }

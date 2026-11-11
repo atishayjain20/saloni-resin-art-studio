@@ -213,9 +213,9 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261159">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261159" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261159" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261160">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261160" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261160" defer><\/script>/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -825,7 +825,9 @@ test("homepage order panel lives in one accessible native modal with an inline f
   const dialog = html.match(/<dialog class="order-dialog" id="order-dialog"[\s\S]*?<\/dialog>/)?.[0] || "";
   assert.match(dialog, /aria-labelledby="order-dialog-title"/);
   assert.match(dialog, /id="order-form-embed"/);
-  assert.match(dialog, /id="order-form-frame"/);
+  assert.match(dialog, /<form id="order-form" novalidate hidden>/);
+  assert.doesNotMatch(dialog, /<iframe/);
+  assert.match(dialog, /<h2 class="order-dialog-title" id="order-dialog-title">Send an order request<\/h2>/);
   const order = html.match(/<section class="order-section shell" id="order"[\s\S]*?<\/section>/)?.[0] || "";
   assert.match(order, /id="order-inline-fallback"/);
   assert.match(order, /data-order-prefill="general"/);
