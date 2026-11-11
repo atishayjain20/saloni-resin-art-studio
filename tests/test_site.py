@@ -1123,12 +1123,27 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_public_metadata_uses_settled_custom_domain_url(self):
         public_url = "https://saloniresinart.com/"
-        image_url = public_url + "assets/resin-clock.jpg"
+        image_url = public_url + "assets/share-mini-resin-desk-clock.jpg"
         self.assertIn(f'<link rel="canonical" href="{public_url}">', self.html)
         self.assertIn(f'<meta property="og:url" content="{public_url}">', self.html)
         self.assertIn(f'<meta property="og:image" content="{image_url}">', self.html)
         self.assertIn(f'<meta name="twitter:image" content="{image_url}">', self.html)
+        self.assertIn('<meta property="og:image:width" content="1200">', self.html)
+        self.assertIn('<meta property="og:image:height" content="630">', self.html)
         self.assertNotIn("atishayjain20.github.io", self.html)
+
+    def test_share_preview_image_is_large_landscape_jpeg(self):
+        data = (ROOT / "assets" / "share-mini-resin-desk-clock.jpg").read_bytes()
+        self.assertEqual(data[:2], b"\xff\xd8", "JPEG")
+        index, size = 2, None
+        while index < len(data) - 9:
+            marker, length = data[index + 1], int.from_bytes(data[index + 2:index + 4], "big")
+            if marker in (0xC0, 0xC1, 0xC2):
+                size = (int.from_bytes(data[index + 7:index + 9], "big"), int.from_bytes(data[index + 5:index + 7], "big"))
+                break
+            index += 2 + length
+        self.assertEqual(size, (1200, 630))
+        self.assertLess((ROOT / "assets" / "share-mini-resin-desk-clock.jpg").stat().st_size, 300 * 1024)
 
     def test_discovery_files_and_favicon_are_valid(self):
         robots_path = ROOT / "robots.txt"
