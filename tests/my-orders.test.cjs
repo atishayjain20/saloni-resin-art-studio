@@ -1104,3 +1104,196 @@ test("a cancel failure that arrives after the dialog was reopened is shown on th
   await settle();
   assert.match(text(live), /Could not send the request/);
 });
+
+// --- Advance payment by UPI: "Pay advance" in the status answer (kept in memory only) ---
+const ADV_ID = "abcd1234-ef56-4789-a012-3456789abcde";
+const ADV = { amount: 500, payee: "saloni.art@okhdfcbank", name: "Saloni Resin Art" };
+const advanceReply = (code, advance, id = ADV_ID) => jsonReply({ ok: true, statuses: { [id]: code }, advance: advance === undefined ? undefined : { [id]: advance } });
+const withAdvanceOrder = (reply, options = {}) => {
+  const runtime = makeRuntime(Object.assign({ statusImpl: reply }, options));
+  runtime.api.save(order({ requestId: ADV_ID }));
+  openDialog(runtime);
+  runtime.card = runtime.elements.get("my-orders-list").children[0];
+  return runtime;
+};
+const payLink = (card) => find(card, (element) => element.tagName === "A" && element.className.split(" ").includes("my-order-pay"))[0] || null;
+const advanceBox = (card) => byClass(card, "my-order-advance");
+
+test("a confirmed order with an advance shows the amount, a Pay advance link with every UPI field encoded, and a copy option", async () => {
+  const runtime = withAdvanceOrder(advanceReply("confirmed", ADV));
+  await settle();
+  const link = payLink(runtime.card);
+  assert.ok(link, "Pay advance link");
+  assert.equal(text(link), "Pay advance ₹500");
+  assert.equal(link.getAttribute("href"), "upi://pay?pa=saloni.art%40okhdfcbank&pn=Saloni%20Resin%20Art&am=500.00&cu=INR&tn=Saloni%20order%20abcd1234");
+  assert.equal(advanceBox(runtime.card).hidden, false);
+  assert.match(text(advanceBox(runtime.card)), /Advance to pay: ₹500/);
+  assert.match(text(advanceBox(runtime.card)), /Or pay ₹500 to\s+saloni\.art@okhdfcbank\s+in any UPI app and add “Saloni order abcd1234” as the note\./);
+  assert.match(text(advanceBox(runtime.card)), /Saloni will confirm once she receives it\./);
+  assert.ok(button(runtime.card, "Copy UPI ID"));
+  assert.ok(button(runtime.card, "Cancel order"), "a confirmed order can still be cancelled");
+  assert.equal(text(statusOf(runtime.card)), "Confirmed by Saloni");
+  const children = runtime.card.children.map((child) => child.className.split(" ")[0]);
+  assert.ok(children.indexOf("my-order-advance") < children.indexOf("my-order-cancel"), "the advance sits above the cancel controls");
+});
+
+test("the UPI link encodes odd payee names and cannot be bent by them", async () => {
+  const runtime = withAdvanceOrder(advanceReply("confirmed", { amount: 1200, payee: "a.b-c_d9@ybl", name: "Saloni & Co. =x?y#z ₹" }));
+  await settle();
+  const href = payLink(runtime.card).getAttribute("href");
+  assert.equal(href, "upi://pay?pa=a.b-c_d9%40ybl&pn=Saloni%20%26%20Co.%20%3Dx%3Fy%23z%20%E2%82%B9&am=1200.00&cu=INR&tn=Saloni%20order%20abcd1234");
+  assert.equal(href.split("?").length, 2);
+  assert.equal(new URLSearchParams(href.split("?")[1]).get("pn"), "Saloni & Co. =x?y#z ₹");
+  assert.equal(new URLSearchParams(href.split("?")[1]).size, 5);
+});
+
+test("Copy UPI ID copies the payee and says so, or says it could not", async () => {
+  const runtime = withAdvanceOrder(advanceReply("confirmed", ADV));
+  await settle();
+  const copied = [];
+  runtime.windowObject.navigator = { clipboard: { writeText: (value) => { copied.push(value); return Promise.resolve(); } } };
+  button(runtime.card, "Copy UPI ID").dispatch("click");
+  await settle();
+  assert.deepEqual(copied, ["saloni.art@okhdfcbank"]);
+  assert.equal(text(byClass(runtime.card, "my-order-copy-feedback")), "UPI ID copied.");
+  assert.equal(byClass(runtime.card, "my-order-copy-feedback").getAttribute("aria-live"), "polite");
+
+  runtime.windowObject.navigator = { clipboard: { writeText: () => Promise.reject(new Error("denied")) } };
+  button(runtime.card, "Copy UPI ID").dispatch("click");
+  await settle();
+  assert.match(text(byClass(runtime.card, "my-order-copy-feedback")), /Could not copy/);
+  assert.match(byClass(runtime.card, "my-order-copy-feedback").className, /is-error/);
+
+  runtime.windowObject.navigator = undefined;
+  button(runtime.card, "Copy UPI ID").dispatch("click");
+  await settle();
+  assert.match(text(byClass(runtime.card, "my-order-copy-feedback")), /Could not copy/);
+});
+
+test("no Pay button without an advance, or when the advance is not exactly what the server promises", async () => {
+  const bad = [
+    undefined, null, "500", 500, [], {},
+    { amount: 0, payee: ADV.payee, name: ADV.name }, { amount: -1, payee: ADV.payee, name: ADV.name },
+    { amount: 500.5, payee: ADV.payee, name: ADV.name }, { amount: 200001, payee: ADV.payee, name: ADV.name },
+    { amount: "500", payee: ADV.payee, name: ADV.name }, { amount: NaN, payee: ADV.payee, name: ADV.name }, { amount: Infinity, payee: ADV.payee, name: ADV.name },
+    { amount: 500, payee: "saloni", name: ADV.name }, { amount: 500, payee: "saloni@1bank", name: ADV.name }, { amount: 500, payee: "sal oni@bank", name: ADV.name },
+    { amount: 500, payee: "saloni@bank&am=1", name: ADV.name }, { amount: 500, payee: "saloni@bank\n", name: ADV.name }, { amount: 500, payee: 7, name: ADV.name },
+    { amount: 500, payee: "x".repeat(257) + "@bank", name: ADV.name }, { amount: 500, name: ADV.name }, { name: ADV.name },
+  ];
+  for (const advance of bad) {
+    const runtime = withAdvanceOrder(advanceReply("confirmed", advance));
+    await settle();
+    assert.equal(payLink(runtime.card), null, JSON.stringify(advance));
+    assert.equal(advanceBox(runtime.card).hidden, true, JSON.stringify(advance));
+    assert.equal(button(runtime.card, "Copy UPI ID"), null);
+    assert.equal(text(statusOf(runtime.card)), "Confirmed by Saloni");
+  }
+});
+
+test("a missing or odd payee name falls back to the studio name, and an odd request ID gets no button", async () => {
+  const plain = withAdvanceOrder(advanceReply("confirmed", { amount: 500, payee: ADV.payee }));
+  await settle();
+  assert.match(payLink(plain.card).getAttribute("href"), /&pn=Saloni%20Resin%20Art%20Studio&/);
+  const long = withAdvanceOrder(advanceReply("confirmed", { amount: 500, payee: ADV.payee, name: "x".repeat(200) }));
+  await settle();
+  assert.match(payLink(long.card).getAttribute("href"), /&pn=Saloni%20Resin%20Art%20Studio&/);
+  const shortId = makeRuntime({ statusImpl: advanceReply("confirmed", ADV, "request-1") });
+  shortId.api.save(order({ requestId: "request-1" }));
+  openDialog(shortId);
+  await settle();
+  assert.equal(payLink(shortId.elements.get("my-orders-list").children[0]), null);
+});
+
+test("an advance shows only while the order reads Confirmed", async () => {
+  for (const code of ["received", "in_progress", "ready", "dispatched", "delivered", "cancel_requested", "cancel_declined", "cancelled", "advance_paid"]) {
+    const runtime = withAdvanceOrder(advanceReply(code, ADV));
+    await settle();
+    assert.equal(payLink(runtime.card), null, code);
+  }
+  // A shopper who already asked to cancel does not get a Pay button while the sheet still says Confirmed.
+  const storage = createStorage();
+  const first = makeRuntime({ storage });
+  first.api.save(order({ requestId: ADV_ID }));
+  const entry = stored(storage); entry.orders[0].cancelRequestedAt = Date.now(); storage.data[KEY] = JSON.stringify(entry);
+  const runtime = makeRuntime({ storage, statusImpl: advanceReply("confirmed", ADV) });
+  openDialog(runtime);
+  await settle();
+  assert.equal(payLink(runtime.elements.get("my-orders-list").children[0]), null);
+});
+
+test("advance received reads Advance received, with no Pay button, no copy option and no Cancel order", async () => {
+  const runtime = withAdvanceOrder(advanceReply("advance_paid", undefined));
+  await settle();
+  assert.equal(text(statusOf(runtime.card)), "Advance received — thank you");
+  assert.equal(statusOf(runtime.card).className, "my-order-status is-advance-paid");
+  assert.equal(payLink(runtime.card), null);
+  assert.equal(button(runtime.card, "Copy UPI ID"), null);
+  assert.equal(button(runtime.card, "Cancel order"), null);
+  assert.equal(byClass(runtime.card, "my-order-cancel"), null);
+  assert.equal(stored(runtime.storage).orders[0].status, "advance_paid", "the code is remembered like any other status");
+  assert.match(css, /\.my-order-status\.is-advance-paid\b/);
+});
+
+test("the advance is never stored: not the amount, not the UPI ID, not the name", async () => {
+  const runtime = withAdvanceOrder(advanceReply("confirmed", ADV));
+  await settle();
+  const raw = runtime.storage.data[KEY];
+  for (const secret of ["okhdfcbank", "saloni.art", "Saloni Resin Art", "500", "advance", "upi"]) assert.ok(!raw.toLowerCase().includes(secret.toLowerCase()), secret);
+  assert.equal(stored(runtime.storage).orders[0].status, "confirmed");
+  // Saved data with an advance planted in it is ignored on read.
+  const planted = stored(runtime.storage); planted.orders[0].advance = ADV; planted.orders[0].status = "confirmed";
+  const fresh = makeRuntime({ storage: createStorage({ [KEY]: JSON.stringify(planted) }), statusImpl: () => new Promise(() => {}) });
+  openDialog(fresh);
+  assert.equal(payLink(fresh.elements.get("my-orders-list").children[0]), null, "a reload shows no button until the server answers");
+  assert.equal("advance" in fresh.api.list()[0], false);
+});
+
+test("the button stays when the dialog is reopened within the minute, and goes when a later answer drops it", async () => {
+  const clock = { now: Date.now() };
+  const replies = [advanceReply("confirmed", ADV), advanceReply("confirmed", undefined), () => Promise.reject(new Error("offline"))];
+  let call = 0;
+  const runtime = withAdvanceOrder(() => replies[call++](), { clock });
+  await settle();
+  assert.ok(payLink(runtime.card));
+  closeDialog(runtime);
+  clock.now += 10 * 1000;
+  openDialog(runtime);
+  await settle();
+  assert.equal(call, 1, "no second check inside the minute");
+  assert.ok(payLink(runtime.elements.get("my-orders-list").children[0]), "still shown from memory");
+  closeDialog(runtime);
+  clock.now += 2 * 60 * 1000;
+  openDialog(runtime);
+  await settle();
+  assert.equal(payLink(runtime.elements.get("my-orders-list").children[0]), null, "Saloni took the amount away");
+  closeDialog(runtime);
+  clock.now += 2 * 60 * 1000;
+  openDialog(runtime);
+  await settle();
+  assert.equal(text(statusOf(runtime.elements.get("my-orders-list").children[0])), "Confirmed by Saloni", "a failed check changes nothing");
+});
+
+test("when the sheet moves from confirmed to advance received, a reopened dialog shows the badge and no Pay button", async () => {
+  let reply = advanceReply("confirmed", ADV);
+  const clock = { now: Date.now() };
+  const runtime = withAdvanceOrder(() => reply(), { clock });
+  await settle();
+  assert.ok(button(runtime.card, "Copy UPI ID"));
+  reply = advanceReply("advance_paid", undefined);
+  runtime.dialog.close(); runtime.popstate(null);
+  clock.now += 2 * 60 * 1000;
+  openDialog(runtime);
+  await settle();
+  const card = runtime.elements.get("my-orders-list").children[0];
+  assert.equal(payLink(card), null);
+  assert.equal(text(statusOf(card)), "Advance received — thank you");
+});
+
+test("my-orders.js builds the advance with text nodes only and keeps the UPI shape in step with the server", () => {
+  assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML|outerHTML/);
+  const server = fs.readFileSync(path.join(root, "apps-script", "Code.gs"), "utf8");
+  const pattern = (text) => /UPI_PAYEE(?:_PATTERN)? = (\/\^.*\$\/);/.exec(text)[1];
+  assert.equal(pattern(source), pattern(server));
+  assert.match(css, /\.my-order-pay\b/);
+  assert.match(css, /\.my-order-advance\b/);
+});

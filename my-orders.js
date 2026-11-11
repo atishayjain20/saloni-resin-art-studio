@@ -7,6 +7,8 @@
  * Opening the dialog asks the same URL for the live order status (action=status): the server answers with one fixed code
  * per request ID (read from the Status column Saloni updates by hand), which is stored as status/statusCheckedAt so the
  * last known status still shows when the check fails. The shopper never sees Saloni's own Status wording.
+ * When Saloni has confirmed an order and typed an advance amount, the same answer carries advance {amount, payee, name}. It is
+ * kept in memory only (never in localStorage), checked again here, and turned into a "Pay advance" UPI link plus a copy option.
  */
 (function () {
   "use strict";
@@ -31,7 +33,8 @@
     delivered: "Delivered",
     cancel_requested: "Cancellation requested — Saloni will confirm",
     cancel_declined: "Confirmed — your cancellation request was declined. Contact Saloni if you have questions.",
-    cancelled: "Cancelled"
+    cancelled: "Cancelled",
+    advance_paid: "Advance received — thank you"
   };
   var PICKUP_LABELS = { ready: "Ready for pickup in Ajmer", delivered: "Picked up" };
   var STATUS_CHECK_GAP_MS = 60 * 1000;
@@ -40,6 +43,13 @@
   var CANCEL_TIMEOUT_MS = 25000;
   // The server only accepts request IDs of this shape (Code.gs ORDER_REQUEST_ID_PATTERN); older or odd IDs get no button.
   var CANCELLABLE_ID = /^[A-Za-z0-9_-]{12,80}$/;
+  // The UPI ID shape the server accepts too (Code.gs UPI_PAYEE_PATTERN). Anything else gets no Pay button.
+  var UPI_PAYEE = /^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9.-]{1,64}$/;
+  var ADVANCE_MIN = 1;
+  var ADVANCE_MAX = 200000;
+  var DEFAULT_PAYEE_NAME = "Saloni Resin Art Studio";
+  // The advance details of the last successful status answer, by request ID. Memory only: a reload asks again.
+  var advanceByRequest = {};
 
   function storage() {
     try { return window.localStorage || null; } catch (error) { return null; }
@@ -216,6 +226,31 @@
     if (changed && store) write(store, orders);
   }
 
+  // One advance from the server, or null when it is not exactly {amount: whole rupees 1..200000, payee: UPI ID, name: text}.
+  function validAdvance(advance, requestId) {
+    if (!advance || typeof advance !== "object" || Array.isArray(advance) || !CANCELLABLE_ID.test(requestId)) return null;
+    if (!wholeNumber(advance.amount, ADVANCE_MIN, ADVANCE_MAX)) return null;
+    if (typeof advance.payee !== "string" || !UPI_PAYEE.test(advance.payee)) return null;
+    var name = text(typeof advance.name === "string" ? advance.name.replace(/\s+/g, " ") : "", 60, true) || DEFAULT_PAYEE_NAME;
+    return { amount: advance.amount, payee: advance.payee, name: name };
+  }
+  function storeAdvances(map) {
+    var fresh = {};
+    if (map && typeof map === "object" && !Array.isArray(map)) {
+      Object.keys(map).forEach(function (id) {
+        var advance = validAdvance(map[id], id);
+        if (advance) fresh[id] = advance;
+      });
+    }
+    advanceByRequest = fresh;
+  }
+  // The note the bank statement and Saloni's UPI app will show: "Saloni order" and the first 8 characters of the request ID.
+  function paymentNote(requestId) { return "Saloni order " + requestId.slice(0, 8); }
+  function upiLink(advance, requestId) {
+    return "upi://pay?pa=" + encodeURIComponent(advance.payee) + "&pn=" + encodeURIComponent(advance.name) +
+      "&am=" + encodeURIComponent(advance.amount + ".00") + "&cu=INR&tn=" + encodeURIComponent(paymentNote(requestId));
+  }
+
   // --- the dialog ---
   var dialog = document.getElementById("my-orders-dialog");
   var closeButton = document.getElementById("my-orders-close");
@@ -306,11 +341,13 @@
     card.appendChild(items);
     card.appendChild(element("p", "my-order-meta", FULFILLMENT_LABELS[order.fulfillment]));
     if (order.notes) card.appendChild(element("p", "my-order-notes", "Your notes: " + order.notes));
-    var view = { order: order, card: card, status: element("p", "my-order-status"), note: element("p", "my-order-note"), cancel: null, sending: false };
+    var view = { order: order, card: card, status: element("p", "my-order-status"), note: element("p", "my-order-note"), advance: element("div", "my-order-advance"), advanceKey: "", cancel: null, sending: false };
     view.note.setAttribute("aria-live", "polite");
     view.note.hidden = true;
+    view.advance.hidden = true;
     card.appendChild(view.status);
     card.appendChild(view.note);
+    card.appendChild(view.advance);
     views.push(view);
     paint(view);
     return card;
@@ -321,6 +358,7 @@
     var code = effectiveStatus(order);
     view.status.className = "my-order-status is-" + code.replace(/_/g, "-");
     view.status.textContent = statusLabel(order);
+    paintAdvance(view);
     if (canCancel(view) && !view.cancel) {
       view.cancel = cancelControls(view);
       view.card.appendChild(view.cancel);
@@ -328,6 +366,55 @@
       // A request that is still out keeps its controls until it settles (then removeControls runs).
       removeControls(view);
     }
+  }
+  // The advance only shows while the order reads "Confirmed" here too (a cancellation the shopper asked for, or any later status, hides it).
+  function advanceFor(view) {
+    var order = view.order;
+    return effectiveStatus(order) === "confirmed" && Object.prototype.hasOwnProperty.call(advanceByRequest, order.requestId) ? advanceByRequest[order.requestId] : null;
+  }
+  // Rebuilt only when the amount or UPI ID changes, so a repaint never takes focus away from the Copy button.
+  function paintAdvance(view) {
+    var advance = advanceFor(view);
+    var key = advance ? [advance.amount, advance.payee, advance.name].join("|") : "";
+    if (key === view.advanceKey) return;
+    view.advanceKey = key;
+    var box = view.advance;
+    var hadFocus = isInside(box, document.activeElement);
+    clearChildren(box);
+    box.hidden = !advance;
+    if (!advance) {
+      if (hadFocus) { view.status.setAttribute("tabindex", "-1"); if (dialog.open) focusIfPossible(view.status, true); }
+      return;
+    }
+    var rupees = "\u20B9" + advance.amount;
+    var note = paymentNote(view.order.requestId);
+    box.appendChild(element("p", "my-order-advance-amount", "Advance to pay: " + rupees));
+    var pay = element("a", "button button-dark my-order-pay", "Pay advance " + rupees);
+    pay.setAttribute("href", upiLink(advance, view.order.requestId));
+    box.appendChild(pay);
+    var alternative = element("p", "my-order-advance-alt");
+    alternative.appendChild(element("span", undefined, "Or pay " + rupees + " to "));
+    alternative.appendChild(element("strong", "my-order-upi-id", advance.payee));
+    alternative.appendChild(element("span", undefined, " in any UPI app and add \u201C" + note + "\u201D as the note."));
+    box.appendChild(alternative);
+    var copy = plainButton("button button-line my-order-copy", "Copy UPI ID");
+    var feedback = element("p", "my-order-feedback my-order-copy-feedback");
+    feedback.setAttribute("aria-live", "polite");
+    copy.addEventListener("click", function () {
+      copyText(advance.payee).then(function (copied) {
+        feedback.className = "my-order-feedback my-order-copy-feedback" + (copied ? "" : " is-error");
+        feedback.textContent = copied ? "UPI ID copied." : "Could not copy. Select the UPI ID above instead.";
+      });
+    });
+    box.appendChild(copy);
+    box.appendChild(feedback);
+    box.appendChild(element("p", "my-order-advance-note", "Saloni will confirm once she receives it."));
+  }
+  // Resolves true once the text is on the clipboard, false when the browser has no clipboard or refuses.
+  function copyText(value) {
+    var clipboard = window.navigator && window.navigator.clipboard;
+    if (!clipboard || typeof clipboard.writeText !== "function") return Promise.resolve(false);
+    try { return Promise.resolve(clipboard.writeText(value)).then(function () { return true; }, function () { return false; }); } catch (error) { return Promise.resolve(false); }
   }
   function canCancel(view) {
     var order = view.order;
@@ -460,6 +547,7 @@
       statusInFlight = false;
       if (!reply || reply.ok !== true || !reply.statuses || typeof reply.statuses !== "object") return;
       storeStatuses(reply.statuses);
+      storeAdvances(reply.advance);
       views.forEach(function (view) {
         var code = Object.prototype.hasOwnProperty.call(reply.statuses, view.order.requestId) ? reply.statuses[view.order.requestId] : null;
         if (!isStatusCode(code)) return;
@@ -467,6 +555,8 @@
         view.order.statusCheckedAt = Date.now();
         paint(view);
       });
+      // An order the server did not answer for (or one whose advance went away) loses its Pay button too.
+      views.forEach(paintAdvance);
     }, function () { statusInFlight = false; });
   }
   // A cancel confirm sits low in a scrolling panel, so its buttons are focused with scrolling on.
