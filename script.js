@@ -80,6 +80,27 @@
     return { name: name, src: "assets/ai-images/" + stem + "--" + name + ".webp", colour: colour, label: styled ? "Styled scene" : "Colour idea: " + colour };
   }
 
+  // Every product has a static share page at /p/<slug>/ (made by tools/product_pages.py) with its own link preview.
+  // It sends visitors to /?product=<slug>, which opens that product's popup. The slug is each card's data-product-slug.
+  var SHARE_ORIGIN = "https://saloniresinart.com";
+
+  function productShareUrl(slug) {
+    return SHARE_ORIGIN + "/p/" + slug + "/";
+  }
+
+  // The popup's price reads "Price: ₹249"; a share message only needs "₹249".
+  function sharePrice(price) {
+    return String(price || "").replace(/^price:\s*/i, "");
+  }
+
+  function shareSummary(name, price) {
+    return sharePrice(price) ? name + " \u2013 " + sharePrice(price) : name;
+  }
+
+  function whatsappShareUrl(name, price, url) {
+    return "https://wa.me/?text=" + encodeURIComponent(shareSummary(name, price) + " \u2013 " + url);
+  }
+
   var REVIEW_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   function formatReviewDate(value) {
@@ -373,6 +394,7 @@
       });
     }
     var lightboxTriggers = document.querySelectorAll("[data-lightbox-trigger]");
+    var openSharedProduct = null;
     var lastTrigger = null;
     var lightboxItems = [];
     var lightboxIndex = 0;
@@ -751,7 +773,73 @@
         }
         // After the request button is set, so the photo hint knows whether it is there.
         renderPhoto();
+        renderShare(item);
       }
+
+      var shareBox = document.getElementById("lightbox-share");
+      var shareButton = document.getElementById("lightbox-share-button");
+      var shareOptions = document.getElementById("lightbox-share-options");
+      var shareWhatsapp = document.getElementById("lightbox-share-whatsapp");
+      var shareCopy = document.getElementById("lightbox-share-copy");
+      var shareStatus = document.getElementById("lightbox-share-status");
+      var shareData = null;
+
+      function showShareOptions(show) {
+        if (!shareOptions) return;
+        shareOptions.hidden = !show;
+        if (shareButton) shareButton.setAttribute("aria-expanded", String(show));
+        if (!show && shareStatus) shareStatus.textContent = "";
+      }
+
+      // Share needs the card's data-product-slug; cards without a share page show no button.
+      function renderShare(item) {
+        if (!shareBox || !shareButton) return;
+        var slug = item.trigger && typeof item.trigger.getAttribute === "function" ? item.trigger.getAttribute("data-product-slug") : "";
+        var url = slug ? productShareUrl(slug) : "";
+        shareData = url ? { title: item.title, text: shareSummary(item.title, item.price), url: url } : null;
+        shareBox.hidden = !shareData;
+        if (shareOptions) { shareOptions.hidden = true; shareButton.removeAttribute("aria-expanded"); }
+        if (shareStatus) shareStatus.textContent = "";
+        if (!shareData) return;
+        shareButton.setAttribute("aria-label", "Share " + item.title);
+        if (shareWhatsapp) shareWhatsapp.href = whatsappShareUrl(item.title, item.price, url);
+      }
+
+      if (shareButton) shareButton.addEventListener("click", function () {
+        if (!shareData) return;
+        var nav = window.navigator;
+        if (nav && typeof nav.share === "function") {
+          var shared;
+          try { shared = nav.share({ title: shareData.title, text: shareData.text, url: shareData.url }); } catch (error) { showShareOptions(true); return; }
+          // Closing the share sheet is not a failure; anything else falls back to the options.
+          if (shared && typeof shared.catch === "function") shared.catch(function (error) { if (!error || error.name !== "AbortError") showShareOptions(true); });
+          return;
+        }
+        showShareOptions(shareOptions ? shareOptions.hidden : false);
+      });
+
+      if (shareCopy) shareCopy.addEventListener("click", function () {
+        if (!shareData || !shareStatus) return;
+        var url = shareData.url;
+        var nav = window.navigator;
+        function report(copied) { shareStatus.textContent = copied ? "Link copied" : "Could not copy. The link is " + url; }
+        if (nav && nav.clipboard && typeof nav.clipboard.writeText === "function") {
+          try { nav.clipboard.writeText(url).then(function () { report(true); }, function () { report(false); }); } catch (error) { report(false); }
+        } else report(false);
+      });
+
+      openSharedProduct = function () {
+        var slug = new URLSearchParams((window.location && window.location.search) || "").get("product");
+        if (!slug) return;
+        var match = null;
+        lightboxTriggers.forEach(function (trigger) {
+          if (!match && trigger.getAttribute("data-product-slug") === slug) match = trigger;
+        });
+        if (!match) return;
+        // Back from the popup must leave the page where the link scrolled it, not where the browser saved it before the jump.
+        if (window.history) window.history.scrollRestoration = "manual";
+        openLightbox(match, match);
+      };
 
       var pressStartedInside = false;
       lightbox.addEventListener("pointerdown", function (event) { pressStartedInside = event.target !== lightbox; });
@@ -1006,6 +1094,8 @@
 
     initReferralAttribution();
     initOrderRequestFlow();
+    // Last, so the popup finds the card's Add to cart button and the catalogue has already shown the card.
+    if (openSharedProduct) openSharedProduct();
   }
 
   // "What happens next" and "Start a conversation" start closed on phones and open on wider screens.
@@ -1512,6 +1602,15 @@
       restoreFromLocation();
     }
 
+    function sharedProductCard() {
+      var slug = new URLSearchParams((window.location && window.location.search) || "").get("product");
+      if (!slug) return null;
+      return cards.filter(function (card) {
+        var link = card.querySelector("[data-product-slug]");
+        return link && link.getAttribute("data-product-slug") === slug;
+      })[0] || null;
+    }
+
     function applyLocation() {
       var state = readLocationState();
       if (state.full) {
@@ -1533,6 +1632,20 @@
       if (state.hasQuery) {
         var cleaned = urlWithState({ preview: true, type: "bestsellers", budget: "all" }, window.location && window.location.hash);
         if (!sameUrl(cleaned)) writeUrl(cleaned, true);
+      }
+      // A shared product link (/?product=<slug>) shows every gift, so the card is on the page whichever section hides it.
+      var sharedCard = sharedProductCard();
+      if (sharedCard) {
+        setFullState("all", "all", "");
+        // Jump at once: the page's smooth scrolling would take a second to cross the page and stop short when the popup opens.
+        // The browser also scrolls to the link's #section once the page has loaded, so jump again then.
+        var jumpToSharedCard = function () {
+          if (typeof sharedCard.scrollIntoView !== "function") return;
+          try { sharedCard.scrollIntoView({ behavior: "instant", block: "center" }); } catch (error) { sharedCard.scrollIntoView(); }
+        };
+        jumpToSharedCard();
+        if (document.readyState !== "complete") window.addEventListener("load", jumpToSharedCard);
+        return;
       }
       showFeatured(false);
       restoreLegacyHash();

@@ -157,6 +157,18 @@ The published gallery uses curated product and process photography supplied with
 
 After the real photo, a product preview can show AI concept images made with Gemini from that photo (`assets/ai-images/<photo>--<name>.webp`, where `<name>` is a colour such as `royal-blue`, or `styled` for a styled scene). Colour images are labelled with the colour name and ask the buyer to mention it in the order notes. Keep the downloaded JPEGs in git-ignored `work/ai-images/<section>/<photo>--ai-<name>.jpg`. In a scratch virtual environment that has `pillow` (not a site dependency), run `tools/ai_images.py sheet <section>` for contact sheets, list the approved files (one `<section>/<file>.jpg` per line) in a keep file, then run `tools/ai_images.py build <keep file>`. `build` replaces `assets/ai-images/` with exactly those images (webp, long side up to 1100 px, up to 150 KB) and rewrites the `data-ai-images` attributes in `index.html`.
 
+### Product share links
+
+Every catalogue product has its own share link, `https://saloniresinart.com/p/<slug>/`, for example `/p/jewel-glow-tealight/`. WhatsApp, Facebook and X build link previews from crawlers that run no JavaScript, so each link is a small static page (`p/<slug>/index.html`) with that product's own photo, name, price and size in its Open Graph tags. A visitor who opens it is sent straight to `/?product=<slug>#<section>`, where `script.js` opens that product's popup (an unknown slug just shows the normal home page). The popup has a **Share** button: it uses the phone's share sheet when there is one, otherwise it offers Share on WhatsApp and Copy link.
+
+The pages, the `data-product-slug` on each card's photo link in `index.html`, and the product entries in `sitemap.xml` are generated. After you add, rename or remove a catalogue card (or change its photo, price, size or description line), run:
+
+```
+python3 tools/product_pages.py
+```
+
+and commit the result. It needs only Python 3, no extra packages. The slug comes from the product name (`Jewel Glow Tealight` becomes `jewel-glow-tealight`); if two names give the same slug, the later card gets a 4-letter suffix. Renaming a product changes its slug, so links already shared for the old name stop working; avoid renaming a product that has been shared. `python3 -m unittest discover -s tests` fails with "run python3 tools/product_pages.py" when the pages are out of step with `index.html`, so a stale page cannot be published by accident. `reviews/products.json` is separate and still follows the card photo file name.
+
 ## In-page order form release note
 
 Release order: deploy the Apps Script version that adds `doPost` `action=order` and `action=referral` first (the old pages keep working through `action=seed`), then publish Pages. Acceptance: on a phone, add a product to the cart and press Order now (the form must appear at once with no request to `script.google.com`), send one request to isolated test Sheet and Drive resources, and confirm the row, the restricted Drive file for an image, and the alert. Rollback: restore the previous Pages commit; the new Apps Script actions are harmless to old pages. Cache version `20261161` is shared by every page, so all pages pick up `order-form.js`, `script.js` and `styles.css` together.

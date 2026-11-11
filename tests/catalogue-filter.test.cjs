@@ -88,6 +88,7 @@ class FakeCard {
   querySelector(selector) {
     if (selector === ".product-pricing dd") return { textContent: this.price };
     if (selector === "figcaption strong" || selector === "figcaption h3") return { textContent: this.title };
+    if (selector === "[data-product-slug]") return { getAttribute: (name) => (name === "data-product-slug" ? "slug-" + this.id : "") };
     return null;
   }
   getAttribute(name) {
@@ -950,4 +951,31 @@ test("real Back and Forward between catalogue states still restore them, includi
   harness.windowObject.history.replaceState({}, "", "https://example.test/#premium-collection");
   harness.windowObject.listeners.popstate();
   assert.equal(harness.typeFilter.value, "bestsellers");
+});
+
+test("a shared ?product= link shows that product's own section in full and scrolls to the card", () => {
+  const harness = createHarness({ url: "https://example.test/?product=slug-product-30#corporate-resin-gifts" });
+  const card = harness.cards.find((item) => item.id === "product-30");
+  const collapsed = createHarness({ url: "https://example.test/" }).cards.find((item) => item.id === "product-30");
+  assert.equal(collapsed.hidden, true, "the card is hidden in the normal four-card preview");
+  assert.equal(card.hidden, false);
+  assert.deepEqual(card.events, ["scroll"]);
+  assert.match(script, /scrollIntoView\(\{ behavior: "instant", block: "center" \}\)/, "an instant jump: the page itself scrolls smoothly");
+  assert.equal(harness.cards.every((item) => !item.hidden), true, "the link opens every collapsed section");
+  assert.equal(harness.windowObject.history.replacements.length, 0, "the shared URL stays as it was");
+});
+
+test("an unknown ?product= slug leaves the normal home preview alone", () => {
+  const harness = createHarness({ url: "https://example.test/?product=no-such-gift#diwali" });
+  assert.equal(visibleCards(harness).length, createHarness({ url: "https://example.test/#diwali" }).cards.filter((item) => !item.hidden).length);
+  assert.equal(harness.cards.some((item) => item.events.length && item.id.startsWith("product-")), false);
+});
+
+test("a shared ?product= link does not disturb the ?type= and ?budget= filters", () => {
+  const harness = createHarness({ url: "https://example.test/?product=slug-product-1&type=corporate&budget=999&ref=keep#corporate-resin-gifts" });
+  assert.equal(harness.typeFilter.value, "corporate");
+  assert.equal(harness.priceFilter.value, "999");
+  const urls = harness.windowObject.history.replacements;
+  assert.match(urls[urls.length - 1] || "", /type=corporate&budget=999/);
+  assert.match(harness.windowObject.location.search, /product=slug-product-1/, "the product stays in the address so its popup can still open");
 });

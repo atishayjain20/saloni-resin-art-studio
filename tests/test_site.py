@@ -643,8 +643,9 @@ class StaticSiteContractTests(unittest.TestCase):
             "https://saloniresinart.com/corporate-gifting/",
             "https://saloniresinart.com/reviews/",
         ]
-        self.assertEqual([url.findtext("sm:loc", namespaces=namespace) for url in urls], expected_urls)
-        self.assertEqual(len(urls), len(expected_urls))
+        product_urls = ["https://saloniresinart.com/p/" + slug + "/" for slug in card_slugs(self.html)]
+        self.assertGreater(len(product_urls), 20)
+        self.assertEqual([url.findtext("sm:loc", namespaces=namespace) for url in urls], expected_urls + product_urls)
         for url in urls:
             self.assertEqual(len(list(url)), 1)
         self.assertNotIn("#", sitemap_path.read_text(encoding="utf-8"))
@@ -2309,6 +2310,206 @@ class ReviewsPageContractTests(unittest.TestCase):
             self.assertRegex(item["id"], r"^catalogue:[A-Za-z0-9_./-]{1,150}$")
             self.assertTrue(0 < len(item["name"]) <= 120)
         self.assertLessEqual(len(actual), 300)
+
+
+def load_product_pages_tool():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("product_pages", ROOT / "tools" / "product_pages.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def card_slugs(page_html):
+    """The data-product-slug stamped on each catalogue card's photo link, in page order."""
+    return re.findall(r'<a class="lightbox-trigger" data-lightbox-trigger[^>]*? data-product-slug="([^"]+)"', page_html)
+
+
+class PageTags(HTMLParser):
+    """Collects a share page's title, meta tags, link tags, inline script, noscript links and visible links."""
+
+    def __init__(self):
+        super().__init__()
+        self.title = ""
+        self.meta = {}
+        self.links = {}
+        self.scripts = []
+        self.noscript_links = []
+        self.body_links = []
+        self.meta_refresh = False
+        self._in_title = False
+        self._in_script = False
+        self._in_noscript = False
+        self._in_body = False
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "title":
+            self._in_title = True
+        elif tag == "meta":
+            if (attributes.get("http-equiv") or "").lower() == "refresh":
+                self.meta_refresh = True
+            key = attributes.get("property") or attributes.get("name")
+            if key:
+                self.meta[key] = attributes.get("content")
+        elif tag == "link":
+            self.links[attributes.get("rel")] = attributes.get("href")
+        elif tag == "script":
+            self._in_script = True
+            self.scripts.append("")
+        elif tag == "noscript":
+            self._in_noscript = True
+        elif tag == "body":
+            self._in_body = True
+        elif tag == "a" and self._in_body:
+            (self.noscript_links if self._in_noscript else self.body_links).append(attributes.get("href"))
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self._in_title = False
+        elif tag == "script":
+            self._in_script = False
+        elif tag == "noscript":
+            self._in_noscript = False
+
+    def handle_data(self, data):
+        if self._in_title:
+            self.title += data
+        if self._in_script:
+            self.scripts[-1] += data
+
+
+class ProductSharePageTests(unittest.TestCase):
+    """Every catalogue product has a static share page: link previews are built by crawlers that run no JavaScript."""
+
+    SITE = "https://saloniresinart.com"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.home = (ROOT / "index.html").read_text(encoding="utf-8")
+        cls.tool_path = ROOT / "tools" / "product_pages.py"
+        cls.products = catalogue_products(cls.home)
+        cls.slugs = card_slugs(cls.home)
+
+    def page(self, slug):
+        path = ROOT / "p" / slug / "index.html"
+        self.assertTrue(path.is_file(), "missing page for " + slug)
+        parsed = PageTags()
+        text = path.read_text(encoding="utf-8")
+        parsed.feed(text)
+        return text, parsed
+
+    def test_generator_is_a_standard_library_only_script(self):
+        self.assertTrue(self.tool_path.is_file(), "tools/product_pages.py must exist")
+        source = self.tool_path.read_text(encoding="utf-8")
+        self.assertNotRegex(source, r"(?m)^\s*(?:from|import)\s+(?:PIL|requests|jinja2|bs4)\b")
+
+    def test_every_card_has_exactly_one_page_and_the_slugs_are_unique(self):
+        self.assertEqual(len(self.slugs), len(self.products), "every catalogue card photo link carries data-product-slug")
+        self.assertEqual(len(self.slugs), len(set(self.slugs)))
+        for slug in self.slugs:
+            self.assertRegex(slug, r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+        on_disk = sorted(path.parent.name for path in (ROOT / "p").glob("*/index.html"))
+        self.assertEqual(on_disk, sorted(self.slugs), "p/ holds exactly one page per card and nothing else")
+        self.assertEqual([path.name for path in (ROOT / "p").iterdir() if path.name != "index.html" and not path.is_dir()], [])
+
+    def test_pages_and_card_slugs_are_in_step_with_index_html(self):
+        tool = load_product_pages_tool()
+        stamped, pages, sitemap = tool.build(self.home, (ROOT / "sitemap.xml").read_text(encoding="utf-8"))
+        self.assertEqual(stamped, self.home, "index.html data-product-slug is stale: run python3 tools/product_pages.py")
+        self.assertEqual((ROOT / "sitemap.xml").read_text(encoding="utf-8"), sitemap, "sitemap.xml is stale: run python3 tools/product_pages.py")
+        for relative, expected in pages.items():
+            self.assertEqual((ROOT / relative).read_text(encoding="utf-8"), expected, relative + " is stale: run python3 tools/product_pages.py")
+        self.assertEqual(len(pages), len(self.products))
+
+    def test_each_page_has_the_products_own_preview_tags(self):
+        by_slug = dict(zip(self.slugs, self.products))
+        for slug, product in by_slug.items():
+            text, tags = self.page(slug)
+            name = html.unescape(product["name"])
+            file_name = re.sub(r"^catalogue:", "", product["id"])
+            url = self.SITE + "/p/" + slug + "/"
+            title = name + " | Saloni Resin Art Studio"
+            self.assertEqual(tags.title, title, slug)
+            self.assertEqual(tags.meta["og:title"], title, slug)
+            self.assertEqual(tags.meta["twitter:title"], title, slug)
+            self.assertEqual(tags.links["canonical"], url, slug)
+            self.assertEqual(tags.meta["og:url"], url, slug)
+            image = self.SITE + "/assets/" + file_name
+            self.assertEqual(tags.meta["og:image"], image, slug)
+            self.assertEqual(tags.meta["twitter:image"], image, slug)
+            self.assertTrue((ROOT / "assets" / file_name).is_file(), slug + " image is missing")
+            self.assertTrue(tags.meta["og:image:alt"].strip(), slug)
+            self.assertEqual(tags.meta["twitter:image:alt"], tags.meta["og:image:alt"], slug)
+            self.assertEqual(tags.meta["twitter:card"], "summary_large_image", slug)
+            self.assertEqual(tags.meta["og:type"], "website", slug)
+            self.assertEqual(tags.meta["og:site_name"], "Saloni Resin Art Studio", slug)
+            self.assertEqual(tags.meta["og:description"], tags.meta["twitter:description"], slug)
+            self.assertEqual(tags.meta["og:description"], tags.meta["description"], slug)
+            self.assertRegex(tags.meta["og:description"], "₹[0-9]|Price on request", slug)
+            self.assertLessEqual(len(tags.meta["og:description"]), 220, slug)
+            self.assertNotRegex((tags.meta.get("robots") or "").lower(), r"noindex|nofollow", slug)
+            self.assertNotIn('rel="alternate"', text)
+
+    def test_og_description_carries_the_cards_own_price_and_size(self):
+        text, tags = self.page("jewel-glow-tealight")
+        self.assertEqual(tags.meta["og:title"], "Jewel Glow Tealight | Saloni Resin Art Studio")
+        self.assertTrue(tags.meta["og:description"].startswith("₹249 · 4 in. "), tags.meta["og:description"])
+        self.assertIn("Rich colour and golden flecks for a festive corner", tags.meta["og:description"])
+        self.assertEqual(tags.meta["og:image"], "https://saloniresinart.com/assets/diwali-jewel-glow-tealight.jpg")
+        self.assertEqual(tags.meta["og:image:alt"], "Jewel-toned resin tealight holder with golden flecks")
+        _, range_tags = self.page("happy-diwali-glow")
+        self.assertTrue(range_tags.meta["og:description"].startswith("₹250–₹400 · "), range_tags.meta["og:description"])
+
+    def test_pages_send_visitors_to_the_home_page_popup_without_a_meta_refresh(self):
+        section_ids = set(re.findall(r'<section[^>]*\bid="([^"]+)"', self.home))
+        for slug in self.slugs:
+            text, tags = self.page(slug)
+            self.assertFalse(tags.meta_refresh, slug + " must not use meta refresh: crawlers follow it and lose the product tags")
+            self.assertEqual(len(tags.scripts), 1, slug)
+            match = re.fullmatch(r'\s*location\.replace\("/\?product=' + re.escape(slug) + r'#([a-z0-9-]+)"\);\s*', tags.scripts[0])
+            self.assertIsNotNone(match, slug + ": " + tags.scripts[0])
+            self.assertIn(match.group(1), section_ids, slug)
+            target = "/?product=" + slug + "#" + match.group(1)
+            self.assertEqual(tags.body_links, [target], slug + " keeps one visible link to the same place")
+            self.assertEqual(tags.noscript_links, [target], slug)
+            self.assertLess(text.index("location.replace"), text.index("<main"), "redirect runs before the page paints")
+        # The redirect lands in the section the card sits in.
+        _, tags = self.page("jewel-glow-tealight")
+        self.assertEqual(tags.body_links, ["/?product=jewel-glow-tealight#diwali"])
+        _, tags = self.page("two-keys-one-little-us")
+        self.assertEqual(tags.body_links, ["/?product=two-keys-one-little-us#romantic-keepsakes"])
+
+    def test_slugs_come_from_the_name_and_stay_stable_when_names_collide(self):
+        tool = load_product_pages_tool()
+        self.assertEqual(tool.slugify("Mr & Mrs Name Plate"), "mr-and-mrs-name-plate")
+        self.assertEqual(tool.slugify("Bride's Jewellery Tray"), "brides-jewellery-tray")
+        self.assertEqual(tool.slugify("Fiancé Initial Pendant"), "fiance-initial-pendant")
+        self.assertEqual(tool.slugify("Two keys, one little us"), "two-keys-one-little-us")
+        self.assertEqual(tool.slugify("  --Ö!!  "), "o")
+        cards = [{"name": "Rose Tray", "file": "a-rose-tray.webp"}, {"name": "Rose  tray", "file": "b-rose-tray.webp"}, {"name": "Other", "file": "c.webp"}]
+        first = tool.assign_slugs(cards)
+        self.assertEqual(first[0], "rose-tray")
+        self.assertNotEqual(first[1], "rose-tray")
+        self.assertRegex(first[1], r"^rose-tray-[0-9a-f]{4}$")
+        self.assertEqual(first[2], "other")
+        # Adding another product later does not rename the ones before it.
+        again = tool.assign_slugs(cards + [{"name": "Rose Tray", "file": "d-rose-tray.webp"}])
+        self.assertEqual(again[:3], first)
+        self.assertEqual(len(set(again)), 4)
+
+    def test_generator_removes_pages_of_products_that_no_longer_exist(self):
+        tool = load_product_pages_tool()
+        import tempfile
+        with tempfile.TemporaryDirectory() as scratch:
+            out = Path(scratch)
+            (out / "p" / "gone").mkdir(parents=True)
+            (out / "p" / "gone" / "index.html").write_text("old", encoding="utf-8")
+            (out / "p" / "keep").mkdir(parents=True)
+            (out / "p" / "keep" / "index.html").write_text("old", encoding="utf-8")
+            tool.remove_stale_pages(out, {"p/keep/index.html"})
+            self.assertFalse((out / "p" / "gone").exists())
+            self.assertTrue((out / "p" / "keep" / "index.html").exists())
 
 
 class ResponsiveCardImageTests(unittest.TestCase):
