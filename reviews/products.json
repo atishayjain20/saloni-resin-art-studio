@@ -1,97 +1,5 @@
 [
   {
-    "id": "catalogue:diwali-jewel-glow-tealight.jpg",
-    "name": "Jewel Glow Tealight"
-  },
-  {
-    "id": "catalogue:diwali-happy-diwali-glow.webp",
-    "name": "Happy Diwali Glow"
-  },
-  {
-    "id": "catalogue:diwali-shubh-labh-welcome-pair.jpg",
-    "name": "Shubh Labh Welcome Pair"
-  },
-  {
-    "id": "catalogue:diwali-rose-gold-festive-set.jpeg",
-    "name": "Rose & Gold Festive Set"
-  },
-  {
-    "id": "catalogue:diwali-lotus-blue-festive-set.jpeg",
-    "name": "Lotus Blue Festive Set"
-  },
-  {
-    "id": "catalogue:diwali-gold-fleck-lotus-light.jpeg",
-    "name": "Gold-Fleck Lotus Light"
-  },
-  {
-    "id": "catalogue:diwali-pastel-lotus-tealight.jpeg",
-    "name": "Pastel Lotus Tealight"
-  },
-  {
-    "id": "catalogue:diwali-ocean-bloom-pooja-platter.jpg",
-    "name": "Ocean Bloom Pooja Platter"
-  },
-  {
-    "id": "catalogue:diwali-golden-ganesha-pooja-plate.jpg",
-    "name": "Golden Ganesha Pooja Plate"
-  },
-  {
-    "id": "catalogue:diwali-om-mini-tilak-plate.webp",
-    "name": "Om Mini Tilak Plate"
-  },
-  {
-    "id": "catalogue:diwali-lotus-diya-pair.webp",
-    "name": "Lotus Diya Pair"
-  },
-  {
-    "id": "catalogue:diwali-peacock-mini-pooja-thali.webp",
-    "name": "Peacock Mini Pooja Thali"
-  },
-  {
-    "id": "catalogue:diwali-floral-swastik-tealight-set.webp",
-    "name": "Floral Swastik Tealight Set"
-  },
-  {
-    "id": "catalogue:diwali-marigold-petal-holder-concept.webp",
-    "name": "Marigold Petal Holder"
-  },
-  {
-    "id": "catalogue:diwali-ivory-mandala-holder-concept.webp",
-    "name": "Ivory Mandala Holder"
-  },
-  {
-    "id": "catalogue:diwali-ruby-leaf-dish-concept.webp",
-    "name": "Ruby Leaf Dish"
-  },
-  {
-    "id": "catalogue:diwali-saffron-tilak-duo-concept.webp",
-    "name": "Saffron Tilak Duo"
-  },
-  {
-    "id": "catalogue:diwali-pearl-rangoli-accent-concept.webp",
-    "name": "Pearl Rangoli Accent"
-  },
-  {
-    "id": "catalogue:diwali-emerald-led-holder-pair-concept.webp",
-    "name": "Emerald Glow Pair"
-  },
-  {
-    "id": "catalogue:diwali-rose-petal-offering-plate-concept.webp",
-    "name": "Rose Petal Offering Plate"
-  },
-  {
-    "id": "catalogue:diwali-golden-toran-charms-concept.webp",
-    "name": "Golden Toran Charms"
-  },
-  {
-    "id": "catalogue:diwali-lotus-rangoli-duo-concept.webp",
-    "name": "Lotus Rangoli Duo"
-  },
-  {
-    "id": "catalogue:diwali-festive-keepsake-box-concept.webp",
-    "name": "Festive Keepsake Box"
-  },
-  {
     "id": "catalogue:marriage-ring-platter.webp",
     "name": "Engagement Ring Platter"
   },
@@ -386,5 +294,97 @@
   {
     "id": "catalogue:premium-black-gold-glassware-set.jpeg",
     "name": "Black-gold glassware set"
+  },
+  {
+    "id": "catalogue:diwali-jewel-glow-tealight.jpg",
+    "name": "Jewel Glow Tealight"
+  },
+  {
+    "id": "catalogue:diwali-happy-diwali-glow.webp",
+    "name": "Happy Diwali Glow"
+  },
+  {
+    "id": "catalogue:diwali-shubh-labh-welcome-pair.jpg",
+    "name": "Shubh Labh Welcome Pair"
+  },
+  {
+    "id": "catalogue:diwali-rose-gold-festive-set.jpeg",
+    "name": "Rose & Gold Festive Set"
+  },
+  {
+    "id": "catalogue:diwali-lotus-blue-festive-set.jpeg",
+    "name": "Lotus Blue Festive Set"
+  },
+  {
+    "id": "catalogue:diwali-gold-fleck-lotus-light.jpeg",
+    "name": "Gold-Fleck Lotus Light"
+  },
+  {
+    "id": "catalogue:diwali-pastel-lotus-tealight.jpeg",
+    "name": "Pastel Lotus Tealight"
+  },
+  {
+    "id": "catalogue:diwali-ocean-bloom-pooja-platter.jpg",
+    "name": "Ocean Bloom Pooja Platter"
+  },
+  {
+    "id": "catalogue:diwali-golden-ganesha-pooja-plate.jpg",
+    "name": "Golden Ganesha Pooja Plate"
+  },
+  {
+    "id": "catalogue:diwali-om-mini-tilak-plate.webp",
+    "name": "Om Mini Tilak Plate"
+  },
+  {
+    "id": "catalogue:diwali-lotus-diya-pair.webp",
+    "name": "Lotus Diya Pair"
+  },
+  {
+    "id": "catalogue:diwali-peacock-mini-pooja-thali.webp",
+    "name": "Peacock Mini Pooja Thali"
+  },
+  {
+    "id": "catalogue:diwali-floral-swastik-tealight-set.webp",
+    "name": "Floral Swastik Tealight Set"
+  },
+  {
+    "id": "catalogue:diwali-marigold-petal-holder-concept.webp",
+    "name": "Marigold Petal Holder"
+  },
+  {
+    "id": "catalogue:diwali-ivory-mandala-holder-concept.webp",
+    "name": "Ivory Mandala Holder"
+  },
+  {
+    "id": "catalogue:diwali-ruby-leaf-dish-concept.webp",
+    "name": "Ruby Leaf Dish"
+  },
+  {
+    "id": "catalogue:diwali-saffron-tilak-duo-concept.webp",
+    "name": "Saffron Tilak Duo"
+  },
+  {
+    "id": "catalogue:diwali-pearl-rangoli-accent-concept.webp",
+    "name": "Pearl Rangoli Accent"
+  },
+  {
+    "id": "catalogue:diwali-emerald-led-holder-pair-concept.webp",
+    "name": "Emerald Glow Pair"
+  },
+  {
+    "id": "catalogue:diwali-rose-petal-offering-plate-concept.webp",
+    "name": "Rose Petal Offering Plate"
+  },
+  {
+    "id": "catalogue:diwali-golden-toran-charms-concept.webp",
+    "name": "Golden Toran Charms"
+  },
+  {
+    "id": "catalogue:diwali-lotus-rangoli-duo-concept.webp",
+    "name": "Lotus Rangoli Duo"
+  },
+  {
+    "id": "catalogue:diwali-festive-keepsake-box-concept.webp",
+    "name": "Festive Keepsake Box"
   }
 ]
