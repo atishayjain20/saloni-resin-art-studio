@@ -786,9 +786,71 @@ function partnerRuntime(options = {}) {
   const spreadsheet = { getSpreadsheetTimeZone: () => options.sheetTimezone || "UTC", getSheetByName: (name) => sheets[name] || null, insertSheet: (name) => { const headers = name === applicationTab ? applicationHeaders : name === partnerTab ? partnerHeaders : commissionHeaders; const created = sheet(name, headers, []); sheets[name] = created; return created; } };
   const properties = { values, getProperty: (key) => values[key] || "", setProperty: (key, value) => { values[key] = String(value); } };
   const utilities = { getUuid: () => "00000000-0000-4000-8000-000000000000", formatDate: (date, timezone, pattern) => { formatDateCalls.push({ date, timezone, pattern }); const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, year: "numeric", month: "2-digit" }).formatToParts(new Date(date)); const year = parts.find((part) => part.type === "year").value; const month = parts.find((part) => part.type === "month").value; return `${year}-${month}`; }, newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(String(value))) }), DigestAlgorithm: { SHA_256: "SHA-256" }, computeDigest: (_algorithm, bytes) => Array.from(require("node:crypto").createHash("sha256").update(Buffer.from(bytes)).digest()).map((byte) => byte > 127 ? byte - 256 : byte) };
-  const context = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array, Intl, Utilities: utilities, PropertiesService: { getScriptProperties: () => properties }, LockService: { getScriptLock: () => lock }, SpreadsheetApp: { openById: () => spreadsheet, ProtectionType: { RANGE: "RANGE" } }, Session: { getScriptTimeZone: () => options.scriptTimezone || "UTC", getActiveUser: () => ({ getEmail: () => "owner@example.com" }), getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) }, UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 }) }) } };
+  const context = { console, Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array, Intl, Utilities: utilities, PropertiesService: { getScriptProperties: () => properties }, LockService: { getScriptLock: () => lock }, SpreadsheetApp: { openById: () => spreadsheet, ProtectionType: { RANGE: "RANGE" } }, Session: { getScriptTimeZone: () => options.scriptTimezone || "UTC", getActiveUser: () => ({ getEmail: () => "owner@example.com" }), getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) }, ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }) }, UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 }) }) } };
   if (options.partnerLookupThrows) context.SpreadsheetApp.openById = () => { throw new Error("sheet unavailable"); };
   vm.createContext(context);
   vm.runInContext(code, context, { filename: "Code.gs" });
   return { context, properties, orderSheet, applicationRows: applicationSheet.rows, partnerRows: partnerSheet.rows, protections, lock, commissionRows: commissionSheet.rows, commissionSheet, formatDateCalls };
 }
+
+// --- JSON partner endpoint used by the Partner Circle form built into the site ---
+function partnerPost(runtime, body, action = "partner") {
+  const output = runtime.context.doPost({ parameter: { action }, postData: { type: "text/plain", contents: typeof body === "string" ? body : JSON.stringify(body) } });
+  assert.equal(output.mimeType, "JSON");
+  return JSON.parse(output.text);
+}
+
+test("action=partner submits a valid application once and returns the referral link", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const result = partnerPost(runtime, applicationForm());
+  assert.equal(result.ok, true);
+  assert.equal(result.applicationId, "application-123456");
+  assert.equal(result.referralLink, REFERRAL_LINK_PREFIX + result.referralCode);
+  assert.equal(runtime.applicationRows.length, 1);
+  assert.equal(runtime.partnerRows.length, 1);
+  const replay = partnerPost(runtime, applicationForm());
+  assert.equal(replay.referralLink, result.referralLink);
+  assert.equal(runtime.partnerRows.length, 1);
+});
+
+test("action=partner still requires a captcha token that verifies for the partner action", () => {
+  const missing = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  const body = applicationForm(); delete body.captchaToken;
+  assert.match(partnerPost(missing, body).errors.captcha, /Captcha/);
+  const rejected = partnerRuntime({ applicationRows: [], partnerRows: [], captchaResponse: { success: false, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 } });
+  assert.match(partnerPost(rejected, applicationForm()).errors.captcha, /Captcha/);
+  const wrongAction = partnerRuntime({ applicationRows: [], partnerRows: [], captchaResponse: { success: true, hostname: "saloniresinart.com", action: "corporate_enquiry", score: 0.9 } });
+  assert.match(partnerPost(wrongAction, applicationForm()).errors.captcha, /Captcha/);
+  const wrongHost = partnerRuntime({ applicationRows: [], partnerRows: [], captchaResponse: { success: true, hostname: "localhost", action: "partner_application", score: 0.9 } });
+  assert.match(partnerPost(wrongHost, applicationForm()).errors.captcha, /Captcha/);
+  [missing, rejected, wrongAction, wrongHost].forEach((runtime) => { assert.equal(runtime.applicationRows.length, 0); assert.equal(runtime.partnerRows.length, 0); });
+});
+
+test("action=partner keeps validation, the kill switch and drops unknown fields", () => {
+  const invalid = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  assert.ok(partnerPost(invalid, Object.assign(applicationForm(), { phone: "1" })).errors.phone);
+  const paused = partnerRuntime({ applicationRows: [], partnerRows: [], properties: { PARTNER_FORM_DISABLED: "true" } });
+  assert.match(partnerPost(paused, applicationForm()).errors.form, /paused/i);
+  const extra = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  assert.equal(partnerPost(extra, Object.assign(applicationForm(), { injected: "<b>unexpected</b>", status: "Approved", commissionRate: 0.9 })).ok, true);
+  assert.equal(JSON.stringify(extra.applicationRows).includes("unexpected"), false);
+  assert.equal(extra.partnerRows[0][9], 0.1);
+  [invalid, paused].forEach((runtime) => assert.equal(runtime.applicationRows.length, 0));
+});
+
+test("action=partner answers invalid for broken JSON and unconfirmed when the save throws", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  for (const body of ["{not json", "[]", "null", ""]) assert.deepEqual(partnerPost(runtime, body), { ok: false, error: "invalid" });
+  assert.equal(runtime.applicationRows.length, 0);
+  const locked = partnerRuntime({ applicationRows: [], partnerRows: [], lockAvailable: false });
+  assert.deepEqual(partnerPost(locked, applicationForm()), { ok: false, error: "unconfirmed" });
+});
+
+test("action=seed still renders the partner form for pages cached before the change", () => {
+  const runtime = partnerRuntime({ applicationRows: [], partnerRows: [] });
+  let templateName = "";
+  const page = { setTitle() { return this; }, setXFrameOptionsMode() { return this; } };
+  runtime.context.HtmlService = { createTemplateFromFile: (name) => { templateName = name; return { evaluate: () => page }; }, XFrameOptionsMode: { ALLOWALL: "ALLOWALL" } };
+  runtime.context.doPost({ parameter: { action: "seed", mode: "partner", seed: JSON.stringify({ applicationId: "application-cached" }) } });
+  assert.equal(templateName, "PartnerForm");
+});

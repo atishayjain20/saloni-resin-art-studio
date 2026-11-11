@@ -48,6 +48,7 @@ function makeRuntime(options = {}) {
     SpreadsheetApp: { ProtectionType: { RANGE: "RANGE" }, openById: () => ({ getSheetByName: () => sheet }) },
     Session: { getScriptTimeZone: () => "UTC", getActiveUser: () => ({ getEmail: () => options.activeEmail || "" }), getEffectiveUser: () => ({ getEmail: () => options.effectiveEmail || "" }) },
     UrlFetchApp: { fetch: () => ({ getContentText: () => JSON.stringify(state.captchaResponse) }) },
+    ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }) },
   };
   vm.createContext(context);
   vm.runInContext(source, context, { filename: "Code.gs" });
@@ -420,4 +421,64 @@ test("corporate form script is syntactically valid and protects retries and stal
   assert.match(formScript, /submitCorporateEnquiry/);
   assert.match(formScript, /aria-invalid/);
   assert.match(formHtml, /id="form-status"[^>]*tabindex="-1"/);
+});
+
+// --- JSON corporate endpoint used by the enquiry form built into the site ---
+function corporatePost(runtime, body, action = "corporate") {
+  const output = runtime.context.doPost({ parameter: { action }, postData: { type: "text/plain", contents: typeof body === "string" ? body : JSON.stringify(body) } });
+  assert.equal(output.mimeType, "JSON");
+  return JSON.parse(output.text);
+}
+
+test("action=corporate saves one enquiry for a valid JSON body and replays safely", () => {
+  const runtime = makeRuntime();
+  const result = corporatePost(runtime, validForm());
+  assert.deepEqual(Object.keys(result).sort(), ["enquiryId", "ok", "receivedAt"].sort());
+  assert.equal(result.enquiryId, "enquiry-1234567890");
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(corporatePost(runtime, validForm()).ok, true);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.appendCalls, 1);
+  assert.match(corporatePost(runtime, validForm({ brief: "A different brief that is long enough to be valid." })).errors.enquiryId, /conflict/i);
+});
+
+test("action=corporate still requires a captcha token that verifies for the corporate action", () => {
+  const missing = makeRuntime();
+  const body = validForm(); delete body.captchaToken;
+  assert.match(corporatePost(missing, body).errors.captcha, /Captcha/);
+  const rejected = makeRuntime({ captchaResponse: { success: false, hostname: "saloniresinart.com", action: "corporate_enquiry", score: 0.9 } });
+  assert.match(corporatePost(rejected, validForm()).errors.captcha, /Captcha/);
+  const wrongAction = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "partner_application", score: 0.9 } });
+  assert.match(corporatePost(wrongAction, validForm()).errors.captcha, /Captcha/);
+  const wrongHost = makeRuntime({ captchaResponse: { success: true, hostname: "localhost", action: "corporate_enquiry", score: 0.9 } });
+  assert.match(corporatePost(wrongHost, validForm()).errors.captcha, /Captcha/);
+  [missing, rejected, wrongAction, wrongHost].forEach((runtime) => assert.equal(runtime.state.appendCalls, 0));
+});
+
+test("action=corporate keeps validation, the kill switch and drops unknown fields", () => {
+  const invalid = makeRuntime();
+  assert.ok(corporatePost(invalid, validForm({ phone: "1" })).errors.phone);
+  const paused = makeRuntime({ properties: { CORPORATE_FORM_DISABLED: "true" } });
+  assert.match(corporatePost(paused, validForm()).errors.form, /paused/i);
+  const extra = makeRuntime();
+  assert.equal(corporatePost(extra, validForm({ injected: "<b>unexpected</b>" })).ok, true);
+  assert.doesNotMatch(extra.rows[0].join("\u001f"), /must not be saved|unexpected/);
+  [invalid, paused].forEach((runtime) => assert.equal(runtime.state.appendCalls, 0));
+});
+
+test("action=corporate answers invalid for broken JSON and unconfirmed when the save throws", () => {
+  const runtime = makeRuntime();
+  for (const body of ["{not json", "[]", "null", ""]) assert.deepEqual(corporatePost(runtime, body), { ok: false, error: "invalid" });
+  assert.equal(runtime.state.appendCalls, 0);
+  assert.deepEqual(corporatePost(makeRuntime({ lockAvailable: false }), validForm()), { ok: false, error: "unconfirmed" });
+  assert.deepEqual(corporatePost(makeRuntime({ properties: { CORPORATE_PROGRAM_CONFIGURED: "" } }), validForm()), { ok: false, error: "unconfirmed" });
+});
+
+test("action=seed still renders the corporate form for pages cached before the change", () => {
+  const runtime = makeRuntime();
+  let templateName = "";
+  const rendered = { setTitle() { return this; }, setXFrameOptionsMode() { return this; } };
+  runtime.context.HtmlService = { createTemplateFromFile: (name) => { templateName = name; return { evaluate: () => rendered }; }, XFrameOptionsMode: { ALLOWALL: "ALLOWALL" } };
+  runtime.context.doPost({ parameter: { action: "seed", mode: "corporate", seed: JSON.stringify({ enquiryId: "enquiry-cached-page" }) } });
+  assert.equal(templateName, "CorporateForm");
 });
