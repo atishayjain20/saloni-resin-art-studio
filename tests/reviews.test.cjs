@@ -309,6 +309,116 @@ test("a review seed passes a plain first name through to the form and drops anyt
   assert.equal(nameOf(42), "");
 });
 
+// --- JSON review endpoint used by the review form built into the site ---
+function reviewPost(runtime, body, action = "review") {
+  const output = runtime.context.doPost({ parameter: { action }, postData: { type: "text/plain", contents: typeof body === "string" ? body : JSON.stringify(body) } });
+  assert.equal(output.mime, "JSON");
+  return JSON.parse(output.text);
+}
+function postedReview(overrides = {}) {
+  const form = validForm(overrides);
+  delete form.publicConsent;
+  delete form.ignoredInternalField;
+  return form;
+}
+
+test("action=review saves one review for a valid JSON body, with photos, and replays safely", () => {
+  const runtime = makeRuntime();
+  const body = postedReview({ photos: [photo(makeJpeg()), photo(makeJpeg({ size: 400 }))] });
+  const result = reviewPost(runtime, body);
+  assert.equal(result.ok, true);
+  assert.equal(result.reviewId, "review-1234567890");
+  assert.equal(result.status, "Published");
+  assert.equal(runtime.rows.length, 2);
+  assert.equal(runtime.rows[1][9].split(",").length, 2);
+  assert.equal(runtime.state.createFileCalls, 2);
+  assert.equal(runtime.state.captchaCalls, 1);
+  const replay = reviewPost(runtime, body);
+  assert.equal(replay.ok, true);
+  assert.equal(runtime.rows.length, 2);
+  assert.equal(runtime.state.createFileCalls, 2);
+  const conflict = reviewPost(runtime, Object.assign({}, body, { comment: "A different comment that is long enough." }));
+  assert.equal(conflict.ok, false);
+  assert.match(conflict.errors.reviewId, /conflict/i);
+  assert.equal(runtime.rows.length, 2);
+});
+
+test("action=review refuses a missing or failed captcha with no row and no stored photo", () => {
+  const withPhoto = { photos: [photo(makeJpeg())] };
+  const missing = makeRuntime();
+  assert.match(reviewPost(missing, postedReview(Object.assign({ captchaToken: "" }, withPhoto))).errors.captcha, /Captcha/);
+  const absent = makeRuntime();
+  const body = postedReview(withPhoto); delete body.captchaToken;
+  assert.match(reviewPost(absent, body).errors.captcha, /Captcha/);
+  const rejected = makeRuntime({ captchaResponse: { success: false, hostname: "saloniresinart.com", action: "review_submission", score: 0.9 } });
+  assert.match(reviewPost(rejected, postedReview(withPhoto)).errors.captcha, /Captcha/);
+  const wrongAction = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "product_rating", score: 0.9 } });
+  assert.match(reviewPost(wrongAction, postedReview(withPhoto)).errors.captcha, /Captcha/);
+  const wrongHost = makeRuntime({ captchaResponse: { success: true, hostname: "localhost", action: "review_submission", score: 0.9 } });
+  assert.match(reviewPost(wrongHost, postedReview(withPhoto)).errors.captcha, /Captcha/);
+  [missing, absent, rejected, wrongAction, wrongHost].forEach((runtime) => {
+    assert.equal(runtime.rows.length, 1, "no row");
+    assert.equal(runtime.state.createFileCalls, 0, "no stored photo");
+    assert.equal(runtime.state.appendCalls, 0);
+  });
+});
+
+test("action=review rejects too many, oversized and wrongly typed photos before decoding them", () => {
+  const runtime = makeRuntime();
+  let decodes = 0;
+  const decode = runtime.context.Utilities.base64Decode;
+  runtime.context.Utilities.base64Decode = (text) => { decodes += 1; return decode(text); };
+  const one = photo(makeJpeg());
+  assert.ok(reviewPost(runtime, postedReview({ photos: [one, one, one, one] })).errors.photos);
+  assert.ok(reviewPost(runtime, postedReview({ photos: Array.from({ length: 50 }, () => one) })).errors.photos);
+  assert.ok(reviewPost(runtime, postedReview({ photos: [{ type: "image/jpeg", data: "A".repeat(Math.ceil(1024 * 1024 / 3) * 4 + 4) }] })).errors.photos);
+  assert.ok(reviewPost(runtime, postedReview({ photos: [{ type: "image/png", data: one.data }] })).errors.photos);
+  assert.ok(reviewPost(runtime, postedReview({ photos: [{ type: "image/jpeg", data: "not base64!!" }] })).errors.photos);
+  assert.ok(reviewPost(runtime, postedReview({ photos: [{ type: "image/jpeg", data: "" }] })).errors.photos);
+  assert.equal(decodes, 0, "nothing was decoded");
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.createFileCalls, 0);
+  assert.equal(runtime.state.captchaCalls, 0);
+});
+
+test("action=review keeps validation, the kill switch and the daily cap, and drops unknown fields", () => {
+  const invalid = makeRuntime();
+  assert.ok(reviewPost(invalid, postedReview({ rating: "9" })).errors.rating);
+  assert.ok(reviewPost(invalid, postedReview({ comment: "Call me on 8209238541 anytime" })).errors.comment);
+  assert.equal(invalid.rows.length, 1);
+  const paused = makeRuntime({ properties: { REVIEWS_DISABLED: "true" } });
+  assert.match(reviewPost(paused, postedReview({ photos: [photo(makeJpeg())] })).errors.form, /paused/i);
+  assert.equal(paused.state.createFileCalls, 0);
+  assert.equal(paused.state.captchaCalls, 0);
+  const capped = makeRuntime({ properties: { REVIEW_DAILY_ACCEPTANCE_CAP: "1" }, rows: [reviewRow({ at: new Date() })] });
+  assert.match(reviewPost(capped, postedReview()).errors.form, /limit/i);
+  const extra = makeRuntime();
+  const sent = reviewPost(extra, Object.assign(postedReview(), { injected: "<b>unexpected</b>", status: "Hidden", publicConsent: true, photos: [Object.assign(photo(makeJpeg()), { name: "x.jpg", injected: "<i>y</i>" })] }));
+  assert.equal(sent.ok, true);
+  assert.equal(extra.rows[1][2], "Published");
+  assert.equal(extra.rows[1][10], false, "publicConsent is not taken from the page");
+  assert.doesNotMatch(extra.rows[1].join("\u001f"), /unexpected|<i>/);
+});
+
+test("action=review answers invalid for broken JSON and unconfirmed when the save throws", () => {
+  const runtime = makeRuntime();
+  for (const body of ["{not json", "[]", "null", ""]) assert.deepEqual(reviewPost(runtime, body), { ok: false, error: "invalid" });
+  assert.equal(runtime.rows.length, 1);
+  const locked = makeRuntime({ lockAvailable: false });
+  assert.deepEqual(reviewPost(locked, postedReview()), { ok: false, error: "unconfirmed" });
+  const unconfigured = makeRuntime({ properties: { REVIEWS_CONFIGURED: "" } });
+  assert.deepEqual(reviewPost(unconfigured, postedReview()), { ok: false, error: "unconfirmed" });
+  assert.equal(locked.rows.length, 1);
+});
+
+test("the review action never runs the seed renderer, and action=seed still renders the review form for cached pages", () => {
+  const runtime = makeRuntime();
+  reviewPost(runtime, postedReview());
+  assert.equal(runtime.state.templateName, "");
+  runtime.context.doPost({ parameter: { action: "seed", mode: "review", seed: JSON.stringify({ reviewId: "review-cached-12345" }) } });
+  assert.equal(runtime.state.templateName, "ReviewForm");
+});
+
 const RATING_CAPTCHA = { success: true, hostname: "saloniresinart.com", action: "product_rating", score: 0.9 };
 const rate = (runtime, overrides = {}) => JSON.parse(runtime.context.doPost({ parameter: Object.assign({ action: "rate", productId: DEFAULT_PRODUCTS[0].id, rating: "4", ratingId: "rating-abcdef123456", captchaToken: "token" }, overrides) }).getContent());
 

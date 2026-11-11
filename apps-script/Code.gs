@@ -90,11 +90,12 @@ function doPost(event) {
   var action = String(parameters.action || "");
   var mode = boundedMode_(parameters.mode);
   if (action === "rate") return ContentService.createTextOutput(JSON.stringify(submitQuickRating_(parameters))).setMimeType(ContentService.MimeType.JSON);
-  // The order, partner and corporate forms live in the site itself and talk to these JSON actions; "seed" below stays so older cached pages keep working.
+  // The order, partner, corporate and review forms live in the site itself and talk to these JSON actions; "seed" below stays so older cached pages keep working.
   if (action === "order") return json_(orderFromPost_(event));
   if (action === "referral") return json_(referralFromPost_(event));
   if (action === "partner") return json_(partnerFromPost_(event));
   if (action === "corporate") return json_(corporateFromPost_(event));
+  if (action === "review") return json_(reviewFromPost_(event));
   if (action === "seed") {
     var seed = parseSeed_(parameters.seed);
     seed.formMode = mode;
@@ -171,6 +172,23 @@ function submitFromPost_(event, fields, submit) {
   var form = {};
   fields.forEach(function (field) { if (body[field] !== undefined && body[field] !== null) form[field] = body[field]; });
   try { return submit(form); } catch (error) { return { ok: false, error: "unconfirmed" }; }
+}
+
+// The review fields submitReview reads. publicConsent is left out on purpose: the page never sends it, so a posted value is not trusted.
+// Photos stay {type, data} base64 strings: submitReview checks their count, type and base64 length before it decodes any of them.
+var REVIEW_POST_FIELDS = ["reviewId", "productId", "rating", "firstName", "city", "comment", "captchaToken"];
+
+function reviewFromPost_(event) {
+  var body;
+  try { body = postedJson_(event); } catch (parseError) { return { ok: false, error: "invalid" }; }
+  var form = {};
+  REVIEW_POST_FIELDS.forEach(function (field) { if (body[field] !== undefined && body[field] !== null) form[field] = body[field]; });
+  if (Array.isArray(body.photos)) {
+    form.photos = body.photos.slice(0, MAX_REVIEW_PHOTOS + 1).map(function (photo) {
+      return { type: photo && typeof photo === "object" ? photo.type : "", data: photo && typeof photo === "object" ? photo.data : "" };
+    });
+  }
+  try { return submitReview(form); } catch (error) { return { ok: false, error: "unconfirmed" }; }
 }
 
 function partnerFromPost_(event) { return submitFromPost_(event, PARTNER_POST_FIELDS, submitPartnerApplication); }
