@@ -1683,15 +1683,14 @@
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
     var requestedMode = embed ? embed.getAttribute("data-form-mode") : "";
-    // The order form is built into the page, so only the partner, corporate and review forms still use an iframe.
-    if (!embed || !status || (!frame && (requestedMode === "partner" || requestedMode === "corporate" || requestedMode === "review"))) return;
+    // The order, partner and corporate forms are built into their pages, so only the review form still uses an iframe.
+    if (!embed || !status || (!frame && requestedMode === "review")) return;
     var orderFormElement = document.getElementById("order-form");
     var orderFormIntro = document.getElementById("order-form-intro");
     var orderUrl = embed.getAttribute("data-order-form-url") || "";
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
-    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" || requestedMode === "review" ? requestedMode : "order" };
-    var corporateIntakeReady = embed.getAttribute("data-intake-ready") === "true";
+    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "review" ? "review" : "order" };
     var orderDialogEnabled = Boolean(orderDialog && typeof orderDialog.showModal === "function");
     var orderDialogHistoryActive = false;
     var orderDialogHistoryBackPending = false;
@@ -1921,7 +1920,7 @@
           window.grecaptcha.ready(function () {
             if (frameState.activeCaptcha !== request) return;
             try {
-              var captchaAction = frameState.mode === "partner" ? "partner_application" : frameState.mode === "corporate" ? "corporate_enquiry" : frameState.mode === "review" ? "review_submission" : "order_request";
+              var captchaAction = "review_submission";
               var result = window.grecaptcha.execute(frameState.siteKey, { action: captchaAction });
               if (!result || typeof result.then !== "function") { postCaptchaResult(request, false, ""); return; }
               result.then(function (token) {
@@ -2067,9 +2066,7 @@
     function submitSeed(seed, shouldScroll, identity, previewSnapshot, previewExpected, opener, customizerHandoff) {
       if (!configured) {
         invalidateChannel();
-        status.innerHTML = frameState.mode === "corporate"
-          ? "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>."
-          : "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+        status.innerHTML = "The request form is not configured for this preview yet. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
         status.hidden = false;
         status.removeAttribute("aria-busy");
         return false;
@@ -2128,11 +2125,6 @@
       var seedField = document.createElement("input");
       seedField.type = "hidden"; seedField.name = "seed"; seedField.value = JSON.stringify(seed);
       postForm.appendChild(action); postForm.appendChild(modeField); postForm.appendChild(seedField);
-      if (frameState.mode === "partner") {
-        var applicationId = document.createElement("input");
-        applicationId.type = "hidden"; applicationId.name = "applicationId"; applicationId.value = seed.applicationId || requestId();
-        postForm.appendChild(applicationId);
-      }
       document.body.appendChild(postForm); postForm.submit(); postForm.remove();
       frameState.loaded = true;
       if (continueOrderButton) continueOrderButton.hidden = false;
@@ -2230,19 +2222,6 @@
       var savedFirstName = savedProfile ? savedProfile.customerName.split(/\s+/)[0] : "";
       if (savedFirstName.length >= 2 && savedFirstName.length <= 40 && !/[0-9@<>]/.test(savedFirstName)) reviewSeed.firstName = savedFirstName;
       submitSeed(reviewSeed, false);
-      return;
-    }
-    if (frameState.mode === "corporate" && !corporateIntakeReady) {
-      status.innerHTML = "Corporate gifting enquiries are being prepared. For a current large-order enquiry, call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
-      status.hidden = false;
-      return;
-    }
-    if (frameState.mode === "partner") {
-      submitSeed({ sourceKind: "partner", sourceId: "partner-application", productName: "", applicationId: requestId() }, false);
-      return;
-    }
-    if (frameState.mode === "corporate") {
-      submitSeed({ sourceKind: "corporate", sourceId: "corporate-enquiry", productName: "", enquiryId: requestId() }, false);
       return;
     }
 

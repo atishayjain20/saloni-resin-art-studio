@@ -1111,39 +1111,20 @@ test("Let Saloni design it for me uses an explicit design-help seed while genera
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
 });
 
-test("keeps the corporate page pending without seeding or loading the old form", () => {
-  const flow = runFlow({ mode: "corporate", intakeReady: false });
-  assert.equal(flow.posted.length, 0);
-  assert.equal(flow.elements.get("order-form-frame").hidden, true);
-  assert.match(flow.elements.get("order-form-status").textContent, /Corporate gifting enquiries are being prepared/);
-  assert.match(flow.elements.get("order-form-status").textContent, /8209238541/);
-  assert.match(flow.elements.get("order-form-status").innerHTML, /href="tel:\+918209238541"/);
-  assert.match(flow.elements.get("order-form-status").textContent, /saloniresin_art_studio/);
-  const unconfigured = runFlow({ mode: "corporate", intakeReady: true, configured: false });
-  assert.equal(unconfigured.posted.length, 0);
-  assert.match(unconfigured.elements.get("order-form-status").textContent, /Corporate gifting enquiries are being prepared/);
-  assert.doesNotMatch(unconfigured.elements.get("order-form-status").textContent, /not configured for this preview/i);
-});
-
-test("keeps the corporate page pending when intake readiness is missing or unknown", () => {
-  for (const intakeReady of [undefined, "unknown"]) {
-    const options = { mode: "corporate" };
-    if (intakeReady !== undefined) options.intakeReady = intakeReady;
-    const flow = runFlow(options);
-    assert.equal(flow.posted.length, 0);
-    assert.equal(flow.elements.get("order-form-frame").hidden, true);
-    assert.match(flow.elements.get("order-form-status").textContent, /Corporate gifting enquiries are being prepared/);
+test("script.js carries no Partner Circle or Corporate form code, and those pages have no iframe hook for it", () => {
+  assert.doesNotMatch(source, /partner_application|corporate_enquiry|data-intake-ready|corporateIntakeReady|applicationId|enquiryId|partner-application|corporate-enquiry/);
+  assert.doesNotMatch(source, /requestedMode === "partner"|requestedMode === "corporate"|frameState\.mode === "partner"|frameState\.mode === "corporate"/);
+  for (const file of ["partners/index.html", "corporate-gifting/index.html"]) {
+    const html = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    assert.doesNotMatch(html, /id="order-form-embed"|id="order-form-frame"|id="order-form-status"|<iframe/, file);
   }
 });
 
-test("keeps the existing order and Partner Circle seed paths active", () => {
+test("keeps the existing order seed path active", () => {
   const order = runFlow();
   requestCatalogue(order, order.catalogueButton);
   assert.equal(order.posted.length, 1);
   assert.equal(submittedSeed(order.posted).requestStage, "quote");
-  const partner = runFlow({ mode: "partner", intakeReady: false });
-  assert.equal(partner.posted.length, 1);
-  assert.equal(partner.posted[0].children.find((child) => child.name === "mode").value, "partner");
 });
 
 test("does not open a catalogue request when the form is not configured", () => {
@@ -1522,8 +1503,8 @@ test("owns CAPTCHA token requests on the exact studio origin and pinned sender",
   assert.doesNotMatch(source, /CHILD_ORIGIN/);
 });
 
-test("a partner form pins the exact iframe sender and observed sandbox origin, then rejects stale or foreign CAPTCHA requests", async () => {
-  const flow = runFlow({ mode: "partner", intakeReady: false });
+test("the review form pins the exact iframe sender and observed sandbox origin, then rejects stale or foreign CAPTCHA requests", async () => {
+  const flow = runFlow({ mode: "review", intakeReady: false });
   const seed = submittedSeed(flow.posted);
   const frame = flow.elements.get("order-form-frame");
   const nestedSource = frame.contentWindow;
@@ -1536,7 +1517,7 @@ test("a partner form pins the exact iframe sender and observed sandbox origin, t
   await Promise.resolve();
   assert.equal(firstPort.messages[0].token, "parent-token");
   assert.equal(firstPort.messages[0].type, "saloni-order-captcha-response");
-  assert.deepEqual(actions, [["site-key", "partner_application"]]);
+  assert.deepEqual(actions, [["site-key", "review_submission"]]);
   const stalePort = new CapturingPort();
   flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-captcha-request", nonce: "stale-nonce", attemptId: "stale" }, ports: [stalePort] });
   const foreignPort = new CapturingPort();
@@ -1548,8 +1529,8 @@ test("a partner form pins the exact iframe sender and observed sandbox origin, t
   assert.equal(wrongOriginPort.messages.length, 0);
 });
 
-test("the partner form still shows the loader until it is ready, falls back after 2500 ms, and offers contact options on timeout", () => {
-  const flow = runFlow({ mode: "partner", intakeReady: false });
+test("the review form still shows the loader until it is ready, falls back after 2500 ms, and offers contact options on timeout", () => {
+  const flow = runFlow({ mode: "review", intakeReady: false });
   const status = flow.elements.get("order-form-status");
   const seed = submittedSeed(flow.posted);
   const frame = flow.elements.get("order-form-frame");
@@ -1560,7 +1541,7 @@ test("the partner form still shows the loader until it is ready, falls back afte
   assert.equal(status.hidden, true);
   assert.equal(status.getAttribute("aria-busy"), "");
 
-  const slow = runFlow({ mode: "partner", intakeReady: false });
+  const slow = runFlow({ mode: "review", intakeReady: false });
   const slowStatus = slow.elements.get("order-form-status");
   const slowFrame = slow.elements.get("order-form-frame");
   const loadingTimer = slow.scheduledTimers.at(-1);
@@ -1573,7 +1554,7 @@ test("the partner form still shows the loader until it is ready, falls back afte
   settle.callback();
   assert.equal(slowStatus.hidden, true);
 
-  const stalled = runFlow({ mode: "partner", intakeReady: false });
+  const stalled = runFlow({ mode: "review", intakeReady: false });
   stalled.scheduledTimers.at(-1).callback();
   const stalledStatus = stalled.elements.get("order-form-status");
   assert.match(stalledStatus.textContent, /taking longer than expected/);
@@ -1581,8 +1562,8 @@ test("the partner form still shows the loader until it is ready, falls back afte
   assert.equal(stalledStatus.getAttribute("aria-busy"), "");
 });
 
-test("the partner, corporate and review pages still load their form in an iframe and never call the order form", () => {
-  for (const mode of ["partner", "corporate", "review"]) {
+test("the review page still loads its form in an iframe and never calls the order form", () => {
+  for (const mode of ["review"]) {
     const flow = runFlow({ mode, intakeReady: true });
     assert.equal(flow.posted.length, 1, mode);
     assert.equal(flow.posted[0].opened, undefined, mode);

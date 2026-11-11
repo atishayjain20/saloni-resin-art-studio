@@ -267,13 +267,14 @@ test("collection referral capture runs when the shared script loads after DOMCon
 
 test("partner page keeps terms visible and consent links to the complete rules", () => {
   const page = fs.readFileSync(path.join(root, "partners", "index.html"), "utf8");
-  const form = fs.readFileSync(path.join(root, "apps-script", "PartnerForm.html"), "utf8");
+  const form = page.match(/<form id="partner-form"[\s\S]*?<\/form>/)[0];
   assert.match(page, /id="rules"/);
   assert.match(page, /cancelled|refunded|self-referred|void/i);
   assert.match(page, /monthly.*manual payout/i);
-  const partnerSeedStart = script.indexOf('if (frameState.mode === "partner")');
-  assert.ok(partnerSeedStart >= 0);
-  assert.doesNotMatch(script.slice(partnerSeedStart, partnerSeedStart + 180), /scrollToForm/);
+  // The form sits in the page already: loading the page must not scroll to it or steal focus.
+  assert.doesNotMatch(form, /autofocus/);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, "public-forms.js"), "utf8"), /scrollIntoView|scrollTo\(/);
+  assert.match(form, /<a href="#rules">Read the full rules<\/a>/);
   assert.match(form, /Partner Circle rules/);
   assert.match(page, /<strong>10%<\/strong>/);
   assert.match(page, /Eligible commission is 10% of the final product subtotal/);
