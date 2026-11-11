@@ -555,6 +555,15 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .lightbox-order-summary strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
 .lightbox-order-summary #lightbox-product-price { color: var(--cocoa); font-weight: 800; }
 .lightbox-request { width: 100%; align-self: stretch; justify-content: center; flex: 0 0 auto; margin-top: 1rem; }
+.lightbox-share { display: grid; width: 100%; gap: .5rem; }
+.lightbox-share[hidden], .lightbox-share-options[hidden] { display: none; }
+.lightbox-share .button-line:not(:hover):not(:focus-visible) { background: transparent; }
+.lightbox-share .button { justify-content: center; min-height: 44px; }
+.lightbox-share-button { width: 100%; }
+.lightbox-share-options { display: grid; grid-template-columns: 1.5fr 1fr; gap: .5rem; }
+.lightbox-share-options .button { padding-inline: .6rem; gap: .4rem; font-size: .78rem; }
+.lightbox-share-status { margin: 0; color: var(--cocoa); font-size: .8rem; font-weight: 800; }
+.lightbox-share-status:empty { display: none; }
 .lightbox-close-form { position: absolute; z-index: 1; top: 0.5rem; right: 0.5rem; margin: 0; }
 .lightbox-close { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--ivory); color: var(--ink); font-size: 1.4rem; line-height: 1; }
 .lightbox-close:hover, .lightbox-close:focus-visible { background: var(--ink); color: var(--ivory); }
