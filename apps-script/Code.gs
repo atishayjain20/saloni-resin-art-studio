@@ -902,6 +902,8 @@ function orderStatusCode_(cell) {
   var status = String(cell == null ? "" : cell).trim().toLowerCase();
   if (status === "" || status === "new request") return "received";
   if (status === "cancellation requested") return "cancel_requested";
+  // Saloni types "Cancellation declined" when she will not cancel; it must be checked before the "cancel" rule below.
+  if (status.indexOf("declined") !== -1) return "cancel_declined";
   if (status.indexOf("cancel") !== -1) return "cancelled";
   if (status === "confirmed" || status === "accepted") return "confirmed";
   if (status === "ready" || status === "ready for pickup") return "ready";

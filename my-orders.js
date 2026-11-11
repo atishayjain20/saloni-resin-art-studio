@@ -30,10 +30,10 @@
     dispatched: "Dispatched",
     delivered: "Delivered",
     cancel_requested: "Cancellation requested — Saloni will confirm",
+    cancel_declined: "Confirmed — your cancellation request was declined. Contact Saloni if you have questions.",
     cancelled: "Cancelled"
   };
   var PICKUP_LABELS = { ready: "Ready for pickup in Ajmer", delivered: "Picked up" };
-  var DECLINED_TEXT = "Your cancellation request was declined — contact Saloni";
   var STATUS_CHECK_GAP_MS = 60 * 1000;
   var STATUS_TIMEOUT_MS = 15000;
   var CANCEL_FAILED_TEXT = "Could not send the request. Please try again or call/WhatsApp Saloni.";
@@ -79,9 +79,6 @@
       var asked = entry.cancelRequestedAt;
       if (typeof asked !== "number" || asked % 1 !== 0 || asked < at - CLOCK_SKEW_MS || asked > now + CLOCK_SKEW_MS) return null;
       valid.cancelRequestedAt = asked;
-      // When the server first answered "cancellation requested": from then on its status always wins over the local display.
-      var seen = entry.cancelSeenAt;
-      if (typeof seen === "number" && seen % 1 === 0 && seen >= asked - CLOCK_SKEW_MS && seen <= now + CLOCK_SKEW_MS) valid.cancelSeenAt = seen;
     }
     // A last known status is optional and never worth dropping the order for: an unknown code or odd time is just ignored.
     var checked = entry.statusCheckedAt;
@@ -191,17 +188,13 @@
   }
   function requestCancellation(requestId) { return postAction("cancel", { requestId: requestId }, CANCEL_TIMEOUT_MS); }
 
-  // What the shopper reads for an order. A cancellation the shopper asked for shows as requested until the server has
-  // acknowledged it (cancelSeenAt) or Saloni's status moves past "sent" or "confirmed". After that the server status always wins,
-  // so a request Saloni declined (Status back to Confirmed) reads as Confirmed again.
+  // What the shopper reads for an order. While a cancellation the shopper asked for is open (the server still says sent, confirmed
+  // or cancellation requested) it reads as requested. Saloni's "Cancellation declined" and every later status (Being made,
+  // Dispatched, Cancelled, ...) show as they are, because that is what really happened.
   function effectiveStatus(order) {
     var code = isStatusCode(order.status) ? order.status : "received";
-    if (order.cancelRequestedAt && !order.cancelSeenAt && (code === "received" || code === "confirmed")) return "cancel_requested";
+    if (order.cancelRequestedAt && (code === "received" || code === "confirmed")) return "cancel_requested";
     return code;
-  }
-  function wasDeclined(order) {
-    var code = effectiveStatus(order);
-    return Boolean(order.cancelRequestedAt && order.cancelSeenAt && (code === "received" || code === "confirmed"));
   }
   function statusLabel(order) {
     var code = effectiveStatus(order);
@@ -217,7 +210,6 @@
       if (!Object.prototype.hasOwnProperty.call(statuses, order.requestId) || !isStatusCode(statuses[order.requestId])) return;
       order.status = statuses[order.requestId];
       order.statusCheckedAt = now;
-      if (order.status === "cancel_requested" && order.cancelRequestedAt && !order.cancelSeenAt) order.cancelSeenAt = now;
       changed = true;
     });
     var store = storage();
@@ -329,8 +321,6 @@
     var code = effectiveStatus(order);
     view.status.className = "my-order-status is-" + code.replace(/_/g, "-");
     view.status.textContent = statusLabel(order);
-    if (wasDeclined(order)) showNote(view, DECLINED_TEXT, "my-order-note my-order-declined");
-    else if (view.note.className.indexOf("my-order-declined") !== -1) showNote(view, "", "my-order-note");
     if (canCancel(view) && !view.cancel) {
       view.cancel = cancelControls(view);
       view.card.appendChild(view.cancel);
@@ -475,7 +465,6 @@
         if (!isStatusCode(code)) return;
         view.order.status = code;
         view.order.statusCheckedAt = Date.now();
-        if (code === "cancel_requested" && view.order.cancelRequestedAt && !view.order.cancelSeenAt) view.order.cancelSeenAt = view.order.statusCheckedAt;
         paint(view);
       });
     }, function () { statusInFlight = false; });

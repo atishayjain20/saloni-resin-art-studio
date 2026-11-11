@@ -1642,6 +1642,7 @@ test("action=status maps the Status cell to a fixed code (trimmed, case-insensit
     ["", "received"], ["New request", "received"], ["  new REQUEST ", "received"],
     ["Cancellation requested", "cancel_requested"], ["cancellation REQUESTED", "cancel_requested"],
     ["Cancelled", "cancelled"], ["Canceled", "cancelled"], ["Order cancelled by Saloni", "cancelled"],
+    ["Cancellation declined", "cancel_declined"], ["  cancellation DECLINED ", "cancel_declined"], ["Declined", "cancel_declined"], ["Cancel request declined by Saloni", "cancel_declined"],
     ["Confirmed", "confirmed"], ["accepted", "confirmed"],
     ["In progress", "in_progress"], ["Making", "in_progress"], ["IN MAKING", "in_progress"], ["Preparing", "in_progress"],
     ["Ready", "ready"], ["Ready for pickup", "ready"],
