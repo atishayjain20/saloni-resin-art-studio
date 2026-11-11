@@ -232,16 +232,19 @@ function reviewRow(overrides = {}) {
   return [v.id, v.at, v.status, v.rating, v.productId, v.productName, v.firstName, v.city, v.comment, v.photos, v.consent, v.fingerprint, v.notes];
 }
 
-test("a review with no captcha token is still refused", () => {
+test("a review submits without a captcha token and never calls reCAPTCHA", () => {
   const runtime = makeRuntime();
-  assert.match(runtime.context.submitReview(validForm({ captchaToken: "" })).errors.captcha, /Captcha/);
+  const form = validForm(); delete form.captchaToken;
+  assert.equal(runtime.context.submitReview(form).ok, true);
+  assert.equal(runtime.context.submitReview(validForm({ reviewId: "review-other-12345", captchaToken: "left-over-token" })).ok, true);
+  assert.equal(runtime.rows.length, 3);
+  assert.equal(runtime.state.captchaCalls, 0);
 });
 
-test("review mode, captcha action and kill switch are bounded", () => {
+test("review mode and kill switch are bounded", () => {
   const runtime = makeRuntime();
   assert.equal(runtime.context.boundedMode_("review"), "review");
   assert.equal(runtime.context.boundedMode_("unknown"), "order");
-  assert.equal(runtime.context.REVIEW_CAPTCHA_ACTION, "review_submission");
   assert.equal(runtime.context.REVIEWS_READY_PROPERTY, "REVIEWS_CONFIGURED");
   assert.deepEqual(plain(runtime.context.REVIEW_STATUSES), ["Published", "Hidden", "Removed"]);
   assert.deepEqual(plain(runtime.context.REVIEW_HEADERS), REVIEW_HEADERS);
@@ -249,9 +252,6 @@ test("review mode, captcha action and kill switch are bounded", () => {
   assert.equal(seed.reviewId, "review-seed-12345");
   assert.equal(seed.comment, undefined);
   assert.match(runtime.context.parseSeed_("{}").reviewId, /^[0-9a-f-]{36}$/);
-  const wrongAction = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 } });
-  assert.match(wrongAction.context.submitReview(validForm()).errors.captcha, /Captcha/);
-  assert.equal(wrongAction.state.appendCalls, 0);
   const paused = makeRuntime({ properties: { REVIEWS_DISABLED: "true" } });
   const result = paused.context.submitReview(validForm({ photos: [photo(makeJpeg())] }));
   assert.equal(result.ok, false);
@@ -332,7 +332,7 @@ test("action=review saves one review for a valid JSON body, with photos, and rep
   assert.equal(runtime.rows.length, 2);
   assert.equal(runtime.rows[1][9].split(",").length, 2);
   assert.equal(runtime.state.createFileCalls, 2);
-  assert.equal(runtime.state.captchaCalls, 1);
+  assert.equal(runtime.state.captchaCalls, 0);
   const replay = reviewPost(runtime, body);
   assert.equal(replay.ok, true);
   assert.equal(runtime.rows.length, 2);
@@ -343,23 +343,18 @@ test("action=review saves one review for a valid JSON body, with photos, and rep
   assert.equal(runtime.rows.length, 2);
 });
 
-test("action=review refuses a missing or failed captcha with no row and no stored photo", () => {
+test("action=review saves with a missing or left-over captcha token, with photos, and never calls reCAPTCHA", () => {
   const withPhoto = { photos: [photo(makeJpeg())] };
   const missing = makeRuntime();
-  assert.match(reviewPost(missing, postedReview(Object.assign({ captchaToken: "" }, withPhoto))).errors.captcha, /Captcha/);
-  const absent = makeRuntime();
   const body = postedReview(withPhoto); delete body.captchaToken;
-  assert.match(reviewPost(absent, body).errors.captcha, /Captcha/);
-  const rejected = makeRuntime({ captchaResponse: { success: false, hostname: "saloniresinart.com", action: "review_submission", score: 0.9 } });
-  assert.match(reviewPost(rejected, postedReview(withPhoto)).errors.captcha, /Captcha/);
-  const wrongAction = makeRuntime({ captchaResponse: { success: true, hostname: "saloniresinart.com", action: "product_rating", score: 0.9 } });
-  assert.match(reviewPost(wrongAction, postedReview(withPhoto)).errors.captcha, /Captcha/);
-  const wrongHost = makeRuntime({ captchaResponse: { success: true, hostname: "localhost", action: "review_submission", score: 0.9 } });
-  assert.match(reviewPost(wrongHost, postedReview(withPhoto)).errors.captcha, /Captcha/);
-  [missing, absent, rejected, wrongAction, wrongHost].forEach((runtime) => {
-    assert.equal(runtime.rows.length, 1, "no row");
-    assert.equal(runtime.state.createFileCalls, 0, "no stored photo");
-    assert.equal(runtime.state.appendCalls, 0);
+  assert.equal(reviewPost(missing, body).ok, true);
+  const stale = makeRuntime();
+  assert.equal(reviewPost(stale, postedReview(Object.assign({ captchaToken: "left-over-token" }, withPhoto))).ok, true);
+  [missing, stale].forEach((runtime) => {
+    assert.equal(runtime.rows.length, 2, "one row saved");
+    assert.equal(runtime.state.createFileCalls, 1, "one stored photo");
+    assert.equal(runtime.state.captchaCalls, 0);
+    assert.equal(JSON.stringify(runtime.rows[1]).includes("left-over-token"), false);
   });
 });
 

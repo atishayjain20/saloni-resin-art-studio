@@ -12,9 +12,6 @@ var MAX_DIMENSION_INCHES = 60;
 var DEFAULT_DAILY_ACCEPTANCE_CAP = 50;
 var DEFAULT_PARTNER_DAILY_ACCEPTANCE_CAP = 20;
 var DEFAULT_CORPORATE_DAILY_ACCEPTANCE_CAP = 20;
-var PARTNER_APPLICATION_CAPTCHA_ACTION = "partner_application";
-var CORPORATE_ENQUIRY_CAPTCHA_ACTION = "corporate_enquiry";
-var REVIEW_CAPTCHA_ACTION = "review_submission";
 var RATING_CAPTCHA_ACTION = "product_rating";
 var DEFAULT_REVIEW_DAILY_ACCEPTANCE_CAP = 20;
 var DEFAULT_RATING_DAILY_ACCEPTANCE_CAP = 100;
@@ -157,14 +154,14 @@ function orderFromPost_(event) {
 
 var PARTNER_POST_FIELDS = [
   "applicationId", "applicantName", "businessName", "category", "serviceArea", "phone", "email", "website",
-  "typicalCustomers", "referralPlan", "rulesAccepted", "captchaToken"
+  "typicalCustomers", "referralPlan", "rulesAccepted"
 ];
 var CORPORATE_POST_FIELDS = [
   "enquiryId", "organisationName", "contactName", "phone", "email", "enquiryType", "occasion", "approximateQuantity",
-  "budgetRange", "requiredDate", "deliveryScope", "brief", "privacyAccepted", "captchaToken"
+  "budgetRange", "requiredDate", "deliveryScope", "brief", "privacyAccepted"
 ];
 
-// The Partner Circle and Corporate pages post JSON too. Only the fields the submit function reads are copied; the captcha check,
+// The Partner Circle and Corporate pages post JSON too. Only the fields the submit function reads are copied (an old page's captchaToken is dropped); the
 // validation, caps, kill switches, lock and replay handling all stay inside submitPartnerApplication / submitCorporateEnquiry.
 function submitFromPost_(event, fields, submit) {
   var body;
@@ -176,7 +173,7 @@ function submitFromPost_(event, fields, submit) {
 
 // The review fields submitReview reads. publicConsent is left out on purpose: the page never sends it, so a posted value is not trusted.
 // Photos stay {type, data} base64 strings: submitReview checks their count, type and base64 length before it decodes any of them.
-var REVIEW_POST_FIELDS = ["reviewId", "productId", "rating", "firstName", "city", "comment", "captchaToken"];
+var REVIEW_POST_FIELDS = ["reviewId", "productId", "rating", "firstName", "city", "comment"];
 
 function reviewFromPost_(event) {
   var body;
@@ -903,8 +900,6 @@ function submitPartnerApplication(form) {
   var payload = collectApplication_(form || {});
   var validation = validateApplication_(payload);
   if (Object.keys(validation).length) return validationFailure_(validation);
-  var captcha = verifyCaptcha_(payload.captchaToken, properties, PARTNER_APPLICATION_CAPTCHA_ACTION);
-  if (!captcha.ok) return validationFailure_({ captcha: captcha.error });
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error("Unable to receive the partner application.");
   try {
@@ -950,8 +945,6 @@ function submitCorporateEnquiry(form) {
   var payload = collectCorporateEnquiry_(form || {});
   var validation = validateCorporateEnquiry_(payload);
   if (Object.keys(validation).length) return validationFailure_(validation);
-  var captcha = verifyCaptcha_(payload.captchaToken, properties, CORPORATE_ENQUIRY_CAPTCHA_ACTION);
-  if (!captcha.ok) return validationFailure_({ captcha: captcha.error });
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error("Unable to receive the organisation enquiry.");
   try {
@@ -1000,8 +993,7 @@ function collectCorporateEnquiry_(form) {
     enquiryType: stringValue_(form.enquiryType), occasion: stringValue_(form.occasion),
     approximateQuantity: stringValue_(form.approximateQuantity), budgetRange: stringValue_(form.budgetRange),
     requiredDate: stringValue_(form.requiredDate), deliveryScope: stringValue_(form.deliveryScope),
-    brief: stringValue_(form.brief), privacyAccepted: isTrue_(form.privacyAccepted),
-    captchaToken: stringValue_(form.captchaToken)
+    brief: stringValue_(form.brief), privacyAccepted: isTrue_(form.privacyAccepted)
   };
 }
 
@@ -1154,8 +1146,6 @@ function submitReview(form) {
     if (decoded.error) errors.photos = decoded.error;
   }
   if (Object.keys(errors).length) return validationFailure_(errors);
-  var captcha = verifyCaptcha_(payload.captchaToken, properties, REVIEW_CAPTCHA_ACTION);
-  if (!captcha.ok) return validationFailure_({ captcha: captcha.error });
   try {
     return storeReview_(payload, products, decoded.items, config, properties);
   } catch (error) {
@@ -1249,7 +1239,7 @@ function collectReview_(form) {
   return {
     reviewId: stringValue_(form.reviewId).trim(), productId: stringValue_(form.productId).trim(), rating: stringValue_(form.rating).trim(),
     firstName: stringValue_(form.firstName).trim(), city: stringValue_(form.city).trim(), comment: stringValue_(form.comment).trim(),
-    publicConsent: isTrue_(form.publicConsent), captchaToken: stringValue_(form.captchaToken),
+    publicConsent: isTrue_(form.publicConsent),
     photos: photos.map(function (photo) { return { type: stringValue_(photo && photo.type), data: stringValue_(photo && photo.data) }; })
   };
 }
@@ -1674,8 +1664,7 @@ function collectApplication_(form) {
     businessName: stringValue_(form.businessName), category: stringValue_(form.category),
     serviceArea: stringValue_(form.serviceArea), phone: stringValue_(form.phone), email: stringValue_(form.email),
     website: stringValue_(form.website), typicalCustomers: stringValue_(form.typicalCustomers),
-    referralPlan: stringValue_(form.referralPlan), rulesAccepted: isTrue_(form.rulesAccepted),
-    captchaToken: stringValue_(form.captchaToken)
+    referralPlan: stringValue_(form.referralPlan), rulesAccepted: isTrue_(form.rulesAccepted)
   };
 }
 
