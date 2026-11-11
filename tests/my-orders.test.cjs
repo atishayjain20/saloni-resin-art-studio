@@ -33,7 +33,7 @@ class FakeElement {
   appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
   removeChild(child) { this.children = this.children.filter((item) => item !== child); return child; }
   get firstChild() { return this.children[0] || null; }
-  focus() { this.focused = true; if (FakeElement.onFocus) FakeElement.onFocus(this); }
+  focus(options) { this.focused = true; this.focusOptions = options; if (FakeElement.onFocus) FakeElement.onFocus(this); }
   getClientRects() { return this.hiddenLayout ? [] : [{}]; }
   find(predicate, found = []) { if (predicate(this)) found.push(this); this.children.forEach((child) => child.find(predicate, found)); return found; }
   showModal() { this.open = true; }
@@ -45,7 +45,7 @@ function createStorage(initial = {}) {
   return { data, getItem: (key) => (key in data ? data[key] : null), setItem(key, value) { data[key] = String(value); }, removeItem(key) { delete data[key]; } };
 }
 
-function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false } = {}) {
+function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false } = {}) {
   const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "my-orders-clear", "my-orders-confirm", "my-orders-confirm-yes", "my-orders-confirm-no", "my-orders-clear-area", "nav-toggle"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id === "my-orders-list" ? "ol" : "div", id)]));
   const dialog = elements.get("my-orders-dialog");
@@ -71,6 +71,10 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   };
   const popstateListeners = [];
   const windowObject = { localStorage: storage, document: documentObject, history, location: { href: "https://saloniresinart.com/" }, addEventListener(type, listener) { if (type === "popstate") popstateListeners.push(listener); } };
+  // Animation frames run at once unless a test wants to see what happens between them.
+  const frames = [];
+  windowObject.requestAnimationFrame = (callback) => { if (manualFrames) frames.push(callback); else callback(); return frames.length; };
+  const flushFrame = () => { const due = frames.splice(0); due.forEach((callback) => callback()); return due.length; };
   const popstate = (state) => { if (history) history.state = state; popstateListeners.forEach((listener) => listener({ state })); };
   const context = { console, document: documentObject, window: windowObject, Date, JSON, Math, Number, String, Array, Object, RegExp };
   vm.createContext(context);
@@ -78,7 +82,7 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   const real = windowObject.saloniMyOrders;
   // Arrays made inside the vm context have another prototype; hand the tests plain objects.
   const api = Object.assign({}, real, { list: () => JSON.parse(JSON.stringify(real.list())) });
-  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject, history, popstate };
+  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject, history, popstate, flushFrame };
 }
 
 const order = (overrides = {}) => Object.assign({
@@ -413,4 +417,39 @@ test("without the History API the dialog still opens and closes", () => {
   assert.doesNotThrow(() => link.dispatch("click", { button: 0 }));
   assert.equal(dialog.open, true);
   assert.doesNotThrow(() => dialog.close());
+});
+
+test("the confirm step buttons take focus without preventScroll, so Keep them is scrolled into view", () => {
+  const { api, link, elements } = makeRuntime();
+  api.save(order());
+  link.dispatch("click", { button: 0 });
+  elements.get("my-orders-clear").dispatch("click");
+  assert.equal(elements.get("my-orders-confirm-no").focused, true);
+  assert.notEqual(elements.get("my-orders-confirm-no").focusOptions && elements.get("my-orders-confirm-no").focusOptions.preventScroll, true);
+  elements.get("my-orders-confirm-no").dispatch("click");
+  assert.equal(elements.get("my-orders-clear").focused, true);
+  assert.notEqual(elements.get("my-orders-clear").focusOptions && elements.get("my-orders-clear").focusOptions.preventScroll, true);
+});
+
+test("opening from the nav link waits two animation frames, so the phone menu has closed and laid out before the modal opens", () => {
+  const { link, dialog, elements, history, flushFrame } = makeRuntime({ manualFrames: true });
+  const click = link.dispatch("click", { button: 0 });
+  assert.equal(click.defaultPrevented, true);
+  assert.equal(dialog.open, false);
+  assert.equal(history.pushed.length, 0);
+  flushFrame();
+  assert.equal(dialog.open, false, "one frame is not enough: the browser applies the menu's scroll adjustment a frame later");
+  flushFrame();
+  assert.equal(dialog.open, true);
+  assert.equal(history.pushed.length, 1);
+  assert.equal(elements.get("my-orders-close").focused, true);
+});
+
+test("tapping the nav link twice quickly opens the dialog once", () => {
+  const { link, dialog, history, flushFrame } = makeRuntime({ manualFrames: true });
+  link.dispatch("click", { button: 0 });
+  link.dispatch("click", { button: 0 });
+  flushFrame(); flushFrame(); flushFrame();
+  assert.equal(dialog.open, true);
+  assert.equal(history.pushed.length, 1);
 });

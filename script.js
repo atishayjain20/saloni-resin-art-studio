@@ -1400,6 +1400,7 @@
       try {
         if (window.history && (replace ? window.history.replaceState : window.history.pushState)) {
           window.history[replace ? "replaceState" : "pushState"]({}, "", next);
+          appliedLocation = locationKey();
           return true;
         }
         if (window.location) window.location.href = next;
@@ -1496,7 +1497,22 @@
       return false;
     }
 
+    // The search and hash the catalogue last applied. A dialog's own history step (order, lightbox, My orders)
+    // fires popstate with the URL unchanged; re-applying it would collapse the shopper's open section and jump the page.
+    var appliedLocation = "";
+    function locationKey() { return window.location ? (window.location.search || "") + (window.location.hash || "") : ""; }
+
     function restoreFromLocation() {
+      applyLocation();
+      appliedLocation = locationKey();
+    }
+
+    function restoreOnPopstate() {
+      if (locationKey() === appliedLocation) return;
+      restoreFromLocation();
+    }
+
+    function applyLocation() {
       var state = readLocationState();
       if (state.full) {
         setFullState(state.type, state.budget, state.q);
@@ -1650,7 +1666,7 @@
       closeControls();
     });
     window.addEventListener("hashchange", restoreFromLocation);
-    window.addEventListener("popstate", restoreFromLocation);
+    window.addEventListener("popstate", restoreOnPopstate);
     restoreFromLocation();
   }
 

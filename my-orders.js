@@ -224,7 +224,11 @@
     clearArea.hidden = !orders.length;
     confirmElement.hidden = true;
   }
-  function focusIfPossible(target) { if (target && typeof target.focus === "function") target.focus({ preventScroll: true }); }
+  // The confirm step sits low in a scrolling panel, so its buttons are focused with scrolling on.
+  function focusIfPossible(target, scrollIntoView) {
+    if (!target || typeof target.focus !== "function") return;
+    if (scrollIntoView) target.focus(); else target.focus({ preventScroll: true });
+  }
   function open(from) {
     if (!dialog || typeof dialog.showModal !== "function") return false;
     opener = from || null;
@@ -240,7 +244,11 @@
     if (!dialog || typeof dialog.showModal !== "function") return;
     if (event && (event.defaultPrevented || (event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
     if (event && event.preventDefault) event.preventDefault();
-    open(link);
+    // On a phone the menu closes in this same click. Open after two frames, once the page has laid out without it;
+    // opened sooner, the browser applies its scroll adjustment for the menu only after the dialog closes (a jump).
+    var raf = window.requestAnimationFrame;
+    if (typeof raf !== "function") { open(link); return; }
+    raf.call(window, function () { raf.call(window, function () { open(link); }); });
   }
 
   if (dialog && listElement && emptyElement && contactElement && clearArea && clearButton && confirmElement && confirmYes && confirmNo) {
@@ -284,11 +292,11 @@
     });
     clearButton.addEventListener("click", function () {
       confirmElement.hidden = false;
-      focusIfPossible(confirmNo);
+      focusIfPossible(confirmNo, true);
     });
     confirmNo.addEventListener("click", function () {
       confirmElement.hidden = true;
-      focusIfPossible(clearButton);
+      focusIfPossible(clearButton, true);
     });
     confirmYes.addEventListener("click", function () {
       clear();

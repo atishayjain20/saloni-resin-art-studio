@@ -891,3 +891,63 @@ test("misspelled searches show the closest matching gifts with a note", () => {
   assert.deepEqual(search("zzzzz"), []);
   assert.equal(harness.status.textContent, "No gifts match those choices.");
 });
+
+// A dialog's own history step (order, lightbox, My orders) fires popstate without changing the URL.
+// That must not re-apply the catalogue state: it would collapse the section the shopper opened and jump the page.
+test("a popstate that leaves the URL unchanged keeps the open section and does not scroll or re-apply filters", () => {
+  const harness = createHarness();
+  const target = harness.sections[1];
+  target.disclosure.dispatch("click");
+  assert.equal(target.disclosure.getAttribute("aria-expanded"), "true");
+  const scrollsBefore = harness.eventLog.filter((entry) => entry === "scroll").length;
+  const writesBefore = harness.windowObject.history.pushes.length + harness.windowObject.history.replacements.length;
+  harness.windowObject.listeners.popstate();
+  assert.equal(target.disclosure.getAttribute("aria-expanded"), "true", "the open section stays open");
+  assert.equal(target.cards.filter((card) => !card.hidden).length, target.cards.length);
+  assert.equal(harness.eventLog.filter((entry) => entry === "scroll").length, scrollsBefore, "no scroll");
+  assert.equal(harness.windowObject.history.pushes.length + harness.windowObject.history.replacements.length, writesBefore);
+});
+
+test("an unchanged-URL popstate is also ignored after a filter was applied and written to the URL, and after a restore", () => {
+  const harness = createHarness({ count: 77 });
+  harness.navBrowseAll.dispatch("click");
+  harness.typeFilter.value = "corporate";
+  harness.applyButton.dispatch("click");
+  const shown = visibleCards(harness).length;
+  harness.searchFilter.value = "typed but not applied";
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.searchFilter.value, "typed but not applied", "the unchanged URL is not re-applied");
+  assert.equal(visibleCards(harness).length, shown);
+  // After a real restore the new URL is the applied one, so a second popstate there is ignored too.
+  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=couple#catalogue-filters");
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.typeFilter.value, "couple");
+  harness.searchFilter.value = "again";
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.searchFilter.value, "again");
+});
+
+test("real Back and Forward between catalogue states still restore them, including a hash-only change", () => {
+  const harness = createHarness({ count: 77 });
+  const target = harness.sections[1];
+  target.disclosure.dispatch("click");
+  harness.navBrowseAll.dispatch("click");
+  harness.typeFilter.value = "corporate";
+  harness.applyButton.dispatch("click");
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("type"), "corporate");
+  // Back to the previous catalogue entry: the URL changed, so the state is restored.
+  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=all&budget=all#catalogue-filters");
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.typeFilter.value, "all");
+  // Forward again.
+  harness.windowObject.history.replaceState({}, "", "https://example.test/?type=corporate&budget=all#catalogue-filters");
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.typeFilter.value, "corporate");
+  // Back to the featured page with only a different hash.
+  harness.windowObject.history.replaceState({}, "", "https://example.test/#catalogue-filters");
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.typeFilter.value, "bestsellers");
+  harness.windowObject.history.replaceState({}, "", "https://example.test/#premium-collection");
+  harness.windowObject.listeners.popstate();
+  assert.equal(harness.typeFilter.value, "bestsellers");
+});
