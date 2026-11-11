@@ -90,12 +90,6 @@ class Element {
   scrollIntoView(options) { this.scrollCalls.push(options); }
 }
 
-class CapturingPort {
-  constructor() { this.messages = []; this.closed = false; }
-  postMessage(message) { if (!this.closed) this.messages.push(message); }
-  close() { this.closed = true; }
-}
-
 function createStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
   return {
@@ -105,7 +99,7 @@ function createStorage(initial = {}) {
   };
 }
 
-function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], mode = "order", intakeReady, longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "", diwaliOffer = false, observers = null } = {}) {
+function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "", diwaliOffer = false, observers = null } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
@@ -114,22 +108,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   orderDialog.showModal = () => { orderDialog.open = true; };
   orderDialog.close = () => { orderDialog.open = false; orderDialog.dispatch("close"); };
   const orderDialogClose = new Element("order-dialog-close");
-  if (mode !== "order") embed.attributes["data-form-mode"] = mode;
-  if (intakeReady !== undefined) embed.attributes["data-intake-ready"] = String(intakeReady);
-  const frame = new Element("order-form-frame"); frame.name = "order-frame"; frame.hidden = true;
-  // In order mode the form is built into the page: there is no iframe, only the form and its intro.
+  // The form is built into the page: there is no iframe, only the form and its intro.
   const orderForm = new Element("order-form"); orderForm.hidden = true;
   const orderFormIntro = new Element("order-form-intro"); orderFormIntro.hidden = true;
-  frame.setAttribute("title", "Saloni Resin Art Studio order request form");
-  frame.setAttribute("loading", "lazy");
-  const frameHost = {
-    replaceChild(next, previous) {
-      elements.set(next.id, next);
-      next.parentNode = this;
-      previous.parentNode = null;
-    },
-  };
-  frame.parentNode = frameHost;
   const status = new Element("order-form-status");
   const continueOrder = new Element("order-continue-request"); continueOrder.hidden = true;
   const selectedProductSummary = new Element("selected-product-summary"); selectedProductSummary.hidden = true;
@@ -163,7 +144,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const frameTypeControl = new Element("frame-type", frameType);
   const framePresetControl = new Element("frame-preset", framePreset);
   const frameUnitControl = new Element("frame-unit", frameUnit);
-  [embed, ...(mode === "order" ? [orderForm, orderFormIntro] : [frame]), status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
+  [embed, orderForm, orderFormIntro, status, continueOrder, orderDialog, orderDialogClose, selectedProductSummary, selectedProductImage, selectedProductName, selectedProductPrice, selectedProductSize, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, customizer, continueWithoutPreview, generalRequest, designHelp, summary, dimension, frameTypeControl, framePresetControl, frameUnitControl].forEach((element) => elements.set(element.id, element));
   const card = new Element("catalogue-card");
   card.caption = new Element("figcaption");
   card.image = { getAttribute: () => "assets/test-frame.png" };
@@ -370,7 +351,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     clearTimeout(id) { if (scheduledTimers[id - 1]) scheduledTimers[id - 1].cleared = true; },
     grecaptcha: { ready(callback) { callback(); }, execute() { return Promise.resolve("parent-token"); } },
   };
-  if (mode === "order") windowObject.saloniOrderForm = {
+  windowObject.saloniOrderForm = {
     open(seed, options) {
       orderOpens.push({ seed, options });
       posted.push({ opened: true, options, children: [{ name: "seed", value: JSON.stringify(seed) }] });
@@ -815,7 +796,7 @@ test("phones get a full-screen order dialog where only the form panel scrolls", 
 
 test("on desktop the order form sits on a light panel so its fields and labels are readable", () => {
   assert.match(css, /\.order-dialog \.order-panel \{ background: var\(--paper\); color: var\(--ink\); \}/);
-  assert.match(css, /:is\(#order-form, #partner-form, #corporate-form\) \{ display: grid; gap: 1rem; color: #2b2020; \}/);
+  assert.match(css, /:is\(#order-form, #partner-form, #corporate-form, #review-form\) \{ display: grid; gap: 1rem; color: #2b2020; \}/);
   assert.doesNotMatch(css, /\.order-dialog \.order-form-panel iframe/);
 });
 test("the mobile sticky cart keeps its buttons at 44px and reserves room for one row", () => {
@@ -1037,8 +1018,8 @@ test("saves the repeat profile when the form reports a sent order, keeping only 
   assert.deepEqual(saved.profile, { customerName: profile.customerName, phone: profile.phone, fulfillment: profile.fulfillment, shippingAddress: profile.shippingAddress, city: profile.city, state: profile.state, pin: profile.pin });
   assert.ok(saved.expiresAt > Date.now());
   assert.equal(storage.getItem("saloniCatalogueCart"), cartBefore, "the cart is untouched");
-  assert.doesNotThrow(() => flow.windowObject.messageListener({ origin: "https://n-x-script.googleusercontent.com", source: {}, data: { type: "saloni-order-save-repeat-profile", version: 1, nonce: "x", profile: { ...profile, customerName: "Message Saved" } }, ports: [] }));
-  assert.equal(JSON.parse(storage.getItem("saloniRepeatProfile")).profile.customerName, "Saved Customer", "a window message can no longer write the profile");
+  assert.equal(flow.windowObject.messageListener, undefined, "script.js listens for no window messages, so a message cannot write the profile");
+  assert.doesNotMatch(source, /saloni-order-save-repeat-profile/);
 });
 test("cart rows expose an accessible remove action for the exact selected item", () => {
   const flow = runFlow();
@@ -1111,10 +1092,10 @@ test("Let Saloni design it for me uses an explicit design-help seed while genera
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
 });
 
-test("script.js carries no Partner Circle or Corporate form code, and those pages have no iframe hook for it", () => {
-  assert.doesNotMatch(source, /partner_application|corporate_enquiry|data-intake-ready|corporateIntakeReady|applicationId|enquiryId|partner-application|corporate-enquiry/);
+test("script.js carries no Partner Circle, Corporate or review form code, and those pages have no iframe hook for it", () => {
+  assert.doesNotMatch(source, /partner_application|corporate_enquiry|data-intake-ready|corporateIntakeReady|applicationId|enquiryId|partner-application|corporate-enquiry|\breviewId\b|review-form/);
   assert.doesNotMatch(source, /requestedMode === "partner"|requestedMode === "corporate"|frameState\.mode === "partner"|frameState\.mode === "corporate"/);
-  for (const file of ["partners/index.html", "corporate-gifting/index.html"]) {
+  for (const file of ["partners/index.html", "corporate-gifting/index.html", "reviews/index.html"]) {
     const html = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
     assert.doesNotMatch(html, /id="order-form-embed"|id="order-form-frame"|id="order-form-status"|<iframe/, file);
   }
@@ -1494,84 +1475,10 @@ test("keeps order seeds correct at the first, eighth, ninth, and eleventh romant
   });
 });
 
-test("owns CAPTCHA token requests on the exact studio origin and pinned sender", () => {
-  assert.match(source, /https:\/\/saloniresinart\.com/);
-  assert.match(source, /pinnedSender/);
-  assert.match(source, /pinnedOrigin/);
-  assert.match(source, /event\.ports\[0\]/);
-  assert.match(source, /activeCaptcha/);
-  assert.doesNotMatch(source, /CHILD_ORIGIN/);
-});
-
-test("the review form pins the exact iframe sender and observed sandbox origin, then rejects stale or foreign CAPTCHA requests", async () => {
-  const flow = runFlow({ mode: "review", intakeReady: false });
-  const seed = submittedSeed(flow.posted);
-  const frame = flow.elements.get("order-form-frame");
-  const nestedSource = frame.contentWindow;
-  const sandboxOrigin = "https://n-nested-script.googleusercontent.com";
-  const actions = [];
-  flow.windowObject.grecaptcha.execute = (siteKey, options) => { actions.push([siteKey, options.action]); return Promise.resolve("parent-token"); };
-  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key" }, ports: [] });
-  const firstPort = new CapturingPort();
-  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: "attempt-1" }, ports: [firstPort] });
-  await Promise.resolve();
-  assert.equal(firstPort.messages[0].token, "parent-token");
-  assert.equal(firstPort.messages[0].type, "saloni-order-captcha-response");
-  assert.deepEqual(actions, [["site-key", "review_submission"]]);
-  const stalePort = new CapturingPort();
-  flow.windowObject.messageListener({ origin: sandboxOrigin, source: nestedSource, data: { type: "saloni-order-captcha-request", nonce: "stale-nonce", attemptId: "stale" }, ports: [stalePort] });
-  const foreignPort = new CapturingPort();
-  flow.windowObject.messageListener({ origin: sandboxOrigin, source: {}, data: { type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: "foreign" }, ports: [foreignPort] });
-  const wrongOriginPort = new CapturingPort();
-  flow.windowObject.messageListener({ origin: "https://evil.example", source: nestedSource, data: { type: "saloni-order-captcha-request", nonce: seed.channelNonce, attemptId: "evil" }, ports: [wrongOriginPort] });
-  assert.equal(stalePort.messages.length, 0);
-  assert.equal(foreignPort.messages.length, 0);
-  assert.equal(wrongOriginPort.messages.length, 0);
-});
-
-test("the review form still shows the loader until it is ready, falls back after 2500 ms, and offers contact options on timeout", () => {
-  const flow = runFlow({ mode: "review", intakeReady: false });
-  const status = flow.elements.get("order-form-status");
-  const seed = submittedSeed(flow.posted);
-  const frame = flow.elements.get("order-form-frame");
-  assert.equal(status.hidden, false);
-  assert.equal(status.getAttribute("aria-busy"), "true");
-  assert.equal(frame.hidden, true);
-  flow.windowObject.messageListener({ origin: "https://n-late-script.googleusercontent.com", source: frame.contentWindow, data: { type: "saloni-order-form-ready", nonce: seed.channelNonce, siteKey: "site-key" }, ports: [] });
-  assert.equal(status.hidden, true);
-  assert.equal(status.getAttribute("aria-busy"), "");
-
-  const slow = runFlow({ mode: "review", intakeReady: false });
-  const slowStatus = slow.elements.get("order-form-status");
-  const slowFrame = slow.elements.get("order-form-frame");
-  const loadingTimer = slow.scheduledTimers.at(-1);
-  assert.equal(loadingTimer.delay, 12000);
-  slowFrame.dispatch("load");
-  assert.equal(slowFrame.hidden, false);
-  assert.equal(slowStatus.getAttribute("aria-busy"), "true");
-  const settle = slow.scheduledTimers.at(-1);
-  assert.equal(settle.delay, 2500);
-  settle.callback();
-  assert.equal(slowStatus.hidden, true);
-
-  const stalled = runFlow({ mode: "review", intakeReady: false });
-  stalled.scheduledTimers.at(-1).callback();
-  const stalledStatus = stalled.elements.get("order-form-status");
-  assert.match(stalledStatus.textContent, /taking longer than expected/);
-  assert.match(stalledStatus.textContent, /8209238541/);
-  assert.equal(stalledStatus.getAttribute("aria-busy"), "");
-});
-
-test("the review page still loads its form in an iframe and never calls the order form", () => {
-  for (const mode of ["review"]) {
-    const flow = runFlow({ mode, intakeReady: true });
-    assert.equal(flow.posted.length, 1, mode);
-    assert.equal(flow.posted[0].opened, undefined, mode);
-    assert.equal(flow.posted[0].target, flow.elements.get("order-form-frame").name, mode);
-    assert.equal(flow.posted[0].children.find((child) => child.name === "action").value, "seed");
-    assert.equal(flow.posted[0].children.find((child) => child.name === "mode").value, mode);
-    assert.equal(flow.orderOpens.length, 0, mode);
-  }
+test("script.js carries no iframe, seed post, captcha relay or window-message code", () => {
+  assert.doesNotMatch(source, /pinnedSender|pinnedOrigin|activeCaptcha|executeParentCaptcha|postCaptchaResult|replaceOrderFormFrame|order-form-frame|saloni-order-captcha|saloni-order-form-ready|MessageChannel|channelNonce|action = "seed"|createElement\("iframe"\)/);
+  assert.doesNotMatch(source, /addEventListener\("message"/);
+  assert.doesNotMatch(source, /data-form-mode|requestedMode|review_submission/);
 });
 
 test("a customizer request opens the form with the captured preview image and sends no preview message", () => {

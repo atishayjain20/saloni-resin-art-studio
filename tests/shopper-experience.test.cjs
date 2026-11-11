@@ -213,9 +213,19 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261161">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261161" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261161" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261162">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261162" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261162" defer><\/script>/);
+});
+
+test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
+  for (const page of ["index.html", "partners/index.html", "corporate-gifting/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html", "reviews/index.html"]) {
+    const source = fs.readFileSync(path.join(root, page), "utf8");
+    const versions = [...source.matchAll(/(?:styles\.css|script\.js|customizer\.js|order-form\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
+    assert.ok(versions.length >= 2, page);
+    assert.deepEqual([...new Set(versions)], ["20261162"], page);
+  }
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261162/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -833,16 +843,10 @@ test("homepage order panel lives in one accessible native modal with an inline f
   assert.match(order, /id="order-continue-request"[^>]*>Continue your request<\/button>/);
 });
 
-test("order modal loading state is spinner-backed and ready-message driven", () => {
-  assert.match(html, /class="order-form-spinner"[^>]*aria-hidden="true"/);
-  assert.match(css, /\.order-form-spinner\s*\{/);
-  assert.match(script, /saloni-order-form-ready/);
-  assert.match(script, /startOrderFormLoading[\s\S]*clearOrderLoadingTimer/);
-  assert.match(script, /aria-busy/);
-  assert.match(script, /nextFrame\.addEventListener\(["']load["'][\s\S]*?finishOrderFormLoading/);
-  assert.match(script, /frameState\.nonce !== identity\.nonce/);
-  assert.match(script, /frameState\.requestId !== identity\.requestId/);
-  assert.doesNotMatch(script, /loadingTimedOut/);
+test("the order modal has no loader, spinner or iframe: the form is in the page and opens at once", () => {
+  assert.doesNotMatch(html, /order-form-spinner|<iframe/);
+  assert.doesNotMatch(css, /order-form-spin|order-form-panel iframe/);
+  assert.doesNotMatch(script, /saloni-order-form-ready|startOrderFormLoading|finishOrderFormLoading|clearOrderLoadingTimer|nextFrame|loadingTimedOut|aria-busy/);
   assert.match(script, /requestHistoryConsumed && orderDialog/);
 });
 

@@ -2183,22 +2183,18 @@ class ReviewsPageContractTests(unittest.TestCase):
             self.assertNotIn(gone, self.page)
         self.assertNotIn('class="button button-dark" href="#write"', self.page, "the hero no longer repeats the write button")
         self.assertRegex(self.page, r'<section[^>]*id="write"')
-        self.assertIn('<link rel="preconnect" href="https://script.google.com">', self.page)
-        self.assertIn('<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>', self.page)
-        self.assertRegex(self.page, r'id="order-form-embed"[^>]*data-form-mode="review"')
-        self.assertIn('id="order-form-status"', self.page)
-        self.assertRegex(self.page, r'<iframe[^>]*id="order-form-frame"[^>]*hidden')
-        self.assertNotRegex(self.page, r'<iframe[^>]*loading="lazy"')
-        self.assertIn(
-            'data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"',
-            self.page,
-        )
-        self.assertNotIn("data-intake-ready", self.page, "the page opens the form only when the backend answers intake open")
-        self.assertIn("Loading the review form…", self.page)
+        # The review form is built into the page: no Apps Script iframe, no seed post, and no connection to Google until the form is used.
+        self.assertNotIn("preconnect", self.page)
+        for gone in ("<iframe", "order-form-embed", "order-form-frame", "order-form-status", "data-form-mode", "Loading the review form", "recaptcha/api.js"):
+            self.assertNotIn(gone, self.page)
+        self.assertRegex(self.page, r'<form id="review-form"[^>]*data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"[^>]*data-captcha-site-key="6Lcyc_YtAAAAAH9NRP14nKWeaeVcIBXs5PwrhmT3"[^>]*data-products-url="products.json"')
+        self.assertIn('<noscript>', self.page)
+        self.assertNotIn("data-intake-ready", self.page)
         self.assertIn('<a class="skip-link" href="#main-content">', self.page)
         self.assertIn('<main id="main-content" tabindex="-1">', self.page)
         self.assertIn('href="../styles.css?v=', self.page)
         self.assertIn('src="../script.js?v=', self.page)
+        self.assertIn('src="../public-forms.js?v=', self.page)
         self.assertNotRegex(self.page, r"aggregateRating|application/ld\+json")
 
     def test_every_page_links_to_reviews_from_the_footer_and_the_primary_nav_is_unchanged(self):
