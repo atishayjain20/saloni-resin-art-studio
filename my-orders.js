@@ -132,6 +132,44 @@
   var confirmNo = document.getElementById("my-orders-confirm-no");
   var opener = null;
   var leaveFocusAlone = false;
+  // The same history pattern as the order and lightbox dialogs in script.js: opening adds one history entry, so
+  // the phone Back button closes the dialog; closing any other way steps that entry back so none is left behind.
+  var historyActive = false;
+  var closedByHistory = false;
+  var backPending = false;
+  var pendingOpener = null;
+
+  function isHistoryState(state) { return Boolean(state && state.saloniMyOrders); }
+  function pushHistory() {
+    var history = window.history;
+    if (!history || typeof history.pushState !== "function") return;
+    if (historyActive || isHistoryState(history.state)) { historyActive = true; return; }
+    try {
+      history.pushState(Object.assign({}, history.state || {}, { saloniMyOrders: true }), "", window.location && window.location.href ? window.location.href : "");
+      historyActive = true;
+    } catch (error) {}
+  }
+  function consumeHistory() {
+    if (!historyActive) return;
+    historyActive = false;
+    if (closedByHistory) return;
+    var history = window.history;
+    if (!history || typeof history.back !== "function" || !isHistoryState(history.state)) return;
+    backPending = true;
+    try { history.back(); } catch (error) { backPending = false; }
+  }
+  // Leaving through a link that adds its own history entry: forget ours in place rather than stepping back.
+  function dropHistoryEntry() {
+    if (!historyActive) return;
+    historyActive = false;
+    var history = window.history;
+    if (!history || typeof history.replaceState !== "function") return;
+    try {
+      var next = Object.assign({}, history.state || {});
+      delete next.saloniMyOrders;
+      history.replaceState(next, "", window.location && window.location.href ? window.location.href : "");
+    } catch (error) {}
+  }
 
   function element(tag, className, content) {
     var node = document.createElement(tag);
@@ -190,7 +228,10 @@
   function open(from) {
     if (!dialog || typeof dialog.showModal !== "function") return false;
     opener = from || null;
+    // A step back from the last close is still on its way: open once it has landed.
+    if (backPending) { pendingOpener = opener; return true; }
     render();
+    pushHistory();
     if (!dialog.open) dialog.showModal();
     focusIfPossible(closeButton);
     return true;
@@ -211,6 +252,8 @@
       var from = opener;
       leaveFocusAlone = false;
       opener = null;
+      consumeHistory();
+      closedByHistory = false;
       if (skip) return;
       // On a phone the menu closes when My orders is tapped, so the link is hidden: fall back to the menu button.
       var visible = from && typeof from.getClientRects === "function" && from.getClientRects().length > 0;
@@ -220,7 +263,24 @@
     dialog.addEventListener("click", function (event) { if (event && event.target === dialog) dialog.close(); });
     // Capture on the link itself, so the dialog is closed before the catalogue takes focus.
     Array.prototype.forEach.call(dialog.querySelectorAll("[data-browse-all]"), function (link) {
-      link.addEventListener("click", function () { leaveFocusAlone = true; dialog.close(); }, true);
+      link.addEventListener("click", function () { leaveFocusAlone = true; dropHistoryEntry(); dialog.close(); }, true);
+    });
+    if (window.addEventListener) window.addEventListener("popstate", function (event) {
+      if (backPending) {
+        backPending = false;
+        var from = pendingOpener;
+        pendingOpener = null;
+        if (from) open(from);
+        return;
+      }
+      if (historyActive && !isHistoryState(event && event.state)) {
+        closedByHistory = true;
+        if (dialog.open) dialog.close();
+        return;
+      }
+      if (!historyActive && !dialog.open && isHistoryState(event && event.state)) {
+        try { window.history.back(); } catch (error) {}
+      }
     });
     clearButton.addEventListener("click", function () {
       confirmElement.hidden = false;

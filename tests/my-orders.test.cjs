@@ -45,7 +45,7 @@ function createStorage(initial = {}) {
   return { data, getItem: (key) => (key in data ? data[key] : null), setItem(key, value) { data[key] = String(value); }, removeItem(key) { delete data[key]; } };
 }
 
-function makeRuntime({ storage = createStorage(), dialogSupported = true } = {}) {
+function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false } = {}) {
   const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "my-orders-clear", "my-orders-confirm", "my-orders-confirm-yes", "my-orders-confirm-no", "my-orders-clear-area", "nav-toggle"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id === "my-orders-list" ? "ol" : "div", id)]));
   const dialog = elements.get("my-orders-dialog");
@@ -62,14 +62,23 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true } = {})
     activeElement: null,
   };
   FakeElement.onFocus = (element) => { documentObject.activeElement = element; };
-  const windowObject = { localStorage: storage, document: documentObject };
+  // A tiny History stand-in: back() only records the call; tests deliver the matching popstate themselves.
+  const history = noHistory ? undefined : {
+    state: null, pushed: [], replaced: [], backs: 0,
+    pushState(state) { this.state = state; this.pushed.push(state); },
+    replaceState(state) { this.state = state; this.replaced.push(state); },
+    back() { this.backs += 1; },
+  };
+  const popstateListeners = [];
+  const windowObject = { localStorage: storage, document: documentObject, history, location: { href: "https://saloniresinart.com/" }, addEventListener(type, listener) { if (type === "popstate") popstateListeners.push(listener); } };
+  const popstate = (state) => { if (history) history.state = state; popstateListeners.forEach((listener) => listener({ state })); };
   const context = { console, document: documentObject, window: windowObject, Date, JSON, Math, Number, String, Array, Object, RegExp };
   vm.createContext(context);
   vm.runInContext(source, context, { filename: "my-orders.js" });
   const real = windowObject.saloniMyOrders;
   // Arrays made inside the vm context have another prototype; hand the tests plain objects.
   const api = Object.assign({}, real, { list: () => JSON.parse(JSON.stringify(real.list())) });
-  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject };
+  return { api, storage, elements, dialog, link, browseLink, documentObject, windowObject, history, popstate };
 }
 
 const order = (overrides = {}) => Object.assign({
@@ -266,11 +275,12 @@ test("Remove these from this device asks first, then clears and shows the empty 
 });
 
 test("reopening the dialog starts with the confirm step closed and a fresh list", () => {
-  const { api, link, dialog, elements } = makeRuntime();
+  const { api, link, dialog, elements, popstate } = makeRuntime();
   api.save(order());
   link.dispatch("click", { button: 0 });
   elements.get("my-orders-clear").dispatch("click");
   dialog.close();
+  popstate(null);
   api.save(order({ requestId: "second" }));
   link.dispatch("click", { button: 0 });
   assert.equal(elements.get("my-orders-confirm").hidden, true);
@@ -336,4 +346,71 @@ test("the dialog has phone and desktop styles that match the order dialog", () =
 
 test("the privacy text tells shoppers that a summary of confirmed orders is kept in this browser for 30 days", () => {
   assert.match(html, /Privacy details[\s\S]*A short summary of each confirmed request \(items, notes and request ID\) is kept only in this browser for 30 days for My orders/);
+});
+
+// --- phone Back button: the same history pattern as the order and lightbox dialogs ---
+const plain = (value) => JSON.parse(JSON.stringify(value));
+
+test("opening the dialog pushes one history entry, and opening it again does not push another", () => {
+  const { link, dialog, history } = makeRuntime();
+  link.dispatch("click", { button: 0 });
+  assert.equal(history.pushed.length, 1);
+  assert.deepEqual(plain(history.state), { saloniMyOrders: true });
+  link.dispatch("click", { button: 0 });
+  assert.equal(history.pushed.length, 1);
+  assert.equal(dialog.open, true);
+});
+
+test("the browser Back button closes the dialog, returns focus, and does not step back again", () => {
+  const { link, dialog, history, popstate } = makeRuntime();
+  link.dispatch("click", { button: 0 });
+  popstate(null);
+  assert.equal(dialog.open, false);
+  assert.equal(history.backs, 0, "Back already moved the history, so the dialog must not call back() a second time");
+  assert.equal(link.focused, true);
+});
+
+test("closing with the X button or Escape steps the history back so no extra entry is left", () => {
+  const { link, dialog, history, popstate } = makeRuntime();
+  link.dispatch("click", { button: 0 });
+  dialog.close();
+  assert.equal(history.backs, 1);
+  popstate(null);
+  assert.equal(dialog.open, false);
+  assert.equal(history.backs, 1, "the popstate caused by that step back is not treated as another Back press");
+});
+
+test("reopening before the step back finishes waits for it, then opens with a fresh history entry", () => {
+  const { link, dialog, history, popstate } = makeRuntime();
+  link.dispatch("click", { button: 0 });
+  dialog.close();
+  link.dispatch("click", { button: 0 });
+  assert.equal(dialog.open, false);
+  assert.equal(history.pushed.length, 1, "nothing is pushed while the step back is pending");
+  popstate(null);
+  assert.equal(dialog.open, true);
+  assert.equal(history.pushed.length, 2);
+});
+
+test("stepping forward into the dialog's old entry while it is closed steps back out again", () => {
+  const { history, popstate } = makeRuntime();
+  popstate({ saloniMyOrders: true });
+  assert.equal(history.backs, 1);
+});
+
+test("the Browse gifts link drops the dialog's history entry in place instead of stepping back, so the catalogue's own entry survives", () => {
+  const { link, dialog, browseLink, history } = makeRuntime();
+  link.dispatch("click", { button: 0 });
+  browseLink.dispatch("click", {});
+  assert.equal(dialog.open, false);
+  assert.equal(history.backs, 0);
+  assert.equal(history.replaced.length, 1);
+  assert.deepEqual(plain(history.state), {});
+});
+
+test("without the History API the dialog still opens and closes", () => {
+  const { link, dialog } = makeRuntime({ noHistory: true });
+  assert.doesNotThrow(() => link.dispatch("click", { button: 0 }));
+  assert.equal(dialog.open, true);
+  assert.doesNotThrow(() => dialog.close());
 });
