@@ -903,8 +903,9 @@ function orderStatusCode_(cell) {
   if (status === "" || status === "new request") return "received";
   if (status === "cancellation requested") return "cancel_requested";
   // Saloni types "Cancellation declined" when she will not cancel; it must be checked before the "cancel" rule below.
-  if (status.indexOf("declined") !== -1) return "cancel_declined";
-  if (status.indexOf("cancel") !== -1) return "cancelled";
+  if (status.indexOf("cancel") !== -1 && status.indexOf("declin") !== -1) return "cancel_declined";
+  // A plain "Declined" or "Rejected" means Saloni turned the order down, so the shopper sees Cancelled.
+  if (status.indexOf("cancel") !== -1 || status.indexOf("declin") !== -1 || status.indexOf("reject") !== -1) return "cancelled";
   if (status === "confirmed" || status === "accepted") return "confirmed";
   if (status === "ready" || status === "ready for pickup") return "ready";
   if (status === "dispatched" || status === "shipped" || status === "out for delivery") return "dispatched";
