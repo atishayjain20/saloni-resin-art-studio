@@ -1,68 +1,23 @@
 /*
  * The Partner Circle application, the Corporate Gifting enquiry and the customer review, built into their pages.
- * Opening a form is instant: nothing is sent to Google until Submit. The reCAPTCHA script loads the first time the
- * shopper focuses the form, and Submit asks it for a token and posts one JSON body to the Apps Script web app.
+ * Opening a form is instant: nothing is sent to Google until Submit, and Submit posts one JSON body to the Apps Script
+ * web app straight away. The server's kill switches and daily caps protect these forms.
  */
 (function () {
   "use strict";
   var TIMEOUT_MS = 30000;
   var LINK_PREFIX = "https://saloniresinart.com/?ref=";
-  var captcha = { loading: false, waiters: [] };
 
   function newId(prefix) {
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
     return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
 
-  // Loads the reCAPTCHA script once, without running it. done(true) when grecaptcha.ready can be used, done(false) if it cannot load.
-  function loadCaptcha(siteKey, done) {
-    if (window.grecaptcha && window.grecaptcha.ready) { if (done) done(true); return; }
-    if (!siteKey) { if (done) done(false); return; }
-    if (done) captcha.waiters.push(done);
-    if (captcha.loading) return;
-    captcha.loading = true;
-    var existing = document.querySelector ? document.querySelector('script[src*="recaptcha/api.js"]') : null;
-    var script = existing || document.createElement("script");
-    function settle(ok) {
-      if (!captcha.loading) return;
-      captcha.loading = false;
-      if (!ok && !existing && script.parentNode && script.parentNode.removeChild) script.parentNode.removeChild(script);
-      var waiters = captcha.waiters;
-      captcha.waiters = [];
-      waiters.forEach(function (waiter) { waiter(ok); });
-    }
-    script.addEventListener("load", function () { settle(Boolean(window.grecaptcha && window.grecaptcha.ready)); });
-    script.addEventListener("error", function () { settle(false); });
-    if (!existing) {
-      script.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(siteKey);
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  }
-
-  function captchaToken(siteKey, action, done) {
-    var finished = false;
-    function finish(token) { if (finished) return; finished = true; done(typeof token === "string" ? token : ""); }
-    loadCaptcha(siteKey, function (ready) {
-      if (!ready) { finish(""); return; }
-      try {
-        window.grecaptcha.ready(function () {
-          try {
-            var result = window.grecaptcha.execute(siteKey, { action: action });
-            if (!result || typeof result.then !== "function") { finish(""); return; }
-            result.then(finish, function () { finish(""); });
-          } catch (error) { finish(""); }
-        });
-      } catch (error) { finish(""); }
-    });
-  }
-
-  // What the forms share: the field helpers, the status line, the captcha token and the JSON post.
+  // What the forms share: the field helpers, the status line and the JSON post.
   function kit(form) {
     var status = document.getElementById("form-status");
     var submitButton = document.getElementById("submit-button");
     var anotherButton = document.getElementById("another-button");
-    var siteKey = form.getAttribute("data-captcha-site-key") || "";
     var execUrl = form.getAttribute("data-order-form-url") || "";
     // A radio group is a list of inputs: the first one stands for it, and its error text goes in the group box (id "<field>-group") when there is one.
     function fieldInput(field) {
@@ -104,33 +59,26 @@
         var input = first && fieldInput(first);
         if (input && input.focus) input.focus(); else helpers.focusStatus();
       },
-      // Fields the shopper can fix get an inline error; a server message for the whole form (paused, full, captcha) goes in the status line.
+      // Fields the shopper can fix get an inline error; a server message for the whole form (paused, full) goes in the status line.
       showServerErrors: function (errors) {
         errors = errors && typeof errors === "object" ? errors : { form: "Please correct the highlighted fields and try again." };
         Object.keys(errors).forEach(function (field) { helpers.setError(field, errors[field]); });
-        helpers.setStatus(errors.form || errors.captcha || "Please correct the highlighted fields and try again.", "error");
+        helpers.setStatus(errors.form || "Please correct the highlighted fields and try again.", "error");
         helpers.focusFirst(errors);
       },
       setFormVisible: function (visible) {
         Array.prototype.forEach.call(form.querySelectorAll("fieldset, #submit-button"), function (element) { element.hidden = !visible; });
       },
-      // Asks reCAPTCHA for a token, then posts the body. gate(hasToken) decides whether to go on (false: stop, nothing is sent).
-      // Resolves with the parsed JSON answer, or null when nothing was sent.
-      send: function (action, captchaAction, body, gate) {
+      // Posts the body at once. Resolves with the parsed JSON answer; rejects when nothing could be sent or read.
+      send: function (action, body) {
         return new Promise(function (resolve, reject) {
-          captchaToken(siteKey, captchaAction, function (token) {
-            if (gate(Boolean(token)) === false || !token) { resolve(null); return; }
-            if (!execUrl || execUrl.indexOf("REPLACE_WITH_") !== -1 || typeof window.fetch !== "function") { reject(new Error("not configured")); return; }
-            body.captchaToken = token;
-            // A text/plain JSON body is a "simple" request, so the browser sends it without a preflight.
-            window.fetch(execUrl + "?action=" + action, { method: "POST", credentials: "omit", body: JSON.stringify(body) })
-              .then(function (response) { return response.json(); }).then(resolve, reject);
-          });
+          if (!execUrl || execUrl.indexOf("REPLACE_WITH_") !== -1 || typeof window.fetch !== "function") { reject(new Error("not configured")); return; }
+          // A text/plain JSON body is a "simple" request, so the browser sends it without a preflight.
+          window.fetch(execUrl + "?action=" + action, { method: "POST", credentials: "omit", body: JSON.stringify(body) })
+            .then(function (response) { return response.json(); }).then(resolve, reject);
         });
       }
     };
-    // The page shows the form already; reCAPTCHA is fetched the first time someone touches it.
-    form.addEventListener("focusin", function () { loadCaptcha(siteKey); });
     return helpers;
   }
 
@@ -223,14 +171,10 @@
       var body = {};
       FIELDS.forEach(function (field) { body[field] = k.value(field); });
       body.rulesAccepted = Boolean(form.elements.rulesAccepted.checked);
-      k.send("partner", "partner_application", body, function (hasToken) {
-        if (!current(attempt)) return false;
-        if (!hasToken) { restore(attempt); k.setStatus("Captcha verification is required. Please try again.", "error"); k.focusStatus(); return false; }
-        return true;
-      }).then(function (result) {
-        if (!result || !current(attempt)) return;
-        if (result.ok === true) success(result, attempt);
-        else if (result.errors) { restore(attempt); k.showServerErrors(result.errors); }
+      k.send("partner", body).then(function (result) {
+        if (!current(attempt)) return;
+        if (result && result.ok === true) success(result, attempt);
+        else if (result && result.errors) { restore(attempt); k.showServerErrors(result.errors); }
         else failed(attempt);
       }, function () { failed(attempt); });
     });
@@ -330,15 +274,11 @@
         if (!attempt.sent) { k.setStatus("Unable to verify the enquiry yet. Your entries are still here; please try again.", "error"); k.focusStatus(); }
       }, TIMEOUT_MS);
       var body = JSON.parse(JSON.stringify(attempt.payload));
-      k.send("corporate", "corporate_enquiry", body, function (hasToken) {
-        if (!current(attempt)) return false;
-        if (!hasToken) { restore(attempt); k.setStatus("Captcha verification is required. Please try again.", "error"); k.focusStatus(); return false; }
-        attempt.sent = true;
-        return true;
-      }).then(function (result) {
-        if (!result || !current(attempt)) return;
-        if (result.ok === true) success(result, attempt);
-        else if (result.errors) { restore(attempt); k.showServerErrors(result.errors); }
+      attempt.sent = true;
+      k.send("corporate", body).then(function (result) {
+        if (!current(attempt)) return;
+        if (result && result.ok === true) success(result, attempt);
+        else if (result && result.errors) { restore(attempt); k.showServerErrors(result.errors); }
         else failed(attempt);
       }, function () { failed(attempt); });
     });
@@ -550,15 +490,11 @@
         if (!attempt.sent) { k.setStatus("Unable to verify the review yet. Your entries are still here; please try again.", "error"); k.focusStatus(); }
       }, TIMEOUT_MS);
       var body = JSON.parse(JSON.stringify(attempt.payload));
-      k.send("review", "review_submission", body, function (hasToken) {
-        if (!current(attempt)) return false;
-        if (!hasToken) { restore(attempt); k.setStatus("Captcha verification is required. Please try again.", "error"); k.focusStatus(); return false; }
-        attempt.sent = true;
-        return true;
-      }).then(function (result) {
-        if (!result || !current(attempt)) return;
-        if (result.ok === true) success(attempt);
-        else if (result.errors) { restore(attempt); k.showServerErrors(result.errors); }
+      attempt.sent = true;
+      k.send("review", body).then(function (result) {
+        if (!current(attempt)) return;
+        if (result && result.ok === true) success(attempt);
+        else if (result && result.errors) { restore(attempt); k.showServerErrors(result.errors); }
         else failed(attempt);
       }, function () { failed(attempt); });
     });

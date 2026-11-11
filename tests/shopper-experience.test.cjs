@@ -213,9 +213,9 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261162">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261162" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261162" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261163">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261163" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261163" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -223,9 +223,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|script\.js|customizer\.js|order-form\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261162"], page);
+    assert.deepEqual([...new Set(versions)], ["20261163"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261162/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261163/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {

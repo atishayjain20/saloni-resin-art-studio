@@ -197,7 +197,7 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   // The review form (later in the same script) reads the saved first name; the corporate form and the shared kit use no browser storage.
   const corporateScript = formScript.slice(0, formScript.indexOf("function initReview")) ;
   assert.doesNotMatch(formMarkup + corporateScript, /localStorage|sessionStorage/);
-  assert.match(formScript, /corporate_enquiry/);
+  assert.doesNotMatch(formScript + formMarkup, /captcha/i);
 });
 
 test("corporate page names resin-art gifts and keeps a compact studio photo strip", () => {

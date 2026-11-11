@@ -5,16 +5,15 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 // The Partner Circle application and the Corporate Gifting enquiry are built into their pages (public-forms.js).
-// These tests run that script against the real form markup of each page, with a fake DOM, fake reCAPTCHA and a fake fetch.
+// These tests run that script against the real form markup of each page, with a fake DOM and a fake fetch. Touching reCAPTCHA in any way fails the test: these forms send straight away.
 const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const source = read("public-forms.js");
 const REFERRAL_LINK_PREFIX = "https://saloniresinart.com/?ref=";
 const EXEC_URL = "https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec";
-const SITE_KEY = "6Lcyc_YtAAAAAH9NRP14nKWeaeVcIBXs5PwrhmT3";
 const KINDS = {
-  partner: { page: "partners/index.html", form: "partner-form", action: "partner", captchaAction: "partner_application", idField: "applicationId" },
-  corporate: { page: "corporate-gifting/index.html", form: "corporate-form", action: "corporate", captchaAction: "corporate_enquiry", idField: "enquiryId" },
+  partner: { page: "partners/index.html", form: "partner-form", action: "partner", idField: "applicationId" },
+  corporate: { page: "corporate-gifting/index.html", form: "corporate-form", action: "corporate", idField: "enquiryId" },
 };
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -77,19 +76,9 @@ function makeRuntime(kind, options = {}) {
   };
   const timers = [];
   const fetches = [];
-  const executions = [];
   const scripts = [];
   const clipboardWrites = [];
   const selections = [];
-  const captchaState = { token: null, reject: false };
-  const recaptcha = {
-    ready: (callback) => callback(),
-    execute: (siteKey, opts) => {
-      executions.push({ siteKey, action: opts.action });
-      if (captchaState.reject) return Promise.reject(new Error("captcha failed"));
-      return Promise.resolve(captchaState.token === null ? "token-" + executions.length : captchaState.token);
-    },
-  };
   let uuid = 0;
   const windowObject = {
     crypto: { randomUUID: () => `${kind}-id-${++uuid}-abcdef` },
@@ -104,13 +93,13 @@ function makeRuntime(kind, options = {}) {
       });
     },
   };
-  if (options.captcha !== "lazy") windowObject.grecaptcha = recaptcha;
+  Object.defineProperty(windowObject, "grecaptcha", { get() { throw new Error("reCAPTCHA must not be touched"); } });
   const head = { appendChild(script) { script.parentNode = head; scripts.push(script); return script; }, removeChild(script) { scripts.splice(scripts.indexOf(script), 1); } };
   const documentObject = {
     head,
     getElementById: (id) => elements.get(id) || errors.find((element) => element.id === id) || null,
     createElement: (tag) => new FakeElement(tag),
-    querySelector: (selector) => (/recaptcha/.test(selector) ? scripts.find((script) => /recaptcha/.test(script.src || "")) || null : null),
+    querySelector: () => { throw new Error("no script lookup is expected"); },
     createRange: () => ({ node: null, selectNodeContents(node) { this.node = node; } }),
     execCommand: () => false,
   };
@@ -118,16 +107,10 @@ function makeRuntime(kind, options = {}) {
   vm.createContext(context);
   vm.runInContext(source, context, { filename: "public-forms.js" });
   const runtime = {
-    config, form, elements, fields, fieldsets, errors, timers, fetches, executions, scripts, captchaState, clipboardWrites, selections, windowObject,
+    config, form, elements, fields, fieldsets, errors, timers, fetches, scripts, clipboardWrites, selections, windowObject,
     status: elements.get("form-status"), submitButton: elements.get("submit-button"), another: elements.get("another-button"),
     box: elements.get("referral-result"),
     submit: async () => { form.dispatch("submit"); await settle(); },
-    // The reCAPTCHA script that a first focus appended finishes loading (or fails).
-    finishScript(ok) {
-      if (ok) windowObject.grecaptcha = recaptcha;
-      scripts.forEach((script) => script.dispatch(ok ? "load" : "error"));
-      return settle();
-    },
     timeout: () => timers.filter((timer) => timer.delay === 30000 && !timer.cleared).pop().fn(),
   };
   return runtime;
@@ -142,23 +125,22 @@ function fill(runtime, overrides = {}) {
   return runtime;
 }
 
-const withoutToken = (body) => { const copy = Object.assign({}, body); delete copy.captchaToken; return copy; };
-
 for (const kind of Object.keys(KINDS)) {
-  const { page, form: formId, action, captchaAction, idField } = KINDS[kind];
+  const { page, form: formId, action, idField } = KINDS[kind];
   const pageHtml = read(page);
 
   test(`${kind}: the form is built into the page, with no iframe, frame messaging or Apps Script template`, () => {
-    assert.match(pageHtml, new RegExp(`<form id="${formId}"[^>]*data-order-form-url="${EXEC_URL.replace(/[./]/g, "\\$&")}"[^>]*data-captcha-site-key="${SITE_KEY}"`));
+    assert.match(pageHtml, new RegExp(`<form id="${formId}"[^>]*data-order-form-url="${EXEC_URL.replace(/[./]/g, "\\$&")}"[^>]*novalidate>`));
+    assert.doesNotMatch(pageHtml, /data-captcha-site-key|grecaptcha|google\.com\/recaptcha|protected by reCAPTCHA/i);
     assert.doesNotMatch(pageHtml, /<iframe|order-form-embed|order-form-frame|data-form-mode|data-intake-ready/);
     assert.match(pageHtml, /<script class="site-script" src="\.\.\/script\.js\?v=\d+" defer><\/script>\s*<script class="public-forms-script" src="\.\.\/public-forms\.js\?v=\d+" defer><\/script>/);
-    assert.doesNotMatch(pageHtml, /recaptcha\/api\.js/);
+    assert.doesNotMatch(source, /recaptcha|captcha/i);
     assert.doesNotMatch(source, /postMessage|MessageChannel|google\.script|window\.top|window\.parent|PARENT_ORIGIN|innerHTML/);
     assert.match(pageHtml, /<noscript>[\s\S]*8209238541[\s\S]*<\/noscript>/);
   });
 
-  test(`${kind}: opening the page shows the form and sends nothing: no request, no reCAPTCHA script`, () => {
-    const runtime = makeRuntime(kind, { captcha: "lazy" });
+  test(`${kind}: opening the page shows the form and sends nothing: no request, no script`, () => {
+    const runtime = makeRuntime(kind);
     assert.equal(runtime.fetches.length, 0);
     assert.equal(runtime.scripts.length, 0);
     assert.equal(runtime.timers.length, 0);
@@ -166,50 +148,26 @@ for (const kind of Object.keys(KINDS)) {
     assert.equal(runtime.form.hidden, false);
   });
 
-  test(`${kind}: the reCAPTCHA script loads once, the first time the form is focused`, async () => {
-    const runtime = makeRuntime(kind, { captcha: "lazy" });
+  test(`${kind}: focusing the form loads nothing, and Submit sends one JSON post at once with no token`, async () => {
+    const runtime = fill(makeRuntime(kind));
     runtime.form.dispatch("focusin");
-    runtime.form.dispatch("focusin");
-    assert.equal(runtime.scripts.length, 1);
-    assert.equal(runtime.scripts[0].src, "https://www.google.com/recaptcha/api.js?render=" + SITE_KEY);
-    await runtime.finishScript(true);
-    runtime.form.dispatch("focusin");
-    assert.equal(runtime.scripts.length, 1);
+    assert.equal(runtime.scripts.length, 0);
     assert.equal(runtime.fetches.length, 0);
-    const ready = makeRuntime(kind);
-    ready.form.dispatch("focusin");
-    assert.equal(ready.scripts.length, 0, "nothing to load when reCAPTCHA is already on the page");
-  });
-
-  test(`${kind}: Submit before the script finished loading waits for it, then sends one JSON post with the token`, async () => {
-    const runtime = fill(makeRuntime(kind, { captcha: "lazy" }));
-    runtime.form.dispatch("focusin");
-    await runtime.submit();
-    assert.equal(runtime.fetches.length, 0, "no post until the captcha token exists");
+    runtime.form.dispatch("submit");
+    assert.equal(runtime.fetches.length, 1, "the post is made in the same tick as the click, with nothing to wait for");
+    await settle();
+    assert.equal(runtime.scripts.length, 0);
     assert.equal(runtime.submitButton.disabled, true);
-    await runtime.finishScript(true);
-    assert.equal(runtime.scripts.length, 1);
-    assert.deepEqual(runtime.executions, [{ siteKey: SITE_KEY, action: captchaAction }]);
-    assert.equal(runtime.fetches.length, 1);
     assert.equal(runtime.fetches[0].url, `${EXEC_URL}?action=${action}`);
     assert.equal(runtime.fetches[0].init.method, "POST");
     assert.equal(runtime.fetches[0].init.credentials, "omit");
-    assert.equal(runtime.fetches[0].body.captchaToken, "token-1");
+    assert.equal(Object.hasOwn(runtime.fetches[0].body, "captchaToken"), false);
     assert.equal(runtime.fetches[0].body[idField], runtime.fields[idField].value);
   });
 
-  test(`${kind}: Submit loads the script itself when the form was never focused`, async () => {
-    const runtime = fill(makeRuntime(kind, { captcha: "lazy" }));
-    await runtime.submit();
-    assert.equal(runtime.scripts.length, 1);
-    await runtime.finishScript(true);
-    assert.equal(runtime.fetches.length, 1);
-  });
-
-  test(`${kind}: invalid entries show inline errors, focus the first one, and use neither reCAPTCHA nor the network`, async () => {
+  test(`${kind}: invalid entries show inline errors, focus the first one, and use no network`, async () => {
     const runtime = fill(makeRuntime(kind), { phone: "12" });
     await runtime.submit();
-    assert.equal(runtime.executions.length, 0);
     assert.equal(runtime.fetches.length, 0);
     assert.equal(runtime.fields.phone.getAttribute("aria-invalid"), "true");
     assert.match(runtime.elements.get("form-status").textContent, /Please correct the highlighted fields/);
@@ -222,38 +180,13 @@ for (const kind of Object.keys(KINDS)) {
     assert.equal(runtime.fetches.length, 1);
   });
 
-  test(`${kind}: a missing, rejected or unloadable captcha shows the captcha message, keeps the entries and sends nothing`, async () => {
-    const empty = fill(makeRuntime(kind));
-    empty.captchaState.token = "";
-    await empty.submit();
-    assert.match(empty.status.textContent, /Captcha verification is required/);
-    assert.equal(empty.status.focused, true);
-    const rejected = fill(makeRuntime(kind));
-    rejected.captchaState.reject = true;
-    await rejected.submit();
-    assert.match(rejected.status.textContent, /Captcha verification is required/);
-    const noScript = fill(makeRuntime(kind, { captcha: "lazy" }));
-    await noScript.submit();
-    await noScript.finishScript(false);
-    assert.match(noScript.status.textContent, /Captcha verification is required/);
-    assert.equal(noScript.scripts.length, 0, "a script that failed to load is removed so a later try can load it again");
-    for (const runtime of [empty, rejected, noScript]) {
-      assert.equal(runtime.fetches.length, 0);
-      assert.equal(runtime.submitButton.disabled, false);
-      assert.equal(runtime.fields.phone.value, "8209238541");
-    }
-    empty.captchaState.token = null;
-    await empty.submit();
-    assert.equal(empty.fetches.length, 1, "the next try works");
-  });
-
   test(`${kind}: the server answering with field errors or a form message keeps the entries and shows them`, async () => {
     const runtime = fill(makeRuntime(kind));
     await runtime.submit();
-    await runtime.fetches[0].respond({ ok: false, errors: { phone: "Enter a valid phone number.", captcha: "Captcha verification failed. Please try again." } });
+    await runtime.fetches[0].respond({ ok: false, errors: { phone: "Enter a valid phone number.", form: "The studio's limit has been reached. Please try again tomorrow." } });
     assert.equal(runtime.fields.phone.getAttribute("aria-invalid"), "true");
     assert.equal(runtime.errors.find((error) => error.id === "phone-error").textContent, "Enter a valid phone number.");
-    assert.equal(runtime.status.textContent, "Captcha verification failed. Please try again.");
+    assert.equal(runtime.status.textContent, "The studio's limit has been reached. Please try again tomorrow.");
     assert.equal(runtime.submitButton.disabled, false);
     assert.equal(runtime.fields.phone.value, "8209238541");
     assert.equal(runtime.fieldsets.some((fieldset) => fieldset.hidden), false);
@@ -292,7 +225,7 @@ for (const kind of Object.keys(KINDS)) {
       await runtime.submit();
       assert.equal(runtime.fetches.length, 2);
       assert.equal(runtime.fetches[1].body[idField], id, "the retry is the same request, so the server can recognise it");
-      assert.deepEqual(withoutToken(runtime.fetches[1].body), withoutToken(runtime.fetches[0].body));
+      assert.deepEqual(runtime.fetches[1].body, runtime.fetches[0].body);
     }
   });
 
@@ -402,7 +335,7 @@ test("corporate: sends every business field and the privacy consent, and shows t
   const runtime = fill(makeRuntime("corporate"));
   await runtime.submit();
   const body = runtime.fetches[0].body;
-  assert.deepEqual(Object.keys(body).sort(), ["approximateQuantity", "brief", "budgetRange", "captchaToken", "contactName", "deliveryScope", "email", "enquiryId", "enquiryType", "occasion", "organisationName", "phone", "privacyAccepted", "requiredDate"]);
+  assert.deepEqual(Object.keys(body).sort(), ["approximateQuantity", "brief", "budgetRange", "contactName", "deliveryScope", "email", "enquiryId", "enquiryType", "occasion", "organisationName", "phone", "privacyAccepted", "requiredDate"]);
   assert.equal(body.privacyAccepted, true);
   await runtime.fetches[0].respond({ ok: true, enquiryId: body.enquiryId, receivedAt: "now" });
   assert.match(runtime.status.textContent, new RegExp(`^Enquiry received\\. Saloni will review.*Enquiry ID: ${body.enquiryId}$`));
@@ -443,36 +376,20 @@ test("corporate: an unconfirmed enquiry is retried with the exact original detai
   assert.equal(runtime.status.getAttribute("tabindex"), "-1");
   await runtime.submit();
   assert.equal(runtime.fetches.length, 2);
-  assert.deepEqual(withoutToken(runtime.fetches[1].body), withoutToken(original));
+  assert.deepEqual(runtime.fetches[1].body, original);
   await runtime.fetches[0].respond({ ok: true, enquiryId: original.enquiryId, receivedAt: "stale" });
   assert.match(runtime.status.textContent, /checking/i);
   await runtime.fetches[1].respond({ ok: true, enquiryId: original.enquiryId, receivedAt: "fresh" });
   assert.match(runtime.status.textContent, /Enquiry received/);
 });
 
-test("corporate: a failed captcha on the retry sends nothing and keeps blocking changed details under the unresolved ID", async () => {
-  const runtime = fill(makeRuntime("corporate"));
-  await runtime.submit();
-  const original = runtime.fetches[0].body;
-  runtime.timeout();
-  runtime.captchaState.token = "";
-  await runtime.submit();
-  assert.equal(runtime.fetches.length, 1, "a failed retry captcha must not call the backend");
-  runtime.fields.organisationName.value = "Changed after retry captcha failure";
-  await runtime.submit();
-  assert.equal(runtime.fetches.length, 1, "changed details must not be sent under the unresolved ID");
-  assert.equal(runtime.fields.enquiryId.value, original.enquiryId);
-  assert.equal(runtime.another.hidden, false);
-  assert.match(runtime.status.textContent, /Start another enquiry/i);
-});
-
-test("corporate: a server captcha rejection on the retry keeps the possible-save details and blocks a changed third submission", async () => {
+test("corporate: a server rejection on the retry keeps the possible-save details and blocks a changed third submission", async () => {
   const runtime = fill(makeRuntime("corporate"));
   await runtime.submit();
   const original = runtime.fetches[0].body;
   runtime.timeout();
   await runtime.submit();
-  await runtime.fetches[1].respond({ ok: false, errors: { captcha: "Captcha verification failed. Please try again." } });
+  await runtime.fetches[1].respond({ ok: false, errors: { form: "Organisation enquiries are paused. Please contact Saloni directly." } });
   assert.equal(runtime.fetches.length, 2);
   assert.equal(runtime.fetches[1].body.enquiryId, original.enquiryId);
   runtime.fields.organisationName.value = "Changed after server rejection";
