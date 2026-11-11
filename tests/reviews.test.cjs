@@ -680,11 +680,12 @@ test("the public list is capped at 50, newest first, and counts every published 
   assert.equal(read(makeRuntime()).summary.count, 0);
 });
 
-test("the public list is cached for five minutes, cleared by a write, and intake stays live", () => {
+test("the public list is cached for six hours, cleared by a write, and intake stays live", () => {
   const runtime = makeRuntime({ rows: [reviewRow({ id: "review-cache-000001" })] });
   assert.equal(read(runtime).reviews.length, 1);
   assert.equal(runtime.state.dataReads, 1);
   assert.equal(runtime.state.cachePuts, 1);
+  assert.equal(runtime.state.cacheTtls["reviews-public-v1"], 21600, "kept for the CacheService maximum of six hours");
   assert.equal(read(runtime).reviews.length, 1);
   assert.equal(runtime.state.dataReads, 1, "a cache hit skips the Sheet read");
   runtime.properties.REVIEWS_DISABLED = "true";
@@ -743,9 +744,11 @@ test("a Reviews tab edit clears the cache and Hidden, Removed and Published chan
   runtime.context.onReviewsSheetEdit_({ range: runtime.sheet.getRange(2, 3) });
   [FILE_A, FILE_B].forEach((id) => assert.deepEqual(runtime.fileById[id].sharing, ["ANYONE_WITH_LINK", "VIEW"]));
   runtime.rows[1][2] = "Removed";
+  const removesBefore = runtime.state.cacheRemoves.length;
   runtime.context.onReviewsSheetEdit_({ range: runtime.sheet.getRange(2, 3) });
   assert.deepEqual(plain(runtime.state.removed), [FILE_A, FILE_B]);
   assert.equal(runtime.rows[1][9], "");
+  assert.equal(runtime.state.cacheRemoves.length - removesBefore, 2, "cleared again after the photo IDs change, so a read during the edit cannot keep old photos for hours");
   assert.equal(runtime.rows[1][2], "Removed");
 });
 

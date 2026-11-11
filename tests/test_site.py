@@ -707,7 +707,7 @@ class StaticSiteContractTests(unittest.TestCase):
             with self.subTest(page=page[:40]):
                 # Asset paths retain their established filenames; visible and
                 # accessible copy must not expose the retired label.
-                customer_markup = re.sub(r'\s(?:src|href)=["\'][^"\']*["\']', "", page, flags=re.IGNORECASE)
+                customer_markup = re.sub(r'\s(?:src|srcset|href)=["\'][^"\']*["\']', "", page, flags=re.IGNORECASE)
                 customer_markup = re.sub(r'\scontent=["\'][^"\']*(?:/assets/|\.(?:webp|jpe?g|png|svg))[^"\']*["\']', "", customer_markup, flags=re.IGNORECASE)
                 self.assertNotRegex(customer_markup, re.compile(r"\bconcept\b", re.IGNORECASE))
         self.assertNotIn("A preview of 13 keepsake ideas for the two of you.", self.html)
@@ -2292,6 +2292,94 @@ class ReviewsPageContractTests(unittest.TestCase):
             self.assertRegex(item["id"], r"^catalogue:[A-Za-z0-9_./-]{1,150}$")
             self.assertTrue(0 < len(item["name"]) <= 120)
         self.assertLessEqual(len(actual), 300)
+
+
+class ResponsiveCardImageTests(unittest.TestCase):
+    """Card photos offer a 540 px copy (covers a 171 px card on a 3x phone), while src and the popup keep the full photo."""
+
+    PAGES = {
+        "index.html": 78,
+        "corporate-gifting/index.html": 2,
+        "resin-photo-frames/index.html": 2,
+    }
+    CARD_WIDTH = 540
+
+    @staticmethod
+    def real_size(path):
+        return webp_dimensions(path) if path.suffix == ".webp" else jpeg_dimensions(path)
+
+    def card_images(self, page):
+        html_text = (ROOT / page).read_text(encoding="utf-8")
+        for tag in re.findall(r"<img\b[^>]*>", html_text):
+            if "srcset=" in tag:
+                yield tag, dict(re.findall(r'([\w-]+)="([^"]*)"', tag))
+
+    def test_card_srcset_points_to_real_smaller_copies(self):
+        for page, minimum in self.PAGES.items():
+            images = list(self.card_images(page))
+            self.assertGreaterEqual(len(images), minimum, page)
+            base = (ROOT / page).parent
+            for tag, attrs in images:
+                with self.subTest(page=page, src=attrs["src"]):
+                    original = (base / attrs["src"]).resolve()
+                    self.assertTrue(original.is_file(), attrs["src"])
+                    self.assertEqual(original.parent, ROOT / "assets", "src must stay a full-size assets/ photo")
+                    original_width, original_height = self.real_size(original)
+                    self.assertEqual(attrs["width"], str(original_width), "width/height attributes describe src")
+                    self.assertEqual(attrs["height"], str(original_height))
+                    candidates = [part.strip().rsplit(" ", 1) for part in attrs["srcset"].split(",")]
+                    self.assertEqual(len(candidates), 2, tag)
+                    for url, descriptor in candidates:
+                        self.assertRegex(descriptor, r"^\d+w$")
+                        self.assertEqual(self.real_size((base / url).resolve())[0], int(descriptor[:-1]), url)
+                    small, full = candidates
+                    small_path = (base / small[0]).resolve()
+                    self.assertEqual(small_path.parent, ROOT / "assets" / "card", "first candidate is the card copy")
+                    self.assertEqual(small_path.name, original.name)
+                    self.assertEqual(small[1], f"{self.CARD_WIDTH}w")
+                    self.assertEqual((base / full[0]).resolve(), original, "last candidate is the unchanged src file")
+                    self.assertGreaterEqual(original_height, original_width * 0.9, "landscape photos sit in square cover boxes; a small copy would be stretched")
+                    small_width, small_height = self.real_size(small_path)
+                    self.assertLessEqual(abs(small_height / small_width - original_height / original_width), 0.01)
+                    self.assertLessEqual(small_path.stat().st_size, original.stat().st_size * 0.75, "copy must save 25% or more")
+                    self.assertRegex(attrs.get("sizes", ""), r"\d+(px|vw)")
+                    self.assertIn(attrs.get("loading"), ("lazy", "eager"))
+
+    def test_hero_photos_over_the_card_width_use_the_small_copy(self):
+        html_text = (ROOT / "index.html").read_text(encoding="utf-8")
+        hero = re.search(r'<section\b[^>]*class="hero-banner\b[\s\S]*?</section>', html_text).group(0)
+        images = re.findall(r"<img\b[^>]*>", hero)
+        self.assertEqual(len(images), 15)
+        with_copy = 0
+        for tag in images:
+            attrs = dict(re.findall(r'([\w-]+)="([^"]*)"', tag))
+            if "srcset" not in attrs:
+                continue
+            with_copy += 1
+            self.assertEqual(attrs["sizes"], "(max-width: 1440px) 30.5vw, 439px")
+            self.assertTrue(attrs["srcset"].startswith(f"assets/card/{Path(attrs['src']).name} {self.CARD_WIDTH}w, "))
+        self.assertEqual(with_copy, 11)
+        first = images[0]
+        self.assertIn('loading="eager"', first)
+        self.assertIn('fetchpriority="high"', first)
+
+    def test_card_popup_link_still_opens_the_full_photo(self):
+        html_text = (ROOT / "index.html").read_text(encoding="utf-8")
+        checked = 0
+        for href, tag in re.findall(r'<a\b[^>]*\bhref="([^"]+)"[^>]*lightbox-trigger[^>]*>(<img\b[^>]*>)', html_text) + re.findall(r'<a\b[^>]*lightbox-trigger[^>]*\bhref="([^"]+)"[^>]*>(<img\b[^>]*>)', html_text):
+            if "srcset=" in tag:
+                checked += 1
+                self.assertIn(f'src="{href}"', tag)
+        self.assertGreater(checked, 40)
+        lightbox = re.search(r'<img\b[^>]*id="lightbox-image"[^>]*>', html_text).group(0)
+        self.assertNotIn("srcset", lightbox)
+
+    def test_every_card_copy_is_used(self):
+        used = set()
+        for page in self.PAGES:
+            used.update(Path(attrs["srcset"].split(" ")[0]).name for _, attrs in self.card_images(page))
+        on_disk = {path.name for path in (ROOT / "assets" / "card").glob("*") if path.is_file()}
+        self.assertEqual(on_disk, used)
 
 
 if __name__ == "__main__":
