@@ -575,6 +575,7 @@
       k.anotherButton.hidden = true;
       k.clearErrors();
       k.setStatus("", "");
+      if (productSelect.focus) productSelect.focus();
     });
 
     form.elements.reviewId.value = newId("review");

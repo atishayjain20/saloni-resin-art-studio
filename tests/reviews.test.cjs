@@ -1230,6 +1230,7 @@ test("review success thanks the first name, says where the review shows and offe
   assert.equal(runtime.another.hidden, false);
   runtime.another.dispatch("click");
   assert.notEqual(runtime.fields.reviewId.value, first);
+  assert.equal(runtime.fields.productId.focused, true, "focus moves to the first field instead of staying on the hidden button");
   assert.equal(runtime.status.textContent, "");
   assert.equal(runtime.fieldsets.some((fieldset) => fieldset.hidden), false);
   assert.equal(runtime.submitButton.hidden, false);
