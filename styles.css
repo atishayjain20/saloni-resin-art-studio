@@ -498,6 +498,7 @@ dialog.my-orders-dialog::backdrop { background: rgba(42, 14, 31, .72); }
 .my-order-status.is-cancel-requested { background: #fff0d1; color: #6b4300; }
 .my-order-status.is-cancel-declined { background: #def3e4; color: #17612f; }
 .my-order-status.is-cancelled { background: #ececec; color: #4a4a4a; }
+.my-order-status.is-advance-paid { background: #d3efdc; color: #0f5226; }
 .my-order-note { margin: .5rem 0 0; font-size: .8rem; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; }
 .my-order-note[hidden] { display: none; }
 .my-order-note.is-error { color: #a41f33; font-weight: 800; }
@@ -513,6 +514,13 @@ dialog.my-orders-dialog::backdrop { background: rgba(42, 14, 31, .72); }
 .my-order-confirm p { flex: 1 1 100%; margin: 0; color: var(--ink); font-size: .85rem; font-weight: 800; line-height: 1.4; }
 .my-order-confirm .button:disabled { opacity: .6; cursor: default; transform: none; }
 .my-orders-contact[hidden], .my-orders-empty[hidden], .my-orders-list[hidden] { display: none; }
+.my-order-advance { display: grid; justify-items: start; gap: .55rem; margin-top: .7rem; padding: .8rem .9rem; border: 1px solid var(--line); border-radius: .8rem; background: #fffaf4; }
+.my-order-advance[hidden] { display: none; }
+.my-order-advance-amount { margin: 0; color: var(--ink); font-size: .95rem; font-weight: 800; }
+.my-order-advance-alt, .my-order-advance-note { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; overflow-wrap: anywhere; }
+.my-order-upi-id { color: var(--ink); user-select: all; }
+.my-order-pay, .my-order-copy { min-height: 2.75rem; justify-content: center; }
+.my-order-copy-feedback:empty { display: none; }
 .order-dialog-panel { position: relative; width: 100%; max-height: calc(100dvh - 2rem); overflow: auto; overscroll-behavior: contain; padding: clamp(2.8rem, 4vw, 3.5rem) clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 1.5rem); border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }
 .order-dialog-close-form { position: sticky; z-index: 2; top: 0; display: flex; justify-content: flex-end; height: 44px; margin: -2.8rem -1rem 1rem; }
 .order-dialog-close { position: static; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--ivory); color: var(--ink); font-size: 1.4rem; line-height: 1; }
@@ -744,6 +752,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
     border: 0;
     background: transparent;
   }  .my-orders-contact .button, .my-order-actions .button { flex: 1 1 100%; justify-content: center; }
+  .my-order-advance { justify-items: stretch; }
 }
 
 @media (prefers-reduced-motion: reduce) {

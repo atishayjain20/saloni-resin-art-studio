@@ -346,7 +346,7 @@ function combinedForm(overrides = {}) {
 }
 
 function makeRuntime(options = {}) {
-  const headers = [
+  const headers = options.headers ? options.headers.slice() : [
     "Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID", "Product name", "Quantity",
     "Height value", "Height unit", "Height (in)", "Width value", "Width unit", "Width (in)", "Design details",
     "Customer name", "Phone", "Email", "Fulfilment",
@@ -1711,4 +1711,200 @@ test("other actions are unaffected by action=status and its kill switch", () => 
   runtime.properties.ORDER_STATUS_DISABLED = "true";
   assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true });
   assert.equal(orderPost(orderedRuntime(), postedOrder({ requestId: "request-other-12345" })).ok, true);
+});
+
+// --- Advance payment by UPI: new "Advance amount" / "Advance status" columns at the END of the Orders sheet ---
+const LEGACY_LAYOUT = ["Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID", "Product name", "Quantity", "Height value", "Height unit", "Height (in)", "Width value", "Width unit", "Width (in)", "Design details", "Customer name", "Phone", "Email", "Fulfilment", "Shipping address", "City", "State", "PIN", "Requested date", "Reference file link", "Status", "Staff notes"];
+const PARTNER_COLUMNS = ["Referral code", "Partner ID", "Partner name snapshot", "Final product subtotal", "Payment status", "Delivery status", "Commission rate snapshot", "Commission amount", "Commission status", "Payout batch ID", "Payout date"];
+const PARTNER_LAYOUT = LEGACY_LAYOUT.concat(PARTNER_COLUMNS);
+const ADVANCE_LAYOUT = PARTNER_LAYOUT.concat(["Advance amount", "Advance status"]);
+const VALID_UPI = { UPI_PAYEE_ID: "saloni.art@okhdfcbank", UPI_PAYEE_NAME: "Saloni Resin Art" };
+
+function advanceRuntime(cells, options = {}) {
+  // cells: [Status, Advance amount, Advance status] per order, on the 39-column layout.
+  const rows = cells.map(([status, amount, advanceStatus], index) => {
+    const row = new Array(ADVANCE_LAYOUT.length).fill("");
+    row[0] = "request-advance-" + String(index).padStart(4, "0");
+    row[14] = "Priya Sharma"; row[15] = "9876543210"; row[16] = "priya@example.com"; row[18] = "Secret Lane 12";
+    row[24] = status; row[25] = "Private staff note about the customer";
+    row[26] = "FRIENDCODE"; row[29] = 4321; row[33] = 432.1;
+    row[37] = amount; row[38] = advanceStatus;
+    return row;
+  });
+  const runtime = makeRuntime(Object.assign({ rows, headers: ADVANCE_LAYOUT, properties: VALID_UPI }, options));
+  runtime.ids = rows.map((row) => row[0]);
+  return runtime;
+}
+const advanceOf = (runtime, index = 0) => (statusPost(runtime, { requestIds: runtime.ids }).advance || {})[runtime.ids[index]];
+
+test("ensureSchema_ accepts exactly the legacy, partner and advance layouts and returns their width", () => {
+  const sheetWith = (headers) => ({ getLastRow: () => 1, getLastColumn: () => headers.length, getRange: (_r, _c, _n, count) => ({ getValues: () => [headers.slice(0, count)] }) });
+  const runtime = makeRuntime();
+  assert.equal(runtime.context.ensureSchema_(sheetWith(LEGACY_LAYOUT)), 26);
+  assert.equal(runtime.context.ensureSchema_(sheetWith(PARTNER_LAYOUT)), 37);
+  assert.equal(runtime.context.ensureSchema_(sheetWith(ADVANCE_LAYOUT)), 39);
+  assert.equal(runtime.context.ADVANCE_ORDER_HEADERS.join("|"), "Advance amount|Advance status");
+  const bad = [
+    PARTNER_LAYOUT.concat(["Advance amount"]),                                 // a single advance column
+    PARTNER_LAYOUT.concat(["Advance status", "Advance amount"]),               // swapped
+    PARTNER_LAYOUT.concat(["Advance amount", "Advance state"]),                // typo
+    ADVANCE_LAYOUT.concat(["Extra"]),                                          // a hand-added column
+    LEGACY_LAYOUT.concat(["Advance amount", "Advance status"]),                // advance without partner columns
+    ADVANCE_LAYOUT.slice(0, 30),
+  ];
+  bad.forEach((headers) => assert.throws(() => runtime.context.ensureSchema_(sheetWith(headers)), /schema does not match/, String(headers.length)));
+});
+
+test("an order is written on each of the three layouts with the same leading columns", () => {
+  for (const [headers, width] of [[LEGACY_LAYOUT, 26], [PARTNER_LAYOUT, 37], [ADVANCE_LAYOUT, 39]]) {
+    const runtime = makeRuntime({ headers, properties: ALERT_PROPERTIES });
+    assert.equal(orderPost(runtime, postedOrder()).ok, true, "layout " + width);
+    assert.equal(runtime.rows.length, 1);
+    assert.equal(runtime.rows[0].length, width);
+    assert.equal(runtime.rows[0][0], "request-1234567890");
+    assert.equal(runtime.rows[0][24], "New request");
+    assert.deepEqual(Array.from(runtime.rows[0].slice(26)), new Array(width - 26).fill(""), "partner and advance cells start blank");
+    // The same request again finds the saved row (findRequest_) and does not add a second one.
+    assert.equal(orderPost(runtime, postedOrder()).ok, true);
+    assert.equal(runtime.rows.length, 1);
+  }
+});
+
+test("a referred order on the advance layout keeps its partner columns and leaves the advance cells blank", () => {
+  const runtime = makeRuntime({ headers: ADVANCE_LAYOUT, properties: ALERT_PROPERTIES });
+  runtime.context.resolveReferralForOrder_ = () => ({ active: true, status: "active", code: "FRIEND-10", partnerId: "partner-1", displayName: "Friend Studio", rate: 0.1 });
+  assert.equal(orderPost(runtime, postedOrder({ referralCode: "FRIEND-10" })).ok, true);
+  assert.equal(runtime.rows[0].length, 39);
+  assert.equal(runtime.rows[0][26], "FRIEND-10");
+  assert.equal(runtime.rows[0][32], 0.1);
+  assert.match(runtime.rows[0][33], /^=IF\(/);
+  assert.deepEqual(Array.from(runtime.rows[0].slice(37)), ["", ""]);
+  const legacy = makeRuntime({ headers: LEGACY_LAYOUT, properties: ALERT_PROPERTIES });
+  legacy.context.resolveReferralForOrder_ = runtime.context.resolveReferralForOrder_;
+  // The old layout still refuses an attributed order (the error is generic by design), and writes nothing.
+  assert.deepEqual(orderPost(legacy, postedOrder({ referralCode: "FRIEND-10" })), { ok: false, error: "unconfirmed" });
+  assert.equal(legacy.rows.length, 0);
+});
+
+test("cancel on the advance layout changes only Status and Staff notes and keeps the advance cells", () => {
+  const runtime = advanceRuntime([["Confirmed", 500, ""]], { properties: Object.assign({}, VALID_UPI, ALERT_PROPERTIES) });
+  assert.deepEqual(cancelPost(runtime, { requestId: runtime.ids[0] }), { ok: true });
+  assert.equal(runtime.rows[0][37], 500);
+  assert.equal(runtime.rows[0][38], "");
+  assert.equal(runtime.state.cellWrites.length, 1);
+  assert.equal(runtime.state.cellWrites[0].column, 26);
+});
+
+test("action=status adds advance only for a confirmed order with a valid amount and a valid payee", () => {
+  const runtime = advanceRuntime([["Confirmed", 500, ""]]);
+  const reply = statusPost(runtime, { requestIds: runtime.ids });
+  assert.deepEqual(reply, {
+    ok: true,
+    statuses: { [runtime.ids[0]]: "confirmed" },
+    advance: { [runtime.ids[0]]: { amount: 500, payee: "saloni.art@okhdfcbank", name: "Saloni Resin Art" } },
+  });
+  assert.equal(runtime.state.rangeReads.length, 1, "still one block read");
+  assert.equal(runtime.state.rangeReads[0].column + runtime.state.rangeReads[0].numColumns - 1, 39, "reads the two advance columns too");
+  assert.equal(runtime.state.cellWrites.length, 0);
+  assert.ok(!runtime.state.released, "no lock for a read");
+});
+
+test("action=status accepts the amount spellings Saloni may type and rejects everything else", () => {
+  const good = [[500, 500], ["500", 500], [" 500 ", 500], ["₹500", 500], ["₹ 500", 500], ["Rs 500", 500], ["Rs. 500", 500], ["rs500", 500], ["INR 500", 500], ["500.00", 500], ["500.0", 500], [1, 1], ["200000", 200000], [200000, 200000]];
+  const bad = ["", null, 0, "0", "0.00", -5, "-500", "500.5", 500.5, "500.50", "200001", 200001, 1e21, "1e3", "1,500", "five hundred", "500 rupees", "Rs", "₹", "500/-", "5 00", "NaN", "0500", "500.000", "$500", true, "=500", "500; DROP"];
+  const runtime = advanceRuntime(good.concat(bad.map((value) => [value, value])).map(([value]) => ["Confirmed", value, ""]));
+  const reply = statusPost(runtime, { requestIds: runtime.ids });
+  good.forEach(([value, amount], index) => assert.equal(reply.advance[runtime.ids[index]].amount, amount, JSON.stringify(value)));
+  bad.forEach((value, index) => assert.equal(reply.advance[runtime.ids[good.length + index]], undefined, JSON.stringify(value)));
+  assert.equal(reply.statuses[runtime.ids[good.length]], "confirmed", "a bad amount still reports the status");
+});
+
+test("action=status gives advance only while the order reads Confirmed", () => {
+  const runtime = advanceRuntime([["", 500, ""], ["New request", 500, ""], ["Accepted", 500, ""], ["In progress", 500, ""], ["Ready", 500, ""], ["Delivered", 500, ""], ["Cancelled", 500, ""], ["Cancellation requested", 500, ""], ["Cancellation declined", 500, ""]]);
+  const reply = statusPost(runtime, { requestIds: runtime.ids });
+  assert.deepEqual(Object.keys(reply.advance), [runtime.ids[2]]);
+});
+
+test("action=status without a valid payee gives no advance, and the payee is checked against the UPI shape", () => {
+  for (const properties of [{}, { UPI_PAYEE_NAME: "Saloni" }, { UPI_PAYEE_ID: "saloni@okhdfcbank" }]) {
+    const runtime = advanceRuntime([["Confirmed", 500, ""]], { properties });
+    const reply = statusPost(runtime, { requestIds: runtime.ids });
+    if (properties.UPI_PAYEE_ID) assert.equal(reply.advance[runtime.ids[0]].payee, "saloni@okhdfcbank");
+    else assert.deepEqual(reply, { ok: true, statuses: { [runtime.ids[0]]: "confirmed" } });
+  }
+  for (const payee of ["saloni", "@okhdfcbank", "a@b", "sal oni@okhdfcbank", "saloni@ok hdfcbank", "saloni@1bank", "saloni@bank&am=1", "saloni@bank?x=1", "saloni@@bank", "a@okhdfcbank", "<b>@bank", "saloni@ba\nnk", "upi://pay?pa=x@y", "x".repeat(257) + "@bank", "saloni@" + "b".repeat(66)]) {
+    const runtime = advanceRuntime([["Confirmed", 500, ""]], { properties: { UPI_PAYEE_ID: payee, UPI_PAYEE_NAME: "Saloni" } });
+    assert.deepEqual(statusPost(runtime, { requestIds: runtime.ids }), { ok: true, statuses: { [runtime.ids[0]]: "confirmed" } }, JSON.stringify(payee));
+  }
+  for (const payee of ["saloni@okhdfcbank", "a.b-c_d9@ybl", "98765.43210@paytm", "name@sbi.co", "  saloni@upi  ", "saloni@bank\n"]) {
+    const runtime = advanceRuntime([["Confirmed", 500, ""]], { properties: { UPI_PAYEE_ID: payee, UPI_PAYEE_NAME: "Saloni" } });
+    assert.equal(advanceOf(runtime).payee, payee.trim(), payee);
+  }
+});
+
+test("action=status shortens a long UPI_PAYEE_NAME and falls back when it is empty", () => {
+  const long = advanceRuntime([["Confirmed", 500, ""]], { properties: { UPI_PAYEE_ID: "saloni@upi", UPI_PAYEE_NAME: "  Saloni   Resin\n Art " + "x".repeat(100) } });
+  assert.equal(advanceOf(long).name.length <= 60, true);
+  assert.equal(advanceOf(long).name.startsWith("Saloni Resin Art x"), true);
+  const none = advanceRuntime([["Confirmed", 500, ""]], { properties: { UPI_PAYEE_ID: "saloni@upi" } });
+  assert.equal(advanceOf(none).name, "Saloni Resin Art Studio");
+});
+
+test("action=status reports advance_paid once the advance is marked Paid or Received, and never offers the button then", () => {
+  const cells = [["Confirmed", 500, "Paid"], ["Confirmed", 500, "received"], ["Confirmed", 500, "  PAID  "], ["Confirmed", 500, "Paid - UPI 123"], ["Confirmed", "", "Paid"], ["In progress", 500, "Paid"], ["Confirmed", 500, "Pending"], ["Confirmed", 500, "Not paid"], ["Confirmed", 500, "Partially paid"], ["Confirmed", 500, "Unpaid"]];
+  const runtime = advanceRuntime(cells);
+  const reply = statusPost(runtime, { requestIds: runtime.ids });
+  const expected = ["advance_paid", "advance_paid", "advance_paid", "advance_paid", "advance_paid", "advance_paid", "confirmed", "confirmed", "confirmed", "confirmed"];
+  expected.forEach((code, index) => assert.equal(reply.statuses[runtime.ids[index]], code, JSON.stringify(cells[index])));
+  assert.deepEqual(Object.keys(reply.advance).sort(), runtime.ids.slice(6).sort(), "only the unpaid rows keep a button");
+});
+
+test("action=status keeps later and cancelled statuses as they are even when the advance is paid", () => {
+  const runtime = advanceRuntime([["Ready", 500, "Paid"], ["Dispatched", 500, "Paid"], ["Delivered", 500, "Paid"], ["Cancelled", 500, "Paid"], ["Cancellation requested", 500, "Paid"], ["Cancellation declined", 500, "Paid"], ["Declined", 500, "Paid"], ["New request", 500, "Paid"]]);
+  const reply = statusPost(runtime, { requestIds: runtime.ids });
+  assert.deepEqual(runtime.ids.map((id) => reply.statuses[id]), ["ready", "dispatched", "delivered", "cancelled", "cancel_requested", "cancel_declined", "cancelled", "advance_paid"]);
+  assert.equal(reply.advance, undefined);
+});
+
+test("action=status never returns other columns, even next to the advance cells", () => {
+  const runtime = advanceRuntime([["Confirmed", 500, ""], ["Confirmed", 300, "Paid"]]);
+  const text = runtime.context.doPost({ parameter: { action: "status" }, postData: { contents: JSON.stringify({ requestIds: runtime.ids }) } }).text;
+  for (const secret of ["Priya", "9876543210", "priya@example.com", "Secret Lane", "Private staff note", "FRIENDCODE", "4321", "432.1", "Paid"]) assert.ok(!text.includes(secret), secret);
+  assert.deepEqual(Object.keys(JSON.parse(text)).sort(), ["advance", "ok", "statuses"]);
+  assert.deepEqual(Object.keys(JSON.parse(text).advance[runtime.ids[0]]).sort(), ["amount", "name", "payee"]);
+});
+
+test("UPI_ADVANCE_DISABLED switches the advance off without touching the status check", () => {
+  const runtime = advanceRuntime([["Confirmed", 500, ""], ["Confirmed", 500, "Paid"]], { properties: Object.assign({ UPI_ADVANCE_DISABLED: "true" }, VALID_UPI) });
+  assert.deepEqual(statusPost(runtime, { requestIds: runtime.ids }), { ok: true, statuses: { [runtime.ids[0]]: "confirmed", [runtime.ids[1]]: "confirmed" } });
+  assert.equal(runtime.state.rangeReads[0].column + runtime.state.rangeReads[0].numColumns - 1, 25, "the advance columns are not even read");
+});
+
+test("action=status on the legacy and partner layouts is unchanged and offers no advance", () => {
+  for (const headers of [LEGACY_LAYOUT, PARTNER_LAYOUT]) {
+    const runtime = statusRuntime(["Confirmed", "Shipped"], { headers, properties: VALID_UPI });
+    assert.deepEqual(statusPost(runtime, { requestIds: runtime.ids }), { ok: true, statuses: { [runtime.ids[0]]: "confirmed", [runtime.ids[1]]: "dispatched" } });
+    assert.equal(runtime.state.rangeReads[0].column + runtime.state.rangeReads[0].numColumns - 1, 25);
+  }
+});
+
+test("action=status does not mix up advance cells between orders and ignores ids it did not ask for", () => {
+  const runtime = advanceRuntime([["Confirmed", 100, ""], ["Confirmed", 200, ""], ["Confirmed", 300, ""]]);
+  const reply = statusPost(runtime, { requestIds: [runtime.ids[2], runtime.ids[0], runtime.ids[2]] });
+  assert.deepEqual(Object.keys(reply.advance).sort(), [runtime.ids[0], runtime.ids[2]]);
+  assert.equal(reply.advance[runtime.ids[0]].amount, 100);
+  assert.equal(reply.advance[runtime.ids[2]].amount, 300);
+});
+
+test("action=status gives no advance once the shopper asked to cancel (Staff notes carry the request), on any device", () => {
+  const runtime = advanceRuntime([["Confirmed", 500, ""], ["Confirmed", 500, ""], ["Confirmed", 500, ""]]);
+  runtime.rows[0][25] = "Customer asked to cancel on 11 Nov 2026, 05:40 PM IST via My orders";
+  runtime.rows[1][25] = "Note first | Customer asked to cancel on 11 Nov 2026, 05:40 PM IST via My orders";
+  runtime.rows[2][25] = "Customer called about colours";
+  const reply = statusPost(runtime, { requestIds: runtime.ids });
+  assert.deepEqual(Object.keys(reply.advance), [runtime.ids[2]]);
+  assert.deepEqual(Object.values(reply.statuses), ["confirmed", "confirmed", "confirmed"], "the status itself is unchanged");
+  const onlyCancelled = advanceRuntime([["Confirmed", 500, ""]]);
+  onlyCancelled.rows[0][25] = "Customer asked to cancel on 11 Nov 2026";
+  assert.deepEqual(statusPost(onlyCancelled, { requestIds: onlyCancelled.ids }), { ok: true, statuses: { [onlyCancelled.ids[0]]: "confirmed" } });
 });
