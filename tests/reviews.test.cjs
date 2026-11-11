@@ -1248,7 +1248,7 @@ function sampleReview(overrides = {}) {
 }
 
 function runReviewsPage(options = {}) {
-  const posted = []; const fetchCalls = []; const timers = []; const executed = [];
+  const posted = []; const fetchCalls = []; const timers = []; const executed = []; const deferred = [];
   const elements = new Map();
   const embed = new DomNode("div", "order-form-embed", true);
   if (!options.home) embed.attributes["data-form-mode"] = "review";
@@ -1269,8 +1269,10 @@ function runReviewsPage(options = {}) {
     setTimeout: (callback) => { timers.push(callback); return timers.length; }, clearTimeout() {},
     grecaptcha: { ready: (callback) => callback(), execute: (siteKey, request) => { executed.push(request); return Promise.resolve("parent-token"); } },
   };
-  if (options.storage) {
-    const store = Object.assign({}, options.storage);
+  const store = Object.assign({}, options.storage);
+  if (options.brokenStorage) {
+    windowObject.localStorage = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); }, removeItem() { throw new Error("blocked"); } };
+  } else if (options.storage) {
     windowObject.localStorage = { getItem: (key) => (Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null), setItem: (key, value) => { store[key] = String(value); }, removeItem: (key) => { delete store[key]; } };
   }
   const observers = [];
@@ -1281,6 +1283,7 @@ function runReviewsPage(options = {}) {
     windowObject.fetch = (url, init) => {
       fetchCalls.push({ url, init });
       if (options.hang) return new Promise(() => {});
+      if (options.defer) return new Promise((resolve, reject) => deferred.push({ resolve: () => resolve({ json: () => Promise.resolve(response) }), reject: () => reject(new Error("network")) }));
       if (options.fetchRejects) return Promise.reject(new Error("network"));
       return Promise.resolve({ json: () => (options.nonJson ? Promise.reject(new SyntaxError("Unexpected token <")) : Promise.resolve(response)) });
     };
@@ -1297,7 +1300,7 @@ function runReviewsPage(options = {}) {
   vm.runInContext(siteScript, context, { filename: "script.js" });
   documentObject.ready();
   const seedOf = () => JSON.parse(posted.at(-1).children.find((child) => child.name === "seed").value);
-  return { elements, status, summary, reviewsStatus, list, section, observers, posted, fetchCalls, timers, executed, windowObject, seedOf, setResponse: (value) => { response = value; }, frame: () => elements.get("order-form-frame") };
+  return { elements, status, summary, reviewsStatus, list, section, observers, posted, fetchCalls, timers, executed, windowObject, store, deferred, seedOf, setResponse: (value) => { response = value; }, frame: () => elements.get("order-form-frame") };
 }
 const openBody = (reviews = [sampleReview()], extra = {}) => Object.assign({ ok: true, intake: "open", summary: { count: reviews.length, average: 4 }, reviews }, extra);
 
@@ -1459,6 +1462,113 @@ test("review photos use the googleusercontent URL, then the Drive thumbnail, the
   const studio = runReviewsPage({ home: true, body: openBody([sampleReview({ photos: [PHOTO_ONE] })]) });
   await settle();
   assert.equal(findAll(studio.list, (item) => item.tag === "img")[0].getAttribute("alt"), "Customer photo 1 for the studio");
+});
+
+// The home reviews and the popup rating line show a saved copy of the last good feed at once, then replace it with the fresh feed.
+const FEED_CACHE_KEY = "saloni-reviews-feed";
+const FEED_URL = "https://script.google.test/exec";
+const savedFeed = (body, extra = {}) => JSON.stringify(Object.assign({ v: 1, url: FEED_URL, savedAt: Date.now() - 60 * 1000, data: body }, extra));
+const cardTexts = (page) => findAll(page.list, (item) => item.className === "review-comment").map((item) => item.textContent);
+
+test("the home reviews show the saved copy at once and the fresh feed replaces it when it arrives", async () => {
+  const old = openBody([sampleReview({ comment: "Saved copy review." })], { summary: { count: 1, average: 4 } });
+  const fresh = openBody([sampleReview({ comment: "Fresh one." }), sampleReview({ id: "review-sample-0002", comment: "Fresh two.", rating: 5 })], { summary: { count: 2, average: 4.5 } });
+  const page = runReviewsPage({ home: true, defer: true, body: fresh, storage: { [FEED_CACHE_KEY]: savedFeed(old) } });
+  await settle();
+  assert.equal(page.fetchCalls.length, 1, "the fresh read still starts");
+  assert.deepEqual(cardTexts(page), ["Saved copy review."], "the saved copy shows before the network answers");
+  assert.equal(page.summary.textContent, "4.0 out of 5 · 1 review");
+  assert.equal(page.reviewsStatus.hidden, true);
+  page.deferred[0].resolve();
+  await settle();
+  assert.deepEqual(cardTexts(page), ["Fresh one.", "Fresh two."], "the fresh feed wins");
+  assert.equal(page.summary.textContent, "4.5 out of 5 · 2 reviews");
+  assert.equal(page.fetchCalls.length, 1);
+  const stored = JSON.parse(page.store[FEED_CACHE_KEY]);
+  assert.deepEqual(plain(stored.data), plain(fresh), "the fresh feed becomes the saved copy");
+});
+
+test("a failed refresh keeps the saved reviews on screen instead of the could-not-load message", async () => {
+  const old = openBody([sampleReview({ comment: "Saved copy review." })]);
+  for (const options of [{ fetchRejects: true }, { body: { ok: false } }, { nonJson: true }]) {
+    const page = runReviewsPage(Object.assign({ home: true, storage: { [FEED_CACHE_KEY]: savedFeed(old) } }, options));
+    await settle();
+    assert.deepEqual(cardTexts(page), ["Saved copy review."], JSON.stringify(Object.keys(options)));
+    assert.equal(page.reviewsStatus.hidden, true);
+    assert.notEqual(page.reviewsStatus.textContent, CALM);
+    assert.equal(JSON.parse(page.store[FEED_CACHE_KEY]).data.reviews[0].comment, "Saved copy review.", "a failed read never overwrites the saved copy");
+  }
+  const hanging = runReviewsPage({ home: true, hang: true, storage: { [FEED_CACHE_KEY]: savedFeed(old) } });
+  await settle();
+  hanging.timers.forEach((timer) => timer());
+  await settle();
+  assert.deepEqual(cardTexts(hanging), ["Saved copy review."], "a timed-out refresh keeps the saved copy too");
+  assert.equal(hanging.reviewsStatus.hidden, true);
+});
+
+test("an unchanged fresh feed leaves the shown reviews alone and only renews the saved timestamp", async () => {
+  const body = openBody([sampleReview({ comment: "Same review." })]);
+  const page = runReviewsPage({ home: true, defer: true, body, storage: { [FEED_CACHE_KEY]: savedFeed(body, { savedAt: Date.now() - 3 * 24 * 60 * 60 * 1000 }) } });
+  await settle();
+  const shown = page.list.children[0];
+  assert.ok(shown, "the saved copy shows");
+  page.deferred[0].resolve();
+  await settle();
+  assert.equal(page.list.children[0], shown, "the cards are not rebuilt when nothing changed");
+  assert.ok(Date.now() - JSON.parse(page.store[FEED_CACHE_KEY]).savedAt < 60 * 1000, "the saved copy is renewed");
+});
+
+test("a saved copy that is old, from another address, the wrong version or the wrong shape is ignored", async () => {
+  const good = openBody([sampleReview({ comment: "Saved copy review." })]);
+  const day = 24 * 60 * 60 * 1000;
+  const copies = {
+    "older than 7 days": savedFeed(good, { savedAt: Date.now() - 8 * day }),
+    "saved in the future": savedFeed(good, { savedAt: Date.now() + 2 * day }),
+    "no timestamp": savedFeed(good, { savedAt: "yesterday" }),
+    "wrong version": savedFeed(good, { v: 2 }),
+    "another backend": savedFeed(good, { url: "https://script.google.test/other" }),
+    "feed not ok": savedFeed(Object.assign({}, good, { ok: false })),
+    "reviews not a list": savedFeed(Object.assign({}, good, { reviews: "x" })),
+    "no summary": savedFeed({ ok: true, reviews: [] }),
+    "not JSON": "<html>",
+    "too big": savedFeed(openBody([sampleReview({ comment: "x".repeat(150000) })])),
+  };
+  for (const [name, raw] of Object.entries(copies)) {
+    const page = runReviewsPage({ home: true, defer: true, body: openBody([sampleReview({ comment: "Fresh one." })]), storage: { [FEED_CACHE_KEY]: raw } });
+    await settle();
+    assert.equal(page.list.children.length, 0, name + ": nothing is shown before the network answers");
+    assert.equal(page.reviewsStatus.textContent, "Loading reviews…", name);
+    page.deferred[0].resolve();
+    await settle();
+    assert.deepEqual(cardTexts(page), ["Fresh one."], name);
+  }
+});
+
+test("only a good feed under 100 KB is saved, with a version, address and timestamp, and storage errors change nothing", async () => {
+  const body = openBody([sampleReview({ comment: "Fresh one." })]);
+  const page = runReviewsPage({ home: true, body, storage: {} });
+  await settle();
+  const saved = JSON.parse(page.store[FEED_CACHE_KEY]);
+  assert.deepEqual(Object.keys(saved).sort(), ["data", "savedAt", "url", "v"]);
+  assert.equal(saved.v, 1);
+  assert.equal(saved.url, FEED_URL);
+  assert.ok(Math.abs(saved.savedAt - Date.now()) < 60 * 1000);
+  assert.deepEqual(plain(saved.data), plain(body), "exactly what the public feed returned");
+  for (const options of [{ fetchRejects: true }, { body: { ok: false } }, { body: { ok: true, reviews: "x" } }, { nonJson: true }]) {
+    const failed = runReviewsPage(Object.assign({ home: true, storage: {} }, options));
+    await settle();
+    assert.equal(FEED_CACHE_KEY in failed.store, false, "nothing saved for " + JSON.stringify(Object.keys(options)));
+  }
+  const huge = runReviewsPage({ home: true, body: openBody([sampleReview({ comment: "x".repeat(150000) })]), storage: { [FEED_CACHE_KEY]: savedFeed(body) } });
+  await settle();
+  assert.equal(huge.list.children.length, 1, "the fresh feed still shows");
+  assert.equal(FEED_CACHE_KEY in huge.store, false, "a feed over the cap is not saved and the older copy is dropped");
+  const broken = runReviewsPage({ home: true, body, brokenStorage: true });
+  await settle();
+  assert.deepEqual(cardTexts(broken), ["Fresh one."], "blocked storage still shows the fresh feed");
+  const blockedFail = runReviewsPage({ home: true, fetchRejects: true, brokenStorage: true });
+  await settle();
+  assert.equal(blockedFail.reviewsStatus.textContent, CALM);
 });
 
 test("on the home page an unreadable, failing or missing feed shows a calm message and no list", async () => {

@@ -213,9 +213,9 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261158">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261158" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261158" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261159">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261159" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261159" defer><\/script>/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -975,7 +975,7 @@ test("lightbox request focuses the order location after native close", () => {
   assert.equal(trigger.focused, undefined);
 });
 
-function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true, sample = null, feed = undefined, rateResponse = { ok: true, rating: 4 }, stored = null, captcha = true, rateReject = false, homeReviews = false, existingScript = null, observer = false } = {}) {
+function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=3", withGalleryElements = true, heroTarget = false, cardPhotos = false, withRequest = true, sample = null, feed = undefined, rateResponse = { ok: true, rating: 4 }, stored = null, captcha = true, rateReject = false, homeReviews = false, existingScript = null, observer = false, savedFeed = null, deferFeed = false } = {}) {
   const start = script.indexOf("    var lightbox = document.getElementById(\"art-lightbox\")");
   const end = script.indexOf("\n\n    initCatalogueExperience();", start);
   const makeElement = (extra = {}) => Object.assign({
@@ -1056,6 +1056,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
   }, gallery);
   const reviewsMode = sample !== null || feed !== undefined;
   const fetchCalls = [];
+  const feedReads = [];
   if (reviewsMode) {
     const list = children(makeElement());
     Object.defineProperty(list, "firstChild", { get() { return this.children[0] || null; } });
@@ -1097,12 +1098,14 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     windowObject.fetch = (url, init) => {
       fetchCalls.push({ url, init });
       if (init && init.method === "POST") return rateReject ? Promise.reject(new Error("network")) : Promise.resolve({ json: () => Promise.resolve(rateResponse) });
+      if (deferFeed) return new Promise((resolve, reject) => feedReads.push({ resolve: (data) => resolve({ json: () => Promise.resolve(data === undefined ? feed : data) }), reject: () => reject(new Error("network")) }));
       return feed === "fail" ? Promise.reject(new Error("network")) : Promise.resolve({ json: () => Promise.resolve(feed) });
     };
   }
   const observers = [];
   if (observer) windowObject.IntersectionObserver = class { constructor(callback, init) { this.callback = callback; this.init = init; this.targets = []; observers.push(this); } observe(target) { this.targets.push(target); } disconnect() { this.disconnected = true; } };
   const storage = new Map(stored ? [["saloni-product-ratings", JSON.stringify(stored)]] : []);
+  if (savedFeed) storage.set("saloni-reviews-feed", JSON.stringify({ v: 1, url: "https://script.google.test/exec", savedAt: Date.now() - 60000, data: savedFeed }));
   if (reviewsMode) {
     windowObject.localStorage = { getItem: (key) => (storage.has(key) ? storage.get(key) : null), setItem: (key, value) => storage.set(key, String(value)) };
     let uuid = 0;
@@ -1117,7 +1120,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     docElements["lightbox-stage"].listeners.pointerdown({ clientX: 200, clientY: 100 });
     docElements["lightbox-stage"].listeners.pointerup({ clientX: 200 + dx, clientY: 100 + dy });
   };
-  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe, trigger, cardImage, fetchCalls, storage, windowObject, headScripts, observers };
+  return { docElements, imageTarget, lightbox, requestButton, srcAssignments, open, press, swipe, trigger, cardImage, fetchCalls, feedReads, storage, windowObject, headScripts, observers };
 }
 
 const textOf = (node) => (node.children && node.children.length ? node.children.map(textOf).join(" ") : String(node.textContent || ""));
@@ -1360,6 +1363,50 @@ test("the popup average uses the feed's per-product rating totals, which include
   h.open();
   await settleAll();
   assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "★★★★☆ 4.0 out of 5 · 3 ratings");
+});
+
+test("the popup rating line shows the saved feed at once, keeps the shopper's own rating when the fresh feed arrives, and fresh data wins", async () => {
+  const productId = "catalogue:sample-gift.jpg";
+  const review = (firstName, rating) => ({ id: "r-" + firstName, rating, productId, productName: "Sample gift", firstName, city: "", comment: firstName + " loved it.", date: "2026-11-08", photos: [] });
+  const saved = { ok: true, intake: "open", summary: { count: 1, average: 5 }, reviews: [review("Asha", 5)], ratings: { [productId]: [10, 2] } };
+  const fresh = { ok: true, intake: "open", summary: { count: 2, average: 4.5 }, reviews: [review("Asha", 5), review("Meera", 4)], ratings: { [productId]: [20, 4] } };
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: fresh, savedFeed: saved, deferFeed: true });
+  h.open();
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "★★★★★ 5.0 out of 5 · 2 ratings", "the saved copy shows before the network answers");
+  assert.match(textOf(h.docElements["lightbox-review-list"]), /Asha/);
+  assert.equal(h.feedReads.length, 1, "the fresh read still starts");
+  rateStar(h, 4);
+  await settleAll();
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "★★★★★ 4.7 out of 5 · 3 ratings", "the shopper's rating is added at once");
+  assert.equal(h.fetchCalls.filter((call) => call.init && call.init.method === "POST").length, 1);
+  h.feedReads[0].resolve();
+  await settleAll();
+  assert.equal(h.feedReads.length, 1, "one background read, no loop");
+  assert.match(textOf(h.docElements["lightbox-review-list"]), /Meera/, "the fresh review list replaces the saved one");
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "★★★★★ 4.8 out of 5 · 5 ratings", "fresh totals plus the shopper's own rating, not lost");
+  assert.deepEqual(JSON.parse(h.storage.get("saloni-product-ratings")), { [productId]: 4 });
+  assert.equal(JSON.parse(h.storage.get("saloni-reviews-feed")).data.ratings[productId][0], 20, "the saved copy is the fresh feed, without the optimistic rating");
+});
+
+test("a failed refresh leaves the popup showing the saved feed, and a popup opened during the refresh also gets the fresh feed", async () => {
+  const productId = "catalogue:sample-gift.jpg";
+  const saved = { ok: true, intake: "open", summary: { count: 0, average: 0 }, reviews: [], ratings: { [productId]: [8, 2] } };
+  const fresh = { ok: true, intake: "open", summary: { count: 0, average: 0 }, reviews: [], ratings: { [productId]: [15, 3] } };
+  const failing = galleryHarness({ sample: "A lovely sample line for this piece.", feed: fresh, savedFeed: saved, deferFeed: true });
+  failing.open();
+  failing.feedReads[0].reject();
+  await settleAll();
+  assert.equal(textOf(failing.docElements["lightbox-rating-summary"]), "★★★★☆ 4.0 out of 5 · 2 ratings");
+  const h = galleryHarness({ sample: "A lovely sample line for this piece.", feed: fresh, savedFeed: saved, deferFeed: true, homeReviews: true, observer: true });
+  h.observers.find((item) => item.targets.includes(h.docElements["customer-reviews"])).callback([{ isIntersecting: true }]);
+  assert.equal(h.docElements["reviews-list"].children.length, 0);
+  assert.equal(h.docElements["reviews-status"].hidden, false, "no reviews yet: the saved copy has none");
+  h.open();
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "★★★★☆ 4.0 out of 5 · 2 ratings");
+  assert.equal(h.feedReads.length, 1, "the popup joins the read already in flight");
+  h.feedReads[0].resolve();
+  await settleAll();
+  assert.equal(textOf(h.docElements["lightbox-rating-summary"]), "★★★★★ 5.0 out of 5 · 3 ratings", "an open popup re-renders with the fresh feed");
 });
 
 test("the product popup adds real reviews for that product only, above the sample, and fetches the feed once", async () => {

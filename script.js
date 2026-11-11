@@ -179,9 +179,38 @@
     try {
       window.fetch(url + "?action=reviews", { credentials: "omit", cache: "no-store" })
         .then(function (response) { return response.json(); })
-        .then(function (data) { finish(data && data.ok === true && data.summary && Array.isArray(data.reviews) ? data : null); })
+        .then(function (data) { finish(validReviewsFeed(data) ? data : null); })
         .catch(function () { finish(null); });
     } catch (error) { finish(null); }
+  }
+
+  function validReviewsFeed(data) {
+    return Boolean(data && data.ok === true && data.summary && Array.isArray(data.reviews));
+  }
+
+  // The last good public feed is kept in this browser so reviews can show before the slow read finishes. It holds only what the public feed returns.
+  var REVIEWS_CACHE_KEY = "saloni-reviews-feed";
+  var REVIEWS_CACHE_VERSION = 1;
+  var REVIEWS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+  var REVIEWS_CACHE_MAX_CHARS = 100000;
+
+  function readSavedReviews(url) {
+    try {
+      var raw = window.localStorage.getItem(REVIEWS_CACHE_KEY);
+      if (!raw || raw.length > REVIEWS_CACHE_MAX_CHARS + 200) return null;
+      var saved = JSON.parse(raw);
+      var age = Date.now() - Number(saved && saved.savedAt);
+      if (!saved || saved.v !== REVIEWS_CACHE_VERSION || saved.url !== url || !isFinite(age) || age < -60000 || age > REVIEWS_CACHE_MAX_AGE_MS) return null;
+      return validReviewsFeed(saved.data) ? saved.data : null;
+    } catch (error) { return null; }
+  }
+
+  function saveReviews(url, data) {
+    try {
+      var raw = JSON.stringify({ v: REVIEWS_CACHE_VERSION, url: url, savedAt: Date.now(), data: data });
+      if (raw.length > REVIEWS_CACHE_MAX_CHARS) window.localStorage.removeItem(REVIEWS_CACHE_KEY);
+      else window.localStorage.setItem(REVIEWS_CACHE_KEY, raw);
+    } catch (error) {}
   }
 
   var REVIEWS_UNAVAILABLE = "Reviews could not be loaded right now. Please try again later.";
@@ -312,15 +341,32 @@
     var productReviewsWaiting = false;
     var productReviewsWaiters = [];
     var productReviewsItem = null;
+    var productReviewsRefreshing = false;
     // One read of the public feed serves the home reviews and the product popup. done gets the feed, or null if it could not be read.
+    // With a saved copy, done gets that copy at once and then the fresh feed; a failed refresh keeps the saved copy.
     function loadReviewsFeed(done) {
-      if (productReviewsData) { done(productReviewsFailed ? null : productReviewsData); return; }
+      if (productReviewsData) {
+        done(productReviewsFailed ? null : productReviewsData);
+        if (productReviewsRefreshing) productReviewsWaiters.push(done);
+        return;
+      }
       productReviewsWaiters.push(done);
       if (productReviewsLoading) return;
       productReviewsLoading = true;
+      var saved = readSavedReviews(productReviewsUrl);
+      if (saved) {
+        productReviewsRefreshing = true;
+        productReviewsData = saved;
+        productReviewsWaiters.slice().forEach(function (waiter) { waiter(saved); });
+      }
       fetchPublicReviews(productReviewsUrl, function (data) {
+        productReviewsRefreshing = false;
+        if (!data && saved) { productReviewsWaiters = []; productReviewsWaiting = false; return; }
+        // Same feed as the saved copy: renew the copy and leave what is on screen alone.
+        if (data && saved && JSON.stringify(data) === JSON.stringify(saved)) { saveReviews(productReviewsUrl, data); productReviewsWaiters = []; productReviewsWaiting = false; return; }
         productReviewsFailed = !data;
         productReviewsData = data || { reviews: [] };
+        if (data) saveReviews(productReviewsUrl, data);
         var waiters = productReviewsWaiters;
         productReviewsWaiters = [];
         waiters.forEach(function (waiter) { waiter(data); });
@@ -661,12 +707,19 @@
         }
         if (lightboxReviewsTitle) lightboxReviewsTitle.textContent = shown > (sample ? 1 : 0) || !sample ? "Reviews" : "What we love about it";
         lightboxReviews.hidden = !shown && !productId;
-        if (productReviewsData || productReviewsWaiting || !productReviewsUrl) return;
+        if ((productReviewsData && !productReviewsRefreshing) || productReviewsWaiting || !productReviewsUrl) return;
         productReviewsWaiting = true;
+        var hadFeed = Boolean(productReviewsData);
+        var delivering = true;
         loadReviewsFeed(function () {
-          productReviewsWaiting = false;
+          // While a saved copy is showing, keep waiting for the fresh feed.
+          if (!productReviewsRefreshing) productReviewsWaiting = false;
+          if (delivering) return;
           if (lightbox.open && productReviewsItem) renderProductReviews(productReviewsItem);
         });
+        delivering = false;
+        // A saved copy is handed over inside the call above, so draw it now.
+        if (!hadFeed && productReviewsData) renderProductReviews(item);
       }
 
       function renderLightboxItem(photoIndex) {
@@ -2234,7 +2287,7 @@
     var catalogueButtons = [];
     var CATALOGUE_CART_STORAGE_KEY = "saloniCatalogueCart";
     var catalogueCartExpiresAt = 0;
-    var CATALOGUE_PREPARE_DELAY_MS = 600;
+    var CATALOGUE_PREPARE_DELAY_MS = 300;
 
     function catalogueCartStorage() {
       try { return window.localStorage || null; } catch (error) { return null; }
@@ -2588,12 +2641,14 @@
     }
 
     // Seed the order form in the background shortly after the cart settles, so Order now can open it instantly.
-    function scheduleCatalogueSelectionPrepare() {
+    // onlyIfIdle: an automatic prepare that must never replace a form the shopper already has.
+    function scheduleCatalogueSelectionPrepare(onlyIfIdle) {
       cancelScheduledCataloguePrepare();
-      if (!configured || !selectedCatalogueItems.length) return;
+      if (!configured || !selectedCatalogueItems.length || (onlyIfIdle && frameState.loaded)) return;
       frameState.catalogueSeedTimer = window.setTimeout(function () {
         frameState.catalogueSeedTimer = null;
         if (orderDialogEnabled && orderDialog.open) return;
+        if (onlyIfIdle && frameState.loaded) return;
         prepareCatalogueSelection();
       }, CATALOGUE_PREPARE_DELAY_MS);
     }
@@ -2729,6 +2784,16 @@
     }
 
     restoreCatalogueSelection();
+
+    // A cart saved from an earlier visit is prepared only when its section nears the screen, so browsing visitors send no seed.
+    if (selectedCatalogueItems.length && catalogueSelection && "IntersectionObserver" in window) {
+      var savedCartObserver = new IntersectionObserver(function (entries) {
+        if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
+        savedCartObserver.disconnect();
+        scheduleCatalogueSelectionPrepare(true);
+      }, { rootMargin: "300px 0px" });
+      savedCartObserver.observe(catalogueSelection);
+    }
 
     function requestSelectedCatalogueItems(opener) {
       if (!selectedCatalogueItems.length) return;
