@@ -33,6 +33,7 @@
     cancelled: "Cancelled"
   };
   var PICKUP_LABELS = { ready: "Ready for pickup in Ajmer", delivered: "Picked up" };
+  var DECLINED_TEXT = "Your cancellation request was declined — contact Saloni";
   var STATUS_CHECK_GAP_MS = 60 * 1000;
   var STATUS_TIMEOUT_MS = 15000;
   var CANCEL_FAILED_TEXT = "Could not send the request. Please try again or call/WhatsApp Saloni.";
@@ -78,6 +79,9 @@
       var asked = entry.cancelRequestedAt;
       if (typeof asked !== "number" || asked % 1 !== 0 || asked < at - CLOCK_SKEW_MS || asked > now + CLOCK_SKEW_MS) return null;
       valid.cancelRequestedAt = asked;
+      // When the server first answered "cancellation requested": from then on its status always wins over the local display.
+      var seen = entry.cancelSeenAt;
+      if (typeof seen === "number" && seen % 1 === 0 && seen >= asked - CLOCK_SKEW_MS && seen <= now + CLOCK_SKEW_MS) valid.cancelSeenAt = seen;
     }
     // A last known status is optional and never worth dropping the order for: an unknown code or odd time is just ignored.
     var checked = entry.statusCheckedAt;
@@ -187,12 +191,17 @@
   }
   function requestCancellation(requestId) { return postAction("cancel", { requestId: requestId }, CANCEL_TIMEOUT_MS); }
 
-  // What the shopper reads for an order. A cancellation the shopper asked for shows as requested until Saloni's status moves
-  // past "sent" or "confirmed" (a later Cancelled, Being made, Dispatched, ... wins, because that is what really happened).
+  // What the shopper reads for an order. A cancellation the shopper asked for shows as requested until the server has
+  // acknowledged it (cancelSeenAt) or Saloni's status moves past "sent" or "confirmed". After that the server status always wins,
+  // so a request Saloni declined (Status back to Confirmed) reads as Confirmed again.
   function effectiveStatus(order) {
     var code = isStatusCode(order.status) ? order.status : "received";
-    if (order.cancelRequestedAt && (code === "received" || code === "confirmed")) return "cancel_requested";
+    if (order.cancelRequestedAt && !order.cancelSeenAt && (code === "received" || code === "confirmed")) return "cancel_requested";
     return code;
+  }
+  function wasDeclined(order) {
+    var code = effectiveStatus(order);
+    return Boolean(order.cancelRequestedAt && order.cancelSeenAt && (code === "received" || code === "confirmed"));
   }
   function statusLabel(order) {
     var code = effectiveStatus(order);
@@ -208,6 +217,7 @@
       if (!Object.prototype.hasOwnProperty.call(statuses, order.requestId) || !isStatusCode(statuses[order.requestId])) return;
       order.status = statuses[order.requestId];
       order.statusCheckedAt = now;
+      if (order.status === "cancel_requested" && order.cancelRequestedAt && !order.cancelSeenAt) order.cancelSeenAt = now;
       changed = true;
     });
     var store = storage();
@@ -304,8 +314,11 @@
     card.appendChild(items);
     card.appendChild(element("p", "my-order-meta", FULFILLMENT_LABELS[order.fulfillment]));
     if (order.notes) card.appendChild(element("p", "my-order-notes", "Your notes: " + order.notes));
-    var view = { order: order, card: card, status: element("p", "my-order-status"), cancel: null };
+    var view = { order: order, card: card, status: element("p", "my-order-status"), note: element("p", "my-order-note"), cancel: null, sending: false };
+    view.note.setAttribute("aria-live", "polite");
+    view.note.hidden = true;
     card.appendChild(view.status);
+    card.appendChild(view.note);
     views.push(view);
     paint(view);
     return card;
@@ -316,14 +329,46 @@
     var code = effectiveStatus(order);
     view.status.className = "my-order-status is-" + code.replace(/_/g, "-");
     view.status.textContent = statusLabel(order);
-    var canCancel = (code === "received" || code === "confirmed") && !order.cancelRequestedAt && CANCELLABLE_ID.test(order.requestId) && execUrl() && typeof window.fetch === "function";
-    if (canCancel && !view.cancel) {
+    if (wasDeclined(order)) showNote(view, DECLINED_TEXT, "my-order-note my-order-declined");
+    else if (view.note.className.indexOf("my-order-declined") !== -1) showNote(view, "", "my-order-note");
+    if (canCancel(view) && !view.cancel) {
       view.cancel = cancelControls(view);
       view.card.appendChild(view.cancel);
-    } else if (!canCancel && view.cancel) {
-      if (view.cancel.parentNode) view.cancel.parentNode.removeChild(view.cancel);
-      view.cancel = null;
+    } else if (!canCancel(view) && view.cancel && !view.sending) {
+      // A request that is still out keeps its controls until it settles (then removeControls runs).
+      removeControls(view);
     }
+  }
+  function canCancel(view) {
+    var order = view.order;
+    var code = effectiveStatus(order);
+    return Boolean((code === "received" || code === "confirmed") && !order.cancelRequestedAt && CANCELLABLE_ID.test(order.requestId) && execUrl() && typeof window.fetch === "function");
+  }
+  function showNote(view, message, className) {
+    view.note.className = className;
+    view.note.textContent = message;
+    view.note.hidden = !message;
+  }
+  function isInside(root, node) {
+    for (; node; node = node.parentNode) if (node === root) return true;
+    return false;
+  }
+  // Take the Cancel order controls off the card. Focus that was inside them moves to the status line, not to nowhere.
+  function removeControls(view) {
+    var wrap = view.cancel;
+    view.cancel = null;
+    if (!wrap) return;
+    var hadFocus = isInside(wrap, document.activeElement);
+    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    if (hadFocus) {
+      view.status.setAttribute("tabindex", "-1");
+      if (dialog.open) focusIfPossible(view.status, true);
+    }
+  }
+  // The card for this request ID that is on screen now (the dialog may have been rebuilt since a request was sent).
+  function liveView(requestId) {
+    for (var index = 0; index < views.length; index += 1) if (views[index].order.requestId === requestId) return views[index];
+    return null;
   }
   function plainButton(className, label) {
     var node = element("button", className, label);
@@ -370,22 +415,30 @@
       yes.addEventListener("click", function () {
         if (sending) return;
         sending = true;
+        view.sending = true;
         yes.disabled = true;
         keep.disabled = true;
         group.setAttribute("aria-busy", "true");
         say("Sending your request…", false);
         requestCancellation(order.requestId).then(function (reply) { return Boolean(reply) && reply.ok === true; }, function () { return false; }).then(function (sent) {
           sending = false;
+          view.sending = false;
+          var live = liveView(order.requestId) || view;
           if (sent) {
             // The server has it. Storage trouble must not turn that into an error: the status still shows.
             markCancelRequested(order.requestId);
-            order.cancelRequestedAt = order.cancelRequestedAt || Date.now();
-            view.status.setAttribute("tabindex", "-1");
-            paint(view);
-            focusHere(view.status);
-          } else {
+            live.order.cancelRequestedAt = live.order.cancelRequestedAt || Date.now();
+            live.status.setAttribute("tabindex", "-1");
+            paint(live);
+            if (live.cancel === wrap) removeControls(live);
+            focusHere(live.status);
+          } else if (live === view && canCancel(view)) {
             say(CANCEL_FAILED_TEXT, true);
             showButton(true);
+          } else {
+            // Saloni's status moved on (or the dialog was rebuilt) while the request was out: say so on the card that is on screen.
+            if (live.cancel === wrap) { removeControls(live); live.status.setAttribute("tabindex", "-1"); focusHere(live.status); }
+            showNote(live, CANCEL_FAILED_TEXT, "my-order-note is-error");
           }
         });
       });
@@ -422,6 +475,7 @@
         if (!isStatusCode(code)) return;
         view.order.status = code;
         view.order.statusCheckedAt = Date.now();
+        if (code === "cancel_requested" && view.order.cancelRequestedAt && !view.order.cancelSeenAt) view.order.cancelSeenAt = view.order.statusCheckedAt;
         paint(view);
       });
     }, function () { statusInFlight = false; });

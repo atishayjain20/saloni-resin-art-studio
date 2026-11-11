@@ -969,5 +969,170 @@ test("the status badge has a style for every status, and no markup is built from
   for (const code of ["received", "confirmed", "in-progress", "ready", "dispatched", "delivered", "cancel-requested", "cancelled"]) {
     assert.match(css, new RegExp("\\.my-order-status\\.is-" + code + "\\b"), code);
   }
+  assert.match(css, /\.my-order-note\b/);
+  assert.match(css, /\.my-order-note\.is-error/);
   assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML|outerHTML/);
+});
+
+// --- declined cancellation, and focus when a status update removes the cancel controls ---
+const DECLINED = "Your cancellation request was declined — contact Saloni";
+function cancelledEntry(extra = {}) {
+  const now = Date.now();
+  return Object.assign({ at: now - 1000, cancelRequestedAt: now - 500 }, order({ requestId: CANCEL_ID }), extra);
+}
+const stateFor = (entries) => createStorage({ [KEY]: JSON.stringify({ version: 1, orders: entries }) });
+
+test("when the server first answers cancel_requested for an order the shopper asked to cancel, cancelSeenAt is stored", async () => {
+  const runtime = makeRuntime({ storage: stateFor([cancelledEntry()]), statusImpl: statusReply({ [CANCEL_ID]: "cancel_requested" }) });
+  const before = Date.now();
+  openDialog(runtime);
+  await settle();
+  const saved = stored(runtime.storage).orders[0];
+  assert.ok(saved.cancelSeenAt >= before && saved.cancelSeenAt <= Date.now());
+  assert.equal(saved.status, "cancel_requested");
+  const plain = makeRuntime({ statusImpl: statusReply({ [CANCEL_ID]: "cancel_requested" }) });
+  plain.api.save(order({ requestId: CANCEL_ID }));
+  openDialog(plain);
+  await settle();
+  assert.equal("cancelSeenAt" in stored(plain.storage).orders[0], false, "no local cancel request, nothing to remember");
+});
+
+test("until the server has acknowledged the cancellation, a confirmed status still reads as requested, with no declined line", async () => {
+  const runtime = makeRuntime({ storage: stateFor([cancelledEntry()]), statusImpl: statusReply({ [CANCEL_ID]: "confirmed" }) });
+  openDialog(runtime);
+  await settle();
+  const card = runtime.elements.get("my-orders-list").children[0];
+  assert.equal(text(statusOf(card)), "Cancellation requested — Saloni will confirm");
+  assert.doesNotMatch(text(card), /declined/);
+  assert.equal("cancelSeenAt" in stored(runtime.storage).orders[0], false);
+});
+
+test("after the server acknowledged it, a Status set back to Confirmed or New request shows the server status, a declined line, and no Cancel button", async () => {
+  for (const [code, wording] of [["confirmed", "Confirmed by Saloni"], ["received", "Request sent — Saloni will contact you to confirm"]]) {
+    const storage = stateFor([cancelledEntry({ cancelSeenAt: Date.now() - 100, status: "cancel_requested", statusCheckedAt: Date.now() - 100 })]);
+    const before = makeRuntime({ storage });
+    openDialog(before);
+    assert.match(text(before.elements.get("my-orders-list").children[0]), /Cancellation requested/, "last known status until the check answers");
+    assert.doesNotMatch(text(before.elements.get("my-orders-list").children[0]), /declined/);
+    const runtime = makeRuntime({ storage, statusImpl: statusReply({ [CANCEL_ID]: code }) });
+    openDialog(runtime);
+    await settle();
+    const card = runtime.elements.get("my-orders-list").children[0];
+    assert.equal(text(statusOf(card)), wording, code);
+    assert.equal(byClass(card, "my-order-declined") && text(byClass(card, "my-order-declined")), DECLINED, code);
+    assert.equal(button(card, "Cancel order"), null, code);
+    const reopened = makeRuntime({ storage });
+    openDialog(reopened);
+    assert.equal(text(statusOf(reopened.elements.get("my-orders-list").children[0])), wording, "after a reload, " + code);
+  }
+});
+
+test("a later status such as Being made or Cancelled shows without the declined line", async () => {
+  for (const code of ["in_progress", "cancelled", "cancel_requested"]) {
+    const runtime = makeRuntime({ storage: stateFor([cancelledEntry({ cancelSeenAt: Date.now() - 100 })]), statusImpl: statusReply({ [CANCEL_ID]: code }) });
+    openDialog(runtime);
+    await settle();
+    assert.doesNotMatch(text(runtime.elements.get("my-orders-list").children[0]), /declined/, code);
+  }
+});
+
+test("a stored cancelSeenAt is validated: a whole number near the order time and only next to cancelRequestedAt, else ignored", () => {
+  const now = Date.now();
+  const entries = [
+    cancelledEntry({ requestId: "good-seen-id-1234", cancelSeenAt: now - 100 }),
+    cancelledEntry({ requestId: "bad-string-id-1234", cancelSeenAt: "yes" }),
+    cancelledEntry({ requestId: "bad-float-id-12345", cancelSeenAt: 1.5 }),
+    cancelledEntry({ requestId: "bad-future-id-1234", cancelSeenAt: now + 10 * DAY }),
+    cancelledEntry({ requestId: "bad-before-id-1234", cancelSeenAt: now - 20 * DAY }),
+    Object.assign({ at: now - 1000, cancelSeenAt: now - 100 }, order({ requestId: "no-request-id-1234" })),
+  ];
+  const listed = makeRuntime({ storage: stateFor(entries) }).api.list();
+  assert.equal(listed.length, 6);
+  const by = (id) => listed.find((item) => item.requestId === id);
+  assert.equal(by("good-seen-id-1234").cancelSeenAt, now - 100);
+  for (const id of ["bad-string-id-1234", "bad-float-id-12345", "bad-future-id-1234", "bad-before-id-1234", "no-request-id-1234"]) assert.equal(by(id).cancelSeenAt, undefined, id);
+});
+
+test("save never writes cancelSeenAt", () => {
+  const { api, storage } = makeRuntime();
+  api.save(order({ requestId: CANCEL_ID, cancelSeenAt: Date.now() }));
+  assert.equal("cancelSeenAt" in stored(storage).orders[0], false);
+});
+
+test("a status update that removes the cancel controls while focus is inside them moves focus to the status line", async () => {
+  let release;
+  const runtime = withOrder({ statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  button(runtime.card, "Cancel order").dispatch("click");
+  const keep = button(runtime.card, "Keep order");
+  assert.equal(keep.focused, true);
+  runtime.elements.get("my-orders-close").focused = false;
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [CANCEL_ID]: "dispatched" } }) });
+  await settle();
+  assert.equal(byClass(runtime.card, "my-order-cancel"), null);
+  const status = statusOf(runtime.card);
+  assert.equal(status.focused, true);
+  assert.equal(status.getAttribute("tabindex"), "-1");
+});
+
+test("a status update that removes the cancel controls while focus is elsewhere leaves focus alone", async () => {
+  let release;
+  const runtime = withOrder({ statusImpl: () => new Promise((resolve) => { release = resolve; }) });
+  runtime.documentObject.activeElement = runtime.elements.get("my-orders-close");
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [CANCEL_ID]: "ready" } }) });
+  await settle();
+  assert.equal(byClass(runtime.card, "my-order-cancel"), null);
+  assert.equal(statusOf(runtime.card).focused, false);
+});
+
+test("a status update during a cancel request keeps the controls until it settles; a failure then says so on the card and focuses the status", async () => {
+  let release, fail;
+  const runtime = withOrder({
+    statusImpl: () => new Promise((resolve) => { release = resolve; }),
+    fetchImpl: () => new Promise((resolve, reject) => { fail = reject; }),
+  });
+  button(runtime.card, "Cancel order").dispatch("click");
+  button(runtime.card, "Yes, ask to cancel").dispatch("click");
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [CANCEL_ID]: "dispatched" } }) });
+  await settle();
+  assert.equal(text(statusOf(runtime.card)), "Dispatched");
+  assert.ok(byClass(runtime.card, "my-order-cancel"), "still there while the request is out");
+  fail(new Error("offline"));
+  await settle();
+  assert.equal(byClass(runtime.card, "my-order-cancel"), null);
+  assert.equal(button(runtime.card, "Cancel order"), null);
+  const note = byClass(runtime.card, "my-order-note");
+  assert.match(text(note), /Could not send the request/);
+  assert.equal(note.getAttribute("aria-live"), "polite");
+  assert.equal(statusOf(runtime.card).focused, true);
+});
+
+test("a cancel request that succeeds after the status moved on stores the request, and the server status wins", async () => {
+  let release, succeed;
+  const runtime = withOrder({
+    statusImpl: () => new Promise((resolve) => { release = resolve; }),
+    fetchImpl: () => new Promise((resolve) => { succeed = resolve; }),
+  });
+  button(runtime.card, "Cancel order").dispatch("click");
+  button(runtime.card, "Yes, ask to cancel").dispatch("click");
+  release({ json: () => Promise.resolve({ ok: true, statuses: { [CANCEL_ID]: "in_progress" } }) });
+  succeed({ json: () => Promise.resolve({ ok: true }) });
+  await settle();
+  assert.ok(stored(runtime.storage).orders[0].cancelRequestedAt);
+  assert.equal(text(statusOf(runtime.card)), "Being made");
+  assert.equal(byClass(runtime.card, "my-order-cancel"), null);
+  assert.equal(statusOf(runtime.card).focused, true);
+});
+
+test("a cancel failure that arrives after the dialog was reopened is shown on the card that is on screen", async () => {
+  let fail;
+  const runtime = withOrder({ fetchImpl: () => new Promise((resolve, reject) => { fail = reject; }) });
+  button(runtime.card, "Cancel order").dispatch("click");
+  button(runtime.card, "Yes, ask to cancel").dispatch("click");
+  closeDialog(runtime);
+  openDialog(runtime);
+  const live = runtime.elements.get("my-orders-list").children[0];
+  assert.notEqual(live, runtime.card);
+  fail(new Error("offline"));
+  await settle();
+  assert.match(text(live), /Could not send the request/);
 });

@@ -497,6 +497,10 @@ dialog.my-orders-dialog::backdrop { background: rgba(42, 14, 31, .72); }
 .my-order-status.is-delivered { background: #d3efdc; color: #0f5226; }
 .my-order-status.is-cancel-requested { background: #fff0d1; color: #6b4300; }
 .my-order-status.is-cancelled { background: #ececec; color: #4a4a4a; }
+.my-order-note { margin: .5rem 0 0; font-size: .8rem; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; }
+.my-order-note[hidden] { display: none; }
+.my-order-note.is-error { color: #a41f33; font-weight: 800; }
+.my-order-note.my-order-declined { font-weight: 800; }
 .my-orders-contact { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .my-orders-contact p { flex: 1 1 100%; margin: 0; }
 .my-order-cancel { margin-top: .7rem; }
