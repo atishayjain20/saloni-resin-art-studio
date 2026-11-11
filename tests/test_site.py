@@ -175,12 +175,15 @@ class StaticSiteContractTests(unittest.TestCase):
         )
         self.assertEqual(len(cards), 97)
         expected_prices = [
-            "₹249", "₹250–₹400", "₹399", "₹849", "₹899", "₹299", "₹249", "₹1,499", "₹649", "₹599", "₹349", "₹449", "₹399", "₹249", "₹299", "₹799", "₹349", "₹399", "₹799", "₹449", "₹449", "₹399", "₹649",
-            "₹1,499", "₹1,799", "₹3,499", "₹599", "₹1,499", "₹1,299", "₹999", "₹2,499", "₹499", "₹2,999",
-            "₹399", "₹699", "₹899", "₹599", "₹349", "₹699", "₹399", "₹1,299", "₹2,499", "₹3,000", "₹599",
-            "₹199", "₹149", "₹399", "₹799", "₹749", "₹179", "₹179", "₹899", "₹999", "₹449", "₹499", "₹699", "₹449", "₹199", "₹299", "₹299", "₹999", "₹449", "₹1,199",
-            "₹4,099", "₹349", "₹399", "₹4,599", "₹399", "₹1,999", "₹1,999", "₹2,299", "₹3,999", "₹2,199", "₹999", "₹2,199", "₹1,299", "₹3,499", "₹599", "₹599", "₹599", "₹599", "₹599", "₹599",
-            "₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000",
+            "₹1,499", "₹1,799", "₹3,499", "₹599", "₹1,499", "₹1,299", "₹999", "₹2,499", "₹499", "₹2,999", "₹399", "₹699",
+            "₹899", "₹599", "₹349", "₹699", "₹399", "₹1,299", "₹2,499", "₹3,000", "₹599", "₹199", "₹149", "₹399",
+            "₹799", "₹749", "₹179", "₹179", "₹899", "₹999", "₹449", "₹499", "₹699", "₹449", "₹199", "₹299",
+            "₹299", "₹999", "₹449", "₹1,199", "₹4,099", "₹349", "₹399", "₹4,599", "₹399", "₹1,999", "₹1,999", "₹2,299",
+            "₹3,999", "₹2,199", "₹999", "₹2,199", "₹1,299", "₹3,499", "₹599", "₹599", "₹599", "₹599", "₹599", "₹599",
+            "₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000", "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request",
+            "Price on request", "₹10,000–₹12,000", "₹249", "₹250–₹400", "₹399", "₹849", "₹899", "₹299", "₹249", "₹1,499", "₹649", "₹599",
+            "₹349", "₹449", "₹399", "₹249", "₹299", "₹799", "₹349", "₹399", "₹799", "₹449", "₹449", "₹399",
+            "₹649",
         ]
         actual_prices = []
         for index, card in enumerate(cards, 1):
@@ -275,6 +278,9 @@ class StaticSiteContractTests(unittest.TestCase):
         hero_end = self.html.index('</section>', hero_start) + len('</section>')
         diwali_start = self.html.index(section_html)
         self.assertLess(hero_end, diwali_start)
+        # Owner decision: Diwali is the last product collection, after Premium and before the customizer.
+        sections = re.findall(r'<section\b[^>]*\bid="([^"]+)"', self.html[:self.html.index("</main>")])
+        self.assertEqual(sections, ["hero", "marriage-gifts", "romantic-keepsakes", "corporate-resin-gifts", "studio-art", "premium-collection", "diwali", "customizer", "order", "customer-reviews"])
         self.assertNotIn('id="offerings"', self.html)
         self.assertNotRegex(self.html, r'<a href="#diwali"(?: data-category-shortcut="diwali")?>Browse Diwali designs')
         self.assertNotRegex(self.html, r'<a href="#diwali" data-category-shortcut="diwali">Diwali')
@@ -460,7 +466,6 @@ class StaticSiteContractTests(unittest.TestCase):
         match = re.search(r'<section\b[^>]*id="marriage-gifts"[\s\S]*?</section>', self.html)
         self.assertIsNotNone(match)
         section = match.group(0)
-        self.assertLess(self.html.index('id="diwali"'), match.start())
         self.assertLess(match.start(), self.html.index('id="romantic-keepsakes"'))
         self.assertIn('<h2 id="marriage-gifts-title">', section)
         self.assertIn('id="marriage-gifts-grid"', section)
