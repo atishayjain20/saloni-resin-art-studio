@@ -362,13 +362,17 @@ function makeRuntime(options = {}) {
     folderAccess: options.folderAccess || "PRIVATE",
     captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 },
     driveDeletes: [], retentionTrashed: 0, rowDeletes: [], triggerCreates: 0, triggerConfig: null,
-    logs: [], locked: false, whatsappFetches: [], emails: [], base64Decodes: 0, cellWrites: [], formats: [],
+    logs: [], rangeReads: [], locked: false, whatsappFetches: [], emails: [], base64Decodes: 0, cellWrites: [], formats: [],
   };
   const sheet = {
     getLastColumn: () => headers.length,
     getLastRow: () => rows.length + 1,
-    getRange: (row, column) => (row >= 2 ? {
-      // A body cell: only setValue is needed (the cancellation request writes Status and Staff notes one cell at a time).
+    getRange: (row, column, numRows, numColumns) => (row >= 2 ? {
+      // A body cell: setValue (the cancellation request writes Status and Staff notes one cell at a time), or a block read (order status).
+      getValues: () => {
+        state.rangeReads.push({ row, column, numRows, numColumns });
+        return rows.slice(row - 2, row - 2 + numRows).map((cells) => cells.slice(column - 1, column - 1 + numColumns));
+      },
       setValue: (value) => { state.cellWrites.push({ row, column, value }); rows[row - 2][column - 1] = value; },
     } : {
       getValues: () => [headers],
@@ -1615,4 +1619,95 @@ test("a blank Status is treated like New request: it becomes Cancellation reques
   assert.equal(runtime.state.emails.length, 1);
   assert.ok(!runtime.state.emails[0].message.subject.includes("(status:"));
   assert.ok(!/Status was not changed/.test(runtime.state.emails[0].message.body));
+});
+
+// --- action=status: "My orders" reads the Status column as a fixed code (never free text, notes or customer data) ---
+const statusPost = (runtime, body) => orderPost(runtime, body, "status");
+function statusRuntime(statuses, options = {}) {
+  const rows = statuses.map((status, index) => {
+    const row = new Array(26).fill("");
+    row[0] = "request-status-" + String(index).padStart(4, "0");
+    row[14] = "Priya Sharma"; row[15] = "9876543210"; row[16] = "priya@example.com"; row[18] = "Secret Lane 12";
+    row[24] = status;
+    row[25] = "Private staff note about the customer";
+    return row;
+  });
+  const runtime = makeRuntime(Object.assign({ rows }, options));
+  runtime.ids = rows.map((row) => row[0]);
+  return runtime;
+}
+
+test("action=status maps the Status cell to a fixed code (trimmed, case-insensitive)", () => {
+  const table = [
+    ["", "received"], ["New request", "received"], ["  new REQUEST ", "received"],
+    ["Cancellation requested", "cancel_requested"], ["cancellation REQUESTED", "cancel_requested"],
+    ["Cancelled", "cancelled"], ["Canceled", "cancelled"], ["Order cancelled by Saloni", "cancelled"],
+    ["Confirmed", "confirmed"], ["accepted", "confirmed"],
+    ["In progress", "in_progress"], ["Making", "in_progress"], ["IN MAKING", "in_progress"], ["Preparing", "in_progress"],
+    ["Ready", "ready"], ["Ready for pickup", "ready"],
+    ["Dispatched", "dispatched"], ["Shipped", "dispatched"], ["Out for delivery", "dispatched"],
+    ["Delivered", "delivered"], ["Completed", "delivered"], ["Picked up", "delivered"],
+    ["Waiting for the cousin to pick colours", "in_progress"], ["Test", "in_progress"],
+  ];
+  const runtime = statusRuntime(table.map(([status]) => status));
+  const result = statusPost(runtime, { requestIds: runtime.ids });
+  assert.equal(result.ok, true);
+  table.forEach(([status, code], index) => assert.equal(result.statuses[runtime.ids[index]], code, JSON.stringify(status)));
+});
+
+test("action=status answers only for ids found, ignores invalid ids, and reads the sheet once without writing", () => {
+  const runtime = statusRuntime(["Confirmed", "Shipped"]);
+  const result = statusPost(runtime, { requestIds: [runtime.ids[0], "request-unknown-0000", "bad id", "short", 42, null, runtime.ids[1], runtime.ids[0]] });
+  assert.deepEqual(result, { ok: true, statuses: { [runtime.ids[0]]: "confirmed", [runtime.ids[1]]: "dispatched" } });
+  assert.equal(runtime.state.rangeReads.length, 1, "one block read");
+  assert.equal(runtime.state.rangeReads[0].column + runtime.state.rangeReads[0].numColumns - 1, 25, "reads up to the Status column only");
+  assert.equal(runtime.state.dataReads, 0, "no whole-sheet read");
+  assert.equal(runtime.state.cellWrites.length, 0);
+  assert.ok(!runtime.state.released, "no lock is taken for a read");
+  assert.equal(runtime.state.emails.length, 0);
+  const none = statusPost(statusRuntime(["Confirmed"]), { requestIds: ["request-unknown-0000"] });
+  assert.deepEqual(none, { ok: true, statuses: {} });
+});
+
+test("action=status with no valid id is invalid before any sheet read", () => {
+  for (const body of [{ requestIds: [] }, { requestIds: ["short", 1, {}] }, { requestIds: "request-status-0000" }, { requestIds: {} }, {}, "not json", "[]", "null"]) {
+    const runtime = statusRuntime(["Confirmed"]);
+    assert.deepEqual(statusPost(runtime, body), { ok: false, error: "invalid" }, JSON.stringify(body));
+    assert.equal(runtime.state.rangeReads.length + runtime.state.dataReads, 0);
+  }
+});
+
+test("action=status copes with ids that look like object method names", () => {
+  const runtime = statusRuntime(["Confirmed"]);
+  const result = statusPost(runtime, { requestIds: ["hasOwnProperty", "propertyIsEnumerable", runtime.ids[0]] });
+  assert.deepEqual(result, { ok: true, statuses: { [runtime.ids[0]]: "confirmed" } });
+});
+
+test("action=status trims a request to the first 50 ids", () => {
+  const runtime = statusRuntime(new Array(60).fill("Confirmed"));
+  const result = statusPost(runtime, { requestIds: runtime.ids });
+  assert.deepEqual(Object.keys(result.statuses), runtime.ids.slice(0, 50));
+});
+
+test("action=status never returns Status words, Staff notes or customer data", () => {
+  const runtime = statusRuntime(["Waiting for Priya's cousin to decide", "Confirmed"]);
+  const text = runtime.context.doPost({ parameter: { action: "status" }, postData: { contents: JSON.stringify({ requestIds: runtime.ids }) } }).text;
+  for (const secret of ["Priya", "9876543210", "priya@example.com", "Secret Lane", "Private staff note", "cousin", "Waiting"]) assert.ok(!text.includes(secret), secret);
+  assert.deepEqual(JSON.parse(text), { ok: true, statuses: { [runtime.ids[0]]: "in_progress", [runtime.ids[1]]: "confirmed" } });
+});
+
+test("ORDER_STATUS_DISABLED pauses status checks before any sheet read, and sheet trouble is unconfirmed", () => {
+  const paused = statusRuntime(["Confirmed"], { properties: { ORDER_STATUS_DISABLED: "true" } });
+  assert.deepEqual(statusPost(paused, { requestIds: paused.ids }), { ok: false, error: "paused" });
+  assert.equal(paused.state.rangeReads.length + paused.state.dataReads, 0);
+  const broken = statusRuntime(["Confirmed"]);
+  broken.properties.ORDER_SHEET_ID = "";
+  assert.deepEqual(statusPost(broken, { requestIds: broken.ids }), { ok: false, error: "unconfirmed" });
+});
+
+test("other actions are unaffected by action=status and its kill switch", () => {
+  const runtime = orderedRuntime();
+  runtime.properties.ORDER_STATUS_DISABLED = "true";
+  assert.deepEqual(cancelPost(runtime, { requestId: CANCEL_ID }), { ok: true });
+  assert.equal(orderPost(orderedRuntime(), postedOrder({ requestId: "request-other-12345" })).ok, true);
 });
