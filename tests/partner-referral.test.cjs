@@ -11,7 +11,8 @@ const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
 test("publishes the partner page and keeps referral links in the browser session", () => {
   const page = fs.readFileSync(path.join(root, "partners", "index.html"), "utf8");
   assert.match(page, /Saloni Resin Art Partner Circle/);
-  assert.match(page, /data-form-mode="partner"/);
+  assert.match(page, /<form id="partner-form"/);
+  assert.doesNotMatch(page, /<iframe/);
   assert.match(script, /saloniReferralCode/);
   assert.match(script, /saloniReferral/);
 });
@@ -604,111 +605,6 @@ test("an auto-approved partner can still be paused and the page says the link co
   assert.match(page, /may pause or close a partnership/i);
   assert.doesNotMatch(page + form, /reviews? applications manually|approval is not automatic|After Saloni reviews the application|Saloni approves applications manually/i);
   assert.match(page, /monthly.*manual payout/i);
-});
-
-class PartnerFakeElement {
-  constructor(id, name, value = "") {
-    this.id = id; this.name = name || id; this.value = value; this.hidden = false; this.disabled = false; this.checked = false;
-    this.listeners = {}; this.attributes = {}; this.children = []; this.parentNode = null; this.focused = false; this.className = ""; this._text = "";
-  }
-  get textContent() { return this._text; }
-  set textContent(value) { this._text = String(value); this.children = []; }
-  set innerHTML(_value) { throw new Error("innerHTML must not be used"); }
-  addEventListener(type, listener) { this.listeners[type] = listener; }
-  dispatch(type) { return this.listeners[type]({ target: this, preventDefault() {} }); }
-  setAttribute(name, value) { this.attributes[name] = String(value); }
-  getAttribute(name) { return this.attributes[name] || ""; }
-  removeAttribute(name) { delete this.attributes[name]; }
-  appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
-  remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((child) => child !== this); }
-  focus() { this.focused = true; }
-}
-
-function makePartnerFormRuntime(options = {}) {
-  const html = fs.readFileSync(path.join(root, "apps-script", "PartnerForm.html"), "utf8");
-  const source = html.match(/<script>\n([\s\S]*?)\n<\/script>/)[1].replace(/<\?!= captchaEnabledJson \?>/g, "true").replace(/<\?!= captchaSiteKeyJson \?>/g, '"site-key"');
-  const ids = ["application-id", "captcha-token", "form-status", "submit-button", "another-button", "referral-result", "seed-data", "applicant-name"];
-  const elements = new Map(ids.map((id) => [id, new PartnerFakeElement(id)]));
-  elements.get("referral-result").hidden = true; elements.get("another-button").hidden = true;
-  elements.get("seed-data").textContent = JSON.stringify({ applicationId: "application-seed-123", channelNonce: "nonce-seed-123456" });
-  const fieldNames = { applicantName: "Asha", businessName: "Asha Studio", category: "Planner", serviceArea: "Ajmer", phone: "8209238541", email: "", website: "", typicalCustomers: "Couples", referralPlan: "Share", applicationId: "", captchaToken: "" };
-  const fields = {};
-  Object.keys(fieldNames).forEach((name) => { fields[name] = new PartnerFakeElement(name, name, fieldNames[name]); });
-  fields.applicationId = elements.get("application-id"); fields.captchaToken = elements.get("captcha-token");
-  fields.rulesAccepted = new PartnerFakeElement("rules-accepted", "rulesAccepted"); fields.rulesAccepted.checked = true;
-  const form = new PartnerFakeElement("partner-form"); form.elements = fields;
-  const fieldsets = [new PartnerFakeElement("fieldset")];
-  form.querySelectorAll = (selector) => selector === "fieldset, #submit-button, #captcha-token" ? fieldsets.concat([elements.get("submit-button"), elements.get("captcha-token")]) : [];
-  form.reset = () => {};
-  elements.set("partner-form", form);
-  const callbacks = [];
-  const run = { withSuccessHandler(callback) { this.success = callback; return this; }, withFailureHandler(callback) { this.failure = callback; return this; }, submitPartnerApplication() { callbacks.push({ success: this.success, failure: this.failure }); return this; } };
-  const clipboardWrites = [];
-  const selections = [];
-  const navigatorObject = options.clipboard === false ? {} : { clipboard: { writeText: (text) => { clipboardWrites.push(text); return options.clipboardReject ? Promise.reject(new Error("denied")) : Promise.resolve(); } } };
-  const parentMessages = [];
-  const channels = [];
-  const windowObject = {
-    crypto: { randomUUID: () => "partner-attempt-1" }, setTimeout: () => 1, clearTimeout() {}, navigator: navigatorObject,
-    MessageChannel: class { constructor() { this.port1 = { close() {} }; this.port2 = {}; channels.push(this); } },
-    top: { postMessage(message, _origin, ports) { parentMessages.push({ message, port: ports && ports[0] }); } },
-    getSelection: () => ({ removeAllRanges() {}, addRange(range) { selections.push(range.node); } }),
-  };
-  const documentObject = {
-    getElementById: (id) => elements.get(id) || null, createElement: (tag) => { const element = new PartnerFakeElement(tag); element.tagName = tag; return element; },
-    createRange: () => ({ node: null, selectNodeContents(node) { this.node = node; } }), execCommand: () => false,
-  };
-  const context = { console, document: documentObject, window: windowObject, navigator: navigatorObject, google: { script: { run } }, Promise };
-  vm.createContext(context);
-  vm.runInContext(source, context, { filename: "PartnerForm.html" });
-  form.dispatch("submit");
-  const request = parentMessages.find((entry) => entry.message.type === "saloni-order-captcha-request").message;
-  channels[0].port1.onmessage({ data: { type: "saloni-order-captcha-response", nonce: request.nonce, attemptId: request.attemptId, ok: true, token: "captcha-token" } });
-  return { elements, status: elements.get("form-status"), box: elements.get("referral-result"), callbacks, clipboardWrites, selections, another: elements.get("another-button") };
-}
-
-test("the partner form shows the referral link with a copy button and no innerHTML", async () => {
-  const link = REFERRAL_LINK_PREFIX + "ASHASTUD7K2M";
-  const runtime = makePartnerFormRuntime();
-  assert.equal(runtime.callbacks.length, 1);
-  runtime.callbacks[0].success({ ok: true, applicationId: "application-seed-123", receivedAt: "now", referralCode: "ASHASTUD7K2M", referralLink: link });
-  assert.equal(runtime.status.textContent, "You're in! Your referral link:");
-  assert.equal(runtime.box.hidden, false);
-  const anchor = runtime.box.children.find((child) => child.tagName === "a");
-  const copy = runtime.box.children.find((child) => child.tagName === "button");
-  assert.equal(anchor.textContent, link);
-  assert.equal(anchor.getAttribute("href"), link);
-  assert.equal(copy.textContent, "Copy link");
-  assert.match(runtime.box.children.map((child) => child.textContent).join(" "), /couples/i);
-  copy.dispatch("click");
-  await Promise.resolve();
-  assert.deepEqual(runtime.clipboardWrites, [link]);
-  assert.equal(copy.textContent, "Copied");
-  runtime.another.dispatch("click");
-  assert.equal(runtime.box.hidden, true);
-  assert.equal(runtime.box.children.length, 0);
-  assert.equal(runtime.status.textContent, "");
-});
-
-test("the partner form selects the link when the clipboard is unavailable and ignores unexpected links", async () => {
-  const link = REFERRAL_LINK_PREFIX + "ASHASTUD7K2M";
-  const runtime = makePartnerFormRuntime({ clipboard: false });
-  runtime.callbacks[0].success({ ok: true, applicationId: "application-seed-123", referralCode: "ASHASTUD7K2M", referralLink: link });
-  const anchor = runtime.box.children.find((child) => child.tagName === "a");
-  runtime.box.children.find((child) => child.tagName === "button").dispatch("click");
-  assert.deepEqual(runtime.selections, [anchor]);
-  const hostile = makePartnerFormRuntime();
-  hostile.callbacks[0].success({ ok: true, applicationId: "application-seed-123", referralLink: "javascript:alert(1)" });
-  assert.equal(hostile.box.children.length, 0);
-  assert.match(hostile.status.textContent, /Saloni will contact you with your referral link\. Application ID: application-seed-123/);
-});
-
-test("the partner form explains that the link follows when none came back", () => {
-  const runtime = makePartnerFormRuntime();
-  runtime.callbacks[0].success({ ok: true, applicationId: "application-seed-123", receivedAt: "now" });
-  assert.equal(runtime.status.textContent, "Application received. Saloni will contact you with your referral link. Application ID: application-seed-123");
-  assert.equal(runtime.box.hidden, true);
-  assert.equal(runtime.another.hidden, false);
 });
 
 function applicationForm() {

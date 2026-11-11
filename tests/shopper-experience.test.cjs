@@ -213,9 +213,9 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261160">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261160" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261160" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261161">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261161" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261161" defer><\/script>/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {

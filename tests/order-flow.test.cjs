@@ -815,7 +815,7 @@ test("phones get a full-screen order dialog where only the form panel scrolls", 
 
 test("on desktop the order form sits on a light panel so its fields and labels are readable", () => {
   assert.match(css, /\.order-dialog \.order-panel \{ background: var\(--paper\); color: var\(--ink\); \}/);
-  assert.match(css, /#order-form \{ display: grid; gap: 1rem; color: #2b2020; \}/);
+  assert.match(css, /:is\(#order-form, #partner-form, #corporate-form\) \{ display: grid; gap: 1rem; color: #2b2020; \}/);
   assert.doesNotMatch(css, /\.order-dialog \.order-form-panel iframe/);
 });
 test("the mobile sticky cart keeps its buttons at 44px and reserves room for one row", () => {
