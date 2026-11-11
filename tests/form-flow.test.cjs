@@ -4,20 +4,35 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const html = fs.readFileSync(path.join(__dirname, "..", "apps-script", "Form.html"), "utf8");
-const formSource = html.match(/<script>\n([\s\S]*?)\n<\/script>/)[1];
+const root = path.join(__dirname, "..");
+const indexHtml = fs.readFileSync(path.join(root, "index.html"), "utf8");
+const formSource = fs.readFileSync(path.join(root, "order-form.js"), "utf8");
+const stylesheet = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+const formMarkup = indexHtml.match(/<form id="order-form"[\s\S]*?<\/form>/)[0];
+// The form's markup, its styles and its script, searched together by the copy and layout checks below.
+const html = formMarkup + "\n" + stylesheet + "\n" + formSource;
 
-test("targets the top-level studio page rather than the immediate parent frame", () => {
-  assert.match(formSource, /window\.top\.postMessage/);
-  assert.doesNotMatch(formSource, /window\.parent\.postMessage/);
+test("the order form is built into the page and never talks to a frame, a parent window, or google.script.run", () => {
+  assert.doesNotMatch(formSource, /postMessage|MessageChannel|google\.script|window\.top|window\.parent|pagehide|pageshow|PARENT_ORIGIN/);
+  assert.match(formSource, /window\.saloniOrderForm = \{ open: open \}/);
+  assert.doesNotMatch(indexHtml, /id="order-form-frame"/);
+  assert.match(indexHtml, /<script class="order-form-script" src="order-form\.js\?v=\d+" defer><\/script>\s*<script class="site-script" src="script\.js/);
 });
 
-test("announces a seeded embedded form without any CAPTCHA site key", () => {
-  const runtime = makeFormRuntime();
-  const ready = runtime.parentMessages.find((entry) => entry.message.type === "saloni-order-form-ready");
-  assert.ok(ready);
-  assert.equal(ready.message.nonce, "nonce-seed-123456");
-  assert.equal(Object.hasOwn(ready.message, "siteKey"), false);
+test("opening the form shows it at once with the seeded request and sends nothing", () => {
+  const runtime = makeFormRuntime({ sourceKind: "catalogue" });
+  assert.equal(runtime.form.hidden, false);
+  assert.equal(runtime.elements.get("order-form-intro").hidden, false);
+  assert.equal(runtime.fields.requestId.value, "request-seed");
+  assert.equal(runtime.fetches.length, 0);
+});
+
+test("the form's ids do not clash with the rest of the page", () => {
+  const ids = [...indexHtml.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+  const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
+  assert.deepEqual(duplicates, []);
+  assert.match(formMarkup, /id="order-reference-image"/);
+  assert.match(formMarkup, /id="order-privacy-details"/);
 });
 
 test("customizer handoff copy does not ask customers to download or reattach a preview", () => {
@@ -73,7 +88,7 @@ test("catalogue quote context is safe and customizer dimensions remain selected"
   const standard = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
   assert.equal(standard.elements.get("product-context").hidden, false);
   assert.equal(standard.fields.requestStage.value, "quote");
-  assert.equal(standard.elements.get("product-image").getAttribute("src"), "https://saloniresinart.com/assets/romantic-heart-trinket-tray.webp");
+  assert.equal(standard.elements.get("product-image").getAttribute("src"), "assets/romantic-heart-trinket-tray.webp");
   assert.equal(standard.elements.get("product-image").getAttribute("alt"), "Test frame product photo");
   assert.equal(standard.elements.get("custom-size").hidden, false);
   assert.equal(standard.elements.get("dimension-fields").parentNode.id, "custom-size");
@@ -86,7 +101,7 @@ test("catalogue quote context is safe and customizer dimensions remain selected"
   assert.equal(general.elements.get("product-context").hidden, true);
   assert.equal(general.elements.get("product-image").getAttribute("src"), "");
 
-  const unsafe = makeFormRuntime({ sourceId: "catalogue:not-an-allowlisted-photo.webp" });
+  const unsafe = makeFormRuntime({ sourceId: "catalogue:../secret" });
   assert.equal(unsafe.elements.get("product-context").hidden, true);
   assert.equal(unsafe.elements.get("product-image").getAttribute("src"), "");
 
@@ -227,7 +242,7 @@ test("after a successful send More details is hidden and Start another brings it
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
   await Promise.resolve();
-  runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
   assert.equal(details.hidden, true);
   runtime.elements.get("another-button").dispatch("click");
   assert.equal(details.hidden, false);
@@ -239,7 +254,7 @@ test("keeps only the required fields visible and groups optional fields in a clo
   assert.match(more, /<summary>More details \(optional\)<\/summary>/);
   assert.doesNotMatch(more.split("\n")[0], /\bopen\b/);
   ["email", "requested-date", "referral-code"].forEach((id) => assert.match(more, new RegExp(`id="${id}"`)));
-  ["customer-name", "phone", "fulfillment", "shipping-address", "pin", "reference-image"].forEach((id) => assert.doesNotMatch(more, new RegExp(`id="${id}"`)));
+  ["customer-name", "phone", "fulfillment", "shipping-address", "pin", "order-reference-image"].forEach((id) => assert.doesNotMatch(more, new RegExp(`id="${id}"`)));
   assert.match(html, /\.more-details > summary \{[^}]*min-height: 44px/);
   const details = html.match(/<legend>Your details<\/legend>[\s\S]*?<\/fieldset>/)[0];
   ["customer-name", "phone", "fulfillment", "shipping-address", "pin"].forEach((id) => assert.match(details, new RegExp(`id="${id}"`)));
@@ -262,7 +277,7 @@ test("More details opens for a field error and starts open only for seeded optio
   await Promise.resolve();
   await Promise.resolve();
   assert.equal(serverError.elements.get("more-details").open, false);
-  serverError.callbacks[0].success({ ok: false, errors: { referralCode: "Enter a valid referral code or clear this field." } });
+  await serverError.callbacks[0].success({ ok: false, errors: { referralCode: "Enter a valid referral code or clear this field." } });
   assert.equal(serverError.elements.get("more-details").open, true);
   assert.equal(serverError.fields.referralCode.focused, true);
   for (const seedOverrides of [{ email: "a@b.co" }, { requestedDate: "2026-12-01" }, { referralCode: "ABC123" }]) {
@@ -300,7 +315,7 @@ function shippingRuntime() {
 
 test("client and server use identical messages for the contact validation rules", () => {
   Object.values(MESSAGES).forEach((message) => {
-    assert.ok(html.includes(JSON.stringify(message)), "Form.html is missing: " + message);
+    assert.ok(html.includes(JSON.stringify(message)), "the order form is missing: " + message);
     assert.ok(serverSource.includes(JSON.stringify(message)), "Code.gs is missing: " + message);
   });
 });
@@ -400,45 +415,16 @@ test("an invalid optional date opens More details and the submit reports every c
   assert.equal(runtime.callbacks.length, 0);
 });
 
-test("descriptive catalogue filenames are allowlisted while lookalikes stay hidden", () => {
+test("the product photo is the site's own image file, and ids that are not an image file show none", () => {
   const filename = "premium-midnight-blue-tiered-set.jpeg";
   const selected = makeFormRuntime({ sourceId: `catalogue:${filename}` });
   assert.equal(selected.elements.get("product-context").hidden, false);
-  assert.equal(selected.elements.get("product-image").getAttribute("src"), `https://saloniresinart.com/assets/${filename}`);
-
-  const unknown = makeFormRuntime({ sourceId: "catalogue:premium-midnight-blue-tiered-set-v2.jpeg" });
-  assert.equal(unknown.elements.get("product-context").hidden, true);
-  assert.equal(unknown.elements.get("product-image").getAttribute("src"), "");
-});
-
-test("customizer form requests one embedded preview port with the seeded identity", () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  const requests = runtime.parentMessages.filter((entry) => entry.message.type === "saloni-preview-request");
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].message.type, "saloni-preview-request");
-  assert.equal(requests[0].message.version, 1);
-  assert.equal(requests[0].message.nonce, "nonce-seed-123456");
-  assert.equal(requests[0].message.requestId, "request-seed");
-  assert.equal(requests[0].message.mode, "order");
-  assert.match(requests[0].message.transferId, /.+/);
-  assert.equal(requests[0].targetOrigin, "https://saloniresinart.com");
-  assert.equal(requests[0].ports.length, 1);
-  assert.equal(requests[0].port, requests[0].ports[0]);
-});
-
-test("embedded preview requires the exact customizer source and an explicit true seed flag", () => {
-  assert.equal(previewRequests(makeFormRuntime({ sourceKind: "customizer", previewExpected: true })).length, 1);
-  for (const options of [
-    { sourceKind: "customizer", previewExpected: false },
-    { sourceKind: "customizer", omitPreviewExpected: true },
-  ]) {
-    const runtime = makeFormRuntime(options);
-    assert.equal(previewRequests(runtime).length, 0);
-    fillValid(runtime.fields);
-    runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-    assert.equal(runtime.submissions.length, 1);
+  assert.equal(selected.elements.get("product-image").getAttribute("src"), `assets/${filename}`);
+  for (const sourceId of ["catalogue:customizer-design-help", "catalogue:multi-item", "catalogue:a/b.webp", "catalogue:..%2Fx.png", "catalogue:photo.svg"]) {
+    const runtime = makeFormRuntime({ sourceId });
+    assert.equal(runtime.elements.get("product-context").hidden, true, sourceId);
+    assert.equal(runtime.elements.get("product-image").getAttribute("src"), "", sourceId);
   }
-  assert.equal(previewRequests(makeFormRuntime({ sourceKind: "CUSTOMIZER", previewExpected: true })).length, 0);
 });
 
 test("quote shipping accepts a blank address when PIN is valid", async () => {
@@ -523,7 +509,7 @@ test("starting another catalogue request restores quote context and optional dim
   assert.equal(runtime.fields.sourceKind.value, "catalogue");
   assert.equal(runtime.fields.sourceId.value, "catalogue:romantic-heart-trinket-tray.webp");
   assert.equal(runtime.elements.get("product-context").hidden, false);
-  assert.equal(runtime.elements.get("product-image").getAttribute("src"), "https://saloniresinart.com/assets/romantic-heart-trinket-tray.webp");
+  assert.equal(runtime.elements.get("product-image").getAttribute("src"), "assets/romantic-heart-trinket-tray.webp");
   assert.equal(runtime.elements.get("custom-size").hidden, false);
   assert.equal(runtime.elements.get("dimension-fields").parentNode.id, "custom-size");
   assert.equal(runtime.elements.get("dimension-fields").hidden, false);
@@ -567,7 +553,7 @@ function cartRuntime(items = SIZE_ITEMS) {
   return runtime;
 }
 
-test("Form.html has a custom size fieldset as the first thing in More details, with no name on the cart rows", () => {
+test("the form has a custom size fieldset as the first thing in More details, with no name on the cart rows", () => {
   const more = html.match(/<details class="more-details" id="more-details">\s*<summary>[^<]*<\/summary>\s*([\s\S]*?)<fieldset>\s*<legend>Optional details/)?.[1] || "";
   assert.match(more, /<fieldset id="custom-size" hidden>\s*<legend>Custom size \(optional\)<\/legend>\s*<div id="bundle-sizes" hidden><\/div>\s*<\/fieldset>/);
   assert.match(html, /\.bundle-size\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
@@ -584,7 +570,7 @@ test("a cart order hides the read-only Quantity row but still submits the total"
   const runtime = cartRuntime();
   await submitAndSend(runtime);
   assert.equal(runtime.submissions.length, 1);
-  assert.equal(runtime.submissions[0].elements.quantity.value, "2");
+  assert.equal(runtime.submissions[0].quantity, "2");
   const single = makeFormRuntime({ sourceId: "catalogue:romantic-heart-trinket-tray.webp" });
   assert.notEqual(single.elements.get("quantity-row").hidden, true);
 });
@@ -595,7 +581,7 @@ test("per-item custom size inputs are 44px tall and aligned to the bottom of eac
 });
 
 test("More details summary has a focus ring and its chevron respects reduced motion", () => {
-  assert.match(html, /\.more-details > summary:focus-visible\s*\{[^}]*outline:\s*3px solid #b24b60/);
+  assert.match(html, /summary:focus-visible\s*\{[^}]*outline:\s*3px solid #b24b60/);
   assert.match(html, /@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\.more-details > summary::after\s*\{[^}]*transition:\s*none/);
 });
 
@@ -803,23 +789,22 @@ class FakeElement {
   focus() { this.focused = true; }
 }
 
-class FakePort {
-  constructor() { this.peer = null; this.onmessage = null; this.closed = false; }
-  postMessage(data) { if (!this.closed && this.peer && this.peer.onmessage) this.peer.onmessage({ data }); }
-  close() { this.closed = true; }
-}
-
-class FakeMessageChannel {
-  constructor() {
-    this.port1 = new FakePort(); this.port2 = new FakePort();
-    this.port1.peer = this.port2; this.port2.peer = this.port1;
+class FakeFileReader {
+  readAsDataURL(blob) {
+    blob.arrayBuffer().then((buffer) => {
+      this.result = "data:" + blob.type + ";base64," + Buffer.from(buffer).toString("base64");
+      if (this.onload) this.onload();
+    }, () => { if (this.onerror) this.onerror(); });
   }
 }
 
-function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], supportsDataTransfer = true, previewExpected = false, omitPreviewExpected = false, seedOverrides = {} } = {}) {
-  const ids = ["success-celebration", "request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "remember-repeat-profile", "forget-repeat-profile", "repeat-profile-status", "reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "retry-preview", "continue-without-preview", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "seed-data", "more-details", "bundle-source-ids"];
+function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], previewExpected = false, omitPreviewExpected = false, previewBlob = null, seedOverrides = {} } = {}) {
+  const ids = ["order-form-embed", "order-form-intro", "success-celebration", "request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "order-reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "more-details", "bundle-source-ids"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
+  elements.get("order-form-embed").setAttribute("data-order-form-url", "https://script.google.com/macros/s/test/exec");
   const form = new FakeElement("order-form");
+  form.hidden = true;
+  elements.get("order-form-intro").hidden = true;
   elements.set("order-form", form);
   const errors = [];
   const created = [];
@@ -828,7 +813,7 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
     quantity: elements.get("quantity"), heightFeet: elements.get("height-feet"), heightInchesPart: elements.get("height-inches-part"), widthFeet: elements.get("width-feet"), widthInchesPart: elements.get("width-inches-part"),
     designDetails: elements.get("design-details"), customerName: elements.get("customer-name"), phone: elements.get("phone"), email: elements.get("email"), fulfillment: elements.get("fulfillment"),
     shippingAddress: elements.get("shipping-address"), city: elements.get("city"), state: elements.get("state"), pin: elements.get("pin"), requestedDate: elements.get("requested-date"),
-    referenceImage: elements.get("reference-image"), referralCode: elements.get("referral-code"), bundleSourceIds: elements.get("bundle-source-ids"),
+    referenceImage: elements.get("order-reference-image"), referralCode: elements.get("referral-code"), bundleSourceIds: elements.get("bundle-source-ids"),
   };
   const moreDetails = elements.get("more-details");
   moreDetails.open = false;
@@ -837,7 +822,7 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
   const dimensionIds = ["height-feet", "height-inches-part", "width-feet", "width-inches-part"];
   moreDetails.contains = (element) => {
     const id = element && element.id;
-    if (["email", "requested-date", "referral-code", "reference-image"].includes(id)) return true;
+    if (["email", "requested-date", "referral-code", "order-reference-image"].includes(id)) return true;
     if (typeof id === "string" && id.startsWith("bundle-size-")) return true;
     return dimensionIds.includes(id) && elements.get("dimension-fields").parentNode?.id === "custom-size";
   };
@@ -853,29 +838,19 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
   };
   form.reset = () => Object.values(fields).forEach((field) => { field.value = ""; field.files = []; });
   Object.values(fields).forEach((field) => { field.parentNode = { appendChild(child) { errors.push(child); } }; });
-  const seed = Object.assign({ requestId: "request-seed", requestStage, channelNonce: "nonce-seed-123456", sourceKind, sourceId, productName, quantity: "1", dimensionFormat: "feet-inches", heightFeet: "3", heightInchesPart: "0", widthFeet: "4", widthInchesPart: "0", designDetails: "Details", bundleItems, customerName: "", phone: "", email: "", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "" }, seedOverrides);
+  const seed = Object.assign({ requestId: "request-seed", requestStage, sourceKind, sourceId, productName, quantity: "1", dimensionFormat: "feet-inches", heightFeet: "3", heightInchesPart: "0", widthFeet: "4", widthInchesPart: "0", designDetails: "Details", bundleItems, customerName: "", phone: "", email: "", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "", requestedDate: "" }, seedOverrides);
   if (!omitPreviewExpected) seed.previewExpected = previewExpected;
-  elements.get("seed-data").textContent = JSON.stringify(seed);
   const status = elements.get("form-status");
   const timers = [];
   const timerDelays = [];
   const clearedTimers = [];
+  const fetches = [];
   const submissions = [];
   const callbacks = [];
   const lookupCallbacks = [];
-  const parentMessages = [];
-  const run = {
-    withSuccessHandler(callback) { this.success = callback; return this; },
-    withFailureHandler(callback) { this.failure = callback; return this; },
-    submitOrder(value) { submissions.push(value); callbacks.push({ success: this.success, failure: this.failure }); return this; },
-    validateReferralCode(value) { lookupCallbacks.push({ value, success: this.success, failure: this.failure }); return this; },
-  };
+  const savedProfiles = [];
   class FakeFile extends Blob {
     constructor(parts, name, options) { super(parts, options); this.name = name; }
-  }
-  class FakeDataTransfer {
-    constructor() { this.items = { add: (file) => { this._file = file; } }; }
-    get files() { return this._file ? [this._file] : []; }
   }
   const imaging = { bitmapSize: { width: 4000, height: 3000 }, decodeError: false, noToBlob: false, jpegBytes: 120000, canvases: [], bitmapsClosed: 0 };
   class FakeCanvas {
@@ -895,26 +870,32 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
   }
   let objectUrlCounter = 0;
   const objectUrls = { created: [], revoked: [] };
-  const pageListeners = {};
   const windowObject = {
-    parent: { postMessage(message, targetOrigin, ports) { parentMessages.push({ message, targetOrigin, ports: ports || [], port: ports && ports[0] }); } },
-    top: null,
     crypto: { randomUUID: () => "request-new" },
-    MessageChannel: FakeMessageChannel,
     setTimeout(callback, delay) { timers.push(callback); timerDelays.push(delay); return timers.length; },
     clearTimeout(id) { clearedTimers.push(id); },
     File: FakeFile,
     Blob,
-    DataTransfer: supportsDataTransfer ? FakeDataTransfer : undefined,
+    FileReader: FakeFileReader,
     URL: { createObjectURL() { const url = "blob:test-" + (++objectUrlCounter); objectUrls.created.push(url); return url; }, revokeObjectURL(url) { objectUrls.revoked.push(url); } },
-    addEventListener(type, listener) { pageListeners[type] = listener; },
     createImageBitmap() {
       if (imaging.decodeError) return Promise.reject(new Error("decode failed"));
       return Promise.resolve({ width: imaging.bitmapSize.width, height: imaging.bitmapSize.height, close() { imaging.bitmapsClosed += 1; } });
     },
+    // The only network the form uses: a JSON POST to the web app, answered when the test says so.
+    fetch(url, options) {
+      const entry = { url, options, body: JSON.parse(options.body) };
+      fetches.push(entry);
+      return new Promise((resolve, reject) => {
+        const answer = {
+          success(result) { resolve({ json: () => Promise.resolve(result) }); return settle(); },
+          failure(error) { reject(error); return settle(); },
+        };
+        if (/[?]action=order$/.test(url)) { submissions.push(entry.body); callbacks.push(answer); }
+        else if (/[?]action=referral$/.test(url)) lookupCallbacks.push(Object.assign({ value: entry.body.code }, answer));
+      });
+    },
   };
-  windowObject.google = { script: { run } };
-  windowObject.top = windowObject.parent;
   const documentObject = {
     getElementById(id) { return elements.get(id) || errors.find((error) => error.id === id) || created.find((element) => element.id === id) || null; },
     createElement(tag) {
@@ -932,15 +913,14 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
     },
   };
   const context = {
-    console, document: documentObject, window: windowObject, MessageChannel: FakeMessageChannel,
-    google: { script: { run } },
+    console, document: documentObject, window: windowObject,
     setTimeout: windowObject.setTimeout, clearTimeout: windowObject.clearTimeout,
-    File: FakeFile, Blob, DataTransfer: supportsDataTransfer ? FakeDataTransfer : undefined, URL: windowObject.URL,
+    File: FakeFile, Blob, URL: windowObject.URL,
   };
   vm.createContext(context);
-  vm.runInContext(formSource, context, { filename: "Form.html" });
-  elements.get("submit-button").dispatch("click");
-  return { imaging, elements, fields, errors, status, timers, timerDelays, clearedTimers, submissions, callbacks, lookupCallbacks, parentMessages, windowObject, objectUrls, pageListeners };
+  vm.runInContext(formSource, context, { filename: "order-form.js" });
+  windowObject.saloniOrderForm.open(seed, { previewBlob, onSent: (profile) => savedProfiles.push(profile) });
+  return { form, imaging, elements, fields, errors, status, timers, timerDelays, clearedTimers, fetches, submissions, callbacks, lookupCallbacks, savedProfiles, windowObject, objectUrls, seed, open: windowObject.saloniOrderForm.open };
 }
 
 function fillValid(fields) {
@@ -952,18 +932,6 @@ function fillValid(fields) {
   Object.assign(fields.phone, { value: "8209238541" }); Object.assign(fields.fulfillment, { value: "pickup" }); Object.assign(fields.pin, { value: "305001" });
 }
 
-function previewRequests(runtime) {
-  return runtime.parentMessages.filter((entry) => entry.message.type === "saloni-preview-request");
-}
-
-function respondPreview(runtime, index, data) {
-  const request = previewRequests(runtime)[index];
-  request.port.postMessage(Object.assign({
-    type: "saloni-preview-response", version: 1, nonce: request.message.nonce,
-    requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: true,
-  }, data || {}));
-}
-
 function pngBlob(size = 4) {
   return new Blob([new Uint8Array(size)], { type: "image/png" });
 }
@@ -972,200 +940,218 @@ function jpegBlob(size = 4) {
   return new Blob([new Uint8Array(size)], { type: "image/jpeg" });
 }
 
-test("preview accepts only the current full identity and ignores wrong or duplicate responses", () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  const request = previewRequests(runtime)[0];
-  for (const mismatch of [
-    { version: 2 }, { nonce: "stale-nonce" }, { requestId: "stale-request" },
-    { mode: "captcha" }, { transferId: "wrong-transfer" },
-  ]) {
-    request.port.postMessage(Object.assign({ type: "saloni-preview-response", version: 1, nonce: request.message.nonce, requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: true, blob: jpegBlob() }, mismatch));
-  }
-  assert.equal(runtime.fields.referenceImage.files.length, 0);
-  assert.equal(runtime.elements.get("continue-without-preview").hidden, true);
-  respondPreview(runtime, 0, { blob: jpegBlob() });
-  const assigned = runtime.fields.referenceImage.files[0];
-  assert.equal(assigned.name, "saloni-customizer-preview.jpg");
-  assert.equal(assigned.type, "image/jpeg");
+const customizerOptions = { sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true };
+const submitOrderForm = (runtime) => runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+
+test("a customizer preview is attached when the form opens, with its name, thumbnail and a remove button", () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, customizerOptions));
+  assert.match(runtime.elements.get("reference-image-status").textContent, /Customizer preview attached as saloni-customizer-preview\.jpg/);
   assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, false);
-  request.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: request.message.nonce, requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: false, error: "late" });
-  assert.equal(runtime.fields.referenceImage.files[0], assigned);
-  assert.equal(request.port.peer.closed, true);
+  assert.equal(runtime.elements.get("reference-image-preview").getAttribute("alt"), "Attached customizer preview");
+  assert.equal(runtime.elements.get("remove-reference-image").hidden, false);
+  assert.equal(runtime.elements.get("submit-button").disabled, false);
+  assert.equal(runtime.fetches.length, 0);
 });
 
-test("preview from the older PNG site is still accepted with a matching .png file name", async () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { blob: pngBlob() });
-  const assigned = runtime.fields.referenceImage.files[0];
-  assert.equal(assigned.name, "saloni-customizer-preview.png");
-  assert.equal(assigned.type, "image/png");
+test("a PNG preview from the older site is attached with a matching .png name and sent as image/png", async () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: pngBlob(8) }, customizerOptions));
   assert.match(runtime.elements.get("reference-image-status").textContent, /saloni-customizer-preview\.png/);
   fillValid(runtime.fields);
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  await Promise.resolve();
+  submitOrderForm(runtime);
   assert.equal(runtime.status.textContent, "Sending your request and design preview…");
+  await settle();
+  assert.equal(runtime.submissions.length, 1);
+  assert.deepEqual(runtime.submissions[0].referenceImage, { type: "image/png", data: Buffer.alloc(8).toString("base64") });
 });
 
-test("preview rejects malformed, empty, wrong-MIME, and oversized blobs", () => {
+test("the customizer preview is sent as base64 in the JSON body, not shrunk", async () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob(1000 * 1024) }, customizerOptions));
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.imaging.canvases.length, 0);
+  const image = runtime.submissions[0].referenceImage;
+  assert.equal(image.type, "image/jpeg");
+  assert.equal(Buffer.from(image.data, "base64").length, 1000 * 1024);
+  assert.equal(runtime.fetches[0].url, "https://script.google.com/macros/s/test/exec?action=order");
+  assert.equal(runtime.fetches[0].options.method, "POST");
+  assert.equal(runtime.fetches[0].options.credentials, "omit");
+  assert.equal(typeof runtime.fetches[0].options.body, "string");
+  assert.equal(runtime.fetches[0].options.headers, undefined, "a text/plain body needs no preflight");
+});
+
+test("a 1.6 MB customizer PNG preview is attached, and one over 5 MB is not", () => {
+  const ok = makeFormRuntime(Object.assign({ previewBlob: pngBlob(1.6 * 1024 * 1024) }, customizerOptions));
+  assert.match(ok.elements.get("reference-image-status").textContent, /attached as saloni-customizer-preview\.png/);
+  const tooBig = makeFormRuntime(Object.assign({ previewBlob: pngBlob(5 * 1024 * 1024 + 1) }, customizerOptions));
+  assert.match(tooBig.elements.get("reference-image-status").textContent, /could not be attached/);
+  assert.equal(tooBig.elements.get("remove-reference-image").hidden, true);
+});
+
+test("a preview that is empty, the wrong type, or missing is not attached and the form can still be sent", async () => {
   for (const blob of [
     { size: 4, type: "image/jpeg" },
     new Blob([], { type: "image/jpeg" }),
-    new Blob([], { type: "image/png" }),
     new Blob([new Uint8Array(4)], { type: "image/webp" }),
     new Blob([new Uint8Array(4)], { type: "" }),
-    jpegBlob(5 * 1024 * 1024 + 1),
-    pngBlob(5 * 1024 * 1024 + 1),
+    null,
   ]) {
-    const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-    respondPreview(runtime, 0, { blob });
-    assert.equal(runtime.fields.referenceImage.files.length, 0);
-    assert.equal(runtime.elements.get("retry-preview").hidden, false);
-    assert.equal(runtime.elements.get("continue-without-preview").hidden, false);
-    assert.match(runtime.elements.get("reference-image-status").textContent, /Retry preview or continue/);
+    const runtime = makeFormRuntime(Object.assign({ previewBlob: blob }, customizerOptions));
+    assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, true);
+    assert.match(runtime.elements.get("reference-image-status").textContent, /could not be attached\. You can still send your request/);
+    fillValid(runtime.fields);
+    submitOrderForm(runtime);
+    await settle();
+    assert.equal(runtime.submissions.length, 1);
+    assert.equal(Object.hasOwn(runtime.submissions[0], "referenceImage"), false);
   }
 });
 
-test("preview errors render as text", () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { ok: false, error: "<b>preview failed</b>" });
-  assert.match(runtime.elements.get("reference-image-status").textContent, /<b>preview failed<\/b>/);
-  assert.equal(runtime.elements.get("reference-image-status").innerHTML, undefined);
-
-  const reasonOnly = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(reasonOnly, 0, { ok: false, reason: "legacy reason must be ignored" });
-  assert.doesNotMatch(reasonOnly.elements.get("reference-image-status").textContent, /legacy reason/);
+test("catalogue, general and non-preview customizer forms attach no preview", () => {
+  for (const options of [{ sourceKind: "catalogue" }, { sourceKind: "general", sourceId: "general:custom-gift" }, { sourceKind: "customizer", previewExpected: false }, { sourceKind: "customizer", omitPreviewExpected: true }, { sourceKind: "CUSTOMIZER", previewExpected: true }]) {
+    const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, options));
+    assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, true, JSON.stringify(options));
+    assert.equal(runtime.elements.get("remove-reference-image").hidden, true);
+  }
 });
 
-test("preview timeout can be retried with a fresh transfer while retaining seed identity", () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  assert.equal(runtime.timerDelays[0], 10000);
-  const first = previewRequests(runtime)[0];
-  runtime.timers[0]();
-  assert.equal(runtime.elements.get("retry-preview").hidden, false);
-  runtime.windowObject.crypto.randomUUID = () => "fresh-transfer";
-  runtime.elements.get("retry-preview").dispatch("click");
-  const requests = previewRequests(runtime);
-  assert.equal(requests.length, 2);
-  assert.equal(first.port.peer.closed, true);
-  assert.equal(requests[1].message.nonce, first.message.nonce);
-  assert.equal(requests[1].message.requestId, first.message.requestId);
-  assert.notEqual(requests[1].message.transferId, first.message.transferId);
-  requests[1].port.postMessage({ type: "saloni-preview-response", version: 1, nonce: first.message.nonce, requestId: first.message.requestId, mode: "order", transferId: first.message.transferId, ok: true, blob: jpegBlob() });
-  assert.equal(runtime.fields.referenceImage.files.length, 0);
-  respondPreview(runtime, 1, { blob: jpegBlob() });
-  assert.equal(runtime.fields.referenceImage.files[0].name, "saloni-customizer-preview.jpg");
-});
-
-test("manual replacement wins a pending race and explicit removal blocks late preview reuse", () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  const request = previewRequests(runtime)[0];
-  const manual = new File([pngBlob()], "manual.png", { type: "image/png" });
-  runtime.fields.referenceImage.files = [manual];
+test("a shopper's own file replaces the customizer preview, and removing it leaves no image", async () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, customizerOptions));
+  runtime.fields.referenceImage.files = [new File([pngBlob(6)], "manual.png", { type: "image/png" })];
   runtime.fields.referenceImage.dispatch("change");
-  assert.equal(request.port.peer.closed, true);
-  assert.equal(runtime.fields.referenceImage.files[0], manual);
+  await settle();
   assert.match(runtime.elements.get("reference-image-status").textContent, /Reference image attached/);
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  assert.equal(runtime.status.textContent, "Sending your request…");
+  await settle();
+  assert.deepEqual(runtime.submissions[0].referenceImage, { type: "image/png", data: Buffer.alloc(6).toString("base64") });
+
+  const removed = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, customizerOptions));
+  removed.elements.get("remove-reference-image").dispatch("click");
+  assert.equal(removed.elements.get("reference-image-preview-wrap").hidden, true);
+  assert.equal(removed.elements.get("remove-reference-image").hidden, true);
+  assert.match(removed.elements.get("reference-image-status").textContent, /Customizer preview removed/);
+  fillValid(removed.fields);
+  submitOrderForm(removed);
+  await settle();
+  assert.equal(Object.hasOwn(removed.submissions[0], "referenceImage"), false);
+});
+
+test("cancelling the file picker keeps the customizer preview", () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, customizerOptions));
   runtime.fields.referenceImage.files = [];
-  runtime.elements.get("remove-reference-image").dispatch("click");
-  assert.equal(runtime.fields.referenceImage.files.length, 0);
-  assert.equal(runtime.elements.get("retry-preview").hidden, false);
-  request.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: request.message.nonce, requestId: request.message.requestId, mode: "order", transferId: request.message.transferId, ok: true, blob: jpegBlob() });
-  assert.equal(runtime.fields.referenceImage.files.length, 0);
+  runtime.fields.referenceImage.dispatch("change");
+  assert.equal(runtime.elements.get("remove-reference-image").hidden, false);
+  assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, false);
 });
 
-test("failed automatic attachment offers explicit continuation and gates submit until resolved", async () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
+test("the attached image and the typed details survive a failed send, and the retry keeps the same request id", async () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, customizerOptions));
   fillValid(runtime.fields);
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.submissions.length, 0);
-  runtime.timers[0]();
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.submissions.length, 0);
-  runtime.elements.get("continue-without-preview").dispatch("click");
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  assert.equal(runtime.submissions.length, 1);
+  submitOrderForm(runtime);
+  await settle();
+  await runtime.callbacks[0].failure(new Error("offline"));
+  assert.match(runtime.status.textContent, /unable to confirm.*entries are still here/i);
+  assert.equal(runtime.elements.get("remove-reference-image").hidden, false);
+  assert.equal(runtime.fields.productName.value, "Test frame");
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions.length, 2);
+  assert.equal(runtime.submissions[1].requestId, runtime.submissions[0].requestId);
+  assert.equal(runtime.submissions[1].requestId, "request-seed");
+  assert.ok(runtime.submissions[1].referenceImage.data.length > 0);
 });
 
-test("unsupported DataTransfer retains the draft and exposes retry or continuation", () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", supportsDataTransfer: false, previewExpected: true });
-  respondPreview(runtime, 0, { blob: jpegBlob() });
-  assert.equal(runtime.fields.referenceImage.files.length, 0);
-  assert.equal(runtime.elements.get("retry-preview").hidden, false);
-  assert.equal(runtime.elements.get("continue-without-preview").hidden, false);
-  assert.match(runtime.elements.get("reference-image-status").textContent, /cannot attach/);
-});
-
-test("assigned generated file and fields survive server failures", async () => {
-  const tokenFailure = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(tokenFailure, 0, { blob: jpegBlob() });
-  fillValid(tokenFailure.fields);
-  tokenFailure.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  const generated = tokenFailure.fields.referenceImage.files[0];
-  assert.equal(tokenFailure.fields.referenceImage.files[0], generated);
-  assert.equal(tokenFailure.fields.productName.value, "Test frame");
-
-  const serverFailure = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(serverFailure, 0, { blob: jpegBlob() });
-  fillValid(serverFailure.fields);
-  serverFailure.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  const serverGenerated = serverFailure.fields.referenceImage.files[0];
-  await Promise.resolve();
-  serverFailure.callbacks[0].success({ ok: false, errors: { form: "The daily request limit has been reached." } });
-  assert.equal(serverFailure.fields.referenceImage.files[0], serverGenerated);
-  assert.equal(serverFailure.fields.productName.value, "Test frame");
-  assert.match(serverFailure.status.textContent, /daily request limit/);
-});
-
-test("success and reset revoke the preview URL without reusing the old preview identity", async () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { blob: jpegBlob() });
+test("a server answer with field errors keeps the image and the entries and focuses the field", async () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, customizerOptions));
   fillValid(runtime.fields);
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  await Promise.resolve();
-  runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
-  assert.equal(runtime.objectUrls.revoked.length, 1);
-  const first = previewRequests(runtime)[0];
+  submitOrderForm(runtime);
+  await settle();
+  await runtime.callbacks[0].success({ ok: false, errors: { form: "The daily request limit has been reached." } });
+  assert.equal(runtime.elements.get("remove-reference-image").hidden, false);
+  assert.equal(runtime.fields.productName.value, "Test frame");
+  assert.match(runtime.status.textContent, /daily request limit/);
+});
+
+test("an unconfirmed or invalid answer shows the unable-to-confirm message and keeps the entries", async () => {
+  for (const answer of [{ ok: false, error: "unconfirmed" }, { ok: false, error: "invalid" }, null]) {
+    const runtime = makeFormRuntime();
+    fillValid(runtime.fields);
+    submitOrderForm(runtime);
+    await runtime.callbacks[0].success(answer);
+    assert.match(runtime.status.textContent, /unable to confirm.*entries are still here/i);
+    assert.equal(runtime.elements.get("submit-button").disabled, false);
+    assert.equal(runtime.fields.customerName.value, "A Customer");
+  }
+});
+
+test("a server error on the image is shown next to the image field", async () => {
+  const runtime = makeFormRuntime();
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  await runtime.callbacks[0].success({ ok: false, errors: { referenceImage: "The reference image must be 5 MB or smaller." } });
+  assert.equal(errorText(runtime, "referenceImage"), "The reference image must be 5 MB or smaller.");
+  assert.equal(runtime.fields.referenceImage.focused, true);
+});
+
+test("success revokes the preview URL, and Start another gets a new request id and no old preview", async () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, customizerOptions));
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  await settle();
+  await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
   runtime.windowObject.crypto.randomUUID = () => "fresh-request";
   runtime.elements.get("another-button").dispatch("click");
-  const requests = previewRequests(runtime);
-  assert.equal(requests.length, 1);
-  assert.equal(first.port.peer.closed, true);
-  assert.equal(runtime.fields.referenceImage.files.length, 0);
+  assert.equal(runtime.objectUrls.revoked.length, runtime.objectUrls.created.length);
   assert.equal(runtime.fields.requestId.value, "fresh-request");
-  assert.notEqual(runtime.fields.requestId.value, first.message.requestId);
-  assert.equal(runtime.elements.get("retry-preview").hidden, true);
-  assert.equal(runtime.elements.get("continue-without-preview").hidden, true);
+  assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, true);
+  assert.equal(runtime.elements.get("remove-reference-image").hidden, true);
   assert.match(runtime.elements.get("reference-image-status").textContent, /return to the designer/i);
-  first.port.postMessage({ type: "saloni-preview-response", version: 1, nonce: first.message.nonce, requestId: first.message.requestId, mode: "order", transferId: first.message.transferId, ok: true, blob: jpegBlob() });
-  assert.equal(runtime.fields.referenceImage.files.length, 0);
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions[1].requestId, "fresh-request");
+  assert.equal(Object.hasOwn(runtime.submissions[1], "referenceImage"), false);
+});
+
+test("opening the form again replaces the old request, its entries and its image", async () => {
+  const runtime = makeFormRuntime(Object.assign({ previewBlob: jpegBlob() }, customizerOptions));
+  fillValid(runtime.fields);
+  runtime.open({ requestId: "request-second", requestStage: "quote", sourceKind: "catalogue", sourceId: "catalogue:romantic-heart-trinket-tray.webp", productName: "Tray", quantity: "1", designDetails: "Tray details", fulfillment: "pickup" }, {});
+  assert.equal(runtime.fields.requestId.value, "request-second");
+  assert.equal(runtime.fields.productName.value, "Tray");
+  assert.equal(runtime.fields.customerName.value, "");
+  assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, true);
+  assert.equal(runtime.form.hidden, false);
+});
+
+test("a late answer for an old request is ignored after the form is opened for another one", async () => {
+  const runtime = makeFormRuntime();
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  runtime.open({ requestId: "request-second", sourceKind: "catalogue", sourceId: "catalogue:other", productName: "Other", quantity: "1", designDetails: "d", fulfillment: "pickup" }, {});
+  await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(runtime.elements.get("another-button").hidden, true);
+  assert.equal(runtime.elements.get("success-celebration").hidden, true);
+  assert.equal(runtime.savedProfiles.length, 0);
 });
 
 test("always saves repeat details after a successful request and never after a failure", async () => {
   const failed = makeFormRuntime();
   fillValid(failed.fields);
-  failed.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  await Promise.resolve();
-  failed.callbacks[0].failure(new Error("server failure"));
-  assert.equal(failed.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile").length, 0);
+  submitOrderForm(failed);
+  await failed.callbacks[0].failure(new Error("server failure"));
+  assert.equal(failed.savedProfiles.length, 0);
 
   const checked = makeFormRuntime();
   fillValid(checked.fields);
-  checked.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  await Promise.resolve();
-  checked.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
-  const save = checked.parentMessages.filter((entry) => entry.message.type === "saloni-order-save-repeat-profile");
-  assert.equal(save.length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(save[0].message.profile)), {
+  submitOrderForm(checked);
+  await checked.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(checked.savedProfiles.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(checked.savedProfiles[0])), {
     customerName: "A Customer", phone: "8209238541", fulfillment: "pickup", shippingAddress: "", city: "", state: "", pin: "305001",
   });
-  assert.equal(save[0].message.nonce, "nonce-seed-123456");
 });
 
 test("uses the existing seeded fields for repeat details", () => {
@@ -1176,75 +1162,51 @@ test("uses the existing seeded fields for repeat details", () => {
   assert.equal(runtime.fields.shippingAddress.value, "61 Hathi Bhata");
 });
 
-test("page teardown closes a pending preview port and revokes its object URL", () => {
-  const pending = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  const request = previewRequests(pending)[0];
-  pending.pageListeners.pagehide();
-  assert.equal(request.port.peer.closed, true);
-  assert.deepEqual(pending.clearedTimers, [1]);
-
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  runtime.fields.referenceImage.files = [new File([pngBlob()], "manual.png", { type: "image/png" })];
-  runtime.fields.referenceImage.dispatch("change");
-  assert.equal(runtime.objectUrls.created.length, 1);
-  runtime.pageListeners.pagehide();
-  assert.deepEqual(runtime.objectUrls.revoked, runtime.objectUrls.created);
+test("the referral check posts the code to the web app and ignores a stale answer", async () => {
+  const runtime = makeFormRuntime();
+  const code = runtime.elements.get("referral-code");
+  code.value = "studioa";
+  runtime.elements.get("check-referral").dispatch("click");
+  assert.equal(runtime.fetches[0].url, "https://script.google.com/macros/s/test/exec?action=referral");
+  assert.deepEqual(runtime.fetches[0].body, { code: "STUDIOA" });
+  assert.equal(runtime.fetches[0].options.credentials, "omit");
+  assert.equal(runtime.elements.get("check-referral").disabled, true);
+  await runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA" });
+  assert.equal(runtime.elements.get("referral-status").textContent, "Code accepted.");
+  assert.equal(runtime.elements.get("check-referral").disabled, false);
 });
 
-test("BFCache preserves an attached preview and allows submission after restore", async () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { blob: jpegBlob() });
-  const assigned = runtime.fields.referenceImage.files[0];
-  runtime.pageListeners.pagehide({ persisted: true });
-  assert.equal(runtime.fields.referenceImage.files[0], assigned);
-  assert.deepEqual(runtime.objectUrls.revoked, []);
-  runtime.pageListeners.pageshow({ persisted: true });
-  assert.equal(runtime.elements.get("retry-preview").hidden, true);
-  assert.equal(previewRequests(runtime).length, 1);
-  fillValid(runtime.fields);
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  assert.equal(runtime.submissions.length, 1);
-  await Promise.resolve();
-  assert.equal(runtime.submissions.length, 1);
+test("referral answers for paused, unknown, error and failed checks each get their own message", async () => {
+  const cases = [["paused", /paused/], ["invalid", /not active/], ["error", /Could not check/]];
+  for (const [state, pattern] of cases) {
+    const runtime = makeFormRuntime();
+    runtime.elements.get("referral-code").value = "STUDIOA";
+    runtime.elements.get("check-referral").dispatch("click");
+    await runtime.lookupCallbacks[0].success({ status: state });
+    assert.match(runtime.elements.get("referral-status").textContent, pattern);
+  }
+  const offline = makeFormRuntime();
+  offline.elements.get("referral-code").value = "STUDIOA";
+  offline.elements.get("check-referral").dispatch("click");
+  await offline.lookupCallbacks[0].failure(new Error("offline"));
+  assert.match(offline.elements.get("referral-status").textContent, /Could not check the code/);
+  assert.equal(offline.elements.get("check-referral").disabled, false);
 });
 
-test("BFCache exposes preview recovery and permits explicit continuation after restore", async () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  const request = previewRequests(runtime)[0];
-  runtime.pageListeners.pagehide({ persisted: true });
-  assert.equal(request.port.peer.closed, true);
-  assert.equal(runtime.elements.get("retry-preview").hidden, false);
-  assert.equal(runtime.elements.get("continue-without-preview").hidden, false);
-  runtime.pageListeners.pageshow({ persisted: true });
-  assert.match(runtime.elements.get("reference-image-status").textContent, /Retry preview or continue/i);
-  assert.equal(previewRequests(runtime).length, 1);
-  runtime.elements.get("continue-without-preview").dispatch("click");
-  fillValid(runtime.fields);
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  assert.equal(runtime.submissions.length, 1);
-});
-
-test("catalogue and general forms do not request an embedded preview", () => {
-  assert.equal(previewRequests(makeFormRuntime({ sourceKind: "catalogue" })).length, 0);
-  assert.equal(previewRequests(makeFormRuntime({ sourceKind: "general", sourceId: "general:custom-gift" })).length, 0);
-});
-
-test("clears accepted referral status on edits and ignores stale lookup responses", () => {
+test("clears accepted referral status on edits and ignores stale lookup responses", async () => {
   const runtime = makeFormRuntime();
   const code = runtime.elements.get("referral-code");
   const check = runtime.elements.get("check-referral");
   code.value = "STUDIOA";
   check.dispatch("click");
   assert.equal(runtime.lookupCallbacks.length, 1);
-  runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA", displayName: "Studio A" });
+  await runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA", displayName: "Studio A" });
   assert.equal(runtime.elements.get("referral-status").textContent, "Code accepted.");
   assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /Studio A/);
   code.value = "UNKNOWN";
   code.dispatch("input");
   assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /Code accepted/);
-  runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA", displayName: "Studio A" });
+  await runtime.lookupCallbacks[0].success({ status: "active", code: "STUDIOA", displayName: "Studio A" });
   assert.doesNotMatch(runtime.elements.get("referral-status").textContent, /Code accepted|Studio A/);
 });
 
@@ -1259,7 +1221,7 @@ test("late success completes and late failure restores the original attempt afte
   assert.equal(runtime.elements.get("submit-button").disabled, true);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   assert.equal(runtime.submissions.length, 1);
-  runtime.callbacks[0].success({ ok: true, requestId: "late", receivedAt: "late" });
+  await runtime.callbacks[0].success({ ok: true, requestId: "late", receivedAt: "late" });
   assert.match(runtime.status.textContent, /Request received/);
   assert.equal(runtime.elements.get("another-button").hidden, false);
 
@@ -1269,7 +1231,7 @@ test("late success completes and late failure restores the original attempt afte
   await Promise.resolve();
   await Promise.resolve();
   failed.timers[0]();
-  failed.callbacks[0].failure(new Error("network"));
+  await failed.callbacks[0].failure(new Error("network"));
   assert.match(failed.status.textContent, /unable to confirm/i);
   assert.equal(failed.elements.get("submit-button").disabled, false);
   assert.equal(failed.fields.productName.value, "Test frame");
@@ -1290,32 +1252,32 @@ test("a pending send shows the still-sending advisory while general server error
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
   await Promise.resolve();
-  runtime.callbacks[0].success({ ok: false, errors: { form: "The daily request limit has been reached." } });
+  await runtime.callbacks[0].success({ ok: false, errors: { form: "The daily request limit has been reached." } });
   assert.match(runtime.status.textContent, /daily request limit/);
 });
 
-test("an order is sent straight to the server with no CAPTCHA request, and the draft and attachment survive a failure", async () => {
+test("an order is sent straight to the web app with no CAPTCHA request, and the draft and attachment survive a failure", async () => {
   const runtime = makeFormRuntime();
   fillValid(runtime.fields);
-  const file = { name: "reference.png", type: "image/png", size: 10 };
-  runtime.fields.referenceImage.files = [file];
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  runtime.fields.referenceImage.files = [new File([pngBlob(10)], "reference.png", { type: "image/png" })];
+  runtime.fields.referenceImage.dispatch("change");
+  await settle();
+  submitOrderForm(runtime);
+  await settle();
   assert.equal(runtime.submissions.length, 1);
   assert.equal(runtime.status.textContent, "Sending your request\u2026");
-  assert.equal(runtime.parentMessages.some((entry) => entry.message.type === "saloni-order-captcha-request"), false);
-  assert.equal(runtime.submissions[0], runtime.elements.get("order-form"));
-  assert.equal(Object.hasOwn(runtime.fields, "captchaToken"), false);
+  assert.equal(runtime.fetches.length, 1);
+  assert.equal(Object.hasOwn(runtime.submissions[0], "captchaToken"), false);
   assert.equal(runtime.timerDelays[0], 30000);
-  runtime.callbacks[0].failure(new Error("network"));
+  assert.deepEqual(runtime.submissions[0].referenceImage, { type: "image/png", data: Buffer.alloc(10).toString("base64") });
+  await runtime.callbacks[0].failure(new Error("network"));
   assert.match(runtime.status.textContent, /unable to confirm/i);
   assert.equal(runtime.elements.get("submit-button").disabled, false);
   assert.equal(runtime.fields.productName.value, "Test frame");
-  assert.equal(runtime.fields.referenceImage.files[0], file);
+  assert.equal(runtime.elements.get("remove-reference-image").hidden, false);
 });
-
 test("client validation blocks invalid normalized dimensions and associates the focused error", () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  runtime.elements.get("continue-without-preview").dispatch("click");
+  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: false });
   runtime.fields.productName.value = "";
   runtime.fields.quantity.value = "1";
   runtime.fields.heightFeet.value = "5"; runtime.fields.heightInchesPart.value = "0.01";
@@ -1338,29 +1300,20 @@ test("submit status goes straight to sending, then still sending at 30 seconds",
   runtime.timers[0]();
   assert.equal(runtime.status.textContent, "Still sending \u2013 please keep this window open. Your request is on its way and usually finishes within a minute.");
   assert.equal(runtime.elements.get("submit-button").disabled, true);
-  runtime.callbacks[0].success({ ok: true, requestId: "late", receivedAt: "late" });
+  await runtime.callbacks[0].success({ ok: true, requestId: "late", receivedAt: "late" });
   assert.match(runtime.status.textContent, /Request received/);
-});
-
-test("customizer order mentions the design preview while sending and accepts the JPEG preview", async () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { blob: jpegBlob() });
-  fillValid(runtime.fields);
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  assert.equal(runtime.status.textContent, "Sending your request and design preview…");
-  assert.equal(runtime.submissions.length, 1);
 });
 
 test("a shopper's own PNG reference upload is still sent with the plain sending text", async () => {
   const runtime = makeFormRuntime();
   runtime.fields.referenceImage.files = [new File([pngBlob()], "manual.png", { type: "image/png" })];
+  runtime.fields.referenceImage.dispatch("change");
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  await Promise.resolve();
   assert.equal(runtime.status.textContent, "Sending your request…");
+  await settle();
   assert.equal(runtime.submissions.length, 1);
-  assert.equal(runtime.fields.referenceImage.files[0].type, "image/png");
+  assert.equal(runtime.submissions[0].referenceImage.type, "image/png");
 });
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -1368,23 +1321,24 @@ const PREVIEW_LIMIT = 5 * 1024 * 1024;
 const REFERENCE_TOO_LARGE = "This image is too large to send. Please choose a smaller photo or screenshot (under 1.5 MB).";
 const largePng = (name = "wall photo.png", size = 4 * 1024 * 1024) => new File([pngBlob(size)], name, { type: "image/png" });
 
-test("a large PNG reference is replaced by a JPEG of at most 1600 px named after the original", async () => {
+test("a large PNG reference is replaced by a JPEG of at most 1600 px, which is what gets sent", async () => {
   const runtime = makeFormRuntime();
   runtime.fields.referenceImage.files = [largePng()];
   runtime.fields.referenceImage.dispatch("change");
   await settle();
-  const assigned = runtime.fields.referenceImage.files[0];
-  assert.equal(assigned.name, "wall photo.jpg");
-  assert.equal(assigned.type, "image/jpeg");
-  assert.equal(assigned.size, runtime.imaging.jpegBytes);
   const canvas = runtime.imaging.canvases[0];
   assert.deepEqual([canvas.width, canvas.height], [1600, 1200]);
   assert.deepEqual(canvas.exported, { type: "image/jpeg", quality: 0.82 });
   assert.equal(runtime.imaging.bitmapsClosed, 1);
   assert.equal(runtime.elements.get("reference-image-status").textContent, "Reference image attached.");
   assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, false);
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  await settle();
+  const image = runtime.submissions[0].referenceImage;
+  assert.equal(image.type, "image/jpeg");
+  assert.equal(Buffer.from(image.data, "base64").length, runtime.imaging.jpegBytes);
 });
-
 test("a large reference that is already small in pixels is not upscaled", async () => {
   const runtime = makeFormRuntime();
   runtime.imaging.bitmapSize = { width: 900, height: 600 };
@@ -1400,12 +1354,14 @@ test("a small JPEG or PNG reference is kept unchanged without decoding", async (
   runtime.fields.referenceImage.files = [small];
   runtime.fields.referenceImage.dispatch("change");
   await settle();
-  assert.equal(runtime.fields.referenceImage.files[0], small);
   assert.equal(runtime.imaging.canvases.length, 0);
   assert.equal(runtime.elements.get("reference-image-status").textContent, "Reference image attached.");
   assert.equal(runtime.elements.get("submit-button").disabled, false);
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(Buffer.from(runtime.submissions[0].referenceImage.data, "base64").length, 600 * 1024);
 });
-
 test("shrinking fills the canvas white before drawing so PNG transparency does not turn black", async () => {
   const runtime = makeFormRuntime();
   runtime.fields.referenceImage.files = [largePng()];
@@ -1442,21 +1398,18 @@ test("an image that cannot be shrunk is cleared with the too-large message and S
     runtime.fields.referenceImage.files = [largePng()];
     runtime.fields.referenceImage.dispatch("change");
     await settle();
-    assert.equal(runtime.fields.referenceImage.files.length, 0);
     assert.equal(runtime.elements.get("reference-image-status").textContent, REFERENCE_TOO_LARGE);
     assert.match(runtime.elements.get("reference-image-status").className, /error/);
     assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, true);
+    assert.equal(runtime.elements.get("remove-reference-image").hidden, true);
     assert.equal(runtime.elements.get("submit-button").disabled, false);
+    fillValid(runtime.fields);
+    submitOrderForm(runtime);
+    await settle();
+    assert.equal(Object.hasOwn(runtime.submissions[0], "referenceImage"), false, "nothing too large is ever sent");
   }
-  const noTransfer = makeFormRuntime({ supportsDataTransfer: false });
-  noTransfer.fields.referenceImage.files = [largePng()];
-  noTransfer.fields.referenceImage.dispatch("change");
-  await settle();
-  assert.equal(noTransfer.fields.referenceImage.files.length, 0);
-  assert.equal(noTransfer.elements.get("reference-image-status").textContent, REFERENCE_TOO_LARGE);
 });
-
-test("when shrinking fails but the original is within 1.5 MB, the original stays attached", async () => {
+test("when shrinking fails but the original is within 1.5 MB, the original is what gets sent", async () => {
   const failures = [
     (runtime) => { runtime.imaging.decodeError = true; },
     (runtime) => { runtime.imaging.noToBlob = true; },
@@ -1465,23 +1418,18 @@ test("when shrinking fails but the original is within 1.5 MB, the original stays
   for (const arrange of failures) {
     const runtime = makeFormRuntime();
     arrange(runtime);
-    const original = largePng("mid.png", 1000 * 1024);
-    runtime.fields.referenceImage.files = [original];
+    runtime.fields.referenceImage.files = [largePng("mid.png", 1000 * 1024)];
     runtime.fields.referenceImage.dispatch("change");
     await settle();
-    assert.equal(runtime.fields.referenceImage.files[0], original);
     assert.equal(runtime.elements.get("reference-image-status").textContent, "Reference image attached.");
     assert.equal(runtime.elements.get("reference-image-preview-wrap").hidden, false);
     assert.equal(runtime.elements.get("submit-button").disabled, false);
+    fillValid(runtime.fields);
+    submitOrderForm(runtime);
+    await settle();
+    assert.deepEqual([runtime.submissions[0].referenceImage.type, Buffer.from(runtime.submissions[0].referenceImage.data, "base64").length], ["image/png", 1000 * 1024]);
   }
-  const noTransfer = makeFormRuntime({ supportsDataTransfer: false });
-  const kept = largePng("mid.png", 1000 * 1024);
-  noTransfer.fields.referenceImage.files = [kept];
-  noTransfer.fields.referenceImage.dispatch("change");
-  await settle();
-  assert.equal(noTransfer.fields.referenceImage.files[0], kept);
 });
-
 test("the decoded image is closed even when the canvas is unavailable", async () => {
   const runtime = makeFormRuntime();
   runtime.imaging.noToBlob = true;
@@ -1504,58 +1452,11 @@ test("a newer file choice wins over a slower shrink of the previous one", async 
   runtime.fields.referenceImage.files = [];
   runtime.fields.referenceImage.dispatch("change");
   await settle();
-  assert.equal(runtime.fields.referenceImage.files.length, 0);
   assert.equal(runtime.elements.get("reference-image-status").textContent, "No reference image attached.");
   assert.equal(runtime.elements.get("submit-button").disabled, false);
-});
-
-test("submit blocks an attached file over 1.5 MB and never calls submitOrder", async () => {
-  const runtime = makeFormRuntime();
   fillValid(runtime.fields);
-  runtime.fields.referenceImage.files = [{ name: "big.jpg", type: "image/jpeg", size: 1536 * 1024 + 1 }];
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  assert.equal(runtime.submissions.length, 0);
-  assert.equal(runtime.submissions.length, 0);
-  assert.ok(runtime.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE));
-  const atLimit = makeFormRuntime();
-  fillValid(atLimit.fields);
-  atLimit.fields.referenceImage.files = [{ name: "ok.jpg", type: "image/jpeg", size: 1536 * 1024 }];
-  atLimit.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  await Promise.resolve();
-  assert.equal(atLimit.submissions.length, 1);
-});
-
-test("the customizer preview is attached as is and not shrunk", async () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { blob: jpegBlob(1000 * 1024) });
-  await settle();
-  const assigned = runtime.fields.referenceImage.files[0];
-  assert.equal(assigned.name, "saloni-customizer-preview.jpg");
-  assert.equal(assigned.size, 1000 * 1024);
-  assert.equal(runtime.imaging.canvases.length, 0);
-  assert.equal(runtime.elements.get("submit-button").disabled, false);
-});
-
-test("a 1.6 MB customizer PNG preview is still submitted, but over 5 MB is blocked", async () => {
-  const runtime = makeFormRuntime({ sourceKind: "customizer", sourceId: "customizer:resin-frame", previewExpected: true });
-  respondPreview(runtime, 0, { blob: pngBlob(1.6 * 1024 * 1024) });
-  assert.equal(runtime.fields.referenceImage.files[0].name, "saloni-customizer-preview.png");
-  fillValid(runtime.fields);
-  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  await Promise.resolve();
-  assert.equal(runtime.submissions.length, 1);
-  assert.equal(runtime.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE), false);
-
-  const oversized = makeFormRuntime();
-  fillValid(oversized.fields);
-  oversized.fields.referenceImage.files = [{ name: "saloni-customizer-preview.png", type: "image/png", size: PREVIEW_LIMIT + 1 }];
-  oversized.elements.get("order-form").dispatch("submit", { preventDefault() {} });
-  await Promise.resolve();
-  assert.equal(oversized.submissions.length, 0);
-  assert.ok(oversized.errors.some((error) => error.textContent === REFERENCE_TOO_LARGE));
+  submitOrderForm(runtime);
+  assert.equal(Object.hasOwn(runtime.submissions[0], "referenceImage"), false);
 });
 
 test("a received order shows the success celebration, and starting another request hides it", async () => {
@@ -1567,7 +1468,7 @@ test("a received order shows the success celebration, and starting another reque
   await Promise.resolve();
   await Promise.resolve();
   assert.equal(celebration.hidden, true, "nothing celebrates before the server answers");
-  runtime.callbacks[0].success({ ok: true, requestId: "req-1", receivedAt: "now" });
+  await runtime.callbacks[0].success({ ok: true, requestId: "req-1", receivedAt: "now" });
   assert.equal(celebration.hidden, false);
   assert.match(runtime.status.textContent, /Request received/);
   runtime.elements.get("another-button").dispatch("click");
@@ -1582,7 +1483,7 @@ test("a failed order never shows the success celebration", async () => {
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
   await Promise.resolve();
   await Promise.resolve();
-  runtime.callbacks[0].failure(new Error("network"));
+  await runtime.callbacks[0].failure(new Error("network"));
   assert.equal(celebration.hidden, true);
 });
 
@@ -1594,5 +1495,5 @@ test("the success celebration is decorative, animated, and still for reduced mot
   assert.ok(html.indexOf('id="success-celebration"') < html.indexOf('id="form-status"'), "sits above the status text");
   assert.ok((block[0].match(/class="confetti"/g) || []).length >= 10, "has a burst of confetti");
   assert.match(html, /@keyframes success-draw/);
-  assert.match(html, /@media \(prefers-reduced-motion: reduce\)[^{]*\{[^}]*\.success-celebration[^}]*animation:\s*none/);
+  assert.match(html, /@media \(prefers-reduced-motion: reduce\)[^@]*\.success-celebration[^}]*animation:\s*none/);
 });

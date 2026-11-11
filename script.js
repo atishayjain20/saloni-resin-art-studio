@@ -1682,12 +1682,15 @@
     var catalogueCartOrder = document.getElementById("catalogue-cart-order");
     var customizerRequestStatus = document.getElementById("share-status");
     var continueCustomizerButton = document.getElementById("customizer-continue-without-preview");
-    if (!embed || !frame || !status) return;
+    var requestedMode = embed ? embed.getAttribute("data-form-mode") : "";
+    // The order form is built into the page, so only the partner, corporate and review forms still use an iframe.
+    if (!embed || !status || (!frame && (requestedMode === "partner" || requestedMode === "corporate" || requestedMode === "review"))) return;
+    var orderFormElement = document.getElementById("order-form");
+    var orderFormIntro = document.getElementById("order-form-intro");
     var orderUrl = embed.getAttribute("data-order-form-url") || "";
     var configured = orderUrl && orderUrl.indexOf("REPLACE_WITH_") === -1;
     var PARENT_ORIGIN = "https://saloniresinart.com";
-    var requestedMode = embed.getAttribute("data-form-mode");
-    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, previewTransfers: Object.create(null), pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", catalogueSeedTimer: null, sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" || requestedMode === "review" ? requestedMode : "order" };
+    var frameState = { loaded: false, nonce: "", requestId: "", pendingCustomizerRequestId: "", customizerFallback: null, siteKey: "", activeCaptcha: null, previewSnapshot: null, pinnedSender: null, pinnedOrigin: "", loadingTimer: null, loading: false, frameSequence: 0, customizerHandoff: false, catalogueSeedKey: "", sourceKind: "", mode: requestedMode === "partner" || requestedMode === "corporate" || requestedMode === "review" ? requestedMode : "order" };
     var corporateIntakeReady = embed.getAttribute("data-intake-ready") === "true";
     var orderDialogEnabled = Boolean(orderDialog && typeof orderDialog.showModal === "function");
     var orderDialogHistoryActive = false;
@@ -1729,10 +1732,6 @@
 
     function previewIdentityPart(value) {
       return typeof value === "string" && value.length > 0 && value.length <= 200;
-    }
-
-    function previewTransferId(value) {
-      return typeof value === "string" && value.length > 0 && value.length <= 120 && /^[A-Za-z0-9._:-]+$/.test(value);
     }
 
     function usablePreviewDetails(summary, dimensions) {
@@ -1899,7 +1898,6 @@
       frameState.customizerFallback = null;
       frameState.siteKey = "";
       frameState.previewSnapshot = null;
-      frameState.previewTransfers = Object.create(null);
       frameState.pinnedSender = null;
       frameState.pinnedOrigin = "";
       frameState.customizerHandoff = false;
@@ -2066,14 +2064,7 @@
       return seed;
     }
 
-    function cancelScheduledCataloguePrepare() {
-      if (frameState.catalogueSeedTimer === null) return;
-      window.clearTimeout(frameState.catalogueSeedTimer);
-      frameState.catalogueSeedTimer = null;
-    }
-
-    function submitSeed(seed, shouldScroll, identity, previewSnapshot, previewExpected, opener, customizerHandoff, openDialog) {
-      cancelScheduledCataloguePrepare();
+    function submitSeed(seed, shouldScroll, identity, previewSnapshot, previewExpected, opener, customizerHandoff) {
       if (!configured) {
         invalidateChannel();
         status.innerHTML = frameState.mode === "corporate"
@@ -2100,9 +2091,26 @@
         return false;
       }
       if (previewExpected !== false && previewSnapshot && usablePreviewSnapshot(previewSnapshot) && previewSnapshot.requestId === frameState.requestId && previewSnapshot.nonce === frameState.nonce && previewSnapshot.mode === frameState.mode) frameState.previewSnapshot = previewSnapshot;
-      seed.channelNonce = frameState.nonce;
       seed.formMode = frameState.mode;
       if (String(seed.sourceKind || "").toLowerCase() === "customizer") seed.previewExpected = previewExpected !== false;
+      if (frameState.mode === "order") {
+        // The order form is part of this page: it opens at once and only Send talks to Google.
+        if (!orderFormElement || !window.saloniOrderForm || typeof window.saloniOrderForm.open !== "function") {
+          invalidateChannel();
+          status.innerHTML = "The request form could not load. You can still call Saloni at <a href=\"tel:+918209238541\">8209238541</a> or message <a href=\"https://www.instagram.com/saloniresin_art_studio/\" target=\"_blank\" rel=\"noreferrer\">@saloniresin_art_studio</a>.";
+          status.hidden = false;
+          return false;
+        }
+        status.hidden = true;
+        status.removeAttribute("aria-busy");
+        window.saloniOrderForm.open(seed, { previewBlob: frameState.previewSnapshot ? frameState.previewSnapshot.blob : null, onSent: saveRepeatProfile });
+        frameState.loaded = true;
+        if (continueOrderButton) continueOrderButton.hidden = false;
+        if (orderDialogEnabled) openOrderDialog(opener, true);
+        else if (shouldScroll !== false) scrollToForm();
+        return true;
+      }
+      seed.channelNonce = frameState.nonce;
       var frameIdentity = { nonce: frameState.nonce, requestId: frameState.requestId };
       var requestFrame = replaceOrderFormFrame(frameIdentity);
       if (orderDialogEnabled) startOrderFormLoading(frameIdentity);
@@ -2127,14 +2135,13 @@
       }
       document.body.appendChild(postForm); postForm.submit(); postForm.remove();
       frameState.loaded = true;
-      if (continueOrderButton && openDialog !== false) continueOrderButton.hidden = false;
-      if (orderDialogEnabled && openDialog !== false) openOrderDialog(opener, true);
-      else if (shouldScroll !== false && openDialog !== false) scrollToForm();
+      if (continueOrderButton) continueOrderButton.hidden = false;
+      if (orderDialogEnabled) openOrderDialog(opener, true);
+      else if (shouldScroll !== false) scrollToForm();
       return true;
     }
 
     function clearPreparedCatalogueRequest() {
-      cancelScheduledCataloguePrepare();
       if (orderDialogEnabled && orderDialog.open) {
         frameState.catalogueSeedKey = "";
         return;
@@ -2146,24 +2153,15 @@
       invalidateChannel();
       frameState.loaded = false;
       frameState.sourceKind = "";
-      frame.hidden = true;
+      if (frame) frame.hidden = true;
+      if (orderFormElement) orderFormElement.hidden = true;
+      if (orderFormIntro) orderFormIntro.hidden = true;
       if (continueOrderButton) continueOrderButton.hidden = true;
       clearSelectedProductSummary();
     }
 
-    function previewResponse(request, ok, reason, blob) {
-      var response = {
-        type: "saloni-preview-response", version: 1, nonce: request.nonce, requestId: request.requestId,
-        mode: request.mode, transferId: request.transferId, ok: ok === true
-      };
-      if (ok === true) response.blob = blob;
-      else response.error = reason || "unavailable";
-      try { request.port.postMessage(response); } catch (error) {}
-      try { if (request.port.close) request.port.close(); } catch (error) {}
-    }
-
     function isCurrentFormSource(source) {
-      if (!source) return false;
+      if (!source || !frame) return false;
       if (source === frame.contentWindow || source === frameState.pinnedSender) return true;
       var current = source;
       for (var depth = 0; depth < 8; depth += 1) {
@@ -2176,55 +2174,20 @@
       return false;
     }
 
-    function handlePreviewRequest(event, data) {
-      if (!data || data.type !== "saloni-preview-request") return;
-      if (!frameState.loaded || !frameState.nonce || !frameState.requestId || data.version !== 1 || data.mode !== frameState.mode || data.nonce !== frameState.nonce || data.requestId !== frameState.requestId || !previewIdentityPart(data.nonce) || !previewIdentityPart(data.requestId) || !previewTransferId(data.transferId) || !event || !isCurrentFormSource(event.source) || !event.ports || event.ports.length !== 1 || !event.origin) return;
-      var origin = previewOrigin(event.origin);
-      if (!origin || (frameState.pinnedOrigin && origin !== frameState.pinnedOrigin) || (frameState.pinnedSender && event.source !== frameState.pinnedSender)) return;
-      var port = event.ports[0];
-      if (!port || typeof port.postMessage !== "function") return;
-      if (frameState.previewTransfers[data.transferId]) return;
-      frameState.previewTransfers[data.transferId] = true;
-      if (!frameState.previewSnapshot || frameState.previewSnapshot.requestId !== data.requestId || frameState.previewSnapshot.nonce !== data.nonce || frameState.previewSnapshot.mode !== data.mode) {
-        if (!frameState.pinnedOrigin) frameState.pinnedOrigin = origin;
-        if (!frameState.pinnedSender) frameState.pinnedSender = event.source;
-        previewResponse({ port: port, nonce: data.nonce, requestId: data.requestId, mode: data.mode, transferId: data.transferId }, false, "unavailable");
-        return;
-      }
-      if (!usablePreviewSnapshot(frameState.previewSnapshot)) {
-        if (!frameState.pinnedOrigin) frameState.pinnedOrigin = origin;
-        if (!frameState.pinnedSender) frameState.pinnedSender = event.source;
-        previewResponse({ port: port, nonce: data.nonce, requestId: data.requestId, mode: data.mode, transferId: data.transferId }, false, "invalid-preview");
-        return;
-      }
-      if (!frameState.pinnedOrigin) frameState.pinnedOrigin = origin;
-      if (!frameState.pinnedSender) frameState.pinnedSender = event.source;
-      previewResponse({ port: port, nonce: data.nonce, requestId: data.requestId, mode: data.mode, transferId: data.transferId }, true, "", frameState.previewSnapshot.blob);
-    }
-
     function chooseSource(source, options) {
       options = options || {};
       var seed = sourceSeed(source);
       seed.requestId = options.requestId || source.requestId || requestId();
       if (options.card) showSelectedProductSummary(options.card);
       else clearSelectedProductSummary();
-      return submitSeed(seed, options.openDialog === false ? false : true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected, options.opener, options.customizerHandoff, options.openDialog);
+      return submitSeed(seed, true, options.identity, options.previewSnapshot || source.previewSnapshot, options.previewExpected, options.opener, options.customizerHandoff);
     }
 
     window.addEventListener("message", function (event) {
       var data = event.data || {};
-      if (data.type === "saloni-preview-request") {
-        handlePreviewRequest(event, data);
-        return;
-      }
       if (!frameState.loaded || !frameState.nonce || data.nonce !== frameState.nonce || !event.source || !event.origin || event.origin === "null") return;
       var messageOrigin = previewOrigin(event.origin);
       if (!messageOrigin) return;
-      if (data.type === "saloni-order-save-repeat-profile") {
-        if (data.version !== REPEAT_PROFILE_VERSION || !isCurrentFormSource(event.source) || event.source !== frameState.pinnedSender || messageOrigin !== frameState.pinnedOrigin) return;
-        saveRepeatProfile(data.profile);
-        return;
-      }
       if (data.type === "saloni-order-form-ready") {
         // Apps Script may deliver the form message from a nested child WindowProxy.
         if (!isCurrentFormSource(event.source)) return;
@@ -2287,7 +2250,6 @@
     var catalogueButtons = [];
     var CATALOGUE_CART_STORAGE_KEY = "saloniCatalogueCart";
     var catalogueCartExpiresAt = 0;
-    var CATALOGUE_PREPARE_DELAY_MS = 300;
 
     function catalogueCartStorage() {
       try { return window.localStorage || null; } catch (error) { return null; }
@@ -2536,7 +2498,7 @@
           setCatalogueSelectionStatus("");
           markCatalogueSelectionChanged();
           updateCatalogueSelection();
-          scheduleCatalogueSelectionPrepare();
+          clearPreparedCatalogueRequest();
         });
         var linePrice = document.createElement("span");
         linePrice.className = "catalogue-selection-item-price";
@@ -2553,8 +2515,7 @@
           setCatalogueSelectionStatus("");
           markCatalogueSelectionChanged();
           updateCatalogueSelection();
-          if (selectedCatalogueItems.length) scheduleCatalogueSelectionPrepare();
-          else clearPreparedCatalogueRequest();
+          clearPreparedCatalogueRequest();
         });
         label.appendChild(input);
         line.appendChild(name);
@@ -2627,46 +2588,22 @@
       return sortedBundleItems(items).map(function (item) { return item.sourceId + ":" + bundleQuantity(item) + (item.photo ? ":" + item.photo : ""); }).join("|");
     }
 
-    function prepareCatalogueSelection() {
-      if (!configured || !selectedCatalogueItems.length) return false;
-      var items = selectedCatalogueItems.slice();
-      var key = catalogueSelectionKey(items);
-      if (frameState.loaded && frameState.sourceKind === "catalogue" && frameState.catalogueSeedKey === key) return true;
-      var prepared = chooseSource({
-        sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: bundleProductName(items),
-        quantity: String(bundleTotal(items)), designDetails: bundleDetails(items), bundleItems: items
-      }, { openDialog: false });
-      if (prepared) frameState.catalogueSeedKey = key;
-      return prepared;
-    }
-
-    // Seed the order form in the background shortly after the cart settles, so Order now can open it instantly.
-    // onlyIfIdle: an automatic prepare that must never replace a form the shopper already has.
-    function scheduleCatalogueSelectionPrepare(onlyIfIdle) {
-      cancelScheduledCataloguePrepare();
-      if (!configured || !selectedCatalogueItems.length || (onlyIfIdle && frameState.loaded)) return;
-      frameState.catalogueSeedTimer = window.setTimeout(function () {
-        frameState.catalogueSeedTimer = null;
-        if (orderDialogEnabled && orderDialog.open) return;
-        if (onlyIfIdle && frameState.loaded) return;
-        prepareCatalogueSelection();
-      }, CATALOGUE_PREPARE_DELAY_MS);
-    }
-
     function openCatalogueSelectionRequest(items, opener) {
       var requestOpener = opener || catalogueRequestSelected;
       var key = catalogueSelectionKey(items);
+      // The same cart as the open request: reopen it as the shopper left it, nothing typed is lost.
       if (frameState.loaded && frameState.sourceKind === "catalogue" && frameState.catalogueSeedKey === key) {
-        cancelScheduledCataloguePrepare();
         if (continueOrderButton) continueOrderButton.hidden = false;
         if (orderDialogEnabled) openOrderDialog(requestOpener, true);
         else scrollToForm();
         return true;
       }
-      return chooseSource({
+      var opened = chooseSource({
         sourceKind: "catalogue", sourceId: "catalogue:multi-item", productName: bundleProductName(items),
         quantity: String(bundleTotal(items)), designDetails: bundleDetails(items), bundleItems: items
       }, { opener: requestOpener });
+      if (opened) frameState.catalogueSeedKey = key;
+      return opened;
     }
 
     function toggleCatalogueSelection(seed) {
@@ -2676,8 +2613,7 @@
         setCatalogueSelectionStatus("");
         markCatalogueSelectionChanged();
         updateCatalogueSelection();
-        if (selectedCatalogueItems.length) scheduleCatalogueSelectionPrepare();
-        else clearPreparedCatalogueRequest();
+        clearPreparedCatalogueRequest();
         return;
       }
       var nextItems = selectedCatalogueItems.concat([seed]);
@@ -2689,7 +2625,7 @@
       setCatalogueSelectionStatus("");
       markCatalogueSelectionChanged();
       updateCatalogueSelection();
-      scheduleCatalogueSelectionPrepare();
+      clearPreparedCatalogueRequest();
     }
 
     function catalogueSeed(card) {
@@ -2784,16 +2720,6 @@
     }
 
     restoreCatalogueSelection();
-
-    // A cart saved from an earlier visit is prepared only when its section nears the screen, so browsing visitors send no seed.
-    if (selectedCatalogueItems.length && catalogueSelection && "IntersectionObserver" in window) {
-      var savedCartObserver = new IntersectionObserver(function (entries) {
-        if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
-        savedCartObserver.disconnect();
-        scheduleCatalogueSelectionPrepare(true);
-      }, { rootMargin: "300px 0px" });
-      savedCartObserver.observe(catalogueSelection);
-    }
 
     function requestSelectedCatalogueItems(opener) {
       if (!selectedCatalogueItems.length) return;

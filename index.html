@@ -45,9 +45,10 @@
     }
   </script>
   <title>Custom Resin Art &amp; Gifts | Saloni Resin Art Studio</title>
-  <link rel="stylesheet" href="styles.css?v=20261159">
-  <script class="site-script" src="script.js?v=20261159" defer></script>
-  <script class="customizer-script" src="customizer.js?v=20261159" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261160">
+  <script class="order-form-script" src="order-form.js?v=20261160" defer></script>
+  <script class="site-script" src="script.js?v=20261160" defer></script>
+  <script class="customizer-script" src="customizer.js?v=20261160" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -1015,11 +1016,114 @@
       <form method="dialog" class="order-dialog-close-form">
         <button class="order-dialog-close" id="order-dialog-close" type="submit" aria-label="Close order request"><span aria-hidden="true">×</span></button>
       </form>
-      <h2 class="sr-only" id="order-dialog-title">Order request</h2>
+      <h2 class="order-dialog-title" id="order-dialog-title">Send an order request</h2>
       <div class="order-panel order-form-panel" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"><div class="selected-product-summary" id="selected-product-summary" hidden aria-live="polite"><img id="selected-product-image" alt="Selected product photo" width="280" height="280" loading="lazy" decoding="async"><div class="selected-product-summary-copy"><p class="panel-label">Selected item</p><h3 id="selected-product-name"></h3><p id="selected-product-price" hidden></p><p id="selected-product-size" hidden></p></div></div><p class="order-final-quote-note">Final quote after size, materials and delivery.</p>
         <p class="panel-label">Order request</p>
         <div class="order-form-status" id="order-form-status" role="status" aria-live="polite"><span class="order-form-spinner" aria-hidden="true" hidden></span>Choose a product, a customizer design, or a general custom gift request to begin. You can still call Saloni at <a href="tel:+918209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.<button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button></div>
-        <iframe id="order-form-frame" name="saloni-order-form-frame" title="Saloni Resin Art Studio order request form" loading="lazy" hidden></iframe>
+        <p class="order-form-intro" id="order-form-intro" hidden>This is a request only. Saloni will contact you to confirm the design, price, and delivery before any production begins.</p>
+        <form id="order-form" novalidate hidden>
+          <input id="request-id" name="requestId" type="hidden">
+          <input id="request-stage" name="requestStage" type="hidden">
+          <input id="source-kind" name="sourceKind" type="hidden">
+          <input id="source-id" name="sourceId" type="hidden">
+          <fieldset>
+            <legend>Selected design</legend>
+            <div id="product-context" class="product-context" hidden>
+              <img id="product-image" alt="Selected product photo" width="352" height="256" loading="lazy" decoding="async" hidden>
+            </div>
+            <div id="bundle-items" class="bundle-items" role="list" aria-label="Selected catalogue items" hidden></div>
+            <div class="grid" id="product-name-row">
+              <label for="product-name">Product name <input id="product-name" name="productName" maxlength="2000" required></label>
+            </div>
+            <p id="product-name-hint" class="hint">You can edit the product name before sending the request.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>What should Saloni make?</legend>
+            <label id="quantity-row" for="quantity">Quantity <input id="quantity" name="quantity" type="number" min="1" max="100" step="1" inputmode="numeric" required></label>
+            <div id="dimension-fields">
+              <div class="dimension-pair">
+                <label for="height-feet">Height feet <input id="height-feet" name="heightFeet" type="number" min="0" max="5" step="1" inputmode="numeric"></label>
+                <label for="height-inches-part">Height inches <input id="height-inches-part" name="heightInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal"></label>
+              </div>
+              <div class="dimension-pair">
+                <label for="width-feet">Width feet <input id="width-feet" name="widthFeet" type="number" min="0" max="5" step="1" inputmode="numeric"></label>
+                <label for="width-inches-part">Width inches <input id="width-inches-part" name="widthInchesPart" type="number" min="0" max="11.99" step="0.01" inputmode="decimal"></label>
+              </div>
+              <p class="hint">Enter each dimension as feet plus an inch remainder. Each total must be greater than 0 and no more than 60 inches. For example, 3 ft × 4 ft is valid.</p>
+            </div>
+            <label for="design-details">Order notes <textarea id="design-details" name="designDetails" maxlength="2000" required placeholder="Colours, words, occasion, reference notes, or anything Saloni should know."></textarea></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Your details</legend>
+            <div class="grid">
+              <label for="customer-name">Customer name <input id="customer-name" name="customerName" maxlength="120" autocomplete="name" required></label>
+              <label for="phone">Phone <input id="phone" name="phone" maxlength="40" autocomplete="tel" inputmode="tel" required></label>
+            </div>
+            <label for="fulfillment">Shipping or pickup <select id="fulfillment" name="fulfillment" required><option value="shipping">Shipping</option><option value="pickup">Pickup in Ajmer</option></select></label>
+            <div class="shipping-fields" id="shipping-fields">
+              <div class="grid">
+                <label for="shipping-address">Shipping address <textarea id="shipping-address" name="shippingAddress" maxlength="300" autocomplete="street-address"></textarea></label>
+                <div class="grid">
+                  <label for="city">City <input id="city" name="city" maxlength="100" autocomplete="address-level2"></label>
+                  <label for="state">State <input id="state" name="state" maxlength="100" autocomplete="address-level1"></label>
+                </div>
+              </div>
+            </div>
+            <div class="shipping-fields" id="pin-field">
+              <label for="pin">PIN <input id="pin" name="pin" maxlength="6" inputmode="numeric" pattern="[1-9][0-9]{5}" autocomplete="postal-code"></label>
+            </div>
+          </fieldset>
+
+          <details class="more-details" id="more-details">
+            <summary>More details (optional)</summary>
+            <fieldset id="custom-size" hidden>
+              <legend>Custom size (optional)</legend>
+              <div id="bundle-sizes" hidden></div>
+            </fieldset>
+            <fieldset>
+              <legend>Optional details</legend>
+              <div class="grid">
+                <label for="email">Email (optional) <input id="email" name="email" type="email" maxlength="254" autocomplete="email"></label>
+                <label for="requested-date">Requested date (optional) <input id="requested-date" name="requestedDate" type="date"></label>
+              </div>
+              <details class="referral-disclosure">
+                <summary>Have a referral code?</summary>
+                <div class="referral-box">
+                  <label for="referral-code">Partner referral code (optional) <input id="referral-code" name="referralCode" maxlength="32" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="referral-status"></label>
+                  <button id="check-referral" class="secondary" type="button">Check code</button>
+                  <p id="referral-status" class="hint" role="status" aria-live="polite">A code is optional. You can continue without partner credit.</p>
+                </div>
+              </details>
+            </fieldset>
+          </details>
+
+          <fieldset>
+            <legend>Optional reference image</legend>
+            <label for="order-reference-image">JPG or PNG, one photo (large photos are shrunk automatically) <input id="order-reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+            <div id="reference-image-preview-wrap" hidden>
+              <img id="reference-image-preview" class="reference-preview" alt="Attached reference image" width="288" height="224" loading="lazy" decoding="async">
+            </div>
+            <p id="reference-image-status" class="hint" role="status" aria-live="polite">Optional: attach a separate reference image if it helps.</p>
+            <div id="reference-image-actions" class="actions" hidden>
+              <button id="remove-reference-image" class="secondary" type="button" hidden>Remove attached image</button>
+            </div>
+          </fieldset>
+
+          <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
+          <input id="bundle-source-ids" name="bundleSourceIds" type="hidden">
+          <div id="success-celebration" class="success-celebration" aria-hidden="true" hidden><svg class="success-check" viewBox="0 0 52 52" width="88" height="88"><circle class="success-check-circle" cx="26" cy="26" r="23"></circle><path class="success-check-mark" d="M15 27 l7 7 l15 -16"></path></svg><p class="success-title">Order sent! 🎉</p><span class="confetti" style="--x:-110px;--y:-80px;--c:#b0125b;--r:30deg;--d:0ms"></span><span class="confetti" style="--x:-70px;--y:-120px;--c:#d9a227;--r:-20deg;--d:25ms"></span><span class="confetti" style="--x:-20px;--y:-135px;--c:#2f8f5b;--r:60deg;--d:50ms"></span><span class="confetti" style="--x:35px;--y:-125px;--c:#f08db3;--r:-45deg;--d:75ms"></span><span class="confetti" style="--x:85px;--y:-95px;--c:#b0125b;--r:15deg;--d:100ms"></span><span class="confetti" style="--x:120px;--y:-50px;--c:#d9a227;--r:80deg;--d:125ms"></span><span class="confetti" style="--x:-125px;--y:-25px;--c:#f08db3;--r:-70deg;--d:150ms"></span><span class="confetti" style="--x:-95px;--y:30px;--c:#2f8f5b;--r:40deg;--d:175ms"></span><span class="confetti" style="--x:100px;--y:25px;--c:#f08db3;--r:-30deg;--d:200ms"></span><span class="confetti" style="--x:60px;--y:-150px;--c:#d9a227;--r:110deg;--d:225ms"></span><span class="confetti" style="--x:-50px;--y:-160px;--c:#b0125b;--r:-95deg;--d:250ms"></span><span class="confetti" style="--x:130px;--y:-110px;--c:#2f8f5b;--r:55deg;--d:275ms"></span></div>
+          <p id="form-status" class="status" role="status" aria-live="polite"></p>
+          <div class="actions">
+            <button id="submit-button" type="submit">Send request</button>
+            <button id="another-button" class="secondary" type="button" hidden>Start another request</button>
+          </div>
+          <details class="privacy-details" id="order-privacy-details">
+            <summary>Privacy details</summary>
+            <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>.</p>
+          </details>
+        </form>
       </div>
     </div>
   </dialog>

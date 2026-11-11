@@ -362,7 +362,7 @@ function makeRuntime(options = {}) {
     folderAccess: options.folderAccess || "PRIVATE",
     captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 },
     driveDeletes: [], retentionTrashed: 0, rowDeletes: [], triggerCreates: 0, triggerConfig: null,
-    logs: [], locked: false, whatsappFetches: [], emails: [],
+    logs: [], locked: false, whatsappFetches: [], emails: [], base64Decodes: 0,
   };
   const sheet = {
     getLastColumn: () => headers.length,
@@ -414,7 +414,12 @@ function makeRuntime(options = {}) {
   };
   const utilities = {
     getUuid: () => "00000000-0000-4000-8000-000000000000",
-    newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(String(value))) }),
+    newBlob: (value, type, name) => {
+      const bytes = typeof value === "string" ? Array.from(Buffer.from(value)) : Array.from(value);
+      const blob = { getBytes: () => bytes, getContentType: () => type || "", getName: () => name || "", copyBlob: () => blob, setName: () => blob };
+      return blob;
+    },
+    base64Decode: (text) => { state.base64Decodes += 1; return Array.from(Buffer.from(String(text), "base64")).map((byte) => byte > 127 ? byte - 256 : byte); },
     DigestAlgorithm: { SHA_256: "SHA-256" },
     computeDigest: (_algorithm, bytes) => Array.from(crypto.createHash("sha256").update(Buffer.from(bytes.map((byte) => byte < 0 ? byte + 256 : byte))).digest()).map((byte) => byte > 127 ? byte - 256 : byte),
     formatDate: (date) => new Date(date).toISOString().slice(0, 10),
@@ -423,6 +428,10 @@ function makeRuntime(options = {}) {
     console: { log: (...values) => state.logs.push(values.join(" ")), error: (...values) => state.logs.push(values.join(" ")) },
     Number, String, JSON, Date, RegExp, Math, isFinite, Object, Array,
     Utilities: utilities,
+    ContentService: {
+      MimeType: { JSON: "JSON" },
+      createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }),
+    },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => properties[key] || "" }) },
     LockService: { getScriptLock: () => lock },
     SpreadsheetApp: { openById: () => ({ getSheetByName: () => sheet }) },
@@ -1086,4 +1095,125 @@ test("testOrderAlerts refuses a web visitor or a different user and sends nothin
   }
   const runtime = makeRuntime();
   assert.equal(/testOrderAlerts/.test(runtime.context.doGet.toString() + runtime.context.doPost.toString()), false);
+});
+
+// --- JSON order endpoint used by the order form built into the site ---
+const JPEG_BASE64 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 1, 2, 3]).toString("base64");
+const PNG_BASE64 = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]).toString("base64");
+
+function orderPost(runtime, body, action = "order") {
+  const output = runtime.context.doPost({
+    parameter: { action },
+    postData: { type: "text/plain", contents: typeof body === "string" ? body : JSON.stringify(body) },
+  });
+  assert.equal(output.mimeType, "JSON");
+  return JSON.parse(output.text);
+}
+
+function postedOrder(overrides = {}) {
+  const form = validForm(overrides);
+  delete form.captchaToken;
+  return form;
+}
+
+test("action=order appends one row and sends one alert for a valid JSON order", () => {
+  const runtime = makeRuntime({ properties: ALERT_PROPERTIES });
+  const result = orderPost(runtime, postedOrder());
+  assert.equal(result.ok, true);
+  assert.equal(result.requestId, "request-1234567890");
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.appendCalls, 1);
+  assert.equal(runtime.state.whatsappFetches.length, 1);
+  assert.equal(runtime.state.emails.length, 1);
+});
+
+test("action=order ignores unknown fields and the old captcha token", () => {
+  const runtime = makeRuntime();
+  const result = orderPost(runtime, Object.assign(postedOrder(), { captchaToken: "x", injected: "<b>", __proto__: { admin: true } }));
+  assert.equal(result.ok, true);
+  assert.equal(runtime.state.captchaCalls, 0);
+  assert.equal(runtime.rows.flat().includes("<b>"), false);
+});
+
+test("action=order replays the same request without a second row and rejects a conflicting replay", () => {
+  const runtime = makeRuntime();
+  assert.equal(orderPost(runtime, postedOrder()).ok, true);
+  const replay = orderPost(runtime, postedOrder());
+  assert.equal(replay.ok, true);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.state.appendCalls, 1);
+  const conflict = orderPost(runtime, postedOrder({ productName: "Changed frame" }));
+  assert.equal(conflict.ok, false);
+  assert.match(conflict.errors.requestId, /conflict/i);
+  assert.equal(runtime.rows.length, 1);
+});
+
+test("action=order keeps the kill switch, validation, and the daily cap of 50", () => {
+  const paused = makeRuntime({ properties: { ORDER_FORM_DISABLED: "true" } });
+  assert.match(orderPost(paused, postedOrder()).errors.form, /paused/);
+  assert.equal(paused.state.appendCalls, 0);
+  const invalid = makeRuntime();
+  assert.ok(orderPost(invalid, postedOrder({ phone: "123" })).errors.phone);
+  assert.equal(invalid.state.appendCalls, 0);
+  const rows = Array.from({ length: 50 }, (_, index) => [`old-request-${index}`, "fp", new Date(), "catalogue", "id"]);
+  const capped = makeRuntime({ rows });
+  assert.match(orderPost(capped, postedOrder()).errors.form, /daily request limit/);
+  assert.equal(capped.state.appendCalls, 0);
+});
+
+test("action=order stores a decoded JPEG or PNG reference image", () => {
+  for (const [type, data] of [["image/jpeg", JPEG_BASE64], ["image/png", PNG_BASE64]]) {
+    const runtime = makeRuntime();
+    const result = orderPost(runtime, postedOrder({ referenceImage: { type, data } }));
+    assert.equal(result.ok, true, type);
+    assert.equal(runtime.state.fileCreates, 1);
+    assert.equal(runtime.state.base64Decodes, 1);
+  }
+});
+
+test("action=order rejects a bad, wrongly typed, mismatched, or oversized image without decoding the big ones", () => {
+  const limit = Math.ceil((5 * 1024 * 1024) / 3) * 4;
+  const cases = [
+    [{ type: "image/jpeg", data: "not base64 !!" }, /JPG or PNG/, 0],
+    [{ type: "image/gif", data: JPEG_BASE64 }, /JPG or PNG/, 0],
+    [{ type: "image/jpeg", data: PNG_BASE64 }, /signature/, 1],
+    [{ type: "image/jpeg", data: "A".repeat(limit + 4) }, /5 MB/, 0],
+    ["just-a-string", /JPG or PNG/, 0],
+  ];
+  for (const [referenceImage, message, decodes] of cases) {
+    const runtime = makeRuntime();
+    const result = orderPost(runtime, postedOrder({ referenceImage }));
+    assert.equal(result.ok, false);
+    assert.match(result.errors.referenceImage, message);
+    assert.equal(runtime.state.base64Decodes, decodes);
+    assert.equal(runtime.state.appendCalls, 0);
+    assert.equal(runtime.state.fileCreates, 0);
+  }
+});
+
+test("action=order answers invalid for broken JSON and unconfirmed when the save throws", () => {
+  const runtime = makeRuntime();
+  for (const body of ["{not json", "[]", "null", ""]) {
+    assert.deepEqual(orderPost(runtime, body), { ok: false, error: "invalid" });
+  }
+  assert.equal(runtime.state.appendCalls, 0);
+  const locked = makeRuntime({ lockAvailable: false });
+  assert.deepEqual(orderPost(locked, postedOrder()), { ok: false, error: "unconfirmed" });
+  assert.equal(locked.state.appendCalls, 0);
+});
+
+test("action=referral returns the code status and never throws", () => {
+  const runtime = makeRuntime();
+  assert.deepEqual(orderPost(runtime, { code: "!!" }, "referral"), { status: "invalid", code: "" });
+  runtime.context.lookupPartner_ = () => ({ status: "active" });
+  assert.deepEqual(orderPost(runtime, { code: "friend-10" }, "referral"), { status: "active", code: "FRIEND-10" });
+  runtime.context.lookupPartner_ = () => { throw new Error("sheet down"); };
+  assert.deepEqual(orderPost(runtime, { code: "friend-10" }, "referral"), { status: "error", code: "FRIEND-10" });
+  assert.deepEqual(orderPost(runtime, "{broken", "referral"), { status: "error", code: "" });
+});
+
+test("action=seed still renders the order form for pages cached before the change", () => {
+  const runtime = makeRuntime();
+  runtime.context.doPost({ parameter: { action: "seed", mode: "order", seed: JSON.stringify({ requestId: "request-cached-page" }) } });
+  assert.equal(runtime.state.templateName, "Form");
 });
