@@ -142,9 +142,15 @@ test("event paths are an allow-list of plain lowercase words, so names, phones, 
   assert.deepEqual(calls, ["product-silver-925-tray", "order-form-open", "advance-pay-googlepay"]);
 });
 
+test("product share pages redirect at once and carry no script tag, so they load nothing extra", () => {
+  const shares = publicPages().filter((page) => page.startsWith("p" + path.sep));
+  assert.ok(shares.length > 90);
+  for (const page of shares) assert.doesNotMatch(read(page), /<script\b[^>]*\bsrc=/, page);
+});
+
 test("every public page loads analytics.js once with the shared cache version, before the page's own scripts", () => {
-  const pages = publicPages();
-  assert.ok(pages.length > 100, "index, sub-pages and every product page");
+  const pages = publicPages().filter((page) => !page.startsWith("p" + path.sep));
+  assert.ok(pages.length >= 6, "index and the sub-pages");
   for (const page of pages) {
     const html = read(page);
     const tags = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]*analytics\.js\?v=(\d+))"[^>]*>/g)];
@@ -152,7 +158,7 @@ test("every public page loads analytics.js once with the shared cache version, b
     assert.equal(tags[0][2], VERSION, page);
     assert.match(tags[0][0], /\bdefer\b/, page + ": must not block the first paint");
     const depth = page.split(path.sep).length - 1;
-    const expected = page.startsWith("p" + path.sep) ? "/analytics.js" : "../".repeat(depth) + "analytics.js";
+    const expected = "../".repeat(depth) + "analytics.js";
     assert.equal(tags[0][1].split("?")[0], expected, page);
     assert.ok(tags[0].index < (html.indexOf("</head>") + 1), page + ": in the head");
     assert.ok(html.indexOf("analytics.js") < html.search(/<script\b[^>]*\bsrc="[^"]*(?:script|order-form|my-orders|customizer|public-forms)\.js/) || !/<script\b[^>]*\bsrc="[^"]*(?:script|order-form|my-orders|customizer|public-forms)\.js/.test(html), page + ": analytics.js comes first so saloniTrack exists");

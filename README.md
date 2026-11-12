@@ -249,7 +249,7 @@ When an order is confirmed with an advance, the home page now tells the shopper 
 
 ## Visitor counts (GoatCounter)
 
-The site counts visits with [GoatCounter](https://www.goatcounter.com): no cookies, no banner, nothing stored in the visitor's browser. One file, `analytics.js`, holds the site code (`saloniresinart`), GoatCounter's versioned count file (`count.v5.js`) and its integrity hash (SRI). Every public page loads it with `defer`, and it adds the count script with `async`, so it never delays the first paint or the order flow. If the script is blocked or fails (ad blocker, offline), the site works as before and nothing is counted.
+The site counts visits with [GoatCounter](https://www.goatcounter.com): no cookies, no banner, nothing stored in the visitor's browser. One file, `analytics.js`, holds the site code (`saloniresinart`), GoatCounter's versioned count file (`count.v5.js`) and its integrity hash (SRI). Every public page (not the `/p/<slug>/` share pages, which redirect at once) loads it with `defer`, and it adds the count script with `async`, so it never delays the first paint or the order flow. If the script is blocked or fails (ad blocker, offline), the site works as before and nothing is counted.
 
 **One-time setup (owner):** create the free account at `https://www.goatcounter.com` with the site code `saloniresinart`. Nothing is counted until that account exists.
 
@@ -258,10 +258,11 @@ The site counts visits with [GoatCounter](https://www.goatcounter.com): no cooki
 - Page views on every public page, with the referrer (for example Instagram) and any `utm_` values in the link. For Instagram, put `https://saloniresinart.com/?utm_source=instagram` in the bio: in-app browsers often hide the referrer.
 - Events, shown in the dashboard under the page list (an `Events` filter): `product-<slug>` (product popup opened), `cart-add-<slug>` (added to cart), `customizer-open`, `order-form-open`, `order-sent` (only after the server confirms the request), `my-orders-open`, `advance-popup-shown`, `advance-pay-googlepay`, `advance-pay-phonepe`, `advance-pay-paytm`, `advance-pay-whatsapp` (which app icon was tapped), `share-tap` (Share pressed) and `share-link-opened` (a visit through a product share link).
 - Never sent: names, phones, addresses, notes, order or request IDs, amounts, UPI IDs. `window.saloniTrack` only accepts short lowercase event names and drops anything else. GoatCounter does not set cookies and does not count `localhost` or `file:` pages.
+- GoatCounter's script also sends the page address's query with each count (for example catalogue search words or a partner `ref` code); GoatCounter keeps only `ref`, `utm_*`, `src`, `source` and `campaign` values, as the referrer or campaign, and discards the rest.
 
 **Where Saloni sees it:** `https://saloniresinart.goatcounter.com` (log in with the account above). Pages, referrers, campaigns, devices and events are on the dashboard. Reading the funnel: `product-*` (looked) then `cart-add-*` (added) then `order-form-open` then `order-sent`; the gap between two steps is where visitors gave up.
 
-**Switch it off:** in `analytics.js`, delete the `try { var tag = ... } catch` block at the bottom (the part that adds the count script) and bump the cache version. The event calls stay in the page scripts and do nothing without GoatCounter. To switch it off for everyone and remove the files, also delete the `analytics.js` tag from each page and from `tools/product_pages.py`, then run `python3 tools/product_pages.py`.
+**Switch it off:** in `analytics.js`, delete the `try { var tag = ... } catch` block at the bottom (the part that adds the count script) and bump the cache version. The event calls stay in the page scripts and do nothing without GoatCounter. To switch it off for everyone and remove the files, also delete the `analytics.js` tag from each page.
 
 **Exclude her own visits:** open `https://saloniresinart.com/#toggle-goatcounter` once in each browser she uses (phone and laptop). An alert says tracking is disabled in that browser; open the same address again to turn it back on. The choice is a flag GoatCounter reads in that browser only. Or add her IP address under GoatCounter, Settings, Ignore IPs. Her own test orders are counted unless she does this.
 

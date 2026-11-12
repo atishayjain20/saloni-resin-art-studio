@@ -34,8 +34,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SITE = "https://saloniresinart.com"
 STUDIO = "Saloni Resin Art Studio"
 PAGE_DIR = "p"
-# The cache version every page of the site shares (see the README); analytics.js is stamped with it.
-ASSET_VERSION = "20261173"
 
 ARTICLE_RE = re.compile(r'<article\b[^>]*\bclass="[^"]*\b(?:work-card|romantic-keepsake-card)\b[^"]*"[^>]*>.*?</article>', re.S)
 TRIGGER_RE = re.compile(r'<a class="lightbox-trigger" data-lightbox-trigger\b[^>]*>')
@@ -195,7 +193,6 @@ def render_page(card, slug, share_size):
   <meta name="twitter:image:alt" content="{alt}">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <style>body{{margin:0;padding:2rem 1rem;background:#fff6e9;color:#3a2a25;font:1rem/1.5 system-ui,sans-serif;text-align:center}}main{{max-width:28rem;margin:0 auto}}img{{max-width:100%;height:auto;border-radius:.75rem}}a{{color:#9b2c5c;font-weight:700}}</style>
-  <script src="/analytics.js?v={version}" defer></script>
 </head>
 <body>
   <script>location.replace({redirect});</script>
@@ -209,7 +206,7 @@ def render_page(card, slug, share_size):
 </body>
 </html>
 """.format(
-        version=ASSET_VERSION, title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
+        title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
         redirect=json.dumps(target), target=esc(target), name=esc(card["name"]), file=esc(card["file"]),
         dims=' width="%s" height="%s"' % (card["width"], card["height"]) if card["width"].isdigit() and card["height"].isdigit() else "",
     )
