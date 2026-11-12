@@ -55,6 +55,8 @@
   // The advance details of the last successful status answer, by request ID. Memory only: a reload asks again.
   var advanceByRequest = {};
 
+  // Visitor counts (analytics.js): a fixed event name only. A no-op when analytics is not there.
+  function track(path) { try { if (window.saloniTrack) window.saloniTrack(path); } catch (error) {} }
   function storage() {
     try { return window.localStorage || null; } catch (error) { return null; }
   }
@@ -471,6 +473,7 @@
       pay.setAttribute("href", option.href);
       pay.setAttribute("aria-label", "Pay " + rupees + " with " + option.aria);
       pay.setAttribute("title", option.aria);
+      pay.addEventListener("click", function () { track("advance-pay-" + option.icon); });
       pay.appendChild(iconSvg(option));
       choice.appendChild(pay);
       if (!view.firstPay) view.firstPay = pay;
@@ -661,6 +664,7 @@
     if (!dialog.open) dialog.showModal();
     focusIfPossible(closeButton);
     refreshStatuses();
+    track("my-orders-open");
     return true;
   }
   // --- the advance payment popup ---
@@ -734,6 +738,7 @@
     pushHistory();
     popup.showModal();
     focusIfPossible(popupPay);
+    track("advance-popup-shown");
   }
   // After a usable status answer: pop up for the newest order that owes an advance and is not snoozed.
   function offerPopup() {

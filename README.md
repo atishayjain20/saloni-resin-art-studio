@@ -246,3 +246,25 @@ Release order: **deploy the new Apps Script version first** (Deploy, Manage depl
 ## My orders: advance payment popup
 
 When an order is confirmed with an advance, the home page now tells the shopper without WhatsApp or email. About 2.5 seconds after the page has loaded it makes the same status check My orders uses (`?action=status`), but only if this browser holds an order that could still owe an advance, and at most once per 10 minutes (`saloniAdvanceLoadCheckAt` in localStorage). A visitor with no stored orders makes no request. If the answer holds an advance, a small popup (`#advance-popup`) says "Advance payment due, ₹500 for <first item> (order <first 8 characters of the Request ID>)", plus "+ N more orders" when several are due. **Pay now** opens My orders on that order with its Pay with icons focused; **Later**, Escape, the backdrop and the phone Back button hide it for 12 hours (`saloniAdvanceSnoozed`: request ID and time only, never the amount or UPI ID, kept only for orders still stored). It never shows while another dialog is open (that page view is skipped), nor for an order that is paid, cancelled or has moved on. `my-orders.js` loads on the home page only, so the partners, corporate and reviews pages (and product pages) show no popup. No backend change. Cache version `20261173` is shared by every page.
+
+## Visitor counts (GoatCounter)
+
+The site counts visits with [GoatCounter](https://www.goatcounter.com): no cookies, no banner, nothing stored in the visitor's browser. One file, `analytics.js`, holds the site code (`saloniresinart`), GoatCounter's versioned count file (`count.v5.js`) and its integrity hash (SRI). Every public page loads it with `defer`, and it adds the count script with `async`, so it never delays the first paint or the order flow. If the script is blocked or fails (ad blocker, offline), the site works as before and nothing is counted.
+
+**One-time setup (owner):** create the free account at `https://www.goatcounter.com` with the site code `saloniresinart`. Nothing is counted until that account exists.
+
+**What is counted**
+
+- Page views on every public page, with the referrer (for example Instagram) and any `utm_` values in the link. For Instagram, put `https://saloniresinart.com/?utm_source=instagram` in the bio: in-app browsers often hide the referrer.
+- Events, shown in the dashboard under the page list (an `Events` filter): `product-<slug>` (product popup opened), `cart-add-<slug>` (added to cart), `customizer-open`, `order-form-open`, `order-sent` (only after the server confirms the request), `my-orders-open`, `advance-popup-shown`, `advance-pay-googlepay`, `advance-pay-phonepe`, `advance-pay-paytm`, `advance-pay-whatsapp` (which app icon was tapped), `share-tap` (Share pressed) and `share-link-opened` (a visit through a product share link).
+- Never sent: names, phones, addresses, notes, order or request IDs, amounts, UPI IDs. `window.saloniTrack` only accepts short lowercase event names and drops anything else. GoatCounter does not set cookies and does not count `localhost` or `file:` pages.
+
+**Where Saloni sees it:** `https://saloniresinart.goatcounter.com` (log in with the account above). Pages, referrers, campaigns, devices and events are on the dashboard. Reading the funnel: `product-*` (looked) then `cart-add-*` (added) then `order-form-open` then `order-sent`; the gap between two steps is where visitors gave up.
+
+**Switch it off:** in `analytics.js`, delete the `try { var tag = ... } catch` block at the bottom (the part that adds the count script) and bump the cache version. The event calls stay in the page scripts and do nothing without GoatCounter. To switch it off for everyone and remove the files, also delete the `analytics.js` tag from each page and from `tools/product_pages.py`, then run `python3 tools/product_pages.py`.
+
+**Exclude her own visits:** open `https://saloniresinart.com/#toggle-goatcounter` once in each browser she uses (phone and laptop). An alert says tracking is disabled in that browser; open the same address again to turn it back on. The choice is a flag GoatCounter reads in that browser only. Or add her IP address under GoatCounter, Settings, Ignore IPs. Her own test orders are counted unless she does this.
+
+**Update GoatCounter:** take the new versioned file and hash from `https://www.goatcounter.com/help/countjs-versions`, check the hash yourself (`curl -s https://gc.zgo.at/count.vN.js | openssl dgst -sha384 -binary | openssl base64 -A`), edit `COUNT_FILE` and `INTEGRITY` in `analytics.js`, and bump the cache version. A wrong hash makes the browser refuse the script (nothing counted, site unaffected).
+
+**Known limits:** ad blockers and some privacy browsers block GoatCounter, so counts are a floor, not an exact number. A product share page (`/p/<slug>/`) sends the visitor straight on to `/?product=<slug>`, so the visit is counted on the home page and as `share-link-opened`, not as a page view of the share page. Cache version `20261173` is shared by every page, including `analytics.js`.

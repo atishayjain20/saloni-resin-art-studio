@@ -222,7 +222,7 @@ test("homepage cache-busts the updated stylesheet, scripts, and customizer", () 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
   for (const page of ["index.html", "partners/index.html", "corporate-gifting/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html", "reviews/index.html"]) {
     const source = fs.readFileSync(path.join(root, page), "utf8");
-    const versions = [...source.matchAll(/(?:styles\.css|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
+    const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
     assert.deepEqual([...new Set(versions)], ["20261173"], page);
   }

@@ -766,7 +766,7 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertEqual(collection["name"], spec["title"].split(" | ")[0])
             self.assertTrue(collection.get("mainEntity"))
             self.assertNotRegex(scripts[0], re.compile(r"Product|Offer|AggregateRating|Review|rating|price|availability|stock", re.I))
-            self.assertNotRegex(html, re.compile(r'<script\b[^>]+src=', re.I), slug)
+            self.assertNotRegex(html, re.compile(r'<script\b(?![^>]*analytics\.js)[^>]+src=', re.I), slug)
             self.assertNotIn("₹", html, slug)
             image_tags = re.findall(r"<img\b[^>]*>", html)
             self.assertGreaterEqual(len(image_tags), 3, slug)
@@ -2439,6 +2439,17 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertEqual((ROOT / relative).read_text(encoding="utf-8"), expected, relative + " is stale: run python3 tools/product_pages.py")
         self.assertEqual(len(pages), len(self.products))
 
+    def test_every_product_page_loads_the_shared_analytics_script_with_the_shared_cache_version(self):
+        shared = re.search(r'script\.js\?v=(\d+)', self.home).group(1)
+        tool = load_product_pages_tool()
+        self.assertEqual(tool.ASSET_VERSION, shared, "the generator stamps the same cache version as the pages")
+        for slug in self.slugs:
+            text, _ = self.page(slug)
+            tags = re.findall(r'<script\b[^>]*\bsrc="([^"]*analytics\.js[^"]*)"[^>]*>', text)
+            self.assertEqual(tags, ["/analytics.js?v=" + shared], slug)
+            self.assertRegex(text, r'<script src="/analytics\.js\?v=\d+" defer></script>\n</head>', slug + ": deferred, in the head, so it never delays first paint")
+        self.assertNotRegex(self.tool_path.read_text(encoding="utf-8"), r"goatcounter|gc\.zgo\.at|sha384-", "the site code and hash live in analytics.js only")
+
     def test_every_share_image_is_a_sized_progressive_jpeg_that_matches_its_page_tags(self):
         # WhatsApp is the main target: every preview image is a JPEG of a safe size and weight, never cropped.
         by_slug = dict(zip(self.slugs, self.products))
@@ -2511,9 +2522,10 @@ class ProductSharePageTests(unittest.TestCase):
         for slug in self.slugs:
             text, tags = self.page(slug)
             self.assertFalse(tags.meta_refresh, slug + " must not use meta refresh: crawlers follow it and lose the product tags")
-            self.assertEqual(len(tags.scripts), 1, slug)
-            match = re.fullmatch(r'\s*location\.replace\("/\?product=' + re.escape(slug) + r'#([a-z0-9-]+)"\);\s*', tags.scripts[0])
-            self.assertIsNotNone(match, slug + ": " + tags.scripts[0])
+            inline = [code for code in tags.scripts if code.strip()]  # the deferred analytics.js tag has no inline code
+            self.assertEqual(len(inline), 1, slug)
+            match = re.fullmatch(r'\s*location\.replace\("/\?product=' + re.escape(slug) + r'#([a-z0-9-]+)"\);\s*', inline[0])
+            self.assertIsNotNone(match, slug + ": " + inline[0])
             self.assertIn(match.group(1), section_ids, slug)
             target = "/?product=" + slug + "#" + match.group(1)
             self.assertEqual(tags.body_links, [target], slug + " keeps one visible link to the same place")

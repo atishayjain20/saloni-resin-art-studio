@@ -72,6 +72,14 @@
     return list.split(/\s+/).filter(function (name) { return /^[a-z]+(?:-[a-z]+)*$/.test(name); });
   }
 
+  // Visitor counts (analytics.js): a fixed event name, or "product-" / "cart-add-" plus the card's slug. A no-op when analytics is not there.
+  function track(path) { try { if (window.saloniTrack) window.saloniTrack(path); } catch (error) {} }
+  // The share slug of a card or its photo link ("" when it has none).
+  function slugOf(node) {
+    var link = node && typeof node.getAttribute === "function" && node.getAttribute("data-product-slug") ? node : node && node.querySelector ? node.querySelector("[data-product-slug]") : null;
+    return link ? String(link.getAttribute("data-product-slug") || "") : "";
+  }
+
   // One AI photo of the design at href: "styled" is the styled scene, any other name a colour idea.
   function aiPhoto(href, name) {
     var stem = String(href || "").split(/[?#]/)[0].split("/").pop().replace(/\.[^.]*$/, "");
@@ -302,6 +310,7 @@
     var customizer = document.getElementById("customizer");
     var customizerDisclosure = document.getElementById("customizer-disclosure");
     if (customizer && customizerDisclosure) {
+      customizerDisclosure.addEventListener("toggle", function () { if (customizerDisclosure.open) track("customizer-open"); });
       function openCustomizer(shouldScroll, focusSummary) {
         customizerDisclosure.open = true;
         if (shouldScroll && typeof customizer.scrollIntoView === "function") customizer.scrollIntoView({ behavior: "instant", block: "start" });
@@ -810,6 +819,7 @@
 
       if (shareButton) shareButton.addEventListener("click", function () {
         if (!shareData) return;
+        track("share-tap");
         var nav = window.navigator;
         if (nav && typeof nav.share === "function") {
           var shared;
@@ -850,6 +860,7 @@
         // Back from the popup must leave the page where the link scrolled it, not where the browser saved it before the jump.
         if (window.history) window.history.scrollRestoration = "manual";
         openLightbox(match, match);
+        track("share-link-opened");
       };
 
       var pressStartedInside = false;
@@ -1029,6 +1040,8 @@
         var targetCard = targetId && document.getElementById ? document.getElementById(targetId) : null;
         var targetTrigger = targetCard && targetCard.querySelector ? targetCard.querySelector("[data-lightbox-trigger]") : null;
         lightboxItems = [productDetails(targetTrigger || trigger)];
+        var slug = slugOf(targetTrigger || trigger);
+        if (slug) track("product-" + slug);
         lightboxIndex = 0;
         renderLightboxItem(cardPhotoIndex(targetTrigger || trigger));
         pushLightboxHistory();
@@ -2108,6 +2121,7 @@
         return false;
       }
       status.hidden = true;
+      track("order-form-open");
       window.saloniOrderForm.open(seed, { previewBlob: frameState.previewSnapshot ? frameState.previewSnapshot.blob : null, onSent: saveRepeatProfile });
       frameState.loaded = true;
       if (continueOrderButton) continueOrderButton.hidden = false;
@@ -2520,13 +2534,14 @@
       var nextItems = selectedCatalogueItems.concat([seed]);
       if (bundleTotal(nextItems) > 100 || bundleDetails(nextItems).length > 2000) {
         setCatalogueSelectionStatus("That item cannot be added because the selected list is full. Remove an item before adding another.");
-        return;
+        return false;
       }
       selectedCatalogueItems = nextItems;
       setCatalogueSelectionStatus("");
       markCatalogueSelectionChanged();
       updateCatalogueSelection();
       clearPreparedCatalogueRequest();
+      return true;
     }
 
     function catalogueSeed(card) {
@@ -2596,7 +2611,10 @@
       button.setAttribute("aria-pressed", "false");
       button.setAttribute("aria-label", "Add " + seed.productName + " to cart");
       button.addEventListener("click", function () {
-        toggleCatalogueSelection(withPhoto(seed, chosenPhotoName(button, card, seed)));
+        if (toggleCatalogueSelection(withPhoto(seed, chosenPhotoName(button, card, seed)))) {
+          var slug = slugOf(card);
+          if (slug) track("cart-add-" + slug);
+        }
       });
       caption.appendChild(button);
     });
