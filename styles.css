@@ -534,7 +534,7 @@ dialog.advance-popup::backdrop { background: rgba(42, 14, 31, .72); }
 .my-order-pay-label { margin: 0; color: var(--ink); font-size: .85rem; font-weight: 700; }
 .my-order-pay-choice { display: flex; flex-wrap: wrap; gap: .6rem; width: 100%; }
 .my-order-pay { display: grid; place-items: center; flex: 0 0 auto; width: 3.5rem; height: 3.5rem; border: 1px solid var(--line); border-radius: .9rem; background: #fff; transition: border-color 180ms ease, transform 180ms ease; }
-.my-order-pay svg { display: block; width: 1.75rem; height: 1.75rem; }
+.my-order-pay > svg { display: block; width: 1.75rem; height: 1.75rem; }
 .my-order-pay:hover { border-color: var(--ink); }
 .my-order-pay:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; border-color: var(--ink); }
 .my-order-pay:active { transform: scale(.96); }
