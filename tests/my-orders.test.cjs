@@ -1145,19 +1145,27 @@ test("a confirmed order with an advance shows the amount, a Pay with choice of a
     "intent://pay?" + PARAMS + "#Intent;scheme=upi;package=com.whatsapp;end",
   ]);
   assert.deepEqual(links.map((link) => link.getAttribute("aria-label")), ["Pay ₹500 with Google Pay", "Pay ₹500 with PhonePe", "Pay ₹500 with Paytm", "Pay ₹500 with WhatsApp"]);
-  assert.deepEqual(links.map(text), ["", "", "", ""], "the buttons show icons, not app names");
+  assert.deepEqual(links.map((link) => text(link).trim()), ["", "", "", ""], "the buttons show icons, not app names");
   for (const link of links) {
-    const icons = find(link, (element) => element.tagName === "SVG");
-    assert.equal(icons.length, 1);
+    const icons = link.children.filter((element) => element.tagName === "SVG");
+    assert.equal(icons.length, 1, "one icon per link");
     assert.equal(icons[0].getAttribute("aria-hidden"), "true");
     assert.equal(icons[0].getAttribute("focusable"), "false");
     assert.equal(icons[0].getAttribute("viewBox"), "0 0 24 24");
-    assert.match(icons[0].getAttribute("fill"), /^#[0-9A-Fa-f]{6}$/);
     const paths = find(icons[0], (element) => element.tagName === "PATH");
-    assert.equal(paths.length, 1);
-    assert.match(paths[0].getAttribute("d"), /^M[\d.\sA-Za-z,-]+$/);
+    assert.ok(paths.length >= 1);
+    for (const path of paths) assert.match(path.getAttribute("d"), /^M[\d.\sA-Za-z,-]+$/);
   }
-  assert.deepEqual(links.map((link) => find(link, (element) => element.tagName === "SVG")[0].getAttribute("fill")), ["#4285F4", "#5F259F", "#20336B", "#25D366"]);
+  // Each icon keeps its brand colours: Google Pay's four-colour G with grey "Pay", Paytm's dark "pay" and light "tm".
+  const colours = (link) => find(link, (element) => Boolean(element.getAttribute && element.getAttribute("fill"))).map((element) => element.getAttribute("fill"));
+  assert.deepEqual(links.map(colours), [
+    ["#5F6368", "#EA4335", "#4285F4", "#FBBC05", "#34A853"], ["#5F259F"], ["#002970", "#00BAF2"], ["#25D366"],
+  ]);
+  for (const link of links) {
+    for (const slice of find(link, (element) => element.tagName === "SVG").slice(1)) {
+      assert.equal(slice.getAttribute("viewBox"), slice.getAttribute("x") + " 0 " + slice.getAttribute("width") + " 24", "each colour band shows only its own slice");
+    }
+  }
   assert.match(text(advanceBox(runtime.card)), /Pay with/);
   assert.doesNotMatch(text(advanceBox(runtime.card)), /If nothing opens|isn.t installed|choose another/);
   assert.doesNotMatch(text(advanceBox(runtime.card)), /Other UPI app/i);
