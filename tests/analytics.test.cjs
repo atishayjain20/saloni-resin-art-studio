@@ -8,7 +8,7 @@ const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const analyticsPath = path.join(root, "analytics.js");
 const source = fs.existsSync(analyticsPath) ? fs.readFileSync(analyticsPath, "utf8") : "";
-const VERSION = "20261173";
+const VERSION = "20261174";
 // The versioned file GoatCounter publishes for SRI, and the hash its help page lists for it (https://www.goatcounter.com/help/countjs-versions).
 const OFFICIAL_SRC = "https://gc.zgo.at/count.v5.js";
 const OFFICIAL_HASH = "sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ";
@@ -167,10 +167,10 @@ test("every public page loads analytics.js once with the shared cache version, b
 
 test("the shared cache version is bumped everywhere it is stamped", () => {
   for (const page of publicPages().filter((page) => !page.startsWith("p" + path.sep))) {
-    assert.doesNotMatch(read(page), /\?v=20261172/, page);
+    assert.doesNotMatch(read(page), /\?v=20261173/, page);
   }
-  assert.doesNotMatch(read("README.md"), /Cache version `20261172`/);
-  assert.match(read("README.md"), /Cache version `20261173`/);
+  assert.doesNotMatch(read("README.md"), /Cache version `20261173`/);
+  assert.match(read("README.md"), /Cache version `20261174`/);
 });
 
 test("no page carries a Content-Security-Policy meta tag that would block GoatCounter", () => {

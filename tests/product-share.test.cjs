@@ -227,7 +227,7 @@ test("every card photo link carries its own data-product-slug and the version is
   assert.ok(slugs.length > 90);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.doesNotMatch(html, /\?v=20261165/);
-  assert.match(html, /script\.js\?v=20261173/);
+  assert.match(html, /script\.js\?v=20261174/);
 });
 
 // --- Visitor counts: the product popup, the share button and a shared link, with no personal data ---
