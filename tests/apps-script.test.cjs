@@ -362,7 +362,7 @@ function makeRuntime(options = {}) {
     folderAccess: options.folderAccess || "PRIVATE",
     captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 },
     driveDeletes: [], retentionTrashed: 0, rowDeletes: [], triggerCreates: 0, triggerConfig: null,
-    richReads: [], richWrites: [], noteReads: [], noteWrites: [], links: {}, notes: {},
+    richReads: [], richWrites: [], noteReads: [], noteWrites: [], links: {}, notes: {}, styles: {},
     logs: [], rangeReads: [], locked: false, whatsappFetches: [], emails: [], base64Decodes: 0, cellWrites: [], formats: [],
   };
   const sheet = {
@@ -384,10 +384,15 @@ function makeRuntime(options = {}) {
         if (options.onFreshRead) options.onFreshRead(rows);
         return richValue(row, column, rows[row - 2][column - 1]);
       },
+      getValue: () => {
+        if (options.onFreshRead) options.onFreshRead(rows);
+        return rows[row - 2][column - 1];
+      },
       setRichTextValue: (rich) => {
         state.richWrites.push({ row, column, text: rich.getText(), url: rich.getLinkUrl(), lockHeld: state.locked });
         rows[row - 2][column - 1] = rich.getText();
         state.links[row + "," + column] = rich.getLinkUrl();
+        state.styles[row + "," + column] = rich.style || null;
       },
       getNotes: () => {
         state.noteReads.push({ row, column, numRows, numColumns });
@@ -415,10 +420,24 @@ function makeRuntime(options = {}) {
       rows.splice(rowNumber - 2, 1);
     },
   };
+  // Like Sheets: a cell that holds a number or a date has no rich text value (null).
   function richValue(row, column, value) {
+    if (typeof value === "number" || value instanceof Date) return null;
     const text = String(value == null ? "" : value);
     const url = state.links[row + "," + column] || null;
-    return { getText: () => text, getLinkUrl: () => url };
+    const style = state.styles[row + "," + column] || null;
+    return {
+      getText: () => text, getLinkUrl: () => url, style,
+      copy: () => { const builder = richBuilder(text, url, style); return builder; },
+    };
+  }
+  function richBuilder(text, url, style) {
+    const builder = {
+      setText(value) { text = String(value); return builder; },
+      setLinkUrl(value) { url = value; return builder; },
+      build: () => ({ getText: () => text, getLinkUrl: () => url, style }),
+    };
+    return builder;
   }
   function iterator(items) {
     let index = 0;
@@ -487,11 +506,7 @@ function makeRuntime(options = {}) {
     },
     SpreadsheetApp: {
       openById: () => ({ getSheetByName: () => sheet }),
-      newRichTextValue: () => {
-        let text = ""; let url = null;
-        const builder = { setText(value) { text = String(value); return builder; }, setLinkUrl(value) { url = value; return builder; }, build: () => ({ getText: () => text, getLinkUrl: () => url }) };
-        return builder;
-      },
+      newRichTextValue: () => richBuilder("", null, null),
     },
     DriveApp: {
       getFolderById: () => folder, Access: { PRIVATE: "PRIVATE" },
@@ -2273,4 +2288,86 @@ test("no other action or response carries the link: a cancel request leaves the 
   assert.equal(runtime.link(0), link);
   assert.equal(runtime.rows[0][37], "500");
   assert.equal(runtime.state.emails.every((email) => !JSON.stringify(email.message).includes("wa.me")), true);
+});
+
+test("a number in Advance amount (no rich text value in Sheets) does not stop the pass: it is linked and later rows still are", () => {
+  const runtime = waRuntime([{}, { amount: 500 }, { amount: "700" }, { amount: 800 }]);
+  assert.equal(runtime.state.links["3," + WA_AMOUNT_COLUMN], undefined);
+  const result = runtime.refresh();
+  assert.equal(result.set, 4);
+  assert.equal(result.checked, 4);
+  for (const index of [0, 1, 2, 3]) assert.ok(runtime.link(index), "row " + index);
+  assert.match(waMessage(runtime.link(1)), /advance of \u20B9500 to/);
+  assert.match(waMessage(runtime.link(2)), /advance of \u20B9700 to/);
+  assert.equal(String(runtime.rows[1][37]), "500", "the amount reads the same");
+  assert.equal(statusPost(runtime, { requestIds: runtime.ids }).advance[runtime.ids[1]].amount, 500);
+  assert.equal(runtime.refresh().set, 0, "and a second run writes nothing");
+});
+
+test("a number that is not a valid advance, or a date, is left alone without error", () => {
+  const runtime = waRuntime([{ amount: 0 }, { amount: 500.5 }, { amount: new Date("2026-11-13T00:00:00Z") }, { amount: "700" }]);
+  const result = runtime.refresh();
+  assert.equal(result.set, 1);
+  assert.ok(runtime.link(3));
+  assert.equal(runtime.writes(), 2, "one link and its note");
+});
+
+test("the link keeps Saloni's text styling: it is built from the existing rich value, on set and on remove", () => {
+  const runtime = waRuntime([{}, {}]);
+  runtime.state.styles["2," + WA_AMOUNT_COLUMN] = "bold-red";
+  runtime.state.styles["3," + WA_AMOUNT_COLUMN] = "green";
+  runtime.refresh();
+  assert.ok(runtime.link(0) && runtime.link(1));
+  assert.equal(runtime.state.styles["2," + WA_AMOUNT_COLUMN], "bold-red");
+  assert.equal(runtime.state.styles["3," + WA_AMOUNT_COLUMN], "green");
+  runtime.rows[0][38] = "Paid";
+  runtime.refresh();
+  assert.equal(runtime.link(0), null);
+  assert.equal(runtime.state.styles["2," + WA_AMOUNT_COLUMN], "bold-red");
+  assert.equal(runtime.rows[0][37], "500");
+});
+
+test("a row that moved during the pass (Request ID in column A changed) is skipped, never written", () => {
+  const runtime = waRuntime([{}, {}], { onFreshRead: (rows) => { rows[0][0] = "zzzz9999-0000-4000-8000-000000000000"; } });
+  const result = runtime.refresh();
+  assert.equal(result.set, 1, "only the row that did not move");
+  assert.ok(runtime.link(1));
+  assert.equal(runtime.link(0), null, "row 1 moved");
+  assert.equal(runtime.note(0), "");
+  assert.equal(runtime.writes(), 2, "the other row's link and note");
+});
+
+test("the trigger runs the link pass at most about every 5 minutes, and a skipped run does not open the sheet", () => {
+  const props = Object.assign({}, VALID_UPI, QUEUED_PROPERTIES);
+  const runtime = waRuntime([{}], { properties: props });
+  runtime.context.sendQueuedOrderAlerts_();
+  assert.ok(runtime.link(0), "the first run does the pass");
+  assert.ok(Number(runtime.properties.WHATSAPP_ADVANCE_LAST_PASS) > 0);
+  const stamp = runtime.properties.WHATSAPP_ADVANCE_LAST_PASS;
+  runtime.rows[0][37] = "800"; runtime.state.links["2," + WA_AMOUNT_COLUMN] = null;
+  runtime.state.rangeReads.length = 0;
+  for (let minute = 0; minute < 4; minute += 1) runtime.context.sendQueuedOrderAlerts_();
+  assert.equal(runtime.link(0), null, "four more runs inside the window do nothing");
+  assert.equal(runtime.state.rangeReads.length, 0);
+  assert.equal(runtime.properties.WHATSAPP_ADVANCE_LAST_PASS, stamp);
+  runtime.properties.WHATSAPP_ADVANCE_LAST_PASS = String(Date.now() - 4.9 * 60 * 1000);
+  runtime.context.sendQueuedOrderAlerts_();
+  assert.ok(runtime.link(0), "after about 5 minutes the next run does the pass");
+  assert.match(waMessage(runtime.link(0)), /\u20B9800/);
+  runtime.rows[0][37] = "900"; runtime.state.links["2," + WA_AMOUNT_COLUMN] = null;
+  runtime.properties.WHATSAPP_ADVANCE_LAST_PASS = String(Date.now() - 4 * 60 * 1000);
+  runtime.context.sendQueuedOrderAlerts_();
+  assert.equal(runtime.link(0), null, "4 minutes is too soon");
+  runtime.properties.WHATSAPP_ADVANCE_LAST_PASS = "not a number";
+  runtime.context.sendQueuedOrderAlerts_();
+  assert.ok(runtime.link(0), "a damaged stamp just means due");
+});
+
+test("the throttle stamp is not written while the kill switch is on, and the owner setup is never throttled", () => {
+  const off = waRuntime([{}], { properties: Object.assign({ WHATSAPP_ADVANCE_LINK_DISABLED: "true" }, VALID_UPI) });
+  off.context.sendQueuedOrderAlerts_();
+  assert.equal(off.properties.WHATSAPP_ADVANCE_LAST_PASS, undefined);
+  const owner = waRuntime([{}], { activeEmail: "o@example.com", effectiveEmail: "o@example.com" });
+  owner.properties.WHATSAPP_ADVANCE_LAST_PASS = String(Date.now());
+  assert.equal(owner.context.setupWhatsAppAdvanceLinks().links.set, 1);
 });

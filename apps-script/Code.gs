@@ -1069,9 +1069,9 @@ function sendQueuedOrderAlerts_() {
   } finally {
     lock.releaseLock();
   }
-  // This trigger already runs every minute, so it also keeps the WhatsApp advance links up to date (no second trigger).
+  // This trigger already runs every minute, so it also keeps the WhatsApp advance links up to date (no second trigger), about every 5 minutes.
   // Never lets a link problem stop alerts, and logs no customer data.
-  try { refreshWhatsAppAdvanceLinks_(); } catch (linkError) { console.error("Could not refresh the WhatsApp advance links."); }
+  try { refreshWhatsAppAdvanceLinksIfDue_(); } catch (linkError) { console.error("Could not refresh the WhatsApp advance links."); }
   return sent;
 }
 
@@ -1198,6 +1198,21 @@ function whatsAppAdvanceLink_(row, amount, payee, number) {
   return WHATSAPP_LINK_PREFIX + number + "?text=" + encodeURIComponent(message);
 }
 
+// The trigger runs every minute, but the link pass only about every 5 minutes: it opens the spreadsheet, and a free account has
+// 90 minutes of trigger time a day that order alerts share. The time of the last pass is kept in a script property (the check
+// costs one property read). The stamp is written before the pass, so a failing pass does not retry every minute; 4.5 minutes
+// rather than 5 so a trigger that fires a little early is not pushed to the minute after.
+var WHATSAPP_PASS_INTERVAL_MS = 4.5 * 60 * 1000;
+function refreshWhatsAppAdvanceLinksIfDue_() {
+  var properties = PropertiesService.getScriptProperties();
+  if (isTrue_(properties.getProperty("WHATSAPP_ADVANCE_LINK_DISABLED"))) return null;
+  var now = new Date().getTime();
+  var last = Number(properties.getProperty("WHATSAPP_ADVANCE_LAST_PASS"));
+  if (last > 0 && now >= last && now - last < WHATSAPP_PASS_INTERVAL_MS) return null;
+  properties.setProperty("WHATSAPP_ADVANCE_LAST_PASS", String(now));
+  return refreshWhatsAppAdvanceLinks_();
+}
+
 // One pass over the Orders sheet: reads the order rows once, writes only the cells whose link or note must change. Safe to repeat.
 // Runs under the script lock like the other writers (read and write together, so a row cannot move in between); when the lock
 // is busy it skips and the next minute tries again. Returns null when it did nothing, else the counts.
@@ -1227,24 +1242,32 @@ function refreshWhatsAppAdvanceLinks_() {
       var number = amount ? whatsAppNumber_(values[row][phoneColumn]) : "";
       var url = amount && number ? whatsAppAdvanceLink_(values[row], amount, payee, number) : "";
       var wantNote = !amount ? "" : url ? WHATSAPP_TAP_NOTE : WHATSAPP_PHONE_NOTE;
-      var haveUrl = String(rich[row][0].getLinkUrl() || "");
+      // Sheets gives no rich text value (null) for a cell holding a number or a date; such a cell has no link and its text is the value.
+      var existing = rich[row][0];
+      var haveUrl = existing ? String(existing.getLinkUrl() || "") : "";
       var haveNote = String(notes[row][0] || "");
       var cell = null;
       // A link she added herself (not a wa.me one) is never removed; a wa.me link is ours.
       var ours = haveUrl.indexOf(WHATSAPP_LINK_PREFIX) === 0;
-      if (haveUrl !== url && (url || ours)) {
-        var text = rich[row][0].getText();
-        cell = sheet.getRange(row + 2, amountColumn + 1);
-        // Saloni may be typing in this very cell: if its text is not what was read, leave it for the next pass.
-        if (cell.getRichTextValue().getText() !== text) continue;
-        var builder = SpreadsheetApp.newRichTextValue().setText(text);
-        cell.setRichTextValue(url ? builder.setLinkUrl(url).build() : builder.build());
-        if (url) counts.set += 1; else counts.removed += 1;
-      }
+      var linkChange = haveUrl !== url && (url || ours);
       // Only our own two notes are replaced or cleared; a note she wrote is kept.
       var ourNote = haveNote === WHATSAPP_TAP_NOTE || haveNote === WHATSAPP_PHONE_NOTE;
-      if (haveNote !== wantNote && (ourNote || (wantNote && !haveNote))) {
-        (cell || sheet.getRange(row + 2, amountColumn + 1)).setNote(wantNote);
+      var noteChange = haveNote !== wantNote && (ourNote || (wantNote && !haveNote));
+      if (!linkChange && !noteChange) continue;
+      cell = sheet.getRange(row + 2, amountColumn + 1);
+      // She may sort, delete or type while this pass runs: write only if the row is still the one that was read.
+      if (String(sheet.getRange(row + 2, 1).getValue()) !== String(values[row][0])) continue;
+      if (linkChange) {
+        var text = existing ? existing.getText() : String(values[row][amountColumn]);
+        var fresh = cell.getRichTextValue();
+        if ((fresh ? fresh.getText() : String(cell.getValue())) !== text) continue; // she is typing in this cell: next pass
+        // Built from the existing value so her fonts and colours stay; a null value (a number) becomes the same text as a rich value.
+        var builder = existing ? existing.copy() : SpreadsheetApp.newRichTextValue().setText(text);
+        cell.setRichTextValue(builder.setLinkUrl(url || null).build());
+        if (url) counts.set += 1; else counts.removed += 1;
+      }
+      if (noteChange) {
+        cell.setNote(wantNote);
         if (wantNote) counts.noted += 1;
       }
     }
