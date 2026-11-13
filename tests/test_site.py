@@ -766,7 +766,7 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertEqual(collection["name"], spec["title"].split(" | ")[0])
             self.assertTrue(collection.get("mainEntity"))
             self.assertNotRegex(scripts[0], re.compile(r"Product|Offer|AggregateRating|Review|rating|price|availability|stock", re.I))
-            self.assertNotRegex(html, re.compile(r'<script\b[^>]+src=', re.I), slug)
+            self.assertNotRegex(html, re.compile(r'<script\b(?![^>]*analytics\.js)[^>]+src=', re.I), slug)
             self.assertNotIn("₹", html, slug)
             image_tags = re.findall(r"<img\b[^>]*>", html)
             self.assertGreaterEqual(len(image_tags), 3, slug)

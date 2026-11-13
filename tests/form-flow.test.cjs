@@ -1605,3 +1605,49 @@ test("My orders: notes are trimmed and capped at 300 characters", async () => {
   await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
   assert.equal(saved[0].notes, "n".repeat(300));
 });
+
+// --- Visitor counts: "order sent" is counted only after the server confirms, and carries nothing from the form ---
+test("analytics: order-sent is counted once the server confirms, with no personal data in the event", async () => {
+  const runtime = makeFormRuntime();
+  const events = [];
+  runtime.windowObject.saloniTrack = (...args) => events.push(args);
+  fillValid(runtime.fields);
+  runtime.fields.referralCode.value = "FRIEND10";
+  submitOrderForm(runtime);
+  assert.deepEqual(events, [], "nothing is counted while the request is still being sent");
+  await runtime.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now", referralCode: "FRIEND10" });
+  assert.deepEqual(events, [["order-sent"]]);
+  assert.match(runtime.status.textContent, /Request received/);
+});
+
+test("analytics: a failed, refused or unconfirmed send is never counted as sent", async () => {
+  const failed = makeFormRuntime();
+  const events = [];
+  failed.windowObject.saloniTrack = (name) => events.push(name);
+  fillValid(failed.fields);
+  submitOrderForm(failed);
+  await failed.callbacks[0].failure(new Error("network"));
+  assert.deepEqual(events, []);
+  const refused = makeFormRuntime();
+  refused.windowObject.saloniTrack = (name) => events.push(name);
+  fillValid(refused.fields);
+  submitOrderForm(refused);
+  await refused.callbacks[0].success({ ok: false, error: "Please check the form." });
+  assert.deepEqual(events, []);
+});
+
+test("analytics: a missing or throwing saloniTrack does not stop the success screen or My orders saving", async () => {
+  const throwing = makeFormRuntime();
+  throwing.windowObject.saloniTrack = () => { throw new Error("analytics broke"); };
+  const saved = watchMyOrders(throwing);
+  fillValid(throwing.fields);
+  submitOrderForm(throwing);
+  await throwing.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(saved.length, 1);
+  assert.equal(throwing.elements.get("success-celebration").hidden, false);
+  const bare = makeFormRuntime();
+  fillValid(bare.fields);
+  submitOrderForm(bare);
+  await bare.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.equal(bare.elements.get("success-celebration").hidden, false);
+});

@@ -55,6 +55,8 @@
   var attachmentGeneration = 0;
   var previewObjectUrl = "";
 
+  // Visitor counts (analytics.js): a fixed event name only. A no-op when analytics is not there.
+  function track(path) { try { if (window.saloniTrack) window.saloniTrack(path); } catch (error) {} }
   function value(name) { return form.elements[name] ? String(form.elements[name].value || "") : ""; }
   function isBundle() { return String(seed.sourceKind || "").toLowerCase() === "catalogue" && String(seed.sourceId || "") === "catalogue:multi-item"; }
   function bundleQuantity(item) {
@@ -615,6 +617,7 @@
       try { onSent(repeatProfileFromForm()); } catch (error) {}
     }
     saveMyOrder(result);
+    track("order-sent");
     // A visual "it worked" moment, so shoppers know without reading; the status text stays the accessible message.
     if (celebration) celebration.hidden = false;
     setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed." + referralMessage + " Request ID: " + result.requestId, "success");

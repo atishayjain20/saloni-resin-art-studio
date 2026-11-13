@@ -1815,3 +1815,42 @@ test("my-orders.js keeps the popup to the home page: it is loaded there only, an
   pages.forEach((page) => assert.doesNotMatch(fs.readFileSync(path.join(root, page, "index.html"), "utf8"), /my-orders\.js/, page));
   assert.match(fs.readFileSync(path.join(root, "README.md"), "utf8"), /advance payment popup/i);
 });
+
+// --- Visitor counts: only fixed event names, nothing about the order, and no change when analytics is missing ---
+const spyTrack = (runtime) => { const events = []; runtime.windowObject.saloniTrack = (name) => events.push(name); return events; };
+
+test("analytics: opening My orders is counted, and a missing or throwing saloniTrack changes nothing", () => {
+  const runtime = makeRuntime();
+  const events = spyTrack(runtime);
+  openDialog(runtime);
+  assert.deepEqual(events, ["my-orders-open"]);
+  const bare = makeRuntime();
+  openDialog(bare);
+  assert.equal(bare.dialog.open, true, "works with no saloniTrack at all");
+  const throwing = makeRuntime();
+  throwing.windowObject.saloniTrack = () => { throw new Error("analytics broke"); };
+  assert.doesNotThrow(() => openDialog(throwing));
+  assert.equal(throwing.dialog.open, true);
+});
+
+test("analytics: tapping a pay icon counts the app only, never the order, amount or UPI ID", async () => {
+  const runtime = withAdvanceOrder(advanceReply("confirmed", ADV), { navigator: { userAgent: ANDROID_UA, platform: "Linux armv8l" } });
+  await settle();
+  const events = spyTrack(runtime);
+  payLinks(runtime.card).forEach((link) => link.dispatch("click", { button: 0 }));
+  assert.deepEqual(events, ["advance-pay-googlepay", "advance-pay-phonepe", "advance-pay-paytm", "advance-pay-whatsapp"]);
+  const everything = JSON.stringify(events);
+  for (const secret of [ADV_ID.slice(0, 8), "500", "okhdfcbank", "saloni.art"]) assert.ok(!everything.includes(secret), secret);
+});
+
+test("analytics: the advance popup is counted when it is shown, once, without the order in the event", async () => {
+  const runtime = dueRuntime();
+  const events = spyTrack(runtime);
+  await load(runtime);
+  assert.equal(runtime.popup.open, true);
+  assert.deepEqual(events, ["advance-popup-shown"]);
+  const quiet = dueRuntime({ skipSave: true });
+  const none = spyTrack(quiet);
+  await load(quiet);
+  assert.deepEqual(none, [], "no popup, no event");
+});

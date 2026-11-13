@@ -227,5 +227,54 @@ test("every card photo link carries its own data-product-slug and the version is
   assert.ok(slugs.length > 90);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.doesNotMatch(html, /\?v=20261165/);
-  assert.match(html, /script\.js\?v=20261173/);
+  assert.match(html, /script\.js\?v=20261174/);
+});
+
+// --- Visitor counts: the product popup, the share button and a shared link, with no personal data ---
+test("analytics: opening a product popup counts product-<slug> with the card's own slug", () => {
+  const page = harness({ search: "" });
+  const events = [];
+  page.windowObject.saloniTrack = (name) => events.push(name);
+  page.triggers[1].listeners.click({ button: 0, preventDefault() {} });
+  assert.deepEqual(events, ["product-mr-and-mrs-name-plate"]);
+  page.triggers[0].listeners.click({ button: 0, preventDefault() {} });
+  assert.deepEqual(events, ["product-mr-and-mrs-name-plate", "product-jewel-glow-tealight"]);
+});
+
+test("analytics: a card without a slug is not counted, and a throwing or missing saloniTrack never stops the popup", () => {
+  const noSlug = harness({ noSlugAttribute: true });
+  const events = [];
+  noSlug.windowObject.saloniTrack = (name) => events.push(name);
+  noSlug.triggers[0].listeners.click({ button: 0, preventDefault() {} });
+  assert.equal(noSlug.lightbox.open, true);
+  assert.deepEqual(events, []);
+  const throwing = harness({});
+  throwing.windowObject.saloniTrack = () => { throw new Error("analytics broke"); };
+  assert.doesNotThrow(() => throwing.triggers[0].listeners.click({ button: 0, preventDefault() {} }));
+  assert.equal(throwing.lightbox.open, true);
+  const bare = harness({});
+  assert.doesNotThrow(() => bare.triggers[0].listeners.click({ button: 0, preventDefault() {} }));
+  assert.equal(bare.lightbox.open, true);
+});
+
+test("analytics: a visit through a shared product link is counted, along with the product it opens", () => {
+  const page = harness({ search: "?product=jewel-glow-tealight" });
+  const events = [];
+  page.windowObject.saloniTrack = (name) => events.push(name);
+  page.openSharedProduct();
+  assert.deepEqual(events, ["product-jewel-glow-tealight", "share-link-opened"]);
+  const unknown = harness({ search: "?product=no-such-gift" });
+  const none = [];
+  unknown.windowObject.saloniTrack = (name) => none.push(name);
+  unknown.openSharedProduct();
+  assert.deepEqual(none, [], "an unknown link opens nothing and counts nothing");
+});
+
+test("analytics: pressing Share counts share-tap and never the link or product name", () => {
+  const page = harness({ search: "?product=jewel-glow-tealight" });
+  page.openSharedProduct();
+  const events = [];
+  page.windowObject.saloniTrack = (name) => events.push(name);
+  page.elements["lightbox-share-button"].listeners.click();
+  assert.deepEqual(events, ["share-tap"]);
 });
