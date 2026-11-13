@@ -909,9 +909,8 @@ function orderStatuses_(requestIds) {
         var paid = advanceIsPaid_(values[row][amountColumn + 1]);
         if (paid && (code === "received" || code === "confirmed" || code === "in_progress")) {
           code = "advance_paid";
-        } else if (!paid && payee && code === "confirmed" && String(values[row][statusColumn + 1] == null ? "" : values[row][statusColumn + 1]).indexOf(CANCEL_NOTE_PREFIX) === -1) {
-          // A cancellation request in Staff notes hides the advance, so a second device never offers to pay for a cancelled order.
-          var amount = advanceAmount_(values[row][amountColumn]);
+        } else {
+          var amount = advanceOfferAmount_(code, paid, values[row][statusColumn + 1], values[row][amountColumn], payee);
           if (amount) { advances[id] = { amount: amount, payee: payee.id, name: payee.name }; advanceCount += 1; }
         }
       }
@@ -938,6 +937,15 @@ function advanceAmount_(cell) {
   var match = /^(?:\u20B9|rs\.?|inr)?\s*([1-9][0-9]{0,5})(?:\.0{1,2})?$/i.exec(String(cell == null ? "" : cell).trim());
   var amount = match ? Number(match[1]) : 0;
   return amount >= 1 && amount <= 200000 ? amount : 0;
+}
+
+// The advance the site offers for one order, or 0: Confirmed, not Paid, a valid payee, a valid amount, and no cancellation request
+// in Staff notes (which hides the advance, so a second device never offers to pay for a cancelled order). The status action and the
+// WhatsApp link both use this, so a link exists exactly where the site shows an advance.
+function advanceOfferAmount_(code, paid, notesCell, amountCell, payee) {
+  if (paid || !payee || code !== "confirmed") return 0;
+  if (String(notesCell == null ? "" : notesCell).indexOf(CANCEL_NOTE_PREFIX) !== -1) return 0;
+  return advanceAmount_(amountCell);
 }
 
 // "Paid" or "Received" (any case, more words after it allowed, e.g. "Paid - UPI 123"). "Not paid" and "Partially paid" are not.
@@ -1061,6 +1069,9 @@ function sendQueuedOrderAlerts_() {
   } finally {
     lock.releaseLock();
   }
+  // This trigger already runs every minute, so it also keeps the WhatsApp advance links up to date (no second trigger).
+  // Never lets a link problem stop alerts, and logs no customer data.
+  try { refreshWhatsAppAdvanceLinks_(); } catch (linkError) { console.error("Could not refresh the WhatsApp advance links."); }
   return sent;
 }
 
@@ -1147,6 +1158,114 @@ function setupAdvancePayments() {
   } finally {
     lock.releaseLock();
   }
+}
+
+// --- WhatsApp advance message ---------------------------------------------
+// For every order that shows an advance on the site, the "Advance amount" cell becomes a link: wa.me/<shopper's number> with
+// the message already typed. Saloni taps the amount on her phone, WhatsApp opens, she checks the text and presses Send.
+// Nothing is sent by the script. The cell VALUE stays the text she typed (only a link is added), so the status action still
+// reads the same amount; no column is added. The link lives only in her private sheet: never in a web reply, a log or an email.
+// Paused by WHATSAPP_ADVANCE_LINK_DISABLED=true (the pass then does nothing, and existing links stay as they are).
+var WHATSAPP_LINK_PREFIX = "https://wa.me/";
+var WHATSAPP_TAP_NOTE = "Tap the amount to send the WhatsApp advance message";
+var WHATSAPP_PHONE_NOTE = "No WhatsApp link: the shopper's phone number is not a valid Indian number. Check the Phone column.";
+
+// wa.me digits for an Indian number: 10 digits (a mobile, 6-9 first) get 91; 12 digits starting 91 are kept; 11 digits starting
+// 0 become 91 + the last 10. Anything else is "" (no link; never guessed).
+function whatsAppNumber_(phone) {
+  var digits = String(phone == null ? "" : phone).replace(/\D/g, "");
+  if (digits.length === 11 && digits.charAt(0) === "0") digits = digits.slice(1);
+  else if (digits.length === 12 && digits.indexOf("91") === 0) digits = digits.slice(2);
+  return /^[6-9][0-9]{9}$/.test(digits) ? "91" + digits : "";
+}
+
+// Text typed into the Orders sheet as the shopper sent it: no control characters, one space between words, and no apostrophe
+// that neutralizeForSheet_ put in front of a leading = + - @.
+function whatsAppText_(value) {
+  return String(value == null ? "" : value).replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().replace(/^'(?=[=+\-@])/, "");
+}
+
+// The same note text the site's UPI link uses (paymentNote in my-orders.js), so a payment can be matched to the order.
+function whatsAppAdvanceLink_(row, amount, payee, number) {
+  var ref = String(row[0]).slice(0, 8);
+  var first = whatsAppText_(row[ORDER_HEADERS.indexOf("Customer name")]).split(" ")[0].slice(0, 40);
+  var product = whatsAppText_(row[LEGACY_ORDER_HEADERS.indexOf("Product name")]).slice(0, 80);
+  var quantity = Number(row[LEGACY_ORDER_HEADERS.indexOf("Quantity")]);
+  var item = product && quantity > 1 ? product + " x " + Math.floor(quantity) : product;
+  var message = "Hi" + (first ? " " + first : "") + ", your Saloni Resin Art order (ref " + ref + ")" + (item ? " for " + item : "") +
+    " is confirmed. Please pay the advance of \u20B9" + amount + " to UPI ID " + payee.id + " (" + payee.name + ") with the note \"Saloni order " + ref +
+    "\". You can also pay from \"My orders\" on saloniresinart.com. Thank you!";
+  return WHATSAPP_LINK_PREFIX + number + "?text=" + encodeURIComponent(message);
+}
+
+// One pass over the Orders sheet: reads the order rows once, writes only the cells whose link or note must change. Safe to repeat.
+// Runs under the script lock like the other writers (read and write together, so a row cannot move in between); when the lock
+// is busy it skips and the next minute tries again. Returns null when it did nothing, else the counts.
+function refreshWhatsAppAdvanceLinks_() {
+  var properties = PropertiesService.getScriptProperties();
+  if (isTrue_(properties.getProperty("WHATSAPP_ADVANCE_LINK_DISABLED"))) return null;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return null;
+  try {
+    var sheet = openOrderSheet_(properties);
+    if (orderSchemaLength_(sheet) !== ORDER_HEADERS_WITH_ADVANCE.length) return null; // the advance columns are on the newest layout only
+    var rows = sheet.getLastRow() - 1;
+    var counts = { set: 0, removed: 0, noted: 0, checked: 0 };
+    if (rows < 1) return counts;
+    var amountColumn = ORDER_HEADERS.length; // 0-based; the sheet column is amountColumn + 1
+    var statusColumn = LEGACY_ORDER_HEADERS.indexOf("Status");
+    var phoneColumn = LEGACY_ORDER_HEADERS.indexOf("Phone");
+    var payee = isTrue_(properties.getProperty("UPI_ADVANCE_DISABLED")) ? null : upiPayee_(properties);
+    var values = sheet.getRange(2, 1, rows, ORDER_HEADERS_WITH_ADVANCE.length).getValues();
+    var amountCells = sheet.getRange(2, amountColumn + 1, rows, 1);
+    var rich = amountCells.getRichTextValues();
+    var notes = amountCells.getNotes();
+    for (var row = 0; row < rows; row += 1) {
+      counts.checked += 1;
+      var code = orderStatusCode_(values[row][statusColumn]);
+      var amount = advanceOfferAmount_(code, advanceIsPaid_(values[row][amountColumn + 1]), values[row][statusColumn + 1], values[row][amountColumn], payee);
+      var number = amount ? whatsAppNumber_(values[row][phoneColumn]) : "";
+      var url = amount && number ? whatsAppAdvanceLink_(values[row], amount, payee, number) : "";
+      var wantNote = !amount ? "" : url ? WHATSAPP_TAP_NOTE : WHATSAPP_PHONE_NOTE;
+      var haveUrl = String(rich[row][0].getLinkUrl() || "");
+      var haveNote = String(notes[row][0] || "");
+      var cell = null;
+      // A link she added herself (not a wa.me one) is never removed; a wa.me link is ours.
+      var ours = haveUrl.indexOf(WHATSAPP_LINK_PREFIX) === 0;
+      if (haveUrl !== url && (url || ours)) {
+        var text = rich[row][0].getText();
+        cell = sheet.getRange(row + 2, amountColumn + 1);
+        // Saloni may be typing in this very cell: if its text is not what was read, leave it for the next pass.
+        if (cell.getRichTextValue().getText() !== text) continue;
+        var builder = SpreadsheetApp.newRichTextValue().setText(text);
+        cell.setRichTextValue(url ? builder.setLinkUrl(url).build() : builder.build());
+        if (url) counts.set += 1; else counts.removed += 1;
+      }
+      // Only our own two notes are replaced or cleared; a note she wrote is kept.
+      var ourNote = haveNote === WHATSAPP_TAP_NOTE || haveNote === WHATSAPP_PHONE_NOTE;
+      if (haveNote !== wantNote && (ourNote || (wantNote && !haveNote))) {
+        (cell || sheet.getRange(row + 2, amountColumn + 1)).setNote(wantNote);
+        if (wantNote) counts.noted += 1;
+      }
+    }
+    return counts;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Public so it shows in the editor Run menu; run once as the owner after deploying. Makes sure the 1-minute alert trigger
+// exists (the same one setupOrderAlertQueue installs; nothing is added when it is already there, and alert queueing is not
+// switched on) and does a first pass. Web visitors have an empty active user, so no web request can reach it.
+function setupWhatsAppAdvanceLinks() {
+  var active = String(Session.getActiveUser().getEmail() || "");
+  if (!active || active !== String(Session.getEffectiveUser().getEmail() || "")) {
+    throw new Error("Run this from the Apps Script editor as the owner.");
+  }
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ["https://www.googleapis.com/auth/script.scriptapp"]);
+  var result = { triggerInstalled: installOrderAlertTrigger_(), links: refreshWhatsAppAdvanceLinks_() };
+  console.log(JSON.stringify(result));
+  return result;
 }
 
 function orderSheetUrl_(properties) {
