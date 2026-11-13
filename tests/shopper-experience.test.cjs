@@ -718,11 +718,11 @@ test("resin-only catalogue removes hamper products and keeps both ₹2,000 budge
   assert.match(html, /<option value="2000">₹2,000 and above<\/option>/);
 });
 
-test("customizer presents a keyboard-matched basics, preview, advanced, and save/share flow", () => {
+test("customizer presents a keyboard-matched basics, preview, advanced, request, reset, and save/share flow", () => {
   const customizerSection = section("customizer");
   const order = [
     "preview-stage", "frame-template", "colour-theme", "reference-image", "personal-text", "frame-preset",
-    "order-from-customizer", "customizer-advanced",
+    "customizer-advanced", "order-from-customizer", "customizer-reset",
     "customizer-save-share"
   ];
   const positions = order.map((id) => customizerSection.indexOf(`id="${id}"`));
