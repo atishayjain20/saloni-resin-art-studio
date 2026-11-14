@@ -493,8 +493,7 @@
         var included = includedAt === -1 ? "" : paragraphs[includedAt];
         var description = paragraphs.filter(function (paragraph, index) { return index !== includedAt; }).join(" ");
         var aiImages = aiImageNames(trigger);
-        if (!description) description = imageAlt;
-        else if (imageAlt && /illustrative preview|reference image|reference design/i.test(imageAlt) && description.indexOf(imageAlt) === -1) description += " " + imageAlt;
+        if (!description) description = imageAlt.replace(/^(?:illustrative preview|reference image|reference design|concept preview):\s*/i, "");
         return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description, included: included, aiImages: aiImages };
       }
 
