@@ -435,6 +435,9 @@ h1 em { color: var(--rose); font-style: italic; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; min-width: 0; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dt { color: var(--muted); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing dd { margin: 0; color: var(--ink); font-size: 0.82rem; font-weight: 800; text-align: right; overflow-wrap: anywhere; }
+/* Sizes stay in the card markup for the product popup and the order form; only the card hides them. */
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div + div,
+.catalogue-grid > :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div + div { display: none; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:first-child dd { justify-self: end; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--marigold); color: var(--ink); font: 500 1.05rem/1.2 var(--display); font-family: var(--sans); font-variant-numeric: lining-nums tabular-nums; letter-spacing: -0.02em; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:not(:first-child) dd { font-family: var(--sans); font-size: 0.82rem; font-weight: 800; line-height: 1.35; letter-spacing: normal; white-space: normal; overflow-wrap: anywhere; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dt, :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:last-child dd { color: var(--rose-ink); }
@@ -865,7 +868,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .catalogue-cart-jump .button-dark { background: var(--rose); color: #fff; }
 .catalogue-cart-jump .button:disabled { cursor: not-allowed; opacity: .55; }
 .text-button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
-.catalogue-section-disclosure { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; margin-top: 1rem; padding: .65rem 1rem; border: 1px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font-size: .78rem; font-weight: 800; cursor: pointer; }
+.catalogue-section-disclosure { display: flex; width: fit-content; align-items: center; justify-content: center; min-height: 2.75rem; margin-top: 1rem; margin-left: auto; padding: .65rem 1rem; border: 1px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font-size: .78rem; font-weight: 800; cursor: pointer; }
 .catalogue-section-disclosure:hover, .catalogue-section-disclosure:focus-visible { background: var(--ink); color: var(--ivory); }
 html:not(.js) .catalogue-section-disclosure { display: none; }
 .catalogue-full .rail-heading h2, .catalogue-full .romantic-keepsakes-heading h2 { max-width: none; margin: 0; color: inherit; font-size: 1.35rem; line-height: 1.1; }
