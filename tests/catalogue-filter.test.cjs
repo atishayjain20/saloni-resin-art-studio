@@ -350,6 +350,35 @@ test("search metadata covers requested item kinds without taxonomy drift", () =>
   assert.doesNotMatch(roseFestive, /data-product-kind="rose preservation"/);
 });
 
+test("Jain search terms find exactly the Jain mantra pieces", () => {
+  const articleBlocks = Array.from(html.matchAll(/<article\b[\s\S]*?<\/article>/g), (match) => match[0]);
+  const searchableText = (article) => {
+    const title = (article.match(/<(?:strong|h3)[^>]*>([^<]*)<\/(?:strong|h3)>/) || [])[1] || "";
+    const keywords = (article.match(/data-search-keywords="([^"]*)"/) || [])[1] || "";
+    return `${title} ${keywords}`.toLowerCase();
+  };
+  const titlesFor = (term) => articleBlocks
+    .filter((article) => searchableText(article).includes(term))
+    .map((article) => (article.match(/<strong>([^<]*)<\/strong>/) || [])[1]);
+  const jainPieces = [
+    "Blue and white Namokar mantra frame",
+    "White and gold Namokar mantra frame",
+    "Om asiausa mantra plaque",
+    "Rose mantra door strips",
+    "Pearl white Namokar mantra frame",
+  ];
+  ["jain", "जैन"].forEach((term) => {
+    assert.deepEqual(titlesFor(term).sort(), [...jainPieces].sort(), `${term} must find every Jain piece and nothing else`);
+  });
+  ["navkar", "namokar"].forEach((term) => {
+    assert.deepEqual(titlesFor(term).sort(), [jainPieces[0], jainPieces[1], jainPieces[4]].sort(), `${term} must find the Namokar frames`);
+  });
+  ["asiausa", "arham"].forEach((term) => {
+    assert.ok(titlesFor(term).includes("Om asiausa mantra plaque"), `${term} must find the plaque`);
+  });
+  assert.ok(titlesFor("asiausa").includes("Rose mantra door strips"), "asiausa must find the door strips");
+});
+
 test("Explore gifts reveals every matching item in one continuous view", () => {
   const harness = createHarness({ count: 77 });
   harness.navBrowseAll.dispatch("click");
