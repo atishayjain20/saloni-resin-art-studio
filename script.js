@@ -1223,13 +1223,12 @@
     var dots = document.querySelectorAll("[data-banner-dot]");
     var prev = document.querySelector("[data-banner-prev]");
     var next = document.querySelector("[data-banner-next]");
-    var toggle = document.querySelector("[data-banner-autoplay]");
     var hero = typeof track.closest === "function" ? track.closest(".hero-banner") : null;
     var pending = false;
     var active = 0;
-    var autoplayDelay = 10000;
+    var autoplayDelay = 5000;
     var timer = null;
-    // Slides advance on their own until the shopper takes over; reduced-motion shoppers start paused.
+    // Slides advance on their own until the shopper takes over; reduced-motion shoppers never autoplay.
     var stopped = Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     var focusPaused = false;
     if (!slides.length) return;
@@ -1253,8 +1252,6 @@
         if (dot === active) dots[dot].setAttribute("aria-current", "true");
         else dots[dot].removeAttribute("aria-current");
       }
-      if (prev) prev.disabled = active === 0;
-      if (next) next.disabled = active === slides.length - 1;
     }
 
     function schedule() {
@@ -1264,19 +1261,11 @@
       timer = window.setInterval(function () { goTo(active === slides.length - 1 ? 0 : active + 1); }, autoplayDelay);
     }
 
-    function setStopped(value) {
-      stopped = value;
-      if (toggle) {
-        toggle.setAttribute("aria-label", stopped ? "Play slides" : "Pause slides");
-        var icon = toggle.querySelector("span");
-        if (icon) icon.textContent = stopped ? "\u25B6" : "\u275A\u275A";
-      }
-      schedule();
-    }
-
-    // A swipe, tap, scroll wheel or key on the banner means the shopper is browsing it themselves.
+    // A swipe, tap, scroll wheel or arrow key on the banner means the shopper is browsing it themselves.
     function takeOver() {
-      if (!stopped) setStopped(true);
+      if (stopped) return;
+      stopped = true;
+      schedule();
     }
 
     track.addEventListener("scroll", function () {
@@ -1285,8 +1274,9 @@
       if (window.requestAnimationFrame) window.requestAnimationFrame(sync);
       else sync();
     });
-    if (prev) prev.addEventListener("click", function () { takeOver(); goTo(active - 1); });
-    if (next) next.addEventListener("click", function () { takeOver(); goTo(active + 1); });
+    // The arrows wrap: previous on the first slide shows the last, next on the last shows the first.
+    if (prev) prev.addEventListener("click", function () { takeOver(); goTo(active === 0 ? slides.length - 1 : active - 1); });
+    if (next) next.addEventListener("click", function () { takeOver(); goTo(active === slides.length - 1 ? 0 : active + 1); });
     Array.prototype.forEach.call(dots, function (dot, index) {
       dot.addEventListener("click", function () { takeOver(); goTo(index); });
     });
@@ -1296,11 +1286,8 @@
     track.addEventListener("keydown", function (event) {
       if (event && /^(?:ArrowLeft|ArrowRight|Home|End|PageUp|PageDown)$/.test(event.key)) takeOver();
     });
-    // Play means play now: focus may still sit on a banner button from an earlier arrow tap.
-    if (toggle) toggle.addEventListener("click", function () { focusPaused = false; setStopped(!stopped); });
     if (hero) {
-      hero.addEventListener("focusin", function (event) {
-        if (event && event.target === toggle) return;
+      hero.addEventListener("focusin", function () {
         focusPaused = true;
         schedule();
       });
@@ -1312,7 +1299,7 @@
     }
     if (typeof document.addEventListener === "function") document.addEventListener("visibilitychange", schedule);
     sync();
-    setStopped(stopped);
+    schedule();
   }
 
   function initCatalogueExperience() {
@@ -1336,7 +1323,7 @@
     var catalogueRegion = tools;
     var validTypes = ["all", "bestsellers", "marriage", "couple", "diwali", "frames", "premium", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
-    var typeLabels = { all: "All gifts", marriage: "Marriage gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
+    var typeLabels = { all: "All gifts", marriage: "Marriage gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Studio keepsakes", premium: "Premium designs", corporate: "Corporate gifts" };
     var searchMaxLength = 100;
     var appliedType = "bestsellers";
     var appliedBudget = "all";
