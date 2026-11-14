@@ -344,6 +344,7 @@
     var photoPrev = document.getElementById("lightbox-photo-prev");
     var photoNext = document.getElementById("lightbox-photo-next");
     var photoLabel = document.getElementById("lightbox-photo-label");
+    var photoThumbs = document.getElementById("lightbox-thumbs");
     var lightboxIncluded = document.getElementById("lightbox-included");
     var lightboxReviews = document.getElementById("lightbox-reviews");
     var lightboxReviewList = document.getElementById("lightbox-review-list");
@@ -515,10 +516,47 @@
         var several = lightboxPhotos.length > 1;
         if (photoPrev) photoPrev.hidden = !several;
         if (photoNext) photoNext.hidden = !several;
+        renderPhotoThumbs();
         if (photoLabel) {
-          photoLabel.hidden = !several;
-          photoLabel.textContent = several ? (lightboxPhotoIndex + 1) + " of " + lightboxPhotos.length + " · " + photo.label + (lightboxPhotoIndex && photo.colour ? (lightboxRequest && !lightboxRequest.hidden ? (lightboxRequest.textContent === "Remove from cart" ? "\nRemove it from the cart first to choose \"" + photo.colour + "\" instead." : "\nUse the button below on this photo to choose \"" + photo.colour + "\".") : "\nMention \"" + photo.colour + "\" in your order notes.") : "") : "";
+          // The thumbnails show which photo is on screen, so only extra photos keep a label and the colour hint.
+          var showLabel = several && lightboxPhotoIndex > 0;
+          photoLabel.hidden = !showLabel;
+          photoLabel.textContent = showLabel ? photo.label + (photo.colour ? (lightboxRequest && !lightboxRequest.hidden ? (lightboxRequest.textContent === "Remove from cart" ? "\nRemove it from the cart first to choose \"" + photo.colour + "\" instead." : "\nUse the button below on this photo to choose \"" + photo.colour + "\".") : "\nMention \"" + photo.colour + "\" in your order notes.") : "") : "";
         }
+      }
+
+      function renderPhotoThumbs() {
+        if (!photoThumbs || typeof document.createElement !== "function") return;
+        var several = lightboxPhotos.length > 1;
+        photoThumbs.hidden = !several;
+        if (photoThumbs.__photos !== lightboxPhotos || photoThumbs.__count !== lightboxPhotos.length) {
+          photoThumbs.__photos = lightboxPhotos;
+          photoThumbs.__count = lightboxPhotos.length;
+          if (typeof photoThumbs.replaceChildren === "function") photoThumbs.replaceChildren(); else photoThumbs.textContent = "";
+          if (several) lightboxPhotos.forEach(function (photo, index) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "lightbox-thumb";
+            button.setAttribute("aria-label", "Show image " + (index + 1) + " of " + lightboxPhotos.length + ": " + photo.label);
+            var image = document.createElement("img");
+            image.src = photo.src;
+            image.alt = "";
+            image.width = 56;
+            image.height = 56;
+            image.decoding = "async";
+            if (typeof image.addEventListener === "function") image.addEventListener("error", function () { button.hidden = true; });
+            button.appendChild(image);
+            button.addEventListener("click", function () {
+              if (index >= lightboxPhotos.length) return;
+              lightboxPhotoIndex = index;
+              renderPhoto();
+            });
+            photoThumbs.appendChild(button);
+          });
+        }
+        Array.prototype.forEach.call(photoThumbs.children || [], function (button, index) {
+          button.setAttribute("aria-current", index === lightboxPhotoIndex ? "true" : "false");
+        });
       }
 
       function stepPhoto(delta) {
@@ -535,6 +573,11 @@
         if (photoPrev) photoPrev.hidden = true;
         if (photoNext) photoNext.hidden = true;
         if (photoLabel) { photoLabel.textContent = ""; photoLabel.hidden = true; }
+        if (photoThumbs) {
+          if (typeof photoThumbs.replaceChildren === "function") photoThumbs.replaceChildren(); else photoThumbs.textContent = "";
+          photoThumbs.__photos = null;
+          photoThumbs.hidden = true;
+        }
         if (lightboxIncluded) { lightboxIncluded.textContent = ""; lightboxIncluded.hidden = true; }
       }
 
