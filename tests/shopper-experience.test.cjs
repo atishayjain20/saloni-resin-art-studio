@@ -662,7 +662,7 @@ test("small-screen layout keeps long labels inside the viewport without masking 
 
 test("each priced gift shows a crossed-out regular price 25% above today's price, which stays the price paid", () => {
   const cards = html.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/g) || [];
-  assert.equal(cards.length, 97);
+  assert.equal(cards.length, 106);
   const rupees = (text) => (text.match(/[0-9][0-9,]*/g) || []).map((n) => Number(n.replace(/,/g, "")));
   const format = (n) => "₹" + n.toLocaleString("en-IN");
   let withRegular = 0;
@@ -679,7 +679,7 @@ test("each priced gift shows a crossed-out regular price 25% above today's price
     assert.equal((card.match(/<dt>/g) || []).length <= 2, true, "no extra row, so the phone price grid keeps its two rows");
     withRegular += 1;
   });
-  assert.equal(withRegular, 89);
+  assert.equal(withRegular, 98);
   assert.match(html, /<dt>Price<\/dt><dd>₹249<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>₹311<\/s> <span>20% off<\/span><\/dd>/);
   assert.match(css, /figcaption \.product-pricing > div > dd\.product-regular-price\s*\{[^}]*grid-column:\s*1 \/ -1/);
   assert.doesNotMatch(html, /<dt>Estimated from<\/dt>/);
@@ -2264,7 +2264,7 @@ test("before-you-order buying-help section is removed from the homepage", () => 
   assert.doesNotMatch(html, /Before you order|Know what your gift will include\.|Ask Saloni about a gift/);
 });
 
-test("all 97 catalogue cards keep price first and show only known size rows", () => {
+test("all 106 catalogue cards keep price first and show only known size rows", () => {
   const expectedRows = [
     ["Size", "8 in"],
     ["Size", "8 × 12 in"],
@@ -2310,6 +2310,8 @@ test("all 97 catalogue cards keep price first and show only known size rows", ()
     null,
     null,
     ["Size", "20×22 in"],
+    ["Size", "8 × 12 in"],
+    ["Size", "8 × 12 in"],
     null,
     null,
     ["Size", "8–10 in"],
@@ -2317,6 +2319,12 @@ test("all 97 catalogue cards keep price first and show only known size rows", ()
     ["Size", "20×22 in"],
     null,
     ["Size", "3 in"],
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
     null,
     ["Size", "3 in"],
     ["Size", "20×22 in"],
@@ -2341,6 +2349,7 @@ test("all 97 catalogue cards keep price first and show only known size rows", ()
     null,
     null,
     ["Size", "4 in"],
+    ["Size", "4–6 in"],
     ["Size", "4–6 in"],
     ["Size", "4–6 in"],
     ["Size", "6 in"],
@@ -2365,8 +2374,8 @@ test("all 97 catalogue cards keep price first and show only known size rows", ()
     ["Size", "3–4 in"],
   ];
   const cards = html.match(/<article\b[^>]*class="[^"]*(?:work-card|romantic-keepsake-card)[^"]*"[\s\S]*?<\/article>/g) || [];
-  assert.equal(cards.length, 97);
-  assert.equal(expectedRows.length, 97);
+  assert.equal(cards.length, 106);
+  assert.equal(expectedRows.length, 106);
   cards.forEach((card, index) => {
     const pricing = card.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/)?.[0] || "";
     const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-regular-price">.*?<\/dd>)?<\/div>/g)].map((match) => match.slice(1));

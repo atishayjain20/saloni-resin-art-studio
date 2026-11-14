@@ -1416,7 +1416,7 @@ test("seeds every corporate catalogue card with identity, unit, concept, and pri
 test("seeds every new Diwali concept with identity, unit, concept, and pricing details", () => {
   const section = page.match(/<section\b[^>]*id=["']diwali["'][\s\S]*?<\/section>/);
   assert.ok(section, "Diwali catalogue section must exist before order extraction is tested");
-  assert.equal((section[0].match(/data-lightbox-trigger/g) || []).length, 23);
+  assert.equal((section[0].match(/data-lightbox-trigger/g) || []).length, 24);
   const flow = runFlow();
   DIWALI_NEW_CONCEPTS.forEach(([asset, title, copy, unit, regular, festive, discount], index) => {
     const button = flow.diwaliCatalogueButtons[index];
