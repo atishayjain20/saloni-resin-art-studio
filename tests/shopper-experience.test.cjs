@@ -213,10 +213,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261175">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261175" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261175" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261175" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261176">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261176" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261176" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261176" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -224,9 +224,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261175"], page);
+    assert.deepEqual([...new Set(versions)], ["20261176"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261175/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261176/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -555,6 +555,9 @@ test("catalogue cards keep only essentials while popups retain full details", ()
   assert.match(css, /figcaption > \.catalogue-order-button[^{]*\{[^}]*grid-row:\s*4/);
   assert.match(script, /querySelectorAll\("figcaption p"\)/);
   assert.match(script, /lightboxDescription\) lightboxDescription\.textContent = item\.description/);
+  // The popup must not show "Illustrative preview: …" image descriptions as visible text.
+  assert.doesNotMatch(script, /description \+= " " \+ imageAlt/);
+  assert.match(script, /if \(!description\) description = imageAlt\.replace\(\/\^\(\?:illustrative preview\|reference image\|reference design\|concept preview\):\\s\*\/i, ""\);/);
   const card = section("diwali").match(/<article\b[^>]*class="[^"]*work-card[^"]*"[\s\S]*?<\/article>/)?.[0] || "";
   assert.match(card, /<figcaption[\s\S]*<p>/);
 });
@@ -1051,6 +1054,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     "lightbox-photo-prev": makeElement({ hidden: true }),
     "lightbox-photo-next": makeElement({ hidden: true }),
     "lightbox-photo-label": makeElement({ hidden: true }),
+    "lightbox-thumbs": children(makeElement({ hidden: true, replaceChildren() { this.children.forEach((child) => { child.parentNode = null; }); this.children = []; } })),
     "lightbox-included": makeElement({ hidden: true }),
   } : {};
   const docElements = Object.assign({
@@ -1101,7 +1105,7 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     querySelector(selector) { return existingScript && selector.indexOf("recaptcha/api.js") !== -1 ? existingScript : null; },
     head: { appendChild(node) { headScripts.push(node); node.parentNode = this; return node; }, removeChild(node) { headScripts.splice(headScripts.indexOf(node), 1); node.parentNode = null; return node; } },
   };
-  if (cardPhotos || reviewsMode) documentObject.createElement = (tagName) => children(makeElement({ tagName }));
+  if (cardPhotos || reviewsMode || withGalleryElements) documentObject.createElement = (tagName) => children(makeElement({ tagName }));
   const windowObject = { setTimeout(callback) { callback(); } };
   if (feed !== undefined) {
     windowObject.setTimeout = () => 1;
@@ -1495,13 +1499,12 @@ test("lightbox gallery steps through the card photo and its extra images", () =>
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
   assert.equal(h.docElements["lightbox-photo-prev"].hidden, false);
   assert.equal(h.docElements["lightbox-photo-next"].hidden, false);
-  assert.equal(h.docElements["lightbox-photo-label"].hidden, false);
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 3 · As shown/);
+  assert.equal(h.docElements["lightbox-photo-label"].hidden, true, "the card photo needs no label; thumbnails replace the 1 of 3 counter");
   assert.deepEqual(h.srcAssignments, ["assets/sample-gift.jpg?v=3"], "no variant URL until it is shown");
   h.docElements["lightbox-photo-next"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp");
   assert.match(h.imageTarget.alt, /^Teal colour idea\. Sample gift photo/);
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour idea: Teal/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /^Colour idea: Teal/);
   assert.match(h.docElements["lightbox-photo-label"].textContent, /\nUse the button below on this photo to choose "Teal"\.$/);
   assert.doesNotMatch(h.docElements["lightbox-photo-label"].textContent, /AI concept|handmade and will vary/);
   h.docElements["lightbox-photo-next"].listeners.click();
@@ -1510,7 +1513,32 @@ test("lightbox gallery steps through the card photo and its extra images", () =>
   h.docElements["lightbox-photo-prev"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--styled.webp", "prev wraps to the styled scene");
   assert.match(h.imageTarget.alt, /^Styled scene\. Sample gift photo/);
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /^3 of 3 · Styled scene$/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /^Styled scene$/);
+});
+
+test("lightbox shows small thumbnails under the photo and a tap switches to that photo", () => {
+  const h = galleryHarness({ colours: "teal styled" });
+  h.open();
+  const thumbs = h.docElements["lightbox-thumbs"];
+  assert.equal(thumbs.hidden, false);
+  assert.equal(thumbs.children.length, 3);
+  const pictures = thumbs.children.map((button) => button.children[0]);
+  assert.deepEqual(pictures.map((img) => img.src), ["assets/sample-gift.jpg?v=3", "assets/ai-images/sample-gift--teal.webp", "assets/ai-images/sample-gift--styled.webp"]);
+  assert.deepEqual(pictures.map((img) => img.alt), ["", "", ""], "thumbnails are decorative; the button names them");
+  assert.deepEqual(thumbs.children.map((button) => button.tagName), ["button", "button", "button"]);
+  assert.equal(thumbs.children[2].attributes["aria-label"], "Show image 3 of 3: Styled scene");
+  assert.deepEqual(thumbs.children.map((button) => button.attributes["aria-current"]), ["true", "false", "false"]);
+  thumbs.children[2].listeners.click();
+  assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--styled.webp");
+  assert.deepEqual(thumbs.children.map((button) => button.attributes["aria-current"]), ["false", "false", "true"]);
+  h.docElements["lightbox-photo-next"].listeners.click();
+  assert.deepEqual(thumbs.children.map((button) => button.attributes["aria-current"]), ["true", "false", "false"], "arrows keep the thumbnails in step");
+  h.lightbox.close();
+  assert.equal(thumbs.hidden, true);
+  assert.equal(thumbs.children.length, 0);
+  const single = galleryHarness({ colours: "" });
+  single.open();
+  assert.equal(single.docElements["lightbox-thumbs"].hidden, true, "a single photo needs no thumbnails");
 });
 
 test("card image box scrolls through the extra photos and opens the lightbox at the one shown", () => {
@@ -1538,7 +1566,7 @@ test("card image box scrolls through the extra photos and opens the lightbox at 
   assert.equal(dots.children[1].className, "is-active");
   h.open();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp", "the lightbox opens on the photo the card shows");
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /^2 of 3 · Colour idea: Teal/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /^Colour idea: Teal/);
 });
 
 test("card photo strip remembers the colour on show for the Add to cart button", () => {
@@ -1681,7 +1709,7 @@ test("lightbox gallery resets on close and reopens at the card photo", () => {
   assert.equal(h.press("ArrowRight").prevented, 0);
   h.open();
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 3 · As shown/);
+  assert.equal(h.docElements["lightbox-photo-label"].hidden, true);
 });
 
 test("lightbox ignores a late close event that arrives after it reopened", () => {
@@ -1692,7 +1720,7 @@ test("lightbox ignores a late close event that arrives after it reopened", () =>
   h.lightbox.listeners.close();
   assert.equal(h.lightbox.open, true);
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--teal.webp");
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 3 · Colour idea: Teal/);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /^Colour idea: Teal/);
 });
 
 test("hero lightbox trigger uses the AI images of its target card and names multi-word colours", () => {
@@ -1700,7 +1728,7 @@ test("hero lightbox trigger uses the AI images of its target card and names mult
   h.open();
   h.docElements["lightbox-photo-next"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--royal-blue.webp");
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /2 of 2 · Colour idea: Royal blue\n[^\n]*Use the button below on this photo to choose "Royal blue"\./);
+  assert.match(h.docElements["lightbox-photo-label"].textContent, /^Colour idea: Royal blue\n[^\n]*Use the button below on this photo to choose "Royal blue"\./);
 });
 
 test("lightbox gallery drops an AI image that fails to load and shows the card photo", () => {
@@ -1709,7 +1737,7 @@ test("lightbox gallery drops an AI image that fails to load and shows the card p
   h.docElements["lightbox-photo-next"].listeners.click();
   h.imageTarget.listeners.error();
   assert.equal(h.imageTarget.src, "assets/sample-gift.jpg?v=3");
-  assert.match(h.docElements["lightbox-photo-label"].textContent, /1 of 2 · As shown/);
+  assert.equal(h.docElements["lightbox-photo-label"].hidden, true);
   h.docElements["lightbox-photo-next"].listeners.click();
   assert.equal(h.imageTarget.src, "assets/ai-images/sample-gift--styled.webp");
   h.imageTarget.listeners.error();
