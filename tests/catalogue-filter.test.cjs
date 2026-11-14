@@ -350,6 +350,19 @@ test("search metadata covers requested item kinds without taxonomy drift", () =>
   assert.doesNotMatch(roseFestive, /data-product-kind="rose preservation"/);
 });
 
+test("cards hide the size row and View all sits on the right", () => {
+  const pricingBlocks = Array.from(html.matchAll(/<dl class="product-pricing"[^>]*>([\s\S]*?)<\/dl>/g), (match) => match[1]);
+  assert.ok(pricingBlocks.length > 50);
+  pricingBlocks.forEach((block) => {
+    const labels = Array.from(block.matchAll(/<dt>([^<]*)<\/dt>/g), (match) => match[1]);
+    assert.equal(labels[0], "Price", "the first pricing row must stay Price");
+    labels.slice(1).forEach((label) => assert.equal(label, "Size", "every later pricing row must be Size, so hiding them hides only sizes"));
+  });
+  // The phone card grid styles every pricing row from `.catalogue-grid >`, so the hide rule must cover that selector too.
+  assert.match(css, /:is\(\.work-card, \.romantic-keepsake-card\) figcaption \.product-pricing > div \+ div,\n\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) figcaption \.product-pricing > div \+ div \{ display: none; \}/);
+  assert.match(css, /\.catalogue-section-disclosure \{[^}]*display: flex;[^}]*margin-left: auto;/);
+});
+
 test("Jain search terms find exactly the Jain mantra pieces", () => {
   const articleBlocks = Array.from(html.matchAll(/<article\b[\s\S]*?<\/article>/g), (match) => match[0]);
   const searchableText = (article) => {
