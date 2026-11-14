@@ -31,18 +31,38 @@ function bannerSlideHtml() {
   return Array.from(section("hero").matchAll(/<article class="hero-slide[^"]*"[\s\S]*?<\/article>/g), (match) => match[0]);
 }
 
-test("homepage first screen is a five-slide hero banner ordered Premium, Couple, Marriage, Corporate, Diwali", () => {
+test("homepage first screen is a seven-slide hero banner: sale, design a frame, then Premium, Couple, Marriage, Corporate, Diwali", () => {
   const hero = section("hero");
   assert.match(hero, /^<section class="hero-banner shell" id="hero" aria-labelledby="hero-title" aria-roledescription="carousel">/);
   assert.match(hero, /<h1 id="hero-title" class="sr-only">Handmade resin gifts from Ajmer<\/h1>/);
   assert.doesNotMatch(html, /Made for the moment|hero-collage|hero-note|hero-actions|hero-catalogue-action/);
-  assert.doesNotMatch(hero, /data-lightbox|reveal|Explore gifts|data-browse-all/);
+  assert.doesNotMatch(hero, /data-lightbox|reveal|Explore gifts/);
   assert.match(hero, /<div class="hero-banner-track" data-banner-track>/);
   const slides = bannerSlideHtml();
-  assert.equal(slides.length, 5);
-  slides.forEach((slide, index) => {
+  assert.equal(slides.length, 7);
+  const [sale, design] = slides;
+  // Slide 1: the 20% sale, built only from facts on the page (no invented deadline or countdown).
+  assert.match(sale, /^<article class="hero-slide hero-promo hero-promo-sale" role="group" aria-roledescription="slide" aria-label="1 of 7: 20% off sale">/);
+  assert.match(sale, /<p class="hero-promo-big"><span>20%<\/span> off<\/p>/);
+  const saleCount = (html.match(/<span>20% off<\/span>/g) || []).length;
+  assert.match(sale, new RegExp(`on ${saleCount} handmade pieces`), "the piece count must match the cards that show 20% off");
+  assert.doesNotMatch(sale, /ends|hurry|only today|countdown|left/i);
+  assert.equal((sale.match(/<a\b/g) || []).length, 1);
+  assert.match(sale, /<a class="button hero-promo-cta" href="#catalogue-filters" data-browse-all>Shop the sale<\/a>/);
+  [["Rose hexagon", "₹3,124", "₹2,499"], ["Sunflower resin lamp", "₹749", "₹599"], ["Little brother keepsake", "₹499", "₹399"]].forEach(([title, was, now]) => {
+    const card = html.match(new RegExp(`<article\\b(?:(?!<\\/article>)[\\s\\S])*?<(?:strong|h3)[^>]*>${title}<\\/(?:strong|h3)>[\\s\\S]*?<\\/article>`))?.[0] || "";
+    assert.match(card, new RegExp(`<dd>${now}<\\/dd>[\\s\\S]*?<s>${was}<\\/s>`), `${title} card price must match the sale slide`);
+    assert.match(sale, new RegExp(`<s>${was}<\\/s> <span class="sr-only">now <\\/span><strong>${now}<\\/strong>`), `${title} sticker reads "was … now …"`);
+  });
+  const cheapest = Math.min(...Array.from(html.matchAll(/<dt>(?:Price|From)<\/dt><dd>₹([\d,]+)/g), (match) => Number(match[1].replace(/,/g, ""))));
+  assert.match(sale, new RegExp(`gifts from ₹${cheapest}<`), "the lowest catalogue price must be the one on the slide");
+  // Slide 2: design your own frame.
+  assert.match(design, /^<article class="hero-slide hero-promo hero-promo-design" role="group" aria-roledescription="slide" aria-label="2 of 7: Design your own frame">/);
+  assert.equal((design.match(/<a\b/g) || []).length, 1);
+  assert.match(design, /<a class="button hero-promo-cta" href="#customizer" data-customizer-open>Start designing<\/a>/);
+  slides.slice(2).forEach((slide, index) => {
     const expected = bannerSlides[index];
-    assert.match(slide, new RegExp(`role="group" aria-roledescription="slide" aria-label="${index + 1} of 5: ${expected.label}"`));
+    assert.match(slide, new RegExp(`role="group" aria-roledescription="slide" aria-label="${index + 3} of 7: ${expected.label}"`));
     assert.doesNotMatch(slide, /<h2|class="eyebrow"|hero-slide-copy/);
     assert.equal((slide.match(/<a\b/g) || []).length, 1);
     assert.match(slide, new RegExp(`<a class="button button-dark hero-slide-cta" href="${expected.href}" data-category-shortcut="${expected.shortcut}" aria-label="Shop now: ${expected.name}">Shop now</a>`));
@@ -50,6 +70,7 @@ test("homepage first screen is a five-slide hero banner ordered Premium, Couple,
   });
   assert.deepEqual(Array.from(hero.matchAll(/data-category-shortcut="([^"]+)"/g), (match) => match[1]), ["premium", "couple", "marriage", "corporate", "diwali"]);
   assert.match(hero, /<a href="#customizer" data-customizer-open>Or design a custom frame<\/a>/);
+  assert.equal((hero.match(/data-browse-all/g) || []).length, 1, "only the sale slide browses all gifts");
   assert.doesNotMatch(hero, /class="instagram-mark"|Request a custom gift|hero-floral-bouquet\.jpg/);
   const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
   assert.match(footer, /<a class="instagram-mark" href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\/" target="_blank" rel="noreferrer">Follow the studio <strong>@saloniresin_art_studio<\/strong><\/a>/);
@@ -59,7 +80,7 @@ test("homepage first screen is a five-slide hero banner ordered Premium, Couple,
 
 test("hero banner images exist, carry alt and size, and only slide 1 loads eagerly", () => {
   const slides = bannerSlideHtml();
-  assert.equal(slides.length, 5);
+  assert.equal(slides.length, 7);
   slides.forEach((slide, slideIndex) => {
     const images = Array.from(slide.matchAll(/<img\b[^>]*>/g), (match) => match[0]);
     assert.equal(images.length, 3);
@@ -81,14 +102,14 @@ test("hero banner images exist, carry alt and size, and only slide 1 loads eager
   });
 });
 
-test("hero banner controls are previous, five dots, then next, hidden without JavaScript", () => {
+test("hero banner controls are previous, seven dots, then next, hidden without JavaScript", () => {
   const hero = section("hero");
   const controls = hero.match(/<div class="hero-banner-controls">([\s\S]*?)<\/div>/)?.[1] || "";
   assert.ok(hero.indexOf("hero-banner-controls") > hero.lastIndexOf("</article>"), "controls follow the track");
-  assert.ok(hero.indexOf("data-customizer-open") > hero.indexOf("data-banner-next"), "custom-frame link sits below the controls");
+  assert.ok(hero.lastIndexOf("data-customizer-open") > hero.indexOf("data-banner-next"), "custom-frame link sits below the controls");
   assert.match(controls, /data-banner-prev[^>]*aria-label="Previous slide"/);
   assert.match(controls, /data-banner-next[^>]*aria-label="Next slide"/);
-  assert.deepEqual(Array.from(controls.matchAll(/data-banner-dot[^>]*aria-label="(Show slide \d)"/g), (match) => match[1]), ["Show slide 1", "Show slide 2", "Show slide 3", "Show slide 4", "Show slide 5"]);
+  assert.deepEqual(Array.from(controls.matchAll(/data-banner-dot[^>]*aria-label="(Show slide \d)"/g), (match) => match[1]), ["Show slide 1", "Show slide 2", "Show slide 3", "Show slide 4", "Show slide 5", "Show slide 6", "Show slide 7"]);
   assert.equal((controls.match(/aria-current="true"/g) || []).length, 1);
   assert.ok(controls.indexOf("data-banner-prev") < controls.indexOf("data-banner-dot") && controls.lastIndexOf("data-banner-dot") < controls.indexOf("data-banner-next"));
   assert.match(css, /html:not\(\.js\) \.hero-banner-controls\s*\{[^}]*display:\s*none/);
@@ -213,10 +234,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261176">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261176" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261176" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261176" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261177">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261177" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261177" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261177" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -224,9 +245,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261176"], page);
+    assert.deepEqual([...new Set(versions)], ["20261177"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261176/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261177/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -2531,7 +2552,7 @@ test("the page background is a very pale blush token used for the body and the c
 });
 
 test("on 8 and 9 November the Diwali hero slide moves first and shows the offer", () => {
-  const diwaliSlide = bannerSlideHtml()[4];
+  const diwaliSlide = bannerSlideHtml()[6];
   assert.match(diwaliSlide, /id="hero-diwali-slide"/);
   const offer = diwaliSlide.match(/<p class="hero-slide-offer" hidden>([\s\S]*?)<\/p>/);
   assert.ok(offer, "the offer label starts hidden");
