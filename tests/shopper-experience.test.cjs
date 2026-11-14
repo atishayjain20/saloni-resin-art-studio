@@ -112,8 +112,7 @@ test("hero banner controls are previous, seven dots, then next, hidden without J
   assert.deepEqual(Array.from(controls.matchAll(/data-banner-dot[^>]*aria-label="(Show slide \d)"/g), (match) => match[1]), ["Show slide 1", "Show slide 2", "Show slide 3", "Show slide 4", "Show slide 5", "Show slide 6", "Show slide 7"]);
   assert.equal((controls.match(/aria-current="true"/g) || []).length, 1);
   assert.ok(controls.indexOf("data-banner-prev") < controls.indexOf("data-banner-dot") && controls.lastIndexOf("data-banner-dot") < controls.indexOf("data-banner-next"));
-  assert.match(controls, /<button class="hero-banner-arrow hero-banner-autoplay" type="button" data-banner-autoplay aria-label="Pause slides"><span aria-hidden="true">❚❚<\/span><\/button>/, "a pause button follows the next arrow");
-  assert.ok(controls.indexOf("data-banner-autoplay") > controls.indexOf("data-banner-next"));
+  assert.doesNotMatch(hero, /data-banner-autoplay|Pause slides/, "owner removed the pause button");
   assert.match(css, /html:not\(\.js\) \.hero-banner-controls\s*\{[^}]*display:\s*none/);
 });
 
@@ -177,15 +176,13 @@ function heroAutoplayHarness({ reduced = false, slideCount = 4 } = {}) {
   const prev = button();
   const next = button();
   const dots = slides.map(() => button());
-  const toggleIcon = { textContent: "❚❚" };
-  const toggle = Object.assign(button(), { attrs: { "aria-label": "Pause slides" }, querySelector: () => toggleIcon });
-  const hero = Object.assign(listen(), { contains: (node) => node === toggle || node === dots[0] || node === "inside" });
+  const hero = Object.assign(listen(), { contains: (node) => node === next || node === dots[0] });
   track.closest = () => hero;
   const timers = [];
   let nextId = 1;
   const documentObject = Object.assign(listen(), {
     hidden: false,
-    querySelector(selector) { return { "[data-banner-track]": track, "[data-banner-prev]": prev, "[data-banner-next]": next, "[data-banner-autoplay]": toggle }[selector] || null; },
+    querySelector(selector) { return { "[data-banner-track]": track, "[data-banner-prev]": prev, "[data-banner-next]": next }[selector] || null; },
     querySelectorAll(selector) { return selector === "[data-banner-dot]" ? dots : []; },
   });
   const windowObject = {
@@ -198,13 +195,13 @@ function heroAutoplayHarness({ reduced = false, slideCount = 4 } = {}) {
   vm.createContext(context);
   vm.runInContext(`(function () {\n${body}\ninitHeroBanner();\n})();`, context);
   const tick = () => timers.slice().forEach((timer) => timer.callback());
-  return { track, prev, next, dots, toggle, toggleIcon, hero, timers, documentObject, scrolls, tick };
+  return { track, prev, next, dots, hero, timers, documentObject, scrolls, tick };
 }
 
-test("hero banner moves to the next slide every 10 seconds and loops back to the first", () => {
+test("hero banner moves to the next slide every 5 seconds and loops back to the first", () => {
   const h = heroAutoplayHarness();
   assert.equal(h.timers.length, 1);
-  assert.equal(h.timers[0].delay, 10000);
+  assert.equal(h.timers[0].delay, 5000);
   h.tick();
   assert.equal(h.track.scrollLeft, 300);
   assert.equal(h.dots[1].attrs["aria-current"], "true");
@@ -232,8 +229,6 @@ test("hero banner autoplay pauses on focus and hidden tabs, and stops once the s
   h.hero.fire("focusout", { relatedTarget: null });
   h.documentObject.fire("visibilitychange");
   assert.equal(h.timers.length, 0, "it stays stopped after the shopper takes over");
-  assert.equal(h.toggle.attrs["aria-label"], "Play slides");
-  assert.equal(h.toggleIcon.textContent, "▶");
   ["click"].forEach((type) => {
     const fresh = heroAutoplayHarness();
     fresh.next.fire(type);
@@ -242,35 +237,6 @@ test("hero banner autoplay pauses on focus and hidden tabs, and stops once the s
     viaDot.dots[2].fire(type);
     assert.equal(viaDot.timers.length, 0, "using a dot stops autoplay");
   });
-});
-
-test("hero banner pause button stops and restarts the slides", () => {
-  const h = heroAutoplayHarness();
-  h.hero.fire("focusin", { target: h.toggle });
-  assert.equal(h.timers.length, 1, "focusing the pause button itself does not pause");
-  h.toggle.fire("click");
-  assert.equal(h.timers.length, 0);
-  assert.equal(h.toggle.attrs["aria-label"], "Play slides");
-  assert.equal(h.toggleIcon.textContent, "▶");
-  h.toggle.fire("click");
-  assert.equal(h.timers.length, 1);
-  assert.equal(h.toggle.attrs["aria-label"], "Pause slides");
-  assert.equal(h.toggleIcon.textContent, "❚❚");
-});
-
-test("pressing play after using an arrow restarts the slides even though focus is still in the banner", () => {
-  const h = heroAutoplayHarness();
-  h.hero.fire("focusin", { target: h.next });
-  h.next.fire("click");
-  assert.equal(h.timers.length, 0);
-  h.hero.fire("focusout", { relatedTarget: h.toggle });
-  h.hero.fire("focusin", { target: h.toggle });
-  h.toggle.fire("click");
-  assert.equal(h.toggle.attrs["aria-label"], "Pause slides");
-  assert.equal(h.timers.length, 1, "play must really start the timer");
-  const before = h.track.scrollLeft;
-  h.tick();
-  assert.notEqual(h.track.scrollLeft, before);
 });
 
 test("only arrow keys on the banner stop autoplay; Tab passing through does not", () => {
@@ -284,11 +250,9 @@ test("only arrow keys on the banner stop autoplay; Tab passing through does not"
 test("hero banner does not move on its own when the shopper prefers reduced motion", () => {
   const h = heroAutoplayHarness({ reduced: true });
   assert.equal(h.timers.length, 0);
-  assert.equal(h.toggle.attrs["aria-label"], "Play slides");
-  h.toggle.fire("click");
-  assert.equal(h.timers.length, 1, "they can still choose to play it");
-  h.tick();
-  assert.equal(h.scrolls.at(-1).behavior, "auto", "and it jumps instead of animating");
+  h.hero.fire("focusout", { relatedTarget: null });
+  h.documentObject.fire("visibilitychange");
+  assert.equal(h.timers.length, 0, "nothing restarts it");
 });
 
 function rootToken(name) {
@@ -361,10 +325,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261178">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261178" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261178" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261178" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261179">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261179" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261179" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261179" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -372,9 +336,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261178"], page);
+    assert.deepEqual([...new Set(versions)], ["20261179"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261178/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261179/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {

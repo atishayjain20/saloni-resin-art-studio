@@ -164,9 +164,7 @@ html:not(.js) .hero-banner-controls {
   font-size: 1.6rem;
   line-height: 1;
 }
-/* The pause/play button reuses the arrow style with a smaller, lighter icon. */
-.hero-banner-autoplay span { font-size: 0.72rem; letter-spacing: 0.08em; opacity: 0.85; }
-/* With seven dots the row is wider than a phone; the arrows and pause button keep 44px and only the dots narrow. */
+/* With seven dots the row is wider than a phone; the arrows keep 44px and only the dots narrow. */
 .hero-banner-arrow { flex: none; }
 .hero-banner-dot { flex: 1 1 44px; min-width: 0; }
 .hero-banner-arrow:disabled {
