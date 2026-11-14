@@ -147,21 +147,27 @@ test("initHeroBanner scrolls by slide and honours reduced motion", () => {
   const context = { document: documentObject, window: windowObject, Math };
   vm.createContext(context);
   vm.runInContext(`(function () {\n${body}\ninitHeroBanner();\n})();`, context);
-  assert.equal(prev.disabled, true);
+  // The arrows never grey out: they wrap from the last slide to the first and back.
+  assert.equal(prev.disabled, false);
   assert.equal(next.disabled, false);
   assert.equal(dots[0].attrs["aria-current"], "true");
+  prev.listeners.click();
+  assert.deepEqual(JSON.parse(JSON.stringify(scrolls.pop())), { left: 900, behavior: "smooth" }, "previous on the first slide goes to the last");
+  assert.equal(dots[3].attrs["aria-current"], "true");
+  assert.equal(prev.disabled, false);
+  assert.equal(next.disabled, false);
+  next.listeners.click();
+  assert.deepEqual(JSON.parse(JSON.stringify(scrolls.pop())), { left: 0, behavior: "smooth" }, "next on the last slide goes back to the first");
   next.listeners.click();
   assert.deepEqual(JSON.parse(JSON.stringify(scrolls.pop())), { left: 300, behavior: "smooth" });
   assert.equal(dots[1].attrs["aria-current"], "true");
   assert.equal(dots[0].attrs["aria-current"], undefined);
-  assert.equal(prev.disabled, false);
   reduced = true;
   dots[3].listeners.click();
   assert.deepEqual(JSON.parse(JSON.stringify(scrolls.pop())), { left: 900, behavior: "auto" });
-  assert.equal(next.disabled, true);
+  assert.equal(next.disabled, false);
   prev.listeners.click();
   assert.deepEqual(JSON.parse(JSON.stringify(scrolls.pop())), { left: 600, behavior: "auto" });
-  assert.equal(next.disabled, false);
 });
 
 function heroAutoplayHarness({ reduced = false, slideCount = 4 } = {}) {

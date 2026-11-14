@@ -1252,8 +1252,6 @@
         if (dot === active) dots[dot].setAttribute("aria-current", "true");
         else dots[dot].removeAttribute("aria-current");
       }
-      if (prev) prev.disabled = active === 0;
-      if (next) next.disabled = active === slides.length - 1;
     }
 
     function schedule() {
@@ -1276,8 +1274,9 @@
       if (window.requestAnimationFrame) window.requestAnimationFrame(sync);
       else sync();
     });
-    if (prev) prev.addEventListener("click", function () { takeOver(); goTo(active - 1); });
-    if (next) next.addEventListener("click", function () { takeOver(); goTo(active + 1); });
+    // The arrows wrap: previous on the first slide shows the last, next on the last shows the first.
+    if (prev) prev.addEventListener("click", function () { takeOver(); goTo(active === 0 ? slides.length - 1 : active - 1); });
+    if (next) next.addEventListener("click", function () { takeOver(); goTo(active === slides.length - 1 ? 0 : active + 1); });
     Array.prototype.forEach.call(dots, function (dot, index) {
       dot.addEventListener("click", function () { takeOver(); goTo(index); });
     });
