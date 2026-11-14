@@ -1323,7 +1323,7 @@
     var catalogueRegion = tools;
     var validTypes = ["all", "bestsellers", "marriage", "couple", "diwali", "frames", "premium", "corporate"];
     var validBudgets = ["all", "499", "999", "1999", "2000"];
-    var typeLabels = { all: "All gifts", marriage: "Marriage gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Frames", premium: "Premium designs", corporate: "Corporate gifts" };
+    var typeLabels = { all: "All gifts", marriage: "Marriage gifts", couple: "Couple gifts", diwali: "Diwali gifts", frames: "Studio keepsakes", premium: "Premium designs", corporate: "Corporate gifts" };
     var searchMaxLength = 100;
     var appliedType = "bestsellers";
     var appliedBudget = "all";

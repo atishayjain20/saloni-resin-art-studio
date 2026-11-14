@@ -331,10 +331,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261179">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261179" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261179" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261179" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261180">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261180" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261180" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261180" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -342,9 +342,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261179"], page);
+    assert.deepEqual([...new Set(versions)], ["20261180"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261179/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261180/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -353,13 +353,14 @@ test("category tab bar sits in the sticky header after the header row with BESTS
   assert.ok(nav, "category tab nav must live inside .site-header");
   assert.match(header, /<\/nav>\n    <\/div>\n    <nav class="category-tabs"/, "tabs follow the header-inner block");
   const tabs = Array.from(nav[1].matchAll(/<a class="category-tab"([^>]*)>([^<]*)<\/a>/g), (match) => ({ attrs: match[1], label: match[2].trim() }));
-  assert.deepEqual(tabs.map((tab) => tab.label), ["Bestsellers", "Premium", "Marriage", "Couple", "Corporate", "Diwali", "All"]);
+  assert.deepEqual(tabs.map((tab) => tab.label), ["Bestsellers", "Premium", "Marriage", "Couple", "Corporate", "Studio keepsakes", "Diwali", "All"]);
   const expected = [
     ["#catalogue-filters", "bestsellers"],
     ["#premium-collection", "premium"],
     ["#marriage-gifts", "marriage"],
     ["#romantic-keepsakes", "couple"],
     ["#corporate-resin-gifts", "corporate"],
+    ["#studio-art", "frames"],
     ["#diwali", "diwali"],
     ["#catalogue-filters", "all"],
   ];
@@ -367,9 +368,12 @@ test("category tab bar sits in the sticky header after the header row with BESTS
     assert.match(tab.attrs, new RegExp('href="' + expected[index][0] + '"'));
     assert.match(tab.attrs, new RegExp('data-category-tab="' + expected[index][1] + '"'));
     assert.equal(/aria-current="true"/.test(tab.attrs), index === 0);
-    assert.equal(/data-browse-all/.test(tab.attrs), index === 6);
-    assert.equal(/data-category-shortcut="/.test(tab.attrs), index !== 6);
-    assert.doesNotMatch(tab.attrs, /frames/);
+    assert.equal(/data-browse-all/.test(tab.attrs), index === 7);
+    assert.equal(/data-category-shortcut="/.test(tab.attrs), index !== 7);
+    if (index === 5) {
+      assert.match(script, /frames: "Studio keepsakes"/, "the filtered heading matches the tab name");
+      assert.match(html, /<option value="frames">Studio keepsakes<\/option>/, "the filter menu uses the same name");
+    }
     assert.ok(html.includes('id="' + expected[index][0].slice(1) + '"'), expected[index][0] + " target exists");
   });
 });
