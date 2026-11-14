@@ -1290,10 +1290,14 @@
     Array.prototype.forEach.call(dots, function (dot, index) {
       dot.addEventListener("click", function () { takeOver(); goTo(index); });
     });
-    ["pointerdown", "touchstart", "wheel", "keydown"].forEach(function (type) {
+    ["pointerdown", "touchstart", "wheel"].forEach(function (type) {
       track.addEventListener(type, takeOver, { passive: true });
     });
-    if (toggle) toggle.addEventListener("click", function () { setStopped(!stopped); });
+    track.addEventListener("keydown", function (event) {
+      if (event && /^(?:ArrowLeft|ArrowRight|Home|End|PageUp|PageDown)$/.test(event.key)) takeOver();
+    });
+    // Play means play now: focus may still sit on a banner button from an earlier arrow tap.
+    if (toggle) toggle.addEventListener("click", function () { focusPaused = false; setStopped(!stopped); });
     if (hero) {
       hero.addEventListener("focusin", function (event) {
         if (event && event.target === toggle) return;

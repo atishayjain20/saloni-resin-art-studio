@@ -258,6 +258,29 @@ test("hero banner pause button stops and restarts the slides", () => {
   assert.equal(h.toggleIcon.textContent, "❚❚");
 });
 
+test("pressing play after using an arrow restarts the slides even though focus is still in the banner", () => {
+  const h = heroAutoplayHarness();
+  h.hero.fire("focusin", { target: h.next });
+  h.next.fire("click");
+  assert.equal(h.timers.length, 0);
+  h.hero.fire("focusout", { relatedTarget: h.toggle });
+  h.hero.fire("focusin", { target: h.toggle });
+  h.toggle.fire("click");
+  assert.equal(h.toggle.attrs["aria-label"], "Pause slides");
+  assert.equal(h.timers.length, 1, "play must really start the timer");
+  const before = h.track.scrollLeft;
+  h.tick();
+  assert.notEqual(h.track.scrollLeft, before);
+});
+
+test("only arrow keys on the banner stop autoplay; Tab passing through does not", () => {
+  const h = heroAutoplayHarness();
+  h.track.fire("keydown", { key: "Tab" });
+  assert.equal(h.timers.length, 1);
+  h.track.fire("keydown", { key: "ArrowRight" });
+  assert.equal(h.timers.length, 0);
+});
+
 test("hero banner does not move on its own when the shopper prefers reduced motion", () => {
   const h = heroAutoplayHarness({ reduced: true });
   assert.equal(h.timers.length, 0);
@@ -651,7 +674,10 @@ test("catalogue sections use four-card responsive grids with independent disclos
   });
   assert.match(css, /\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4/);
   assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.catalogue-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2/);
-  assert.doesNotMatch(script, /track\.addEventListener\("keydown"/);
+  // The product grids must not bring back the old card-carousel key handling; the hero banner's own arrow-key listener is separate.
+  const heroStart = script.indexOf("  function initHeroBanner(");
+  const withoutHero = script.slice(0, heroStart) + script.slice(script.indexOf("\n  }\n", heroStart) + 5);
+  assert.doesNotMatch(withoutHero, /track\.addEventListener\("keydown"/);
 });
 
 test("mobile catalogue cards keep full copy in source while reserving aligned title, pricing, and action slots", () => {
