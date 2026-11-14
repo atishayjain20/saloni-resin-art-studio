@@ -52,7 +52,7 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
   [["Rose hexagon", "₹3,124", "₹2,499"], ["Sunflower resin lamp", "₹749", "₹599"], ["Little brother keepsake", "₹499", "₹399"]].forEach(([title, was, now]) => {
     const card = html.match(new RegExp(`<article\\b(?:(?!<\\/article>)[\\s\\S])*?<(?:strong|h3)[^>]*>${title}<\\/(?:strong|h3)>[\\s\\S]*?<\\/article>`))?.[0] || "";
     assert.match(card, new RegExp(`<dd>${now}<\\/dd>[\\s\\S]*?<s>${was}<\\/s>`), `${title} card price must match the sale slide`);
-    assert.match(sale, new RegExp(`<s>${was}<\\/s> <strong>${now}<\\/strong>`), `${title} sticker`);
+    assert.match(sale, new RegExp(`<s>${was}<\\/s> <span class="sr-only">now <\\/span><strong>${now}<\\/strong>`), `${title} sticker reads "was … now …"`);
   });
   const cheapest = Math.min(...Array.from(html.matchAll(/<dt>(?:Price|From)<\/dt><dd>₹([\d,]+)/g), (match) => Number(match[1].replace(/,/g, ""))));
   assert.match(sale, new RegExp(`gifts from ₹${cheapest}<`), "the lowest catalogue price must be the one on the slide");
