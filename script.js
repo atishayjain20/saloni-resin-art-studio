@@ -1223,8 +1223,15 @@
     var dots = document.querySelectorAll("[data-banner-dot]");
     var prev = document.querySelector("[data-banner-prev]");
     var next = document.querySelector("[data-banner-next]");
+    var toggle = document.querySelector("[data-banner-autoplay]");
+    var hero = typeof track.closest === "function" ? track.closest(".hero-banner") : null;
     var pending = false;
     var active = 0;
+    var autoplayDelay = 10000;
+    var timer = null;
+    // Slides advance on their own until the shopper takes over; reduced-motion shoppers start paused.
+    var stopped = Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    var focusPaused = false;
     if (!slides.length) return;
 
     function goTo(index) {
@@ -1250,18 +1257,62 @@
       if (next) next.disabled = active === slides.length - 1;
     }
 
+    function schedule() {
+      if (timer !== null && typeof window.clearInterval === "function") window.clearInterval(timer);
+      timer = null;
+      if (stopped || focusPaused || document.hidden || slides.length < 2 || typeof window.setInterval !== "function") return;
+      timer = window.setInterval(function () { goTo(active === slides.length - 1 ? 0 : active + 1); }, autoplayDelay);
+    }
+
+    function setStopped(value) {
+      stopped = value;
+      if (toggle) {
+        toggle.setAttribute("aria-label", stopped ? "Play slides" : "Pause slides");
+        var icon = toggle.querySelector("span");
+        if (icon) icon.textContent = stopped ? "\u25B6" : "\u275A\u275A";
+      }
+      schedule();
+    }
+
+    // A swipe, tap, scroll wheel or key on the banner means the shopper is browsing it themselves.
+    function takeOver() {
+      if (!stopped) setStopped(true);
+    }
+
     track.addEventListener("scroll", function () {
       if (pending) return;
       pending = true;
       if (window.requestAnimationFrame) window.requestAnimationFrame(sync);
       else sync();
     });
-    if (prev) prev.addEventListener("click", function () { goTo(active - 1); });
-    if (next) next.addEventListener("click", function () { goTo(active + 1); });
+    if (prev) prev.addEventListener("click", function () { takeOver(); goTo(active - 1); });
+    if (next) next.addEventListener("click", function () { takeOver(); goTo(active + 1); });
     Array.prototype.forEach.call(dots, function (dot, index) {
-      dot.addEventListener("click", function () { goTo(index); });
+      dot.addEventListener("click", function () { takeOver(); goTo(index); });
     });
+    ["pointerdown", "touchstart", "wheel"].forEach(function (type) {
+      track.addEventListener(type, takeOver, { passive: true });
+    });
+    track.addEventListener("keydown", function (event) {
+      if (event && /^(?:ArrowLeft|ArrowRight|Home|End|PageUp|PageDown)$/.test(event.key)) takeOver();
+    });
+    // Play means play now: focus may still sit on a banner button from an earlier arrow tap.
+    if (toggle) toggle.addEventListener("click", function () { focusPaused = false; setStopped(!stopped); });
+    if (hero) {
+      hero.addEventListener("focusin", function (event) {
+        if (event && event.target === toggle) return;
+        focusPaused = true;
+        schedule();
+      });
+      hero.addEventListener("focusout", function (event) {
+        if (event && event.relatedTarget && typeof hero.contains === "function" && hero.contains(event.relatedTarget)) return;
+        focusPaused = false;
+        schedule();
+      });
+    }
+    if (typeof document.addEventListener === "function") document.addEventListener("visibilitychange", schedule);
     sync();
+    setStopped(stopped);
   }
 
   function initCatalogueExperience() {
