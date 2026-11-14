@@ -327,6 +327,45 @@ h1 em { color: var(--rose); font-style: italic; }
   outline: 3px solid var(--ivory);
   outline-offset: 2px;
 }
+/* Promo slides: the 20% sale and design-your-frame banners lead the carousel. */
+.hero-promo { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: clamp(0.5rem, 2vw, 1.5rem); padding-inline: clamp(0.9rem, 4vw, 3.5rem); overflow: hidden; }
+.hero-promo-sale { background: radial-gradient(circle at 12% 18%, rgba(242, 160, 7, 0.28), transparent 40%), linear-gradient(135deg, #2a0e1f 0%, #5c0f36 55%, #8f0d49 100%); color: var(--ivory); }
+/* Gold flecks, like the gold flakes set in the resin. */
+.hero-promo-sale::before { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(242, 160, 7, 0.95) 0 1.2px, transparent 1.7px), radial-gradient(circle, rgba(255, 246, 233, 0.6) 0 1px, transparent 1.5px); background-position: 0 0, 19px 11px; background-size: 38px 34px, 57px 49px; content: ""; opacity: 0.35; pointer-events: none; }
+.hero-promo-design { background: radial-gradient(circle at 85% 20%, rgba(176, 18, 91, 0.12), transparent 45%), linear-gradient(135deg, var(--ivory) 0%, #ffe3ee 100%); color: var(--ink); }
+.hero-promo-copy { position: relative; z-index: 1; display: grid; justify-items: start; gap: clamp(0.15rem, 0.8vw, 0.55rem); min-width: 0; }
+.hero-promo-kicker { margin: 0; color: var(--marigold); font-size: clamp(0.58rem, 1.6vw, 0.85rem); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.hero-promo-design .hero-promo-kicker { color: var(--rose-ink); }
+.hero-promo-big { margin: 0; font: 500 clamp(1.5rem, 6.4vw, 4.6rem)/0.95 var(--display); letter-spacing: 0.02em; text-transform: uppercase; }
+.hero-promo-big span { display: inline-block; padding-right: 0.05em; background: linear-gradient(100deg, var(--marigold) 40%, #ffe9b0 50%, var(--marigold) 60%) 100% 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; font-size: 1.55em; font-weight: 700; animation: hero-promo-shine 4.5s ease-in-out infinite; }
+@keyframes hero-promo-shine { 0%, 55% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+.hero-promo-title { font-size: clamp(1.2rem, 5vw, 3.6rem); line-height: 1; text-transform: none; }
+.hero-promo-sub { margin: 0; color: rgba(255, 246, 233, 0.9); font-size: clamp(0.62rem, 1.7vw, 0.95rem); }
+.hero-promo-steps { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; margin: 0; padding: 0; color: var(--cocoa); font-size: clamp(0.58rem, 1.6vw, 0.85rem); font-weight: 800; list-style: none; counter-reset: hero-step; }
+.hero-promo-steps li { display: inline-flex; align-items: center; gap: 0.3em; counter-increment: hero-step; }
+.hero-promo-steps li::before { display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 50%; background: var(--rose-ink); color: var(--ivory); font-size: 0.85em; content: counter(hero-step); }
+.hero-promo-cta { min-height: 44px; margin-top: clamp(0.2rem, 1vw, 0.6rem); padding: 0.5rem 1.2rem; border-color: var(--marigold); background: var(--marigold); color: var(--ink); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); white-space: nowrap; }
+.hero-promo-design .hero-promo-cta { border-color: var(--rose-ink); background: var(--rose-ink); color: var(--ivory); }
+.hero-promo-cta:hover, .hero-promo-cta:focus-visible { filter: brightness(1.06); }
+.hero-promo-cta:focus-visible { outline: 3px solid var(--ivory); outline-offset: 2px; }
+.hero-promo-design .hero-promo-cta:focus-visible { outline-color: var(--ink); }
+.hero-promo-picks { position: relative; z-index: 1; height: 80%; margin: 0; padding: 0; list-style: none; }
+.hero-promo-picks li { position: absolute; top: 50%; width: 46%; aspect-ratio: 4 / 5; padding: 4px; border-radius: 0.55rem; background: var(--paper); box-shadow: 0 10px 24px rgba(42, 14, 31, 0.35); }
+.hero-promo-picks li:nth-child(1) { left: 0; transform: translateY(-50%) rotate(-7deg); }
+.hero-promo-picks li:nth-child(2) { left: 27%; z-index: 2; transform: translateY(-62%) scale(1.08); }
+.hero-promo-picks li:nth-child(3) { right: 0; transform: translateY(-50%) rotate(7deg); }
+.hero-promo-picks img { width: 100%; height: 100%; border-radius: 0.35rem; object-fit: cover; }
+.hero-promo-tag { position: absolute; bottom: -0.6rem; left: 50%; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--marigold); color: var(--ink); font-size: clamp(0.55rem, 1.5vw, 0.82rem); font-weight: 800; white-space: nowrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25); transform: translateX(-50%) rotate(-3deg); }
+.hero-promo-tag s { margin-right: 0.15em; font-weight: 500; opacity: 0.7; }
+.hero-promo-design .hero-promo-tag { background: var(--rose-ink); color: var(--ivory); }
+/* The middle card sits higher and on top, so its sticker goes on its top edge and the side stickers drop below it. */
+.hero-promo-picks li:nth-child(2) .hero-promo-tag { top: -0.7rem; bottom: auto; }
+.hero-promo-picks li:not(:nth-child(2)) .hero-promo-tag { bottom: -1.3rem; }
+/* The wide 21:9 banner is short for its width, so the photo cards are sized smaller to keep every sticker inside. */
+@media (min-width: 621px) {
+  .hero-promo-picks li { width: 32%; }
+  .hero-promo-picks li:nth-child(2) { left: 34%; transform: translateY(-58%) scale(1.08); }
+}
 .button-whatsapp { justify-content: center; gap: 0.5rem; background: #25d366; border-color: #25d366; color: #0b3b1f; }
 .button-whatsapp:hover, .button-whatsapp:focus-visible { background: #1ebe5b; border-color: #1ebe5b; color: #0b3b1f; }
 .whatsapp-icon { width: 1.25rem; height: 1.25rem; flex: none; fill: currentColor; }
@@ -743,6 +782,9 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 }
 
 @media (max-width: 620px) {
+  /* Phone stickers stack the old and new price so the side stickers stay narrow. */
+  .hero-promo-sale .hero-promo-tag { display: grid; justify-items: center; padding: 0.1rem 0.45rem; border-radius: 0.6rem; line-height: 1.15; }
+  .hero-promo-sale .hero-promo-tag s { margin: 0; font-size: 0.85em; }
   :root { --sticky-offset: 7.5rem; }
   :root:has(.category-tabs) { --sticky-offset: calc(5.5rem + var(--category-tabs-height)); }
   html { scroll-padding-top: var(--sticky-offset); }
@@ -788,6 +830,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hero-promo-big span { animation: none; background-position: 50% 0; }
   html { scroll-behavior: auto; }.button, .text-link span { transition: none; }.reveal-ready .reveal, .reveal-ready .reveal.is-visible { opacity: 1; transform: none; transition: none; }
   .category-tab {
     transition: none;

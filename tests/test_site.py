@@ -821,7 +821,7 @@ class StaticSiteContractTests(unittest.TestCase):
         hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html)
         self.assertIsNotNone(hero)
         slides = re.findall(r'<article class="hero-slide[^"]*"[\s\S]*?</article>', hero.group(0))
-        self.assertEqual(len(slides), 5)
+        self.assertEqual(len(slides), 7)
         for slide_index, slide in enumerate(slides):
             images = re.findall(r'<img\b[^>]*>', slide)
             self.assertEqual(len(images), 3)
@@ -929,7 +929,9 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertIsNotNone(old_section)
             with self.subTest(moved_asset=moved_asset):
                 self.assertNotIn(f"assets/{moved_asset}", old_section.group(0))
-                self.assertEqual(self.html.count(f'src="assets/{moved_asset}"'), 1)
+                # The design-a-frame hero slide may reuse a photo; the catalogue itself keeps one copy.
+                hero_section = re.search(r'<section\b[^>]*class="hero-banner\b[\s\S]*?</section>', self.html).group(0)
+                self.assertEqual(self.html.replace(hero_section, "").count(f'src="assets/{moved_asset}"'), 1)
         studio_section = re.search(r'<section\b[^>]*id=["\']studio-art["\'][\s\S]*?</section>', self.html)
         self.assertIsNotNone(studio_section)
         for moved_asset in (
@@ -947,9 +949,11 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(hero)
         hero_html = hero.group(0)
         self.assertNotIn('hero-actions', hero_html)
-        self.assertNotIn('data-browse-all', hero_html)
+        self.assertEqual(hero_html.count('data-browse-all'), 1)
+        self.assertIn('href="#catalogue-filters" data-browse-all>Shop the sale</a>', hero_html)
         self.assertEqual(len(re.findall(r'data-category-shortcut=', hero_html)), 5)
-        self.assertEqual(len(re.findall(r'data-customizer-open', hero_html)), 1)
+        # The design-a-frame slide and the link under the carousel both open the frame designer.
+        self.assertEqual(len(re.findall(r'data-customizer-open', hero_html)), 2)
         self.assertNotIn('Browse gifts by type or budget', hero_html)
         self.assertNotIn('Request a custom gift', hero_html)
         self.assertNotIn('data-browse-filters', hero_html)
@@ -2629,7 +2633,7 @@ class ResponsiveCardImageTests(unittest.TestCase):
         html_text = (ROOT / "index.html").read_text(encoding="utf-8")
         hero = re.search(r'<section\b[^>]*class="hero-banner\b[\s\S]*?</section>', html_text).group(0)
         images = re.findall(r"<img\b[^>]*>", hero)
-        self.assertEqual(len(images), 15)
+        self.assertEqual(len(images), 21)
         with_copy = 0
         for tag in images:
             attrs = dict(re.findall(r'([\w-]+)="([^"]*)"', tag))
