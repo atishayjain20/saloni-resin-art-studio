@@ -1543,6 +1543,13 @@
         var sectionCards = cardsForSection(section);
         var hasVisibleCard = sectionCards.some(function (card) { return !card.hidden; });
         section.hidden = !hasVisibleCard;
+        // The section video would push search or budget results down, so it steps aside; a hidden video also stops playing.
+        var reel = section.querySelector && section.querySelector("[data-section-reel]");
+        if (reel) {
+          reel.hidden = Boolean(normalizeSearch(searchFilter.value)) || appliedBudget !== "all";
+          var video = (section.hidden || reel.hidden) && reel.querySelector ? reel.querySelector("video") : null;
+          if (video && typeof video.pause === "function") video.pause();
+        }
         var disclosure = section.querySelector && section.querySelector("[data-catalogue-disclosure]");
         if (!disclosure) return;
         var canExpand = !allVisible && sectionCards.length > previewLimit;

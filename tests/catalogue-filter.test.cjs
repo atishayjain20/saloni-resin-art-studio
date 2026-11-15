@@ -49,6 +49,8 @@ class FakeSection {
     this.classList = { values: new Set(), toggle: (name, enabled) => enabled ? this.classList.values.add(name) : this.classList.values.delete(name), contains: (name) => this.classList.values.has(name) };
     this.disclosure = new FakeControl("");
     this.disclosure.hidden = false;
+    this.reelVideo = { pauses: 0, pause() { this.pauses += 1; } };
+    this.reel = { hidden: false, querySelector: (selector) => selector === "video" ? this.reelVideo : null };
     this.grid = new FakeControl("");
     this.grid.scrollIntoView = (options) => { this.grid.scrolledIntoView = options; };
   }
@@ -64,6 +66,7 @@ class FakeSection {
   querySelector(selector) {
     if (selector === ".work-card, .romantic-keepsake-card") return this.cards[0] || null;
     if (selector === ".catalogue-grid") return this.grid;
+    if (selector === "[data-section-reel]") return this.reel;
     return selector === "[data-catalogue-disclosure]" ? this.disclosure : null;
   }
 }
@@ -398,6 +401,30 @@ test("Explore gifts reveals every matching item in one continuous view", () => {
   assert.equal(visibleCards(harness).length, 77);
   assert.equal(harness.status.textContent, "");
   assert.ok(harness.sections.every((section) => section.disclosure.hidden));
+});
+
+test("a section video hides while a search or budget is narrowing the results", () => {
+  const harness = createHarness({ count: 12 });
+  const sections = harness.sections.filter((section) => section.cards.length > 0);
+  assert.ok(sections.length > 0);
+  assert.ok(sections.every((section) => section.reel.hidden === false));
+
+  harness.searchToggle.dispatch("click");
+  harness.searchFilter.value = "gift";
+  harness.searchFilter.dispatch("input");
+  assert.ok(sections.every((section) => section.reel.hidden === true));
+
+  harness.searchFilter.value = "";
+  harness.searchFilter.dispatch("input");
+  assert.ok(sections.every((section) => section.reel.hidden === false));
+
+  assert.ok(sections.every((section) => section.reelVideo.pauses === 1), "a hidden video is paused once");
+
+  harness.filterToggle.dispatch("click");
+  harness.priceFilter.value = "499";
+  harness.priceFilter.dispatch("change");
+  harness.applyButton.dispatch("click");
+  assert.ok(sections.every((section) => section.reel.hidden === true));
 });
 
 test("search matches title, type, and kind while ignoring descriptions", () => {
