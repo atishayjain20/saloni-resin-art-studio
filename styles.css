@@ -465,6 +465,13 @@ h1 em { color: var(--rose); font-style: italic; }
 .rail-heading > div:first-child { min-width: 0; }
 .rail-heading h2 { max-width: 10ch; margin-bottom: 0; }
 .catalogue-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(1rem, 2vw, 1.5rem); padding: 0.2rem 0 1rem; }
+.section-reel { display: flex; gap: 1rem; align-items: center; max-width: 34rem; margin: 0 0 1.5rem; }
+.section-reel video { flex: 0 0 auto; width: min(42%, 11.5rem); height: auto; aspect-ratio: 9 / 16; border-radius: 0.9rem; background: #f3e6ea; object-fit: cover; }
+.section-reel-text { min-width: 0; }
+.section-reel strong { display: block; font-size: 1.05rem; line-height: 1.25; }
+.section-reel p { margin: 0.4rem 0 0.7rem; color: var(--muted); font-size: 0.86rem; }
+.section-reel .text-link { min-height: 2.75rem; }
+.section-reel .section-reel-note { margin: 0.7rem 0 0; font-size: 0.72rem; }
 .work-card { min-width: 0; }
 .catalogue-ready .catalogue-grid > :is(.work-card, .romantic-keepsake-card) { cursor: pointer; }
 .work-card figure { margin: 0; }
