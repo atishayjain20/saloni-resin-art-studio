@@ -17,7 +17,9 @@ It also:
   * stamps data-product-slug on each card's photo link in index.html (script.js reads it),
   * rewrites sitemap.xml so it lists every product page after the site's own pages,
   * deletes p/<slug>/ folders of products that no longer exist,
-  * also writes the topic pages (/resin-clocks/ and others) from the TOPICS table below.
+  * also writes the topic pages (/resin-clocks/ and others) from the TOPICS table below,
+  * writes merchant-feed.tsv, the product list Google Merchant Center fetches every day. It holds only
+    products with a photo of the real piece and one price.
 
 The slug comes from the product name. If two names give the same slug, the first card in
 page order keeps it and later ones get a 4-letter suffix taken from their photo file name,
@@ -39,6 +41,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SITE = "https://saloniresinart.com"
 STUDIO = "Saloni Resin Art Studio"
 PAGE_DIR = "p"
+FEED_FILE = "merchant-feed.tsv"
+FEED_COLUMNS = ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists"]
 
 ARTICLE_RE = re.compile(r'<article\b[^>]*\bclass="[^"]*\b(?:work-card|romantic-keepsake-card)\b[^"]*"[^>]*>.*?</article>', re.S)
 TRIGGER_RE = re.compile(r'<a class="lightbox-trigger" data-lightbox-trigger\b[^>]*>')
@@ -304,6 +308,23 @@ def product_json_ld(card):
     return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
 
 
+def merchant_feed(cards, slugs):
+    """The Google Merchant Center feed (tab-separated). AI preview photos and prices that are a range or on request stay out."""
+    rows = [FEED_COLUMNS]
+    for card, slug in zip(cards, slugs):
+        offer = price_offer(card["price"])
+        if card["alt"].startswith("Illustrative preview:") or not offer or offer["@type"] != "Offer":
+            continue
+        about = " ".join(part for part in (card["line"], "Size: %s." % card["size"] if card["size"] else "",
+                                           "Handmade to order by Saloni in Ajmer, Rajasthan.") if part)
+        rows.append([slug, card["name"], about, "%s/%s/%s/" % (SITE, PAGE_DIR, slug),
+                     SITE + "/assets/" + urllib.parse.quote(card["file"]), "in_stock", offer["price"] + " INR", STUDIO, "new", "no"])
+    for row in rows:
+        if any(re.search(r'[\t\n\r"]', value) for value in row):
+            raise SystemExit("A tab, line break or double quote would break %s: fix the card %r in index.html" % (FEED_FILE, row[1]))
+    return "".join("\t".join(row) + "\n" for row in rows)
+
+
 def esc(value):
     return html.escape(value, quote=True)
 
@@ -541,6 +562,8 @@ def main():
         target.write_text(content, encoding="utf-8")
     index_path.write_text(stamped, encoding="utf-8")
     sitemap_path.write_text(sitemap, encoding="utf-8")
+    cards = parse_cards(stamped)
+    (ROOT / FEED_FILE).write_text(merchant_feed(cards, assign_slugs(cards)), encoding="utf-8")
     topic_count = len(TOPICS)
     print("Wrote %d product pages in %s/, %d topic pages, stamped index.html and updated sitemap.xml." % (len(pages) - topic_count, PAGE_DIR, topic_count))
 
