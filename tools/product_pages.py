@@ -80,6 +80,13 @@ TOPICS = [
      "products": ["lotus-diya-pair", "floral-swastik-tealight-set", "jewel-glow-tealight", "gold-fleck-lotus-light",
                   "pastel-lotus-tealight", "marigold-petal-holder", "ivory-mandala-holder", "emerald-glow-pair",
                   "sunflower-resin-lamp"]},
+    {"slug": "resin-boards", "link": "Resin boards",
+     "title": "Resin Boards: Name Plates and Handled Trays",
+     "description": "Handmade resin name plates for your home door or desk, and handled trays, made by Saloni in Ajmer and shipped across India.",
+     "heading": "Resin boards: name plates and handled trays",
+     "intro": "Resin name plates for the home and desk, and handled trays. Every piece is handmade by Saloni in her studio in Ajmer, Rajasthan.",
+     "products": ["mr-and-mrs-name-plate", "resin-desk-nameplate", "turquoise-tray-and-coasters", "smoky-bronze-handled-tray",
+                  "champagne-white-handled-tray", "silver-icy-blue-handled-tray", "ocean-seashell-tray", "pastel-butterfly-trays"]},
 ]
 REFERENCE_KICKER = "Reference image · final design confirmed before making"
 CARD_SIZES = "(max-width: 620px) 40vw, (max-width: 1320px) 26vw, 344px"

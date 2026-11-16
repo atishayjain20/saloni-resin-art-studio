@@ -646,6 +646,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "https://saloniresinart.com/couple-gifts/",
             "https://saloniresinart.com/marriage-gifts/",
             "https://saloniresinart.com/celebration-lights/",
+            "https://saloniresinart.com/resin-boards/",
             "https://saloniresinart.com/partners/",
             "https://saloniresinart.com/corporate-gifting/",
             "https://saloniresinart.com/reviews/",
@@ -2780,7 +2781,7 @@ class TopicPageTests(unittest.TestCase):
     """The topic pages (/resin-clocks/ ...) are generated from the home cards: no price, only CollectionPage and ItemList data."""
 
     SITE = "https://saloniresinart.com"
-    TOPIC_SLUGS = ["resin-clocks", "couple-gifts", "marriage-gifts", "celebration-lights"]
+    TOPIC_SLUGS = ["resin-clocks", "couple-gifts", "marriage-gifts", "celebration-lights", "resin-boards"]
     CLOCKS = [
         "teal-and-gold-roman-resin-clock", "sage-and-gold-resin-clock", "lilac-and-silver-resin-clock",
         "ivory-diamond-resin-clock", "sky-blue-roman-resin-clock", "pearl-geode-resin-clock",
@@ -2791,6 +2792,10 @@ class TopicPageTests(unittest.TestCase):
         "lotus-diya-pair", "floral-swastik-tealight-set", "jewel-glow-tealight", "gold-fleck-lotus-light",
         "pastel-lotus-tealight", "marigold-petal-holder", "ivory-mandala-holder", "emerald-glow-pair",
         "sunflower-resin-lamp",
+    ]
+    BOARDS = [
+        "mr-and-mrs-name-plate", "resin-desk-nameplate", "turquoise-tray-and-coasters", "smoky-bronze-handled-tray",
+        "champagne-white-handled-tray", "silver-icy-blue-handled-tray", "ocean-seashell-tray", "pastel-butterfly-trays",
     ]
     HAND_WRITTEN = [
         ("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"),
@@ -2878,6 +2883,7 @@ class TopicPageTests(unittest.TestCase):
             "couple-gifts": [slug for slug, card in zip(self.slugs, self.cards) if card["section"] == "romantic-keepsakes"],
             "marriage-gifts": [slug for slug, card in zip(self.slugs, self.cards) if card["section"] == "marriage-gifts"],
             "celebration-lights": self.LIGHTS,
+            "resin-boards": self.BOARDS,
         }
         for topic, product_slugs in expected.items():
             with self.subTest(topic):
@@ -3045,6 +3051,7 @@ class ResponsiveCardImageTests(unittest.TestCase):
         "couple-gifts/index.html": 9,
         "marriage-gifts/index.html": 10,
         "celebration-lights/index.html": 6,
+        "resin-boards/index.html": 4,
     }
     CARD_WIDTH = 540
 
