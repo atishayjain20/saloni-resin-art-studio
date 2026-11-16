@@ -2744,13 +2744,16 @@ class ProductSharePageTests(unittest.TestCase):
             shown = re.search(r'<p class="price">([^<]*)</p>', text)
             self.assertIsNotNone(shown, slug)
             self.assertEqual(html.unescape(shown.group(1)), card["price"], slug)
-            blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)
+            blocks = [json.loads(block) for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)]
+            products = [block for block in blocks if block.get("@type") == "Product"]
+            self.assertEqual(len([block for block in blocks if block.get("@type") == "BreadcrumbList"]), 1, slug)
+            self.assertEqual(len(blocks), len(products) + 1, slug)
             if card["price"] == "Price on request":
-                self.assertEqual(blocks, [], slug)
+                self.assertEqual(products, [], slug)
                 kinds["none"] += 1
                 continue
-            self.assertEqual(len(blocks), 1, slug)
-            data = json.loads(blocks[0])
+            self.assertEqual(len(products), 1, slug)
+            data = products[0]
             self.assertEqual(data["@context"], "https://schema.org", slug)
             self.assertEqual(data["@type"], "Product", slug)
             self.assertEqual(data["name"], card["name"], slug)
@@ -2784,7 +2787,8 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertNotRegex(text, r"location\.(?:replace|assign)|location\.href\s*=", slug)
             self.assertNotIn("<noscript", text, slug)
             self.assertIn(card["section"], section_ids, slug)
-            self.assertEqual(tags.body_links, ["/", "/?product=" + slug + "#" + card["section"]], slug)
+            self.assertEqual(tags.body_links[0], "/", slug)
+            self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=" + slug + "#" + card["section"]], slug)
             self.assertEqual(tags.noscript_links, [], slug)
             self.assertEqual(re.findall(r"<h1>([^<]*)</h1>", text), [html.escape(card["name"], quote=True)], slug)
             sizes = re.findall(r'<p class="size">Size: ([^<]*)</p>', text)
@@ -2797,9 +2801,71 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertEqual(re.findall(r"<script\b([^>]*)>", text), [' type="application/ld+json"'] * len(re.findall(r"application/ld\+json", text)), slug)
         # The button lands in the section the card sits in.
         _, tags = self.page("jewel-glow-tealight")
-        self.assertEqual(tags.body_links, ["/", "/?product=jewel-glow-tealight#diwali"])
+        self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=jewel-glow-tealight#diwali"])
         _, tags = self.page("two-keys-one-little-us")
-        self.assertEqual(tags.body_links, ["/", "/?product=two-keys-one-little-us#romantic-keepsakes"])
+        self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=two-keys-one-little-us#romantic-keepsakes"])
+
+    def test_every_page_has_a_path_line_and_four_more_pieces_that_link_the_pages_together(self):
+        tool = load_product_pages_tool()
+        cards = tool.parse_cards(self.home)
+        slugs = tool.assign_slugs(cards)
+        by_slug = dict(zip(slugs, cards))
+
+        def topic_group(topic):
+            return list(topic["products"]) if "products" in topic else [s for s, c in zip(slugs, cards) if c["section"] == topic["section"]]
+
+        linked = set()
+        for slug, card in by_slug.items():
+            with self.subTest(slug=slug):
+                text, tags = self.page(slug)
+                topic = next((t for t in tool.TOPICS if slug in topic_group(t)), None)
+                held = {s for t in tool.TOPICS for s in topic_group(t)}
+                group = topic_group(topic) if topic else [s for s, c in zip(slugs, cards) if c["section"] == card["section"] and s not in held]
+                at = group.index(slug)
+                expected = (group[at + 1:] + group[:at])[:4]
+                self.assertEqual(len(expected), 4)
+
+                # The visible path line, and the BreadcrumbList that says the same thing.
+                canonical = self.SITE + "/p/" + slug + "/"
+                self.assertEqual(tags.links["canonical"], canonical)
+                shown = [("/", "Home")] + ([("/%s/" % topic["slug"], topic["link"])] if topic else []) + [(None, card["name"])]
+                nav = re.search(r'<nav class="path" aria-label="Breadcrumb"><ol>(.*?)</ol></nav>', text, re.S).group(1)
+                self.assertLess(text.index('<nav class="path"'), text.index("<img "), "the path line comes before the photo")
+                entries = re.findall(r"<li( aria-current=\"page\")?>(.*?)</li>", nav)
+                self.assertEqual(len(entries), len(shown))
+                for number, ((current, inner), (href, label)) in enumerate(zip(entries, shown)):
+                    self.assertEqual(bool(current), number == len(shown) - 1)
+                    link = re.search(r'<a href="([^"]*)">(.*?)</a>', inner)
+                    if href:
+                        self.assertEqual((link.group(1), html.unescape(link.group(2))), (href, label))
+                    else:
+                        self.assertIsNone(link, "the product name is plain text")
+                        self.assertEqual(html.unescape(re.sub(r"<[^>]*>", "", inner)), "›" + label)
+                crumbs = [json.loads(b) for b in re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)]
+                crumb = [c for c in crumbs if c.get("@type") == "BreadcrumbList"][0]
+                self.assertEqual(crumb["@context"], "https://schema.org")
+                self.assertEqual([(i["position"], i["name"]) for i in crumb["itemListElement"]], [(n, label) for n, (_, label) in enumerate(shown, 1)])
+                self.assertEqual([i["@type"] for i in crumb["itemListElement"]], ["ListItem"] * len(shown))
+                urls = [i["item"] for i in crumb["itemListElement"]]
+                self.assertEqual(urls, [self.SITE + (href or "/p/" + slug + "/") for href, _ in shown])
+                self.assertEqual(urls[-1], canonical)
+
+                # More like this: the next four in the group, never the page itself.
+                block = re.search(r'<section class="more" aria-labelledby="more-title"><h2 id="more-title">More like this</h2><ul>(.*?)</ul></section>', text, re.S).group(1)
+                more = re.findall(r'<li><a href="([^"]*)">(.*?)</a></li>', block)
+                self.assertEqual([href for href, _ in more], ["/p/%s/" % other for other in expected])
+                self.assertEqual([html.unescape(name) for _, name in more], [by_slug[other]["name"] for other in expected])
+                self.assertEqual(len(set(expected)), 4)
+                self.assertNotIn(slug, expected)
+                self.assertNotIn("<img", block)
+                linked.update(expected)
+
+                # Every link on the page leads to a file in the site.
+                for href in tags.body_links:
+                    path = re.split(r"[?#]", href)[0]
+                    self.assertTrue(path.startswith("/"), href)
+                    self.assertTrue((ROOT / path.strip("/") / "index.html").is_file(), href)
+        self.assertEqual(linked, set(slugs), "every product page is linked from another product page")
 
     def test_slugs_come_from_the_name_and_stay_stable_when_names_collide(self):
         tool = load_product_pages_tool()

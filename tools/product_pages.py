@@ -11,6 +11,10 @@ them without running JavaScript) and Product structured data (JSON-LD) so Google
 price and photo. Products priced "Price on request" get no structured data. The "View and order"
 button opens /?product=<slug>#<section>, where script.js opens that product's popup. A price in a
 new format stops this script until price_offer() learns it.
+Each product page also has a path line (Home > topic > product; products no topic holds get Home > product)
+with BreadcrumbList data, and a "More like this" list of the next 4 products in the same group: the first
+topic in TOPICS that holds the product, else the cards of its home section that no topic holds, in card
+order and wrapping around. These links join the pages so Google can find and group all of them.
 
 It also:
   * points og:image at assets/share/<slug>.jpg and reads its width and height from the JPEG,
@@ -96,12 +100,17 @@ REFERENCE_KICKER = "Reference image · final design confirmed before making"
 CARD_SIZES = "(max-width: 620px) 40vw, (max-width: 1320px) 26vw, 344px"
 VERSION_RE = re.compile(r'href="styles\.css\?v=(\d+)"')
 PAGE_CSS = ('*{box-sizing:border-box}body{margin:0;background:#ffeaf2;color:#2a0e1f;font:1rem/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif}'
-            'header,main{max-width:30rem;margin:0 auto;padding:0 1rem}header a{display:inline-flex;align-items:center;min-height:2.75rem;color:#8f0d49;font-weight:700;text-decoration:none}'
+            'header,main{max-width:30rem;margin:0 auto;padding:0 1rem}header a,.path a,.more a{display:inline-flex;align-items:center;min-height:2.75rem;color:#8f0d49;font-weight:700;text-decoration:none}'
             'img{display:block;width:auto;max-width:100%;height:auto;max-height:55vh;margin:0 auto;border-radius:.75rem;background:#fff}'
             'h1{margin:1rem 0 .25rem;font:500 1.75rem/1.15 Georgia,"Times New Roman",serif}'
             '.price{display:inline-block;margin:.25rem 0;padding:.2rem .6rem;border-radius:999px;background:#f2a007;font-size:1.15rem;font-weight:700}'
             '.size{margin:.25rem 0;color:#6a4a5b}'
             '.order{display:flex;align-items:center;justify-content:center;min-height:3rem;margin:1.25rem 0 2rem;padding:.75rem 1rem;border-radius:999px;background:#b0125b;color:#fff;font-weight:700;text-decoration:none}'
+            '.path{margin:.25rem 0 .5rem}.path ol,.more ul{margin:0;padding:0;list-style:none}.path ol{display:flex;flex-wrap:nowrap;align-items:center}'
+            '.path li{display:flex;flex:none;align-items:center;color:#6a4a5b;white-space:nowrap}.path li span{margin:0 .4rem}'
+            '.path li[aria-current]{display:block;flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;line-height:2.75rem}'
+            '.more{margin:0 0 2rem}.more h2{margin:0 0 .25rem;font:500 1.25rem/1.2 Georgia,"Times New Roman",serif}'
+            '.more a{display:flex}.more li+li{border-top:1px solid #e6c4d4}'
             'a:focus-visible{outline:3px solid #b0125b;outline-offset:4px}')
 # Sizes the popup also hides: they are not a real size yet.
 NOT_A_SIZE_RE = re.compile(r"suggested size|confirm with saloni|custom size in inches|component size to confirm", re.I)
@@ -308,6 +317,27 @@ def product_json_ld(card):
     return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
 
 
+def breadcrumb_json_ld(card, slug, topic):
+    """BreadcrumbList structured data as a JSON string; says the same as the visible path line."""
+    trail = [("Home", SITE + "/")]
+    if topic:
+        trail.append((topic["link"], "%s/%s/" % (SITE, topic["slug"])))
+    trail.append((card["name"], "%s/%s/%s/" % (SITE, PAGE_DIR, slug)))
+    data = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [{"@type": "ListItem", "position": number, "name": name, "item": url} for number, (name, url) in enumerate(trail, 1)],
+    }
+    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+
+
+def more_like_this(slug, group):
+    """Up to 4 (card, slug) pairs: the ones after slug in group (a list of (card, slug)), wrapping to the start, never slug itself."""
+    order = [other for _, other in group]
+    at = order.index(slug)
+    return (group[at + 1:] + group[:at])[:4]
+
+
 def merchant_feed(cards, slugs):
     """The Google Merchant Center feed (tab-separated). AI preview photos and prices that are a range or on request stay out."""
     rows = [FEED_COLUMNS]
@@ -343,7 +373,7 @@ def jpeg_size(path):
     raise SystemExit("Not a JPEG: " + str(path))
 
 
-def render_page(card, slug, share_size):
+def render_page(card, slug, share_size, topic, more):
     url = "%s/%s/%s/" % (SITE, PAGE_DIR, slug)
     target = "/?product=%s#%s" % (slug, card["section"])
     title = "%s | %s" % (card["name"], STUDIO)
@@ -351,6 +381,15 @@ def render_page(card, slug, share_size):
     image = "%s/assets/share/%s.jpg" % (SITE, slug)
     alt = card["alt"] or card["name"]
     data = product_json_ld(card)
+    crumbs = breadcrumb_json_ld(card, slug, topic)
+    path = '<li><a href="/">Home</a></li>'
+    if topic:
+        path += '<li><span aria-hidden="true">›</span><a href="/%s/">%s</a></li>' % (topic["slug"], esc(topic["link"]))
+    path += '<li aria-current="page"><span aria-hidden="true">›</span>%s</li>' % esc(card["name"])
+    more_html = ""
+    if more:
+        links = "".join('<li><a href="/%s/%s/">%s</a></li>' % (PAGE_DIR, other, esc(other_card["name"])) for other_card, other in more)
+        more_html = '    <section class="more" aria-labelledby="more-title"><h2 id="more-title">More like this</h2><ul>%s</ul></section>\n' % links
     size = '  <meta property="og:image:width" content="%d">\n  <meta property="og:image:height" content="%d">\n' % share_size
     return """<!doctype html>
 <html lang="en">
@@ -380,16 +419,18 @@ def render_page(card, slug, share_size):
 <body>
   <header><a href="/">{studio}</a></header>
   <main>
+    <nav class="path" aria-label="Breadcrumb"><ol>{path}</ol></nav>
     <img src="/assets/{file}" alt="{alt}"{dims} fetchpriority="high">
     <h1>{name}</h1>
     <p class="price">{price}</p>
 {size_line}{line_html}    <a class="order" href="{target}">View and order</a>
-  </main>
+{more_html}  </main>
 </body>
 </html>
 """.format(
         title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
-        ld='  <script type="application/ld+json">%s</script>\n' % data if data else "", css=PAGE_CSS,
+        ld=("".join('  <script type="application/ld+json">%s</script>\n' % block for block in (data, crumbs) if block)), css=PAGE_CSS,
+        path=path, more_html=more_html,
         target=esc(target), name=esc(card["name"]), file=esc(card["file"]), price=esc(card["price"]),
         size_line='    <p class="size">Size: %s</p>\n' % esc(card["size"]) if card["size"] else "",
         line_html='    <p>%s</p>\n' % esc(card["line"]) if card["line"] else "",
@@ -533,14 +574,31 @@ def build(index_html, sitemap, root=ROOT):
     """(index.html with slugs, {relative path: page}, sitemap.xml): a page per card in index_html and one per topic in TOPICS."""
     cards = parse_cards(index_html)
     slugs = assign_slugs(cards)
-    pages = {"%s/%s/index.html" % (PAGE_DIR, slug): render_page(card, slug, share_size(root, slug)) for card, slug in zip(cards, slugs)}
     version = asset_version(index_html)
     seen = {PAGE_DIR}
+    topic_pages = []
+    # Topic checks run first, so a bad topic stops the script before anything is rendered or written.
     for topic in TOPICS:
         if topic.get("slug") in seen:
             raise SystemExit("Topic %s repeats a folder name or equals %r: fix TOPICS in tools/product_pages.py" % (topic.get("slug"), PAGE_DIR))
         seen.add(topic.get("slug"))
-        items = topic_items(topic, cards, slugs)
+        topic_pages.append((topic, topic_items(topic, cards, slugs)))
+    # Each product's path and "More like this" group: the first topic that holds it, else the cards of its home
+    # section that no topic holds (cards a topic holds link within their topic, so counting them here would leave
+    # some pages with no link pointing at them).
+    placed = {}
+    for topic, items in reversed(topic_pages):
+        for _, slug in items:
+            placed[slug] = (topic, items)
+    sections = {}
+    for card, slug in zip(cards, slugs):
+        if slug not in placed:
+            sections.setdefault(card["section"], []).append((card, slug))
+    pages = {}
+    for card, slug in zip(cards, slugs):
+        topic, group = placed[slug] if slug in placed else (None, sections[card["section"]])
+        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topic, more_like_this(slug, group))
+    for topic, items in topic_pages:
         pages[topic["slug"] + "/index.html"] = render_topic(topic, items, version, share_size(root, items[0][1]))
     return stamp(index_html, cards, slugs), pages, sitemap_with_products(sitemap, slugs)
 
