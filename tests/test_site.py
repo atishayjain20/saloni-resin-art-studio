@@ -2832,6 +2832,47 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertFalse((out / "p" / "gone").exists())
             self.assertTrue((out / "p" / "keep" / "index.html").exists())
 
+    def test_merchant_feed_lists_only_real_photo_single_price_products(self):
+        # Google Merchant Center fetches merchant-feed.tsv every day. AI preview photos and prices that are a range
+        # or "on request" stay out: Google wants a photo of the real product and one price that matches the page.
+        from urllib.parse import unquote
+        tool = load_product_pages_tool()
+        cards = tool.parse_cards(self.home)
+        path = ROOT / "merchant-feed.tsv"
+        self.assertTrue(path.is_file(), "merchant-feed.tsv is missing: run python3 tools/product_pages.py")
+        text = path.read_text(encoding="utf-8")
+        self.assertEqual(text, tool.merchant_feed(cards, self.slugs), "merchant-feed.tsv is stale: run python3 tools/product_pages.py")
+        lines = text.splitlines()
+        header = lines[0].split("\t")
+        self.assertEqual(header, ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists"])
+        wanted = [(slug, card) for slug, card in zip(self.slugs, cards)
+                  if not card["alt"].startswith("Illustrative preview:") and re.fullmatch(r"₹[0-9,]+", card["price"])]
+        self.assertGreater(len(wanted), 0)
+        self.assertEqual([line.split("\t")[0] for line in lines[1:]], [slug for slug, _ in wanted])
+        for line, (slug, card) in zip(lines[1:], wanted):
+            fields = line.split("\t")
+            self.assertEqual(len(fields), len(header), slug)
+            row = dict(zip(header, fields))
+            self.assertNotIn('"', line, slug)
+            self.assertTrue(all(value.strip() for value in fields), slug)
+            self.assertEqual(row["title"], card["name"])
+            self.assertIn(card["line"], row["description"])
+            self.assertEqual(row["link"], "%s/p/%s/" % (self.SITE, slug))
+            page, _ = self.page(slug)
+            prefix = self.SITE + "/assets/"
+            self.assertTrue(row["image_link"].startswith(prefix), slug)
+            self.assertTrue((ROOT / "assets" / unquote(row["image_link"][len(prefix):])).is_file(), slug)
+            self.assertEqual(row["price"], card["price"].lstrip("₹").replace(",", "") + " INR")
+            self.assertIn('"price": "%s", "priceCurrency": "INR"' % row["price"].split(" ")[0], page, slug)
+            self.assertEqual((row["availability"], row["brand"], row["condition"], row["identifier_exists"]),
+                             ("in_stock", "Saloni Resin Art Studio", "new", "no"))
+
+    def test_merchant_feed_stops_on_a_field_that_would_break_the_file(self):
+        tool = load_product_pages_tool()
+        card = dict(tool.parse_cards(self.home)[0], alt="Photo", price="₹100", name="Bad\tname")
+        with self.assertRaises(SystemExit):
+            tool.merchant_feed([card], ["bad-name"])
+
 
 class TopicPageTests(unittest.TestCase):
     """The topic pages (/resin-clocks/ ...) are generated from the home cards: no price, only CollectionPage and ItemList data."""
