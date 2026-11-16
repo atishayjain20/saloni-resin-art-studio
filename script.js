@@ -347,6 +347,8 @@
     var photoThumbs = document.getElementById("lightbox-thumbs");
     var lightboxIncluded = document.getElementById("lightbox-included");
     var lightboxReviews = document.getElementById("lightbox-reviews");
+    var lightboxMore = document.getElementById("lightbox-more");
+    var lightboxMoreList = document.getElementById("lightbox-more-list");
     var lightboxReviewList = document.getElementById("lightbox-review-list");
     var lightboxReviewsTitle = document.getElementById("lightbox-reviews-title");
     var lightboxRatingSummary = document.getElementById("lightbox-rating-summary");
@@ -883,12 +885,18 @@
         } else report(false);
       });
 
-      openSharedProduct = function () {
-        if (!sharedSlug) return;
+      // The card photo link with this share slug, or null.
+      function triggerForSlug(slug) {
         var match = null;
         lightboxTriggers.forEach(function (trigger) {
-          if (!match && trigger.getAttribute("data-product-slug") === sharedSlug) match = trigger;
+          if (!match && trigger.getAttribute("data-product-slug") === slug) match = trigger;
         });
+        return match;
+      }
+
+      openSharedProduct = function () {
+        if (!sharedSlug) return;
+        var match = triggerForSlug(sharedSlug);
         if (!match) return;
         // Take ?product= out of the address (hash and other params stay) so a reload or a later category pick never
         // reopens the popup. This is done before the popup's own history step, so Back still closes the popup and stays on the site.
@@ -949,6 +957,8 @@
         if (lightboxSize) { lightboxSize.textContent = ""; lightboxSize.hidden = true; }
         if (lightboxDescription) lightboxDescription.textContent = "";
         if (lightboxRequest) { lightboxRequest.hidden = true; lightboxRequest.disabled = true; }
+        if (lightboxMoreList) lightboxMoreList.textContent = "";
+        if (lightboxMore) lightboxMore.hidden = true;
         clearPhotos();
         if (pendingLightboxRequest) {
           invalidateLightboxFocus();
@@ -1075,6 +1085,44 @@
         }, { passive: true });
       }
 
+      // "More like this": the product's own list (data-product-slug values that tools/product_pages.py stamped
+      // in data-more-like-this) as text buttons. Hidden when no card is left to show.
+      function renderMoreLikeThis(trigger) {
+        if (!lightboxMore || !lightboxMoreList) return;
+        lightboxMoreList.textContent = "";
+        var own = slugOf(trigger);
+        var listed = (typeof trigger.getAttribute === "function" ? trigger.getAttribute("data-more-like-this") || "" : "").split(/\s+/);
+        var shown = 0;
+        listed.forEach(function (slug) {
+          var target = slug && slug !== own ? triggerForSlug(slug) : null;
+          var title = target ? productDetails(target).title : "";
+          if (!title) return;
+          var item = document.createElement("li");
+          var button = document.createElement("button");
+          button.setAttribute("type", "button");
+          button.className = "lightbox-more-item";
+          button.setAttribute("data-more-slug", slug);
+          button.textContent = title;
+          item.appendChild(button);
+          lightboxMoreList.appendChild(item);
+          shown += 1;
+        });
+        lightboxMore.hidden = !shown;
+      }
+
+      if (lightboxMoreList) lightboxMoreList.addEventListener("click", function (event) {
+        var node = event && event.target;
+        var button = node && typeof node.closest === "function" ? node.closest("[data-more-slug]") : null;
+        var target = button ? triggerForSlug(button.getAttribute("data-more-slug")) : null;
+        if (!target) return;
+        // The popup stays open on the same history step, and closing it still goes back to the card that opened it.
+        openLightbox(target, lastTrigger);
+        var figure = typeof lightbox.querySelector === "function" ? lightbox.querySelector(".lightbox-figure") : null;
+        if (!figure) return;
+        figure.scrollTop = 0;
+        if (typeof figure.focus === "function") figure.focus({ preventScroll: true });
+      });
+
       function openLightbox(trigger, restoreTarget) {
         invalidateLightboxFocus();
         lastTrigger = restoreTarget || trigger;
@@ -1086,6 +1134,7 @@
         if (slug) track("product-" + slug);
         lightboxIndex = 0;
         renderLightboxItem(cardPhotoIndex(targetTrigger || trigger));
+        renderMoreLikeThis(targetTrigger || trigger);
         pushLightboxHistory();
         if (!lightbox.open) lightbox.showModal();
       }
