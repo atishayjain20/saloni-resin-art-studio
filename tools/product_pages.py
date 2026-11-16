@@ -16,7 +16,8 @@ It also:
   * points og:image at assets/share/<slug>.jpg and reads its width and height from the JPEG,
   * stamps data-product-slug on each card's photo link in index.html (script.js reads it),
   * rewrites sitemap.xml so it lists every product page after the site's own pages,
-  * deletes p/<slug>/ folders of products that no longer exist.
+  * deletes p/<slug>/ folders of products that no longer exist,
+  * also writes the topic pages (/resin-clocks/ and others) from the TOPICS table below.
 
 The slug comes from the product name. If two names give the same slug, the first card in
 page order keeps it and later ones get a 4-letter suffix taken from their photo file name,
@@ -45,6 +46,44 @@ SECTION_RE = re.compile(r'<section\b[^>]*\bid="([^"]+)"')
 SLUG_ATTR_RE = re.compile(r' data-product-slug="[^"]*"')
 AMOUNT = r"([1-9][0-9]{0,2}(?:,[0-9]{2,3})*)"
 PRICE_RE = re.compile("₹" + AMOUNT + "(?:–₹" + AMOUNT + ")?")
+
+# Topic pages (/<slug>/): built from the home cards. Each picks cards by an explicit list of product slugs
+# ("products") or one home section id ("section"), never by name. Adding or removing a topic also needs its
+# sitemap.xml URL and its footer link on every hand-written page (the tests list both).
+TOPICS = [
+    {"slug": "resin-clocks", "link": "Resin clocks",
+     "title": "Resin Clocks: Wall, Photo and Desk Clocks",
+     "description": "Handmade resin wall clocks, photo clocks and a mini desk clock from Saloni Resin Art Studio in Ajmer. Shown palette or custom colours, shipped across India.",
+     "heading": "Resin clocks, handmade in Ajmer",
+     "intro": "Wall clocks in soft resin colours with gold or silver detail, photo clocks for a favourite picture, and a small desk clock. Choose the shown palette or ask for your own colours. Every piece is handmade by Saloni in her studio in Ajmer, Rajasthan.",
+     "products": ["teal-and-gold-roman-resin-clock", "sage-and-gold-resin-clock", "lilac-and-silver-resin-clock",
+                  "ivory-diamond-resin-clock", "sky-blue-roman-resin-clock", "pearl-geode-resin-clock",
+                  "blue-hour-resin-clock", "a-little-blue-hour", "personalized-photo-clock",
+                  "engagement-photo-clock", "mini-resin-desk-clock"]},
+    {"slug": "couple-gifts", "link": "Couple gifts",
+     "title": "Couple Gifts in Resin",
+     "description": "Resin couple gifts: matching keychains, an anniversary calendar coaster, rose keepsakes and a photo clock, handmade by Saloni in Ajmer and shipped across India.",
+     "heading": "Resin gifts for couples",
+     "intro": "Keep the moment close. Matching keychains, an anniversary calendar coaster, a bracelet with a preserved petal and a clock for a favourite couple photo. Every piece is handmade by Saloni in her studio in Ajmer, Rajasthan.",
+     "section": "romantic-keepsakes"},
+    {"slug": "marriage-gifts", "link": "Marriage gifts",
+     "title": "Marriage Gifts in Resin",
+     "description": "Handmade resin marriage gifts: a ring platter, Mr and Mrs name plate, varmala frame, wedding card keepsake and engagement photo clock, made by Saloni in Ajmer.",
+     "heading": "Resin marriage gifts",
+     "intro": "For her, before forever. A ring platter for the ring ceremony, a name plate for the door of your first home, and frames that keep your varmala flowers and wedding invitation. Every piece is handmade by Saloni in her studio in Ajmer, Rajasthan.",
+     "section": "marriage-gifts"},
+    {"slug": "celebration-lights", "link": "Celebration lights",
+     "title": "Resin Lights for Functions and Celebrations",
+     "description": "Handmade resin tealight holders, lotus diyas, LED tealight holders and a sunflower lamp for functions and celebrations, made by Saloni in Ajmer, Rajasthan.",
+     "heading": "Resin lights for functions and celebrations",
+     "intro": "Tealight holders, a lotus diya pair, LED tealight holders and a sunflower lamp for a glowing corner at a function, pooja or family celebration. Every piece is handmade by Saloni in her studio in Ajmer, Rajasthan. Tealights, LEDs and bulbs are not included.",
+     "products": ["lotus-diya-pair", "floral-swastik-tealight-set", "jewel-glow-tealight", "gold-fleck-lotus-light",
+                  "pastel-lotus-tealight", "marigold-petal-holder", "ivory-mandala-holder", "emerald-glow-pair",
+                  "sunflower-resin-lamp"]},
+]
+REFERENCE_KICKER = "Reference image · final design confirmed before making"
+CARD_SIZES = "(max-width: 620px) 40vw, (max-width: 1320px) 26vw, 344px"
+VERSION_RE = re.compile(r'href="styles\.css\?v=(\d+)"')
 PAGE_CSS = ('*{box-sizing:border-box}body{margin:0;background:#ffeaf2;color:#2a0e1f;font:1rem/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif}'
             'header,main{max-width:30rem;margin:0 auto;padding:0 1rem}header a{display:inline-flex;align-items:center;min-height:2.75rem;color:#8f0d49;font-weight:700;text-decoration:none}'
             'img{display:block;width:auto;max-width:100%;height:auto;max-height:55vh;margin:0 auto;border-radius:.75rem;background:#fff}'
@@ -55,6 +94,77 @@ PAGE_CSS = ('*{box-sizing:border-box}body{margin:0;background:#ffeaf2;color:#2a0
             'a:focus-visible{outline:3px solid #b0125b;outline-offset:4px}')
 # Sizes the popup also hides: they are not a real size yet.
 NOT_A_SIZE_RE = re.compile(r"suggested size|confirm with saloni|custom size in inches|component size to confirm", re.I)
+
+# The topic page's header and footer are the ones on varmala-preservation/index.html, plus the topic links.
+TOPIC_HEADER = '  <header class="site-header">\n    <div class="shell header-inner">\n      <a class="wordmark" href="../" aria-label="Saloni Resin Art Studio home">\n        <span class="wordmark-name">Saloni</span>\n        <span class="wordmark-subtitle">resin art studio</span>\n      </a>\n      <nav class="collection-nav" aria-label="Collection navigation">\n        <a href="../">Studio home</a>\n        <a href="../resin-photo-frames/">Photo frames</a>\n        <a href="../namokar-mantra-frames/">Namokar frames</a>\n        <a href="../corporate-gifting/">Corporate gifting</a>\n      </nav>\n    </div>\n  </header>\n'
+TOPIC_FOOTER = '  <footer class="site-footer" id="footer">\n    <div class="shell footer-inner">\n      <div><a class="wordmark wordmark-footer" href="../"><span class="wordmark-name">Saloni</span><span class="wordmark-subtitle">resin art studio</span></a><p>Small details. Lasting feelings.</p></div>\n      <div class="footer-links"><a href="../resin-photo-frames/">Photo frames</a><a href="../namokar-mantra-frames/">Namokar frames</a><a href="../varmala-preservation/">Varmala preservation</a>{topic_links}<a href="../partners/">Partner Circle</a><a href="../corporate-gifting/">Corporate gifting</a><a href="../#customer-reviews">Reviews</a><a href="../#order">Order</a><a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Instagram</a></div>\n      <p class="footer-credit">© Saloni Resin Art Studio</p>\n    </div>\n  </footer>\n'
+TOPIC_PAGE = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fbd3e5">
+  <meta name="description" content="{desc}">
+  <meta property="og:title" content="{title}">
+  <meta property="og:description" content="{desc}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{studio}">
+  <meta property="og:url" content="{url}">
+  <meta property="og:image" content="{image}">
+  <meta property="og:image:width" content="{image_width}">
+  <meta property="og:image:height" content="{image_height}">
+  <meta property="og:image:alt" content="{hero_alt}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{title}">
+  <meta name="twitter:description" content="{desc}">
+  <meta name="twitter:image" content="{image}">
+  <meta name="twitter:image:alt" content="{hero_alt}">
+  <link rel="canonical" href="{url}">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <script type="application/ld+json">{data}</script>
+  <title>{title}</title>
+  <link rel="stylesheet" href="../styles.css?v={version}">
+  <script class="analytics-script" src="../analytics.js?v={version}" defer></script>
+  <script>(function () {{ var script = document.createElement("script"); script.src = "../script.js?v={version}"; script.defer = true; document.head.appendChild(script); }}());</script>
+</head>
+<body class="collection-page">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+{header}  <main id="main-content" tabindex="-1">
+    <section class="collection-hero shell" aria-labelledby="collection-title">
+      <div class="collection-hero-copy">
+        <h1 id="collection-title">{heading}</h1>
+        <p>{intro}</p>
+        <div class="collection-actions">
+          <a class="button button-dark" href="../#order">Start a conversation <span aria-hidden="true">↗</span></a>
+          <a class="text-link" href="../">Back to the studio <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+      <figure class="collection-hero-image">
+        <img src="../assets/{hero_file}" alt="{hero_alt}" width="{hero_width}" height="{hero_height}" loading="lazy" decoding="async">
+        <figcaption>{hero_kicker}</figcaption>
+      </figure>
+    </section>
+    <section class="collection-list shell" aria-labelledby="collection-list-title">
+      <div class="collection-list-heading">
+        <p class="eyebrow">The studio edit</p>
+        <h2 id="collection-list-title">Pieces to explore before you order.</h2>
+        <p>Open a piece to see its price and details, then order it from the studio page.</p>
+      </div>
+      <div class="collection-grid">
+{cards}      </div>
+    </section>
+    <section class="collection-next shell" aria-labelledby="collection-next-title">
+      <p class="eyebrow">Keep exploring</p>
+      <h2 id="collection-next-title">Find another way to make it personal.</h2>
+      <p>Shipping is across India; the shipping charge is extra and depends on location. Orders use protective packaging.</p>
+      <div class="collection-actions">
+{next_links}      </div>
+    </section>
+  </main>
+{footer}</body>
+</html>
+"""
 
 
 class CardParser(HTMLParser):
@@ -104,7 +214,7 @@ class CardParser(HTMLParser):
 
 
 def parse_cards(page):
-    """The catalogue cards in page order: name, photo, alt, section, price, size, description, and where they sit in the page."""
+    """The catalogue cards in page order: name, photo, alt, srcset, section, price, size, description, and where they sit in the page."""
     cards = []
     for match in ARTICLE_RE.finditer(page):
         article = match.group(0)
@@ -122,6 +232,7 @@ def parse_cards(page):
             "alt": parser.image.get("alt", ""),
             "width": parser.image.get("width", ""),
             "height": parser.image.get("height", ""),
+            "srcset": parser.image.get("srcset", ""),
             "section": sections[-1] if sections else "",
             "price": parser.rows.get("price", ""),
             "size": "" if NOT_A_SIZE_RE.search(size) else size,
@@ -258,6 +369,107 @@ def render_page(card, slug, share_size):
     )
 
 
+def topic_items(topic, cards, slugs):
+    """(card, slug) pairs for one topic, in the topic's own order. Stops on any slug or section that does not match the home cards."""
+    name = "Topic %s" % topic.get("slug")
+
+    def fail(problem):
+        raise SystemExit("%s: %s: fix TOPICS in tools/product_pages.py" % (name, problem))
+
+    if ("products" in topic) == ("section" in topic):
+        fail('needs exactly one of "products" or "section"')
+    by_slug = dict(zip(slugs, cards))
+    if "products" in topic:
+        chosen = list(topic["products"])
+        for slug in chosen:
+            if slug not in by_slug:
+                fail("unknown product slug %r" % slug)
+            if chosen.count(slug) > 1:
+                fail("product slug %r appears twice" % slug)
+    else:
+        chosen = [slug for card, slug in zip(cards, slugs) if card["section"] == topic["section"]]
+        if len(chosen) < 3:
+            fail("section %r has %d cards, need at least 3" % (topic["section"], len(chosen)))
+    return [(by_slug[slug], slug) for slug in chosen]
+
+
+def asset_version(index_html):
+    """The ?v= number on the home page's stylesheet link: the topic pages use the same one."""
+    match = VERSION_RE.search(index_html)
+    if not match:
+        raise SystemExit("No styles.css?v= link in index.html: topic pages need its version")
+    return match.group(1)
+
+
+def topic_json_ld(topic, items):
+    """CollectionPage and ItemList structured data as a JSON string. Topic pages state no price, so no Product or Offer."""
+    data = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": topic["title"],
+        "url": "%s/%s/" % (SITE, topic["slug"]),
+        "description": topic["description"],
+        "isPartOf": {"@type": "WebSite", "name": STUDIO, "url": SITE + "/"},
+        "mainEntity": {
+            "@type": "ItemList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": number, "name": card["name"], "url": "%s/%s/%s/" % (SITE, PAGE_DIR, slug)}
+                for number, (card, slug) in enumerate(items, 1)
+            ],
+        },
+    }
+    return json.dumps(data, ensure_ascii=False, indent=2).replace("<", "\\u003c")
+
+
+def card_kicker(card):
+    return REFERENCE_KICKER if card["alt"].startswith("Illustrative preview:") else "Studio collection"
+
+
+def render_topic_card(card, slug):
+    alt = card["alt"] or card["name"]
+    srcset = ""
+    if card["srcset"]:
+        urls = ", ".join("../" + part.strip() for part in card["srcset"].split(","))
+        srcset = ' srcset="%s" sizes="%s"' % (esc(urls), CARD_SIZES)
+    pad = " " * 10
+    lines = [
+        '<article class="collection-card">',
+        "  <figure>",
+        '    <img src="../assets/%s" alt="%s" width="%s" height="%s" loading="lazy" decoding="async"%s>' % (esc(card["file"]), esc(alt), esc(card["width"]), esc(card["height"]), srcset),
+        "    <figcaption>",
+        '      <p class="collection-card-kicker">%s</p>' % card_kicker(card),
+        "      <h2>%s</h2>" % esc(card["name"]),
+    ]
+    if card["line"]:
+        lines.append("      <p>%s</p>" % esc(card["line"]))
+    if card["size"]:
+        lines.append("      <p>Size: %s</p>" % esc(card["size"]))
+    lines += [
+        '      <a class="button button-line collection-card-link" href="../%s/%s/">View this piece and order <span aria-hidden="true">↗</span></a>' % (PAGE_DIR, slug),
+        "    </figcaption>",
+        "  </figure>",
+        "</article>",
+    ]
+    return "".join(pad + line + "\n" for line in lines)
+
+
+def render_topic(topic, items, version, share_size):
+    first, first_slug = items[0]
+    hero_alt = first["alt"] or first["name"]
+    title = "%s | %s" % (topic["title"], STUDIO)
+    topic_links = "".join('<a href="../%s/">%s</a>' % (other["slug"], esc(other["link"])) for other in TOPICS)
+    next_links = "".join('        <a class="button button-line" href="../%s/">%s</a>\n' % (other["slug"], esc(other["link"])) for other in TOPICS if other is not topic)
+    return TOPIC_PAGE.format(
+        title=esc(title), desc=esc(topic["description"]), studio=esc(STUDIO), url="%s/%s/" % (SITE, topic["slug"]),
+        image="%s/assets/share/%s.jpg" % (SITE, first_slug), image_width=share_size[0], image_height=share_size[1],
+        hero_alt=esc(hero_alt), data=topic_json_ld(topic, items), version=version, header=TOPIC_HEADER,
+        heading=esc(topic["heading"]), intro=esc(topic["intro"]), hero_file=esc(first["file"]),
+        hero_width=esc(first["width"]), hero_height=esc(first["height"]), hero_kicker=card_kicker(first),
+        cards="".join(render_topic_card(card, slug) for card, slug in items), next_links=next_links,
+        footer=TOPIC_FOOTER.format(topic_links=topic_links),
+    )
+
+
 def stamp(page, cards, slugs):
     """index.html with data-product-slug on each card's photo link, replacing any older one."""
     pieces, last = [], 0
@@ -290,10 +502,18 @@ def share_size(root, slug):
 
 
 def build(index_html, sitemap, root=ROOT):
-    """(index.html with slugs, {relative path: page}, sitemap.xml) for the cards in index_html."""
+    """(index.html with slugs, {relative path: page}, sitemap.xml): a page per card in index_html and one per topic in TOPICS."""
     cards = parse_cards(index_html)
     slugs = assign_slugs(cards)
     pages = {"%s/%s/index.html" % (PAGE_DIR, slug): render_page(card, slug, share_size(root, slug)) for card, slug in zip(cards, slugs)}
+    version = asset_version(index_html)
+    seen = {PAGE_DIR}
+    for topic in TOPICS:
+        if topic.get("slug") in seen:
+            raise SystemExit("Topic %s repeats a folder name or equals %r: fix TOPICS in tools/product_pages.py" % (topic.get("slug"), PAGE_DIR))
+        seen.add(topic.get("slug"))
+        items = topic_items(topic, cards, slugs)
+        pages[topic["slug"] + "/index.html"] = render_topic(topic, items, version, share_size(root, items[0][1]))
     return stamp(index_html, cards, slugs), pages, sitemap_with_products(sitemap, slugs)
 
 
@@ -314,7 +534,8 @@ def main():
         target.write_text(content, encoding="utf-8")
     index_path.write_text(stamped, encoding="utf-8")
     sitemap_path.write_text(sitemap, encoding="utf-8")
-    print("Wrote %d product pages in %s/, stamped index.html and updated sitemap.xml." % (len(pages), PAGE_DIR))
+    topic_count = len(TOPICS)
+    print("Wrote %d product pages in %s/, %d topic pages, stamped index.html and updated sitemap.xml." % (len(pages) - topic_count, PAGE_DIR, topic_count))
 
 
 if __name__ == "__main__":
