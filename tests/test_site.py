@@ -650,6 +650,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "https://saloniresinart.com/partners/",
             "https://saloniresinart.com/corporate-gifting/",
             "https://saloniresinart.com/reviews/",
+            "https://saloniresinart.com/shipping-and-returns/",
         ]
         product_urls = ["https://saloniresinart.com/p/" + slug + "/" for slug in card_slugs(self.html)]
         self.assertGreater(len(product_urls), 20)
@@ -840,7 +841,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn(size, page)
         for sentence in (
             "Typical handmade production takes 4–5 days after design and advance confirmation.",
-            "Shipping is across India; the shipping charge is extra and depends on location. Orders use protective packaging.",
+            "Shipping is across India: ₹100 within Rajasthan and ₹150 to other states. Orders use protective packaging.",
             "Final quote after size, materials and delivery.",
             "she will check feasibility and try to meet it, but delivery is not promised until she confirms.",
             "Saloni normally replies within 5–6 working hours.",
@@ -886,6 +887,60 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertRegex(page, r'"\.\./script\.js\?v=\d+"')
         self.assertNotRegex(page, re.compile(r"\b(guarantee[sd]?|lifetime|refund(s|ed)?|returns?)\b", re.I))
 
+    def test_shipping_and_returns_page_contract(self):
+        page = (ROOT / "shipping-and-returns" / "index.html").read_text(encoding="utf-8")
+        tags = PageTags()
+        tags.feed(page)
+        url = "https://saloniresinart.com/shipping-and-returns/"
+        description = "Shipping across India from Ajmer: ₹100 within Rajasthan, ₹150 to other states. No returns on customised pieces; transit damage support with photos and video."
+        title = "Shipping and Returns | Saloni Resin Art Studio"
+        self.assertEqual(tags.title, title)
+        self.assertEqual(tags.meta["og:title"], title)
+        self.assertEqual(tags.links["canonical"], url)
+        self.assertEqual(tags.meta["og:url"], url)
+        for key in ("description", "og:description", "twitter:description"):
+            self.assertEqual(tags.meta[key], description, key)
+        self.assertEqual(len(re.findall(r"<h1\b", page)), 1)
+        self.assertIn('<h1 id="collection-title">Shipping and returns</h1>', page)
+        for sentence in (
+            "Shipping is across India: ₹100 within Rajasthan and ₹150 to other states. Orders use protective packaging.",
+            "Typical handmade production takes 4–5 days after design and advance confirmation.",
+            "For an urgent date, tell Saloni the required date; she will check feasibility and try to meet it, but delivery is not promised until she confirms.",
+            "Advance amount and payment terms are confirmed with the final design and quote before production starts.",
+            "For transit damage or replacement support, contact Saloni promptly with photos, packaging, and an unboxing video. Saloni reviews the case and confirms the replacement resolution.",
+            "Saloni will contact you to confirm the design, price, and delivery",
+            "Saloni normally replies within 5–6 working hours.",
+        ):
+            with self.subTest(sentence=sentence):
+                self.assertIn(sentence, self.html)
+                self.assertIn(sentence, page)
+        cancellation = re.search(r"<strong>Cancellation</strong><span>(.*?)</span>", page, re.S).group(1)
+        self.assertEqual(cancellation, "To cancel an order, call or message Saloni on WhatsApp. Before you pay the advance, you can also send a cancel request from My orders on the studio page, on the phone or computer you ordered from. If you cancel before making starts, your advance is refunded.")
+        self.assertIn("My orders", cancellation)
+        refund = "If you cancel before making starts, your advance is refunded."
+        self.assertEqual(page.count(refund), 1)
+        self.assertTrue(cancellation.endswith(" " + refund))
+        self.assertNotIn("confirms or declines", page)
+        self.assertNotIn("Once paid, the advance is not refunded if you cancel.", page)
+        self.assertIn("House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM.", page)
+        self.assertIn('"openingHours": "Mo-Su 11:00-16:00"', self.html)
+        self.assertIn('href="tel:+918209238541"', page)
+        self.assertIn("https://www.instagram.com/saloniresin_art_studio/", page)
+        for absent in ("application/ld+json", "<iframe", "public-forms.js", "my-orders.js"):
+            self.assertNotIn(absent, page)
+        self.assertNotRegex(page, re.compile(r"all sales final|under any circumstances|warrant|guarantee|lifetime|\bAct\b", re.I))
+        ids = set(re.findall(r'\bid="([^"]+)"', page))
+        for labelled in re.findall(r'aria-labelledby="([^"]+)"', page):
+            self.assertIn(labelled, ids)
+        self.assertIn('<a class="skip-link" href="#main-content">', page)
+        self.assertIn('<main id="main-content"', page)
+        self.assertIn('<a href="shipping-and-returns/">Shipping and returns</a>', re.search(r"<footer\b.*?</footer>", self.html, re.S).group(0))
+        phrase = "depends on location"
+        stale = ["index.html", "varmala-preservation/index.html", "tools/product_pages.py"] + ["%s/index.html" % slug for slug in ("resin-clocks", "couple-gifts", "marriage-gifts", "celebration-lights", "resin-boards")]
+        for name in stale:
+            with self.subTest(stale=name):
+                self.assertNotIn(phrase, (ROOT / name).read_text(encoding="utf-8"))
+
     def test_every_page_footer_links_to_varmala_preservation(self):
         for page, href in (
             ("index.html", "varmala-preservation/"),
@@ -895,6 +950,7 @@ class StaticSiteContractTests(unittest.TestCase):
             ("namokar-mantra-frames/index.html", "../varmala-preservation/"),
             ("reviews/index.html", "../varmala-preservation/"),
             ("varmala-preservation/index.html", "../varmala-preservation/"),
+            ("shipping-and-returns/index.html", "../varmala-preservation/"),
         ):
             with self.subTest(page=page):
                 source = (ROOT / page).read_text(encoding="utf-8")
@@ -1404,7 +1460,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(touch[16:20], "big"), 180)
         style_version = re.search(r'href="styles\.css\?v=(\d+)"', self.html).group(1)
         script_version = re.search(r'src="script\.js\?v=(\d+)"', self.html).group(1)
-        for page, prefix in (("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"), ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../"), ("reviews/index.html", "../"), ("varmala-preservation/index.html", "../")):
+        for page, prefix in (("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"), ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../"), ("reviews/index.html", "../"), ("varmala-preservation/index.html", "../"), ("shipping-and-returns/index.html", "../")):
             with self.subTest(page=page):
                 source = (ROOT / page).read_text(encoding="utf-8")
                 self.assertIn('<meta name="theme-color" content="#fbd3e5">', source)
@@ -2355,7 +2411,7 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertNotRegex(self.page, r"aggregateRating|application/ld\+json")
 
     def test_every_page_links_to_reviews_from_the_footer_and_the_primary_nav_is_unchanged(self):
-        for page, href in (("index.html", "#customer-reviews"), ("corporate-gifting/index.html", "../#customer-reviews"), ("partners/index.html", "../#customer-reviews"), ("resin-photo-frames/index.html", "../#customer-reviews"), ("namokar-mantra-frames/index.html", "../#customer-reviews"), ("reviews/index.html", "../#customer-reviews"), ("varmala-preservation/index.html", "../#customer-reviews")):
+        for page, href in (("index.html", "#customer-reviews"), ("corporate-gifting/index.html", "../#customer-reviews"), ("partners/index.html", "../#customer-reviews"), ("resin-photo-frames/index.html", "../#customer-reviews"), ("namokar-mantra-frames/index.html", "../#customer-reviews"), ("reviews/index.html", "../#customer-reviews"), ("varmala-preservation/index.html", "../#customer-reviews"), ("shipping-and-returns/index.html", "../#customer-reviews")):
             with self.subTest(page=page):
                 source = (ROOT / page).read_text(encoding="utf-8")
                 footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', source)
@@ -2800,7 +2856,7 @@ class TopicPageTests(unittest.TestCase):
     HAND_WRITTEN = [
         ("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"),
         ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../"),
-        ("reviews/index.html", "../"), ("varmala-preservation/index.html", "../"),
+        ("reviews/index.html", "../"), ("varmala-preservation/index.html", "../"), ("shipping-and-returns/index.html", "../"),
     ]
 
     @classmethod
@@ -3035,7 +3091,7 @@ class TopicPageTests(unittest.TestCase):
             for topic in self.tool.TOPICS:
                 with self.subTest(page=page, topic=topic["slug"]):
                     self.assertIn('<a href="%s%s/">%s</a>' % (prefix, topic["slug"], html.escape(topic["link"])), footer)
-        known = {"corporate-gifting", "partners", "resin-photo-frames", "namokar-mantra-frames", "reviews", "varmala-preservation", "customised-hampers"}
+        known = {"corporate-gifting", "partners", "resin-photo-frames", "namokar-mantra-frames", "reviews", "varmala-preservation", "customised-hampers", "shipping-and-returns"}
         folders = {path.parent.name for path in ROOT.glob("*/index.html")}
         self.assertEqual(folders, known | set(self.TOPIC_SLUGS))
 

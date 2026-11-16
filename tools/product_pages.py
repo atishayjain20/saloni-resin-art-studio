@@ -164,7 +164,7 @@ TOPIC_PAGE = """<!doctype html>
     <section class="collection-next shell" aria-labelledby="collection-next-title">
       <p class="eyebrow">Keep exploring</p>
       <h2 id="collection-next-title">Find another way to make it personal.</h2>
-      <p>Shipping is across India; the shipping charge is extra and depends on location. Orders use protective packaging.</p>
+      <p>Shipping is across India. Orders use protective packaging.</p>
       <div class="collection-actions">
 {next_links}      </div>
     </section>

@@ -1811,7 +1811,7 @@ test("the popup is static accessible markup with phone-first styles that reuse t
 });
 
 test("my-orders.js keeps the popup to the home page: it is loaded there only, and says so", () => {
-  const pages = ["corporate-gifting", "partners", "reviews", "customised-hampers", "namokar-mantra-frames", "resin-photo-frames", "varmala-preservation"];
+  const pages = ["corporate-gifting", "partners", "reviews", "customised-hampers", "namokar-mantra-frames", "resin-photo-frames", "varmala-preservation", "shipping-and-returns"];
   pages.forEach((page) => assert.doesNotMatch(fs.readFileSync(path.join(root, page, "index.html"), "utf8"), /my-orders\.js/, page));
   assert.match(fs.readFileSync(path.join(root, "README.md"), "utf8"), /advance payment popup/i);
 });
