@@ -5,9 +5,12 @@
 
 Run it from anywhere after adding, renaming or removing a catalogue card in index.html
 (run tools/share_images.py first: it makes the preview JPEGs this script points to).
-Link previews (WhatsApp, Facebook, X) come from crawlers that run no JavaScript, so each
-product gets p/<slug>/index.html with its own Open Graph tags. Visitors are sent on to
-/?product=<slug>#<section> where script.js opens that product's popup.
+Each product gets p/<slug>/index.html: a small real product page (photo, name, price, size,
+description line) with its own Open Graph tags for link previews (WhatsApp, Facebook and X read
+them without running JavaScript) and Product structured data (JSON-LD) so Google can show the
+price and photo. Products priced "Price on request" get no structured data. The "View and order"
+button opens /?product=<slug>#<section>, where script.js opens that product's popup. A price in a
+new format stops this script until price_offer() learns it.
 
 It also:
   * points og:image at assets/share/<slug>.jpg and reads its width and height from the JPEG,
@@ -27,6 +30,7 @@ import re
 import shutil
 import sys
 import unicodedata
+import urllib.parse
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -39,6 +43,16 @@ ARTICLE_RE = re.compile(r'<article\b[^>]*\bclass="[^"]*\b(?:work-card|romantic-k
 TRIGGER_RE = re.compile(r'<a class="lightbox-trigger" data-lightbox-trigger\b[^>]*>')
 SECTION_RE = re.compile(r'<section\b[^>]*\bid="([^"]+)"')
 SLUG_ATTR_RE = re.compile(r' data-product-slug="[^"]*"')
+AMOUNT = r"([1-9][0-9]{0,2}(?:,[0-9]{2,3})*)"
+PRICE_RE = re.compile("₹" + AMOUNT + "(?:–₹" + AMOUNT + ")?")
+PAGE_CSS = ('*{box-sizing:border-box}body{margin:0;background:#ffeaf2;color:#2a0e1f;font:1rem/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif}'
+            'header,main{max-width:30rem;margin:0 auto;padding:0 1rem}header a{display:inline-flex;align-items:center;min-height:2.75rem;color:#8f0d49;font-weight:700;text-decoration:none}'
+            'img{display:block;width:auto;max-width:100%;height:auto;max-height:55vh;margin:0 auto;border-radius:.75rem;background:#fff}'
+            'h1{margin:1rem 0 .25rem;font:500 1.75rem/1.15 Georgia,"Times New Roman",serif}'
+            '.price{display:inline-block;margin:.25rem 0;padding:.2rem .6rem;border-radius:999px;background:#f2a007;font-size:1.15rem;font-weight:700}'
+            '.size{margin:.25rem 0;color:#6a4a5b}'
+            '.order{display:flex;align-items:center;justify-content:center;min-height:3rem;margin:1.25rem 0 2rem;padding:.75rem 1rem;border-radius:999px;background:#b0125b;color:#fff;font-weight:700;text-decoration:none}'
+            'a:focus-visible{outline:3px solid #b0125b;outline-offset:4px}')
 # Sizes the popup also hides: they are not a real size yet.
 NOT_A_SIZE_RE = re.compile(r"suggested size|confirm with saloni|custom size in inches|component size to confirm", re.I)
 
@@ -143,6 +157,35 @@ def description(card):
     return (facts + ". " + card["line"] if card["line"] else facts).strip()
 
 
+def price_offer(price):
+    """The schema.org offer for a card price, or None for "Price on request". Stops on any other format."""
+    if price == "Price on request":
+        return None
+    match = PRICE_RE.fullmatch(price)
+    if not match:
+        raise SystemExit("Unknown price format %r: extend price_offer() in tools/product_pages.py" % price)
+    low, high = (value.replace(",", "") if value else None for value in match.groups())
+    if high is None:
+        return {"@type": "Offer", "price": low, "priceCurrency": "INR"}
+    if int(high) <= int(low):
+        raise SystemExit("Unknown price format %r: extend price_offer() in tools/product_pages.py" % price)
+    return {"@type": "AggregateOffer", "lowPrice": low, "highPrice": high, "priceCurrency": "INR"}
+
+
+def product_json_ld(card):
+    """Product structured data as a JSON string, or "" when the card has no price to state."""
+    offer = price_offer(card["price"])
+    if offer is None:
+        return ""
+    data = {"@context": "https://schema.org", "@type": "Product", "name": card["name"]}
+    if card["line"]:
+        data["description"] = card["line"]
+    data["image"] = SITE + "/assets/" + urllib.parse.quote(card["file"])
+    data["brand"] = {"@type": "Brand", "name": STUDIO}
+    data["offers"] = offer
+    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+
+
 def esc(value):
     return html.escape(value, quote=True)
 
@@ -168,6 +211,7 @@ def render_page(card, slug, share_size):
     desc = description(card)
     image = "%s/assets/share/%s.jpg" % (SITE, slug)
     alt = card["alt"] or card["name"]
+    data = product_json_ld(card)
     size = '  <meta property="og:image:width" content="%d">\n  <meta property="og:image:height" content="%d">\n' % share_size
     return """<!doctype html>
 <html lang="en">
@@ -192,22 +236,24 @@ def render_page(card, slug, share_size):
   <meta name="twitter:image" content="{image}">
   <meta name="twitter:image:alt" content="{alt}">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-  <style>body{{margin:0;padding:2rem 1rem;background:#fff6e9;color:#3a2a25;font:1rem/1.5 system-ui,sans-serif;text-align:center}}main{{max-width:28rem;margin:0 auto}}img{{max-width:100%;height:auto;border-radius:.75rem}}a{{color:#9b2c5c;font-weight:700}}</style>
+{ld}  <style>{css}</style>
 </head>
 <body>
-  <script>location.replace({redirect});</script>
+  <header><a href="/">{studio}</a></header>
   <main>
+    <img src="/assets/{file}" alt="{alt}"{dims} fetchpriority="high">
     <h1>{name}</h1>
-    <p>{desc}</p>
-    <p><a href="{target}">See {name} on the {studio} home page</a></p>
-    <noscript><p>JavaScript is off, so use this link: <a href="{target}">open {name} on the home page</a>.</p></noscript>
-    <img src="/assets/{file}" alt="{alt}"{dims}>
+    <p class="price">{price}</p>
+{size_line}{line_html}    <a class="order" href="{target}">View and order</a>
   </main>
 </body>
 </html>
 """.format(
         title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
-        redirect=json.dumps(target), target=esc(target), name=esc(card["name"]), file=esc(card["file"]),
+        ld='  <script type="application/ld+json">%s</script>\n' % data if data else "", css=PAGE_CSS,
+        target=esc(target), name=esc(card["name"]), file=esc(card["file"]), price=esc(card["price"]),
+        size_line='    <p class="size">Size: %s</p>\n' % esc(card["size"]) if card["size"] else "",
+        line_html='    <p>%s</p>\n' % esc(card["line"]) if card["line"] else "",
         dims=' width="%s" height="%s"' % (card["width"], card["height"]) if card["width"].isdigit() and card["height"].isdigit() else "",
     )
 

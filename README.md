@@ -159,7 +159,7 @@ After the real photo, a product preview can show AI concept images made with Gem
 
 ### Product share links
 
-Every catalogue product has its own share link, `https://saloniresinart.com/p/<slug>/`, for example `/p/jewel-glow-tealight/`. WhatsApp, Facebook and X build link previews from crawlers that run no JavaScript, so each link is a small static page (`p/<slug>/index.html`) with that product's own photo, name, price and size in its Open Graph tags. A visitor who opens it is sent straight to `/?product=<slug>#<section>`, where `script.js` opens that product's popup (an unknown slug just shows the normal home page). The popup has a **Share** button: it uses the phone's share sheet when there is one, otherwise it offers Share on WhatsApp and Copy link.
+Every catalogue product has its own share link, `https://saloniresinart.com/p/<slug>/`, for example `/p/jewel-glow-tealight/`. WhatsApp, Facebook and X build link previews from crawlers that run no JavaScript, so each link is a small static product page (`p/<slug>/index.html`) with that product's photo, name, price, size and description, Open Graph tags for link previews, and Product structured data (JSON-LD) so Google can show the price and photo in search. Products with "Price on request" get no structured data. The page's **View and order** button opens `/?product=<slug>#<section>`, where `script.js` opens that product's popup (an unknown slug just shows the normal home page). A price in a new format stops `product_pages.py` until `price_offer()` learns it. The popup has a **Share** button: it uses the phone's share sheet when there is one, otherwise it offers Share on WhatsApp and Copy link.
 
 The pages, the `data-product-slug` on each card's photo link in `index.html`, and the product entries in `sitemap.xml` are generated. After you add, rename or remove a catalogue card (or change its photo, price, size or description line), run these two steps and commit the result:
 
@@ -269,7 +269,7 @@ The link appears only where the website would show an advance (the same rule): `
 
 ## Visitor counts (GoatCounter)
 
-The site counts visits with [GoatCounter](https://www.goatcounter.com): no cookies, no banner, nothing stored in the visitor's browser. One file, `analytics.js`, holds the site code (`saloniresinart`), GoatCounter's versioned count file (`count.v5.js`) and its integrity hash (SRI). Every public page (not the `/p/<slug>/` share pages, which redirect at once) loads it with `defer`, and it adds the count script with `async`, so it never delays the first paint or the order flow. If the script is blocked or fails (ad blocker, offline), the site works as before and nothing is counted.
+The site counts visits with [GoatCounter](https://www.goatcounter.com): no cookies, no banner, nothing stored in the visitor's browser. One file, `analytics.js`, holds the site code (`saloniresinart`), GoatCounter's versioned count file (`count.v5.js`) and its integrity hash (SRI). Every public page (not the `/p/<slug>/` product pages, which load no script file) loads it with `defer`, and it adds the count script with `async`, so it never delays the first paint or the order flow. If the script is blocked or fails (ad blocker, offline), the site works as before and nothing is counted.
 
 **One-time setup (owner):** create the free account at `https://www.goatcounter.com` with the site code `saloniresinart`. Nothing is counted until that account exists.
 
@@ -288,4 +288,4 @@ The site counts visits with [GoatCounter](https://www.goatcounter.com): no cooki
 
 **Update GoatCounter:** take the new versioned file and hash from `https://www.goatcounter.com/help/countjs-versions`, check the hash yourself (`curl -s https://gc.zgo.at/count.vN.js | openssl dgst -sha384 -binary | openssl base64 -A`), edit `COUNT_FILE` and `INTEGRITY` in `analytics.js`, and bump the cache version. A wrong hash makes the browser refuse the script (nothing counted, site unaffected).
 
-**Known limits:** ad blockers and some privacy browsers block GoatCounter, so counts are a floor, not an exact number. A product share page (`/p/<slug>/`) sends the visitor straight on to `/?product=<slug>`, so the visit is counted on the home page and as `share-link-opened`, not as a page view of the share page. Cache version `20261181` is shared by every page, including `analytics.js`.
+**Known limits:** ad blockers and some privacy browsers block GoatCounter, so counts are a floor, not an exact number. A product page (`/p/<slug>/`) is not counted. A visitor who taps **View and order** is counted on the home page and as `share-link-opened`; a visitor who leaves without tapping is not counted. Cache version `20261181` is shared by every page, including `analytics.js`.

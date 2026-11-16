@@ -2635,24 +2635,109 @@ class ProductSharePageTests(unittest.TestCase):
         _, range_tags = self.page("happy-diwali-glow")
         self.assertTrue(range_tags.meta["og:description"].startswith("₹250–₹400 · "), range_tags.meta["og:description"])
 
-    def test_pages_send_visitors_to_the_home_page_popup_without_a_meta_refresh(self):
+    def cards(self):
+        """(slug, card) for each catalogue card; the price is read from index.html itself, not from the tool."""
+        tool = load_product_pages_tool()
+        cards = tool.parse_cards(self.home)
+        self.assertEqual(len(cards), len(self.slugs))
+        result = []
+        for slug, card in zip(self.slugs, cards):
+            article = self.home[card["start"]:card["end"]]
+            self.assertIn('data-product-slug="' + slug + '"', article)
+            price = re.search(r"<dt>Price</dt><dd>([^<]+)</dd>", article)
+            self.assertIsNotNone(price, slug)
+            result.append((slug, dict(card, price=html.unescape(price.group(1)))))
+        return result
+
+    def test_price_offer_reads_every_known_format_and_stops_on_anything_else(self):
+        tool = load_product_pages_tool()
+        self.assertEqual(tool.price_offer("₹399"), {"@type": "Offer", "price": "399", "priceCurrency": "INR"})
+        self.assertEqual(tool.price_offer("₹3,499")["price"], "3499")
+        self.assertEqual(tool.price_offer("₹1,00,000")["price"], "100000")
+        self.assertEqual(
+            tool.price_offer("₹12,000–₹15,000"),
+            {"@type": "AggregateOffer", "lowPrice": "12000", "highPrice": "15000", "priceCurrency": "INR"},
+        )
+        self.assertIsNone(tool.price_offer("Price on request"))
+        for bad in ("", "Rs 3499", "₹3.499", "₹3,499 onwards", "₹500–₹400", "₹3,499-₹4,000"):
+            with self.assertRaises(SystemExit, msg=repr(bad)):
+                tool.price_offer(bad)
+
+    def test_structured_data_matches_the_card_price_on_every_page(self):
+        from urllib.parse import quote
+        forbidden = {"aggregateRating", "review", "availability", "priceValidUntil", "sku", "gtin"}
+
+        def keys(value):
+            if isinstance(value, dict):
+                for key, inner in value.items():
+                    yield key
+                    yield from keys(inner)
+            elif isinstance(value, list):
+                for inner in value:
+                    yield from keys(inner)
+
+        kinds = {"Offer": 0, "AggregateOffer": 0, "none": 0}
+        for slug, card in self.cards():
+            text, _ = self.page(slug)
+            shown = re.search(r'<p class="price">([^<]*)</p>', text)
+            self.assertIsNotNone(shown, slug)
+            self.assertEqual(html.unescape(shown.group(1)), card["price"], slug)
+            blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)
+            if card["price"] == "Price on request":
+                self.assertEqual(blocks, [], slug)
+                kinds["none"] += 1
+                continue
+            self.assertEqual(len(blocks), 1, slug)
+            data = json.loads(blocks[0])
+            self.assertEqual(data["@context"], "https://schema.org", slug)
+            self.assertEqual(data["@type"], "Product", slug)
+            self.assertEqual(data["name"], card["name"], slug)
+            self.assertEqual(data.get("description"), card["line"] or None, slug)
+            self.assertEqual(data["image"], self.SITE + "/assets/" + quote(card["file"]), slug)
+            self.assertTrue((ROOT / "assets" / card["file"]).is_file(), slug)
+            shown_src = re.search(r'<img src="/assets/([^"]+)"', text)
+            self.assertEqual(html.unescape(shown_src.group(1)), card["file"], slug + ": the JSON-LD photo is the visible photo")
+            self.assertEqual(data["brand"], {"@type": "Brand", "name": "Saloni Resin Art Studio"}, slug)
+            offer = data["offers"]
+            self.assertEqual(offer["priceCurrency"], "INR", slug)
+            digits = [part.replace(",", "") for part in re.findall(r"₹([0-9,]+)", card["price"])]
+            if len(digits) == 2:
+                self.assertEqual(offer["@type"], "AggregateOffer", slug)
+                self.assertEqual((offer["lowPrice"], offer["highPrice"]), tuple(digits), slug)
+                kinds["AggregateOffer"] += 1
+            else:
+                self.assertEqual(offer["@type"], "Offer", slug)
+                self.assertEqual(offer["price"], digits[0], slug)
+                kinds["Offer"] += 1
+            self.assertFalse(forbidden & set(keys(data)), slug)
+        self.assertEqual(sum(kinds.values()), len(self.products))
+        for kind, count in kinds.items():
+            self.assertGreater(count, 0, kind)
+
+    def test_pages_are_real_product_pages_with_one_order_button(self):
         section_ids = set(re.findall(r'<section[^>]*\bid="([^"]+)"', self.home))
-        for slug in self.slugs:
+        for slug, card in self.cards():
             text, tags = self.page(slug)
             self.assertFalse(tags.meta_refresh, slug + " must not use meta refresh: crawlers follow it and lose the product tags")
-            self.assertEqual(len(tags.scripts), 1, slug)
-            match = re.fullmatch(r'\s*location\.replace\("/\?product=' + re.escape(slug) + r'#([a-z0-9-]+)"\);\s*', tags.scripts[0])
-            self.assertIsNotNone(match, slug + ": " + tags.scripts[0])
-            self.assertIn(match.group(1), section_ids, slug)
-            target = "/?product=" + slug + "#" + match.group(1)
-            self.assertEqual(tags.body_links, [target], slug + " keeps one visible link to the same place")
-            self.assertEqual(tags.noscript_links, [target], slug)
-            self.assertLess(text.index("location.replace"), text.index("<main"), "redirect runs before the page paints")
-        # The redirect lands in the section the card sits in.
+            self.assertNotRegex(text, r"location\.(?:replace|assign)|location\.href\s*=", slug)
+            self.assertNotIn("<noscript", text, slug)
+            self.assertIn(card["section"], section_ids, slug)
+            self.assertEqual(tags.body_links, ["/", "/?product=" + slug + "#" + card["section"]], slug)
+            self.assertEqual(tags.noscript_links, [], slug)
+            self.assertEqual(re.findall(r"<h1>([^<]*)</h1>", text), [html.escape(card["name"], quote=True)], slug)
+            sizes = re.findall(r'<p class="size">Size: ([^<]*)</p>', text)
+            self.assertEqual([html.unescape(size) for size in sizes], [card["size"]] if card["size"] else [], slug)
+            image = re.search(r'<img src="/assets/[^"]+" alt="([^"]*)"( width="(\d+)" height="(\d+)")?', text)
+            self.assertIsNotNone(image, slug)
+            self.assertEqual(html.unescape(image.group(1)), card["alt"] or card["name"], slug)
+            self.assertEqual((image.group(3) or "", image.group(4) or ""), (card["width"], card["height"]), slug)
+            self.assertNotRegex(text, r"<script\b[^>]*\bsrc=", slug)
+            self.assertEqual(re.findall(r"<script\b([^>]*)>", text), [' type="application/ld+json"'] * len(re.findall(r"application/ld\+json", text)), slug)
+        # The button lands in the section the card sits in.
         _, tags = self.page("jewel-glow-tealight")
-        self.assertEqual(tags.body_links, ["/?product=jewel-glow-tealight#diwali"])
+        self.assertEqual(tags.body_links, ["/", "/?product=jewel-glow-tealight#diwali"])
         _, tags = self.page("two-keys-one-little-us")
-        self.assertEqual(tags.body_links, ["/?product=two-keys-one-little-us#romantic-keepsakes"])
+        self.assertEqual(tags.body_links, ["/", "/?product=two-keys-one-little-us#romantic-keepsakes"])
 
     def test_slugs_come_from_the_name_and_stay_stable_when_names_collide(self):
         tool = load_product_pages_tool()
