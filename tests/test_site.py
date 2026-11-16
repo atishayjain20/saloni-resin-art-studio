@@ -2805,6 +2805,34 @@ class ProductSharePageTests(unittest.TestCase):
         _, tags = self.page("two-keys-one-little-us")
         self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=two-keys-one-little-us#romantic-keepsakes"])
 
+    def test_every_product_has_a_small_progressive_thumb_that_its_card_points_to(self):
+        for slug in self.slugs:
+            path = ROOT / "assets" / "thumb" / (slug + ".jpg")
+            self.assertTrue(path.is_file(), slug + ": run tools/share_images.py")
+            frame = jpeg_frame(path)
+            self.assertEqual((frame["marker"], frame["components"], frame["size"]), (0xC2, 3, (300, 300)), slug)
+            self.assertLess(path.stat().st_size, 30 * 1024, slug)
+        on_disk = sorted(path.name for path in (ROOT / "assets" / "thumb").iterdir() if not path.name.startswith("."))
+        self.assertEqual(on_disk, sorted(slug + ".jpg" for slug in self.slugs), "a thumb with no product, or a product without one")
+        tags = re.findall(r'<a class="lightbox-trigger" data-lightbox-trigger[^>]*? data-product-slug="([^"]+)"([^>]*)>', self.home)
+        self.assertEqual([slug for slug, _ in tags], self.slugs)
+        for slug, rest in tags:
+            self.assertEqual(re.search(r' data-thumb="([^"]*)"', rest).group(1), "assets/thumb/%s.jpg" % slug, slug)
+        # A missing or wrongly sized thumb stops the generator instead of leaving a broken image.
+        import tempfile
+        tool = load_product_pages_tool()
+        with tempfile.TemporaryDirectory() as scratch:
+            folder = Path(scratch) / "assets" / "thumb"
+            folder.mkdir(parents=True)
+            with self.assertRaises(SystemExit) as caught:
+                tool.thumb(Path(scratch), "gone")
+            self.assertIn("share_images.py", str(caught.exception))
+            (folder / "big.jpg").write_bytes((ROOT / "assets" / "share" / (self.slugs[0] + ".jpg")).read_bytes())
+            with self.assertRaises(SystemExit):
+                tool.thumb(Path(scratch), "big")
+            (folder / "ok.jpg").write_bytes((ROOT / "assets" / "thumb" / (self.slugs[0] + ".jpg")).read_bytes())
+            self.assertEqual(tool.thumb(Path(scratch), "ok"), "assets/thumb/ok.jpg")
+
     def test_popup_more_like_this_matches_the_product_pages(self):
         tags = re.findall(r'<a class="lightbox-trigger" data-lightbox-trigger[^>]*? data-product-slug="([^"]+)"([^>]*)>', self.home)
         self.assertEqual(len(tags), len(self.slugs))
@@ -2869,12 +2897,12 @@ class ProductSharePageTests(unittest.TestCase):
 
                 # More like this: the next four in the group, never the page itself.
                 block = re.search(r'<section class="more" aria-labelledby="more-title"><h2 id="more-title">More like this</h2><ul>(.*?)</ul></section>', text, re.S).group(1)
-                more = re.findall(r'<li><a href="([^"]*)">(.*?)</a></li>', block)
-                self.assertEqual([href for href, _ in more], ["/p/%s/" % other for other in expected])
-                self.assertEqual([html.unescape(name) for _, name in more], [by_slug[other]["name"] for other in expected])
+                more = re.findall(r'<li><a href="([^"]*)">(<img [^>]*>)<span>(.*?)</span></a></li>', block)
+                self.assertEqual([href for href, _, _ in more], ["/p/%s/" % other for other in expected])
+                self.assertEqual([html.unescape(name) for _, _, name in more], [by_slug[other]["name"] for other in expected])
+                self.assertEqual([img for _, img, _ in more], ['<img src="/assets/thumb/%s.jpg" alt="" width="300" height="300" loading="lazy" decoding="async">' % other for other in expected])
                 self.assertEqual(len(set(expected)), 4)
                 self.assertNotIn(slug, expected)
-                self.assertNotIn("<img", block)
                 linked.update(expected)
 
                 # Every link on the page leads to a file in the site.
@@ -3032,6 +3060,7 @@ class TopicPageTests(unittest.TestCase):
             with mock.patch.object(self.tool, "TOPICS", topics), \
                     mock.patch.object(self.tool, "parse_cards", return_value=cards), \
                     mock.patch.object(self.tool, "share_size", return_value=(10, 10)), \
+                    mock.patch.object(self.tool, "thumb", return_value="assets/thumb/x.jpg"), \
                     mock.patch.object(self.tool, "stamp", return_value=index):
                 return self.tool.build(index, sitemap)
 

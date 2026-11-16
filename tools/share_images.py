@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Make the link-preview JPEG for every catalogue product: assets/share/<slug>.jpg
+and a small square thumbnail for its "More like this" lists: assets/thumb/<slug>.jpg
 
 Needs Pillow in a scratch venv (it is NOT a site dependency; tools/product_pages.py needs only Python):
 
@@ -13,6 +14,9 @@ progressive JPEG at quality 80 (or lower when needed to stay light), the photo's
 600 px (a small photo is enlarged only as much as needed), longest side at most 1200 px, and
 under 250 KB (quality 80 is lowered in steps for a heavy photo, the tests allow 300 KB). The product photos in assets/ are only read, never changed. Share images of
 products that no longer exist are deleted.
+
+The thumbnail is 300x300 (the photo cropped to a square around its centre, enlarged only if it is smaller),
+RGB on white, progressive JPEG at quality 75. Thumbnails of products that no longer exist are deleted too.
 """
 import sys
 from pathlib import Path
@@ -24,6 +28,8 @@ import product_pages  # noqa: E402
 
 ROOT = product_pages.ROOT
 OUT_DIR = ROOT / "assets" / "share"
+THUMB_DIR = ROOT / "assets" / "thumb"
+THUMB_SIDE, THUMB_QUALITY = 300, 75
 MIN_SIDE, MAX_SIDE, SIZE_CAP, QUALITY_STEPS = 600, 1200, 250 * 1024, (80, 74, 68, 62)
 
 
@@ -40,10 +46,21 @@ def target_size(width, height):
     return size
 
 
-def make_image(source, target):
+def flatten(source):
+    """The photo upright, RGB on white (no transparency)."""
     photo = ImageOps.exif_transpose(Image.open(source)).convert("RGBA")
     flat = Image.new("RGB", photo.size, "white")
     flat.paste(photo, mask=photo.getchannel("A"))
+    return flat
+
+
+def make_thumb(source, target):
+    flat = flatten(source)
+    ImageOps.fit(flat, (THUMB_SIDE, THUMB_SIDE), Image.LANCZOS).save(target, "JPEG", quality=THUMB_QUALITY, progressive=True, optimize=True)
+
+
+def make_image(source, target):
+    flat = flatten(source)
     size = target_size(*flat.size)
     if size != flat.size:
         flat = flat.resize(size, Image.LANCZOS)
@@ -58,13 +75,18 @@ def main():
     cards = product_pages.parse_cards((ROOT / "index.html").read_text(encoding="utf-8"))
     slugs = product_pages.assign_slugs(cards)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
     for card, slug in zip(cards, slugs):
         make_image(ROOT / "assets" / card["file"], OUT_DIR / (slug + ".jpg"))
-    for old in OUT_DIR.glob("*.jpg"):
-        if old.stem not in slugs:
-            old.unlink()
+        make_thumb(ROOT / "assets" / card["file"], THUMB_DIR / (slug + ".jpg"))
+    for folder in (OUT_DIR, THUMB_DIR):
+        for old in folder.glob("*.jpg"):
+            if old.stem not in slugs:
+                old.unlink()
     files = list(OUT_DIR.glob("*.jpg"))
-    print("%d share images, %.1f MB in assets/share/. Now run: python3 tools/product_pages.py" % (len(files), sum(f.stat().st_size for f in files) / 1e6))
+    thumbs = list(THUMB_DIR.glob("*.jpg"))
+    print("%d share images, %.1f MB in assets/share/; %d thumbnails, %.1f MB in assets/thumb/. Now run: python3 tools/product_pages.py" % (
+        len(files), sum(f.stat().st_size for f in files) / 1e6, len(thumbs), sum(f.stat().st_size for f in thumbs) / 1e6))
 
 
 if __name__ == "__main__":

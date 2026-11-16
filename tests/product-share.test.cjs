@@ -27,7 +27,7 @@ test("share helpers build the product page URL and an encoded WhatsApp message",
   assert.equal(decodeURIComponent(api.whatsappShareUrl("Rose Tray", "", `${SITE}/p/rose-tray/`).split("text=")[1]), `Rose Tray – ${SITE}/p/rose-tray/`, "no price, no dangling dash");
 });
 
-function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {} } = {}) {
+function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {}, thumbs = false } = {}) {
   const make = (extra = {}) => Object.assign({
     hidden: false, textContent: "", attributes: {}, listeners: {},
     addEventListener(type, listener) { this.listeners[type] = listener; },
@@ -45,7 +45,7 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
     });
     return make({
       href: `assets/${slug}.jpg`,
-      attributes: noSlugAttribute ? {} : Object.assign({ "data-product-slug": slug }, more[slug] ? { "data-more-like-this": more[slug] } : {}),
+      attributes: noSlugAttribute ? {} : Object.assign({ "data-product-slug": slug }, more[slug] ? { "data-more-like-this": more[slug] } : {}, thumbs ? { "data-thumb": `assets/thumb/${slug}.jpg` } : {}),
       querySelector: (selector) => (selector === "img" ? { alt: name + " photo" } : null),
       closest: (selector) => (selector === "article" ? card : null),
     });
@@ -78,7 +78,12 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
   if (!noLocation) windowObject.location = { search, hash, href: "https://saloniresinart.com/" + search + hash };
   const documentObject = {
     getElementById: (id) => elements[id] || null,
-    createElement: () => make({ children: [], className: "", appendChild(child) { this.children.push(child); return child; }, closest() { return this; } }),
+    createElement: (tag) => {
+      // textContent reads the children's text like a real element, and setting it drops them.
+      const node = make({ tagName: tag, children: [], className: "", _text: "", appendChild(child) { this.children.push(child); return child; }, closest() { return this; } });
+      Object.defineProperty(node, "textContent", { get() { return this.children.length ? this.children.map((child) => child.textContent).join("") : this._text; }, set(value) { this._text = value; this.children = []; } });
+      return node;
+    },
     querySelectorAll: (selector) => (selector === "[data-lightbox-trigger]" ? triggers : []),
   };
   const result = vm.runInNewContext(`(function () { ${helpers}${lightboxBlock}\n return { openSharedProduct: typeof openSharedProduct === "function" ? openSharedProduct : null }; })()`, { document: documentObject, window: windowObject, URLSearchParams, URL });
@@ -242,6 +247,7 @@ test("popup More like this: the card's own list becomes text buttons, and a tap 
   assert.deepEqual(moreNames(page), ["Gold-Fleck Lotus Light", "Pastel Lotus Tealight", "Ivory Mandala Holder", "Emerald Glow Pair"]);
   assert.deepEqual(page.moreList.children.map((li) => li.children[0].attributes["data-more-slug"]), ["gold-fleck-lotus-light", "pastel-lotus-tealight", "ivory-mandala-holder", "emerald-glow-pair"]);
   assert.equal(page.moreList.children[0].children[0].attributes.type, "button");
+  assert.deepEqual(page.moreList.children[0].children[0].children.map((child) => child.tagName), ["span"], "a card with no data-thumb gives a text-only item");
   // A tap on the first button: the filter may hide the target card, the popup stays open, Back still has one step.
   page.triggers[1].closest("article").hidden = true;
   page.figure.scrollTop = 400;
@@ -259,6 +265,19 @@ test("popup More like this: the card's own list becomes text buttons, and a tap 
   assert.equal(page.triggers[1].focused, undefined);
   assert.equal(page.moreList.children.length, 0);
   assert.equal(page.elements["lightbox-more"].hidden, true);
+});
+
+test("popup More like this: the item shows the target card's own thumbnail, with an empty alt and the name as its text", () => {
+  const page = harness({ slugs: MORE_SLUGS, more: MORE, thumbs: true });
+  page.triggers[0].listeners.click({ button: 0, preventDefault() {} });
+  const button = page.moreList.children[0].children[0];
+  assert.deepEqual(button.children.map((child) => child.tagName), ["img", "span"]);
+  const img = button.children[0];
+  assert.equal(img.attributes.src, "assets/thumb/gold-fleck-lotus-light.jpg", "the URL comes from the target card's data-thumb");
+  assert.equal(img.attributes.alt, "");
+  assert.deepEqual([img.attributes.width, img.attributes.height, img.attributes.loading], ["300", "300", "lazy"]);
+  assert.equal(button.textContent, "Gold-Fleck Lotus Light");
+  assert.equal(button.attributes["data-more-slug"], "gold-fleck-lotus-light");
 });
 
 test("popup More like this: works after a shared link, skips unknown or own slugs, and a card with no list shows no section", () => {
@@ -283,6 +302,8 @@ test("popup More like this: the markup sits last in the figure after the care ti
   assert.match(html, /<\/details>\s*<section class="lightbox-more" id="lightbox-more" aria-labelledby="lightbox-more-title" hidden><h3 id="lightbox-more-title">More like this<\/h3><ul class="lightbox-more-list" id="lightbox-more-list"><\/ul><\/section>\s*<\/figure>/);
   assert.match(css, /\.lightbox-more-item\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.lightbox-more-item:focus-visible/);
+  assert.match(css, /\.lightbox-more-list\s*\{[^}]*grid-template-columns:\s*repeat\(2/);
+  assert.match(css, /\.lightbox-more-item img\s*\{[^}]*width:\s*6\.25rem[^}]*height:\s*6\.25rem/);
 });
 
 test("every card photo link carries its own data-product-slug and the version is bumped", () => {
@@ -290,7 +311,7 @@ test("every card photo link carries its own data-product-slug and the version is
   assert.ok(slugs.length > 90);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.doesNotMatch(html, /\?v=20261165/);
-  assert.match(html, /script\.js\?v=20261182/);
+  assert.match(html, /script\.js\?v=20261183/);
 });
 
 // --- Visitor counts: the product popup, the share button and a shared link, with no personal data ---

@@ -15,11 +15,12 @@ Each product page also has a path line (Home > topic > product; products no topi
 with BreadcrumbList data, and a "More like this" list of the next 4 products in the same group: the first
 topic in TOPICS that holds the product, else the cards of its home section that no topic holds, in card
 order and wrapping around. These links join the pages so Google can find and group all of them. The same list is
-stamped on each card's photo link as data-more-like-this, so the home page popup shows it too.
+stamped on each card's photo link as data-more-like-this, so the home page popup shows it too. Each item shows the
+product's thumbnail (assets/thumb/<slug>.jpg, made by tools/share_images.py; the script stops if one is missing).
 
 It also:
   * points og:image at assets/share/<slug>.jpg and reads its width and height from the JPEG,
-  * stamps data-product-slug and data-more-like-this on each card's photo link in index.html (script.js reads them),
+  * stamps data-product-slug, data-more-like-this and data-thumb on each card's photo link in index.html (script.js reads them),
   * rewrites sitemap.xml so it lists every product page after the site's own pages,
   * deletes p/<slug>/ folders of products that no longer exist,
   * also writes the topic pages (/resin-clocks/ and others) from the TOPICS table below,
@@ -54,6 +55,8 @@ TRIGGER_RE = re.compile(r'<a class="lightbox-trigger" data-lightbox-trigger\b[^>
 SECTION_RE = re.compile(r'<section\b[^>]*\bid="([^"]+)"')
 SLUG_ATTR_RE = re.compile(r' data-product-slug="[^"]*"')
 MORE_ATTR_RE = re.compile(r' data-more-like-this="[^"]*"')
+THUMB_ATTR_RE = re.compile(r' data-thumb="[^"]*"')
+THUMB_SIDE = 300
 AMOUNT = r"([1-9][0-9]{0,2}(?:,[0-9]{2,3})*)"
 PRICE_RE = re.compile("₹" + AMOUNT + "(?:–₹" + AMOUNT + ")?")
 
@@ -112,7 +115,10 @@ PAGE_CSS = ('*{box-sizing:border-box}body{margin:0;background:#ffeaf2;color:#2a0
             '.path li{display:flex;flex:none;align-items:center;color:#6a4a5b;white-space:nowrap}.path li span{margin:0 .4rem}'
             '.path li[aria-current]{display:block;flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;line-height:2.75rem}'
             '.more{margin:0 0 2rem}.more h2{margin:0 0 .25rem;font:500 1.25rem/1.2 Georgia,"Times New Roman",serif}'
-            '.more a{display:flex}.more li+li{border-top:1px solid #e6c4d4}'
+            '.more ul{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem}'
+            '.more a{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.35rem;height:100%;padding:.4rem;text-align:center}'
+            '.more a:focus-visible{outline-offset:-3px}.more img{width:6.25rem;height:6.25rem;max-height:none}'
+            '.more span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-size:.9rem;line-height:1.25}'
             'a:focus-visible{outline:3px solid #b0125b;outline-offset:4px}')
 # Sizes the popup also hides: they are not a real size yet.
 NOT_A_SIZE_RE = re.compile(r"suggested size|confirm with saloni|custom size in inches|component size to confirm", re.I)
@@ -390,7 +396,9 @@ def render_page(card, slug, share_size, topic, more):
     path += '<li aria-current="page"><span aria-hidden="true">›</span>%s</li>' % esc(card["name"])
     more_html = ""
     if more:
-        links = "".join('<li><a href="/%s/%s/">%s</a></li>' % (PAGE_DIR, other, esc(other_card["name"])) for other_card, other in more)
+        links = "".join(
+            '<li><a href="/%s/%s/"><img src="/assets/thumb/%s.jpg" alt="" width="%d" height="%d" loading="lazy" decoding="async"><span>%s</span></a></li>'
+            % (PAGE_DIR, other, other, THUMB_SIDE, THUMB_SIDE, esc(other_card["name"])) for other_card, other in more)
         more_html = '    <section class="more" aria-labelledby="more-title"><h2 id="more-title">More like this</h2><ul>%s</ul></section>\n' % links
     size = '  <meta property="og:image:width" content="%d">\n  <meta property="og:image:height" content="%d">\n' % share_size
     return """<!doctype html>
@@ -541,18 +549,18 @@ def render_topic(topic, items, version, share_size):
     )
 
 
-def stamp(page, cards, slugs, more):
-    """index.html with data-product-slug and data-more-like-this (the slugs of its "More like this" list, from more)
-    on each card's photo link, replacing any older ones. The popup reads the list from there."""
+def stamp(page, cards, slugs, more, thumbs):
+    """index.html with data-product-slug, data-more-like-this (the slugs of its "More like this" list, from more) and
+    data-thumb (its thumbnail, from thumbs) on each card's photo link, replacing any older ones. The popup reads them from there."""
     pieces, last = [], 0
     for card, slug in zip(cards, slugs):
         article = page[card["start"]:card["end"]]
         trigger = TRIGGER_RE.search(article)
         if not trigger:
             raise SystemExit("No photo link in the card " + card["name"])
-        tag = MORE_ATTR_RE.sub("", SLUG_ATTR_RE.sub("", trigger.group(0)))
+        tag = THUMB_ATTR_RE.sub("", MORE_ATTR_RE.sub("", SLUG_ATTR_RE.sub("", trigger.group(0))))
         related = " ".join(other for _, other in more.get(slug, []))
-        attributes = ' data-product-slug="%s"' % slug + (' data-more-like-this="%s"' % related if related else "")
+        attributes = ' data-product-slug="%s"' % slug + (' data-more-like-this="%s"' % related if related else "") + ' data-thumb="%s"' % thumbs[slug]
         tag = tag.replace(" data-lightbox-trigger", " data-lightbox-trigger" + attributes, 1)
         pieces.append(page[last:card["start"]] + article[:trigger.start()] + tag + article[trigger.end():])
         last = card["end"]
@@ -573,6 +581,15 @@ def share_size(root, slug):
     if not path.is_file():
         raise SystemExit("Missing %s: run tools/share_images.py first" % path.relative_to(root))
     return jpeg_size(path)
+
+
+def thumb(root, slug):
+    """The thumbnail's path under the site root, e.g. assets/thumb/<slug>.jpg. Stops if it is missing or not 300x300."""
+    relative = "assets/thumb/%s.jpg" % slug
+    path = Path(root) / relative
+    if not path.is_file() or jpeg_size(path) != (THUMB_SIDE, THUMB_SIDE):
+        raise SystemExit("Missing or not %dx%d: %s: run tools/share_images.py first" % (THUMB_SIDE, THUMB_SIDE, relative))
+    return relative
 
 
 def build(index_html, sitemap, root=ROOT):
@@ -599,6 +616,7 @@ def build(index_html, sitemap, root=ROOT):
     for card, slug in zip(cards, slugs):
         if slug not in placed:
             sections.setdefault(card["section"], []).append((card, slug))
+    thumbs = {slug: thumb(root, slug) for slug in slugs}
     pages = {}
     more = {}
     for card, slug in zip(cards, slugs):
@@ -607,7 +625,7 @@ def build(index_html, sitemap, root=ROOT):
         pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topic, more[slug])
     for topic, items in topic_pages:
         pages[topic["slug"] + "/index.html"] = render_topic(topic, items, version, share_size(root, items[0][1]))
-    return stamp(index_html, cards, slugs, more), pages, sitemap_with_products(sitemap, slugs)
+    return stamp(index_html, cards, slugs, more, thumbs), pages, sitemap_with_products(sitemap, slugs)
 
 
 def remove_stale_pages(root, keep):
