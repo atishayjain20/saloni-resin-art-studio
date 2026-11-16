@@ -471,7 +471,6 @@ h1 em { color: var(--rose); font-style: italic; }
 .section-reel strong { display: block; font-size: 1.05rem; line-height: 1.25; }
 .section-reel p { margin: 0.4rem 0 0.7rem; color: var(--muted); font-size: 0.86rem; }
 .section-reel .text-link { min-height: 2.75rem; }
-.section-reel .section-reel-note { margin: 0.7rem 0 0; font-size: 0.72rem; }
 .work-card { min-width: 0; }
 .catalogue-ready .catalogue-grid > :is(.work-card, .romantic-keepsake-card) { cursor: pointer; }
 .work-card figure { margin: 0; }

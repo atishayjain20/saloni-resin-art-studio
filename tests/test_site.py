@@ -866,7 +866,7 @@ class StaticSiteContractTests(unittest.TestCase):
         for source in sources:
             self.assertTrue(source.startswith("../assets/reel-varmala-couple"), source)
             self.assertTrue((page_path.parent / source).resolve().is_file(), source)
-        self.assertIn("Illustrative video made with AI", page)
+        self.assertNotIn("Illustrative video made with AI", page)
 
         for image_tag in re.findall(r"<img\b[^>]*>", page):
             with self.subTest(image=image_tag):
