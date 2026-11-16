@@ -1086,7 +1086,7 @@
       }
 
       // "More like this": the product's own list (data-product-slug values that tools/product_pages.py stamped
-      // in data-more-like-this) as text buttons. Hidden when no card is left to show.
+      // in data-more-like-this) as buttons with a thumbnail and the name. Hidden when no card is left to show.
       function renderMoreLikeThis(trigger) {
         if (!lightboxMore || !lightboxMoreList) return;
         lightboxMoreList.textContent = "";
@@ -1102,7 +1102,21 @@
           button.setAttribute("type", "button");
           button.className = "lightbox-more-item";
           button.setAttribute("data-more-slug", slug);
-          button.textContent = title;
+          // The thumbnail's address is the target card's own data-thumb; a card without one gives a text-only item.
+          var thumb = target.getAttribute("data-thumb") || "";
+          if (thumb) {
+            var image = document.createElement("img");
+            image.setAttribute("src", thumb);
+            image.setAttribute("alt", "");
+            image.setAttribute("width", "300");
+            image.setAttribute("height", "300");
+            image.setAttribute("loading", "lazy");
+            image.setAttribute("decoding", "async");
+            button.appendChild(image);
+          }
+          var name = document.createElement("span");
+          name.textContent = title;
+          button.appendChild(name);
           item.appendChild(button);
           lightboxMoreList.appendChild(item);
           shown += 1;
