@@ -640,6 +640,7 @@ class StaticSiteContractTests(unittest.TestCase):
             canonical,
             "https://saloniresinart.com/resin-photo-frames/",
             "https://saloniresinart.com/namokar-mantra-frames/",
+            "https://saloniresinart.com/varmala-preservation/",
             "https://saloniresinart.com/partners/",
             "https://saloniresinart.com/corporate-gifting/",
             "https://saloniresinart.com/reviews/",
@@ -787,6 +788,113 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(len(titles), len(collection_specs))
         self.assertEqual(len(descriptions), len(collection_specs))
         self.assertEqual(len(headings), len(collection_specs))
+
+    def test_varmala_preservation_page_contract(self):
+        page_path = ROOT / "varmala-preservation" / "index.html"
+        self.assertTrue(page_path.is_file(), "varmala-preservation/index.html must exist")
+        page = page_path.read_text(encoding="utf-8")
+        url = "https://saloniresinart.com/varmala-preservation/"
+        title = "Varmala Preservation in Resin | Saloni Resin Art Studio"
+        description = "Keep your wedding varmala (jaimala) flowers in a clear resin frame, handmade by Saloni in Ajmer and shipped across India."
+        image = "https://saloniresinart.com/assets/share/varmala-keepsake-frame.jpg"
+        card_alt = re.search(r'<article\b[^>]*\bid="marriage-varmala-frame"[\s\S]*?<img\b[^>]*\balt="([^"]+)"', self.html).group(1)
+        self.assertIn(f"<title>{title}</title>", page)
+        self.assertIn(f'<link rel="canonical" href="{url}">', page)
+        for tag in (
+            f'<meta property="og:url" content="{url}">',
+            f'<meta property="og:title" content="{title}">',
+            f'<meta name="twitter:title" content="{title}">',
+            f'<meta name="description" content="{description}">',
+            f'<meta property="og:description" content="{description}">',
+            f'<meta name="twitter:description" content="{description}">',
+            f'<meta property="og:image" content="{image}">',
+            f'<meta name="twitter:image" content="{image}">',
+            f'<meta property="og:image:alt" content="{card_alt}">',
+            f'<meta name="twitter:image:alt" content="{card_alt}">',
+        ):
+            self.assertIn(tag, page)
+        self.assertTrue((ROOT / "assets" / "share" / "varmala-keepsake-frame.jpg").is_file())
+        h1s = re.findall(r"<h1\b[^>]*>([\s\S]*?)</h1>", page)
+        self.assertEqual(len(h1s), 1)
+        self.assertIn("Varmala preservation", h1s[0])
+        self.assertIn("jaimala", page)
+        scripts = re.findall(r'<script type="application/ld\+json">([\s\S]*?)</script>', page)
+        self.assertEqual(len(scripts), 1)
+        data = json.loads(scripts[0])
+        self.assertEqual(data["@type"], "CollectionPage")
+        self.assertEqual(data["url"], url)
+        items = data["mainEntity"]["itemListElement"]
+        self.assertEqual([item["url"] for item in items], ["https://saloniresinart.com/p/varmala-keepsake-frame/"])
+        self.assertNotRegex(scripts[0], r"Offer|AggregateRating|Review|rating|price|availability")
+
+        card = re.search(r'<article\b[^>]*\bid="marriage-varmala-frame"[\s\S]*?</article>', self.html).group(0)
+        price = re.search(r"<dt>Price</dt><dd>(₹[\d,]+)</dd>", card).group(1)
+        size = re.search(r"<dt>Size</dt><dd>([^<]+)</dd>", card).group(1)
+        self.assertIn(price, page)
+        self.assertIn(size, page)
+        for sentence in (
+            "Typical handmade production takes 4–5 days after design and advance confirmation.",
+            "Shipping is across India; the shipping charge is extra and depends on location. Orders use protective packaging.",
+            "Final quote after size, materials and delivery.",
+            "she will check feasibility and try to meet it, but delivery is not promised until she confirms.",
+            "Saloni normally replies within 5–6 working hours.",
+        ):
+            with self.subTest(sentence=sentence):
+                self.assertIn(sentence, self.html)
+                self.assertIn(sentence, page)
+        self.assertIn('href="../?product=varmala-keepsake-frame#marriage-gifts"', page)
+        self.assertIn('data-product-slug="varmala-keepsake-frame"', self.html)
+        whatsapp = re.search(r'<a\b[^>]*href="https://wa\.me/918209238541\?text=[^"]*"[^>]*>', page)
+        self.assertIsNotNone(whatsapp)
+        self.assertIn('rel="noopener"', whatsapp.group(0))
+
+        videos = re.findall(r"<video\b[^>]*>", page)
+        self.assertEqual(len(videos), 1)
+        video = videos[0]
+        for attribute in ("controls", "muted", "playsinline", 'preload="none"'):
+            self.assertRegex(video, rf"\b{re.escape(attribute)}")
+        self.assertNotRegex(video, r"\b(autoplay|loop)\b")
+        self.assertRegex(video, r'aria-label="Video: ')
+        sources = [re.search(r'poster="([^"]+)"', video).group(1)] + re.findall(r'<source\b[^>]*\bsrc="([^"]+)"', page)
+        self.assertEqual(len(sources), 2)
+        for source in sources:
+            self.assertTrue(source.startswith("../assets/reel-varmala-couple"), source)
+            self.assertTrue((page_path.parent / source).resolve().is_file(), source)
+        self.assertIn("Illustrative video made with AI", page)
+
+        for image_tag in re.findall(r"<img\b[^>]*>", page):
+            with self.subTest(image=image_tag):
+                self.assertRegex(image_tag, r'\balt="[^"]+"')
+                self.assertRegex(image_tag, r'\bwidth="\d+"')
+                self.assertRegex(image_tag, r'\bheight="\d+"')
+                src = re.search(r'\bsrc="([^"]+)"', image_tag).group(1)
+                self.assertTrue((page_path.parent / src).resolve().is_file(), src)
+        visible = re.sub(r'\b(?:alt|content)="[^"]*"', "", page)
+        self.assertNotIn("Illustrative preview", visible)
+
+        self.assertIn('<a class="skip-link" href="#main-content">', page)
+        self.assertIn('<main id="main-content"', page)
+        ids = set(re.findall(r'\bid="([^"]+)"', page))
+        for labelled in re.findall(r'aria-labelledby="([^"]+)"', page):
+            self.assertIn(labelled, ids)
+        self.assertRegex(page, r'"\.\./script\.js\?v=\d+"')
+        self.assertNotRegex(page, re.compile(r"\b(guarantee[sd]?|lifetime|refund(s|ed)?|returns?)\b", re.I))
+
+    def test_every_page_footer_links_to_varmala_preservation(self):
+        for page, href in (
+            ("index.html", "varmala-preservation/"),
+            ("corporate-gifting/index.html", "../varmala-preservation/"),
+            ("partners/index.html", "../varmala-preservation/"),
+            ("resin-photo-frames/index.html", "../varmala-preservation/"),
+            ("namokar-mantra-frames/index.html", "../varmala-preservation/"),
+            ("reviews/index.html", "../varmala-preservation/"),
+            ("varmala-preservation/index.html", "../varmala-preservation/"),
+        ):
+            with self.subTest(page=page):
+                source = (ROOT / page).read_text(encoding="utf-8")
+                footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', source)
+                self.assertIsNotNone(footer)
+                self.assertIn(f'<a href="{href}">Varmala preservation</a>', footer.group(1))
 
     def test_homepage_links_collections_and_stable_catalogue_cards(self):
         for slug in ("resin-photo-frames", "namokar-mantra-frames"):
@@ -1290,7 +1398,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(touch[16:20], "big"), 180)
         style_version = re.search(r'href="styles\.css\?v=(\d+)"', self.html).group(1)
         script_version = re.search(r'src="script\.js\?v=(\d+)"', self.html).group(1)
-        for page, prefix in (("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"), ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../"), ("reviews/index.html", "../")):
+        for page, prefix in (("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"), ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../"), ("reviews/index.html", "../"), ("varmala-preservation/index.html", "../")):
             with self.subTest(page=page):
                 source = (ROOT / page).read_text(encoding="utf-8")
                 self.assertIn('<meta name="theme-color" content="#fbd3e5">', source)
@@ -2241,7 +2349,7 @@ class ReviewsPageContractTests(unittest.TestCase):
         self.assertNotRegex(self.page, r"aggregateRating|application/ld\+json")
 
     def test_every_page_links_to_reviews_from_the_footer_and_the_primary_nav_is_unchanged(self):
-        for page, href in (("index.html", "#customer-reviews"), ("corporate-gifting/index.html", "../#customer-reviews"), ("partners/index.html", "../#customer-reviews"), ("resin-photo-frames/index.html", "../#customer-reviews"), ("namokar-mantra-frames/index.html", "../#customer-reviews"), ("reviews/index.html", "../#customer-reviews")):
+        for page, href in (("index.html", "#customer-reviews"), ("corporate-gifting/index.html", "../#customer-reviews"), ("partners/index.html", "../#customer-reviews"), ("resin-photo-frames/index.html", "../#customer-reviews"), ("namokar-mantra-frames/index.html", "../#customer-reviews"), ("reviews/index.html", "../#customer-reviews"), ("varmala-preservation/index.html", "../#customer-reviews")):
             with self.subTest(page=page):
                 source = (ROOT / page).read_text(encoding="utf-8")
                 footer = re.search(r'<div class="footer-links">([\s\S]*?)</div>', source)
