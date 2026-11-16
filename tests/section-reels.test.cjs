@@ -50,10 +50,10 @@ for (const reel of reels) {
     assert.ok(poster < 80 * 1024, `poster is ${poster} bytes`);
   });
 
-  test(`${reel.section} video is marked illustrative and links to its product`, () => {
+  test(`${reel.section} video links to its product without an AI note`, () => {
     const markup = sectionMarkup(reel.section);
     const block = markup.slice(markup.indexOf("data-section-reel"), markup.indexOf('class="catalogue-grid"'));
-    assert.match(block, /Illustrative video made with AI/);
+    assert.doesNotMatch(block, /Illustrative video made with AI|Each piece is made by hand|section-reel-note/);
     assert.ok(block.includes(`href="?product=${reel.slug}#${reel.section}"`));
     assert.ok(html.includes(`data-product-slug="${reel.slug}"`), "the linked product exists");
   });
