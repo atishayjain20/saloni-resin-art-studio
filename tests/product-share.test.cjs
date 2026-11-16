@@ -27,7 +27,7 @@ test("share helpers build the product page URL and an encoded WhatsApp message",
   assert.equal(decodeURIComponent(api.whatsappShareUrl("Rose Tray", "", `${SITE}/p/rose-tray/`).split("text=")[1]), `Rose Tray – ${SITE}/p/rose-tray/`, "no price, no dangling dash");
 });
 
-function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false } = {}) {
+function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {} } = {}) {
   const make = (extra = {}) => Object.assign({
     hidden: false, textContent: "", attributes: {}, listeners: {},
     addEventListener(type, listener) { this.listeners[type] = listener; },
@@ -45,7 +45,7 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
     });
     return make({
       href: `assets/${slug}.jpg`,
-      attributes: noSlugAttribute ? {} : { "data-product-slug": slug },
+      attributes: noSlugAttribute ? {} : Object.assign({ "data-product-slug": slug }, more[slug] ? { "data-more-like-this": more[slug] } : {}),
       querySelector: (selector) => (selector === "img" ? { alt: name + " photo" } : null),
       closest: (selector) => (selector === "article" ? card : null),
     });
@@ -57,7 +57,13 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
   elements["lightbox-share-options"].hidden = true;
   const image = make();
   const pushes = [];
-  const lightbox = make({ showModal() { this.open = true; }, close() { this.open = false; this.listeners.close(); } });
+  // The popup's "More like this" section: a list whose children are the buttons the script makes, and the scrolling figure.
+  const moreList = make({ children: [], appendChild(child) { this.children.push(child); return child; } });
+  Object.defineProperty(moreList, "textContent", { get() { return ""; }, set() { this.children = []; } });
+  const figure = make({ scrollTop: 0 });
+  elements["lightbox-more"] = make({ hidden: true });
+  elements["lightbox-more-list"] = moreList;
+  const lightbox = make({ querySelector: (selector) => (selector === ".lightbox-figure" ? figure : null), showModal() { this.open = true; }, close() { this.open = false; this.listeners.close(); } });
   Object.assign(elements, {
     "art-lightbox": lightbox, "lightbox-image": image, "lightbox-caption": make(),
     "lightbox-product-name": make(), "lightbox-product-price": make(), "lightbox-product-size": make(), "lightbox-image-description": make(), "lightbox-request": make(),
@@ -72,10 +78,11 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
   if (!noLocation) windowObject.location = { search, hash, href: "https://saloniresinart.com/" + search + hash };
   const documentObject = {
     getElementById: (id) => elements[id] || null,
+    createElement: () => make({ children: [], className: "", appendChild(child) { this.children.push(child); return child; }, closest() { return this; } }),
     querySelectorAll: (selector) => (selector === "[data-lightbox-trigger]" ? triggers : []),
   };
   const result = vm.runInNewContext(`(function () { ${helpers}${lightboxBlock}\n return { openSharedProduct: typeof openSharedProduct === "function" ? openSharedProduct : null }; })()`, { document: documentObject, window: windowObject, URLSearchParams, URL });
-  return { elements, triggers, lightbox, image, pushes, replaces, order, calls, windowObject, openSharedProduct: result.openSharedProduct };
+  return { elements, triggers, lightbox, image, figure, moreList, pushes, replaces, order, calls, windowObject, openSharedProduct: result.openSharedProduct };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -222,12 +229,68 @@ test("the popup markup has an accessible Share button, the two options and a pol
   assert.match(css, /\.lightbox-share-options\[hidden\]\s*\{\s*display:\s*none/);
 });
 
+const MORE_SLUGS = { "jewel-glow-tealight": "Jewel Glow Tealight", "gold-fleck-lotus-light": "Gold-Fleck Lotus Light", "pastel-lotus-tealight": "Pastel Lotus Tealight", "ivory-mandala-holder": "Ivory Mandala Holder", "emerald-glow-pair": "Emerald Glow Pair" };
+const MORE = { "jewel-glow-tealight": "gold-fleck-lotus-light pastel-lotus-tealight ivory-mandala-holder emerald-glow-pair", "gold-fleck-lotus-light": "pastel-lotus-tealight jewel-glow-tealight" };
+const moreNames = (page) => page.moreList.children.map((li) => li.children[0].textContent);
+
+test("popup More like this: the card's own list becomes text buttons, and a tap swaps the product inside the open popup", () => {
+  const page = harness({ slugs: MORE_SLUGS, more: MORE });
+  const events = [];
+  page.windowObject.saloniTrack = (name) => events.push(name);
+  page.triggers[0].listeners.click({ button: 0, preventDefault() {} });
+  assert.equal(page.elements["lightbox-more"].hidden, false);
+  assert.deepEqual(moreNames(page), ["Gold-Fleck Lotus Light", "Pastel Lotus Tealight", "Ivory Mandala Holder", "Emerald Glow Pair"]);
+  assert.deepEqual(page.moreList.children.map((li) => li.children[0].attributes["data-more-slug"]), ["gold-fleck-lotus-light", "pastel-lotus-tealight", "ivory-mandala-holder", "emerald-glow-pair"]);
+  assert.equal(page.moreList.children[0].children[0].attributes.type, "button");
+  // A tap on the first button: the filter may hide the target card, the popup stays open, Back still has one step.
+  page.triggers[1].closest("article").hidden = true;
+  page.figure.scrollTop = 400;
+  page.moreList.listeners.click({ target: page.moreList.children[0].children[0] });
+  assert.equal(page.lightbox.open, true);
+  assert.equal(page.elements["lightbox-product-name"].textContent, "Gold-Fleck Lotus Light");
+  assert.deepEqual(events, ["product-jewel-glow-tealight", "product-gold-fleck-lotus-light"]);
+  assert.equal(page.pushes.length, 1, "no new history entry: Back closes the popup");
+  assert.equal(page.figure.scrollTop, 0);
+  assert.deepEqual(page.figure.focused, true, "focus moves to the scrolling area");
+  assert.deepEqual(moreNames(page), ["Pastel Lotus Tealight", "Jewel Glow Tealight"], "the new product's own list, never itself");
+  // Closing returns focus to the card that first opened the popup, and empties the section.
+  page.lightbox.close();
+  assert.equal(page.triggers[0].focused, true);
+  assert.equal(page.triggers[1].focused, undefined);
+  assert.equal(page.moreList.children.length, 0);
+  assert.equal(page.elements["lightbox-more"].hidden, true);
+});
+
+test("popup More like this: works after a shared link, skips unknown or own slugs, and a card with no list shows no section", () => {
+  const shared = harness({ search: "?product=jewel-glow-tealight", slugs: MORE_SLUGS, more: MORE });
+  shared.openSharedProduct();
+  assert.equal(shared.moreList.children.length, 4);
+  shared.moreList.listeners.click({ target: shared.moreList.children[1].children[0] });
+  assert.equal(shared.elements["lightbox-product-name"].textContent, "Pastel Lotus Tealight");
+  const odd = harness({ slugs: MORE_SLUGS, more: { "jewel-glow-tealight": "jewel-glow-tealight no-such-gift emerald-glow-pair" } });
+  odd.triggers[0].listeners.click({ button: 0, preventDefault() {} });
+  assert.deepEqual(moreNames(odd), ["Emerald Glow Pair"]);
+  const none = harness({ slugs: MORE_SLUGS, more: MORE });
+  none.triggers[2].listeners.click({ button: 0, preventDefault() {} });
+  assert.equal(none.elements["lightbox-more"].hidden, true);
+  assert.equal(none.moreList.children.length, 0);
+  const onlyOwn = harness({ slugs: MORE_SLUGS, more: { "jewel-glow-tealight": "jewel-glow-tealight no-such-gift" } });
+  onlyOwn.triggers[0].listeners.click({ button: 0, preventDefault() {} });
+  assert.equal(onlyOwn.elements["lightbox-more"].hidden, true);
+});
+
+test("popup More like this: the markup sits last in the figure after the care tips and the styles keep a 44px tap target", () => {
+  assert.match(html, /<\/details>\s*<section class="lightbox-more" id="lightbox-more" aria-labelledby="lightbox-more-title" hidden><h3 id="lightbox-more-title">More like this<\/h3><ul class="lightbox-more-list" id="lightbox-more-list"><\/ul><\/section>\s*<\/figure>/);
+  assert.match(css, /\.lightbox-more-item\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.lightbox-more-item:focus-visible/);
+});
+
 test("every card photo link carries its own data-product-slug and the version is bumped", () => {
   const slugs = [...html.matchAll(/<a class="lightbox-trigger" data-lightbox-trigger[^>]*? data-product-slug="([a-z0-9-]+)"/g)].map((match) => match[1]);
   assert.ok(slugs.length > 90);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.doesNotMatch(html, /\?v=20261165/);
-  assert.match(html, /script\.js\?v=20261181/);
+  assert.match(html, /script\.js\?v=20261182/);
 });
 
 // --- Visitor counts: the product popup, the share button and a shared link, with no personal data ---

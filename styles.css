@@ -662,6 +662,12 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .lightbox-care { max-width: 60ch; margin: 0.9rem auto 0; border-top: 1px solid var(--line); }
 .lightbox-care summary { display: flex; align-items: center; justify-content: center; min-height: 44px; cursor: pointer; color: var(--cocoa); font-size: 0.74rem; font-weight: 800; }
 .lightbox-care ul { margin: 0 0 0.4rem; padding-left: 1.2rem; color: var(--muted); font-size: 0.76rem; text-align: left; }
+.lightbox-more { max-width: 60ch; margin: 0.9rem auto 0; border-top: 1px solid var(--line); }
+.lightbox-more h3 { margin: 0.7rem 0 0.2rem; color: var(--cocoa); font-size: 0.74rem; font-weight: 800; text-align: center; }
+.lightbox-more-list { margin: 0 0 0.4rem; padding: 0; list-style: none; }
+.lightbox-more-item { display: block; width: 100%; min-height: 44px; padding: 0.4rem 0.2rem; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--cocoa); font: inherit; font-size: 0.82rem; font-weight: 800; text-align: left; cursor: pointer; }
+.lightbox-more-list li:first-child .lightbox-more-item { border-top: 0; }
+.lightbox-more-item:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .lightbox-order-summary { display: grid; flex: 0 0 auto; justify-items: center; gap: .3rem; margin-top: .9rem; text-align: center; }
 .lightbox-order-summary strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
 .lightbox-order-summary #lightbox-product-price { color: var(--cocoa); font-weight: 800; }

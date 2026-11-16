@@ -14,11 +14,12 @@ new format stops this script until price_offer() learns it.
 Each product page also has a path line (Home > topic > product; products no topic holds get Home > product)
 with BreadcrumbList data, and a "More like this" list of the next 4 products in the same group: the first
 topic in TOPICS that holds the product, else the cards of its home section that no topic holds, in card
-order and wrapping around. These links join the pages so Google can find and group all of them.
+order and wrapping around. These links join the pages so Google can find and group all of them. The same list is
+stamped on each card's photo link as data-more-like-this, so the home page popup shows it too.
 
 It also:
   * points og:image at assets/share/<slug>.jpg and reads its width and height from the JPEG,
-  * stamps data-product-slug on each card's photo link in index.html (script.js reads it),
+  * stamps data-product-slug and data-more-like-this on each card's photo link in index.html (script.js reads them),
   * rewrites sitemap.xml so it lists every product page after the site's own pages,
   * deletes p/<slug>/ folders of products that no longer exist,
   * also writes the topic pages (/resin-clocks/ and others) from the TOPICS table below,
@@ -52,6 +53,7 @@ ARTICLE_RE = re.compile(r'<article\b[^>]*\bclass="[^"]*\b(?:work-card|romantic-k
 TRIGGER_RE = re.compile(r'<a class="lightbox-trigger" data-lightbox-trigger\b[^>]*>')
 SECTION_RE = re.compile(r'<section\b[^>]*\bid="([^"]+)"')
 SLUG_ATTR_RE = re.compile(r' data-product-slug="[^"]*"')
+MORE_ATTR_RE = re.compile(r' data-more-like-this="[^"]*"')
 AMOUNT = r"([1-9][0-9]{0,2}(?:,[0-9]{2,3})*)"
 PRICE_RE = re.compile("₹" + AMOUNT + "(?:–₹" + AMOUNT + ")?")
 
@@ -539,16 +541,19 @@ def render_topic(topic, items, version, share_size):
     )
 
 
-def stamp(page, cards, slugs):
-    """index.html with data-product-slug on each card's photo link, replacing any older one."""
+def stamp(page, cards, slugs, more):
+    """index.html with data-product-slug and data-more-like-this (the slugs of its "More like this" list, from more)
+    on each card's photo link, replacing any older ones. The popup reads the list from there."""
     pieces, last = [], 0
     for card, slug in zip(cards, slugs):
         article = page[card["start"]:card["end"]]
         trigger = TRIGGER_RE.search(article)
         if not trigger:
             raise SystemExit("No photo link in the card " + card["name"])
-        tag = SLUG_ATTR_RE.sub("", trigger.group(0))
-        tag = tag.replace(" data-lightbox-trigger", ' data-lightbox-trigger data-product-slug="%s"' % slug, 1)
+        tag = MORE_ATTR_RE.sub("", SLUG_ATTR_RE.sub("", trigger.group(0)))
+        related = " ".join(other for _, other in more.get(slug, []))
+        attributes = ' data-product-slug="%s"' % slug + (' data-more-like-this="%s"' % related if related else "")
+        tag = tag.replace(" data-lightbox-trigger", " data-lightbox-trigger" + attributes, 1)
         pieces.append(page[last:card["start"]] + article[:trigger.start()] + tag + article[trigger.end():])
         last = card["end"]
     return "".join(pieces) + page[last:]
@@ -595,12 +600,14 @@ def build(index_html, sitemap, root=ROOT):
         if slug not in placed:
             sections.setdefault(card["section"], []).append((card, slug))
     pages = {}
+    more = {}
     for card, slug in zip(cards, slugs):
         topic, group = placed[slug] if slug in placed else (None, sections[card["section"]])
-        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topic, more_like_this(slug, group))
+        more[slug] = more_like_this(slug, group)
+        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topic, more[slug])
     for topic, items in topic_pages:
         pages[topic["slug"] + "/index.html"] = render_topic(topic, items, version, share_size(root, items[0][1]))
-    return stamp(index_html, cards, slugs), pages, sitemap_with_products(sitemap, slugs)
+    return stamp(index_html, cards, slugs, more), pages, sitemap_with_products(sitemap, slugs)
 
 
 def remove_stale_pages(root, keep):

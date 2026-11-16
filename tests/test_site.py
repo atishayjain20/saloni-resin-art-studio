@@ -2805,6 +2805,23 @@ class ProductSharePageTests(unittest.TestCase):
         _, tags = self.page("two-keys-one-little-us")
         self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=two-keys-one-little-us#romantic-keepsakes"])
 
+    def test_popup_more_like_this_matches_the_product_pages(self):
+        tags = re.findall(r'<a class="lightbox-trigger" data-lightbox-trigger[^>]*? data-product-slug="([^"]+)"([^>]*)>', self.home)
+        self.assertEqual(len(tags), len(self.slugs))
+        for slug, rest in tags:
+            with self.subTest(slug=slug):
+                text, _ = self.page(slug)
+                block = re.search(r'<section class="more" aria-labelledby="more-title">.*?</section>', text, re.S).group(0)
+                from_page = [href.split("/")[2] for href in re.findall(r'<a href="([^"]+)">', block)]
+                attribute = re.match(r' data-more-like-this="([^"]*)"', rest)
+                self.assertIsNotNone(attribute, "the attribute sits right after data-product-slug")
+                self.assertEqual(attribute.group(1).split(" "), from_page)
+        figure = re.search(r'<figure class="lightbox-figure".*?</figure>', self.home, re.S).group(0)
+        section = '<section class="lightbox-more" id="lightbox-more" aria-labelledby="lightbox-more-title" hidden><h3 id="lightbox-more-title">More like this</h3><ul class="lightbox-more-list" id="lightbox-more-list"></ul></section>'
+        self.assertIn(section, figure)
+        self.assertLess(figure.index('class="lightbox-care"'), figure.index(section))
+        self.assertTrue(figure.rstrip().endswith(section + "\n      </figure>"))
+
     def test_every_page_has_a_path_line_and_four_more_pieces_that_link_the_pages_together(self):
         tool = load_product_pages_tool()
         cards = tool.parse_cards(self.home)
