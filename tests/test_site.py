@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 import re
 import unittest
+from unittest import mock
 import xml.etree.ElementTree as ET
 
 
@@ -641,6 +642,10 @@ class StaticSiteContractTests(unittest.TestCase):
             "https://saloniresinart.com/resin-photo-frames/",
             "https://saloniresinart.com/namokar-mantra-frames/",
             "https://saloniresinart.com/varmala-preservation/",
+            "https://saloniresinart.com/resin-clocks/",
+            "https://saloniresinart.com/couple-gifts/",
+            "https://saloniresinart.com/marriage-gifts/",
+            "https://saloniresinart.com/celebration-lights/",
             "https://saloniresinart.com/partners/",
             "https://saloniresinart.com/corporate-gifting/",
             "https://saloniresinart.com/reviews/",
@@ -2566,7 +2571,7 @@ class ProductSharePageTests(unittest.TestCase):
         self.assertEqual((ROOT / "sitemap.xml").read_text(encoding="utf-8"), sitemap, "sitemap.xml is stale: run python3 tools/product_pages.py")
         for relative, expected in pages.items():
             self.assertEqual((ROOT / relative).read_text(encoding="utf-8"), expected, relative + " is stale: run python3 tools/product_pages.py")
-        self.assertEqual(len(pages), len(self.products))
+        self.assertEqual(len(pages), len(self.products) + len(tool.TOPICS))
 
     def test_every_share_image_is_a_sized_progressive_jpeg_that_matches_its_page_tags(self):
         # WhatsApp is the main target: every preview image is a JPEG of a safe size and weight, never cropped.
@@ -2771,6 +2776,264 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertTrue((out / "p" / "keep" / "index.html").exists())
 
 
+class TopicPageTests(unittest.TestCase):
+    """The topic pages (/resin-clocks/ ...) are generated from the home cards: no price, only CollectionPage and ItemList data."""
+
+    SITE = "https://saloniresinart.com"
+    TOPIC_SLUGS = ["resin-clocks", "couple-gifts", "marriage-gifts", "celebration-lights"]
+    CLOCKS = [
+        "teal-and-gold-roman-resin-clock", "sage-and-gold-resin-clock", "lilac-and-silver-resin-clock",
+        "ivory-diamond-resin-clock", "sky-blue-roman-resin-clock", "pearl-geode-resin-clock",
+        "blue-hour-resin-clock", "a-little-blue-hour", "personalized-photo-clock",
+        "engagement-photo-clock", "mini-resin-desk-clock",
+    ]
+    LIGHTS = [
+        "lotus-diya-pair", "floral-swastik-tealight-set", "jewel-glow-tealight", "gold-fleck-lotus-light",
+        "pastel-lotus-tealight", "marigold-petal-holder", "ivory-mandala-holder", "emerald-glow-pair",
+        "sunflower-resin-lamp",
+    ]
+    HAND_WRITTEN = [
+        ("index.html", ""), ("corporate-gifting/index.html", "../"), ("partners/index.html", "../"),
+        ("resin-photo-frames/index.html", "../"), ("namokar-mantra-frames/index.html", "../"),
+        ("reviews/index.html", "../"), ("varmala-preservation/index.html", "../"),
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tool = load_product_pages_tool()
+        cls.home = (ROOT / "index.html").read_text(encoding="utf-8")
+        cls.cards = cls.tool.parse_cards(cls.home)
+        cls.slugs = cls.tool.assign_slugs(cls.cards)
+        cls.by_slug = dict(zip(cls.slugs, cls.cards))
+        cls.version = re.search(r'href="styles\.css\?v=(\d+)"', cls.home).group(1)
+
+    def text(self, slug):
+        path = ROOT / slug / "index.html"
+        self.assertTrue(path.is_file(), "missing topic page " + slug)
+        return path.read_text(encoding="utf-8")
+
+    def meta(self, slug):
+        tags = PageTags()
+        tags.feed(self.text(slug))
+        return tags
+
+    def page_cards(self, slug):
+        """(slug, img attributes, h2 text, link href) for each card on the page."""
+        found = []
+        for article in re.findall(r'<article class="collection-card">(.*?)</article>', self.text(slug), re.S):
+            img = re.search(r"<img\b[^>]*>", article).group(0)
+            attrs = {key: html.unescape(value) for key, value in re.findall(r'([\w-]+)="([^"]*)"', img)}
+            href = re.search(r'<a class="button button-line collection-card-link" href="([^"]+)"', article).group(1)
+            found.append((href, attrs, html.unescape(re.search(r"<h2>(.*?)</h2>", article, re.S).group(1))))
+        return found
+
+    def json_ld(self, slug):
+        blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', self.text(slug), re.S)
+        self.assertEqual(len(blocks), 1, slug)
+        return json.loads(blocks[0])
+
+    def test_topic_items_fail_loudly(self):
+        def card(name, section):
+            return {
+                "name": name, "file": name + ".webp", "alt": "", "width": "10", "height": "10", "section": section,
+                "price": "₹100", "size": "", "line": "A line.", "srcset": "", "start": 0, "end": 0,
+            }
+
+        cards = [card("One", "a"), card("Two", "a"), card("Three", "a"), card("Four", "b")]
+        index = '<link rel="stylesheet" href="styles.css?v=1">'
+        sitemap = ""
+
+        def build_with(topics):
+            with mock.patch.object(self.tool, "TOPICS", topics), \
+                    mock.patch.object(self.tool, "parse_cards", return_value=cards), \
+                    mock.patch.object(self.tool, "share_size", return_value=(10, 10)), \
+                    mock.patch.object(self.tool, "stamp", return_value=index):
+                return self.tool.build(index, sitemap)
+
+        base = {"slug": "topic", "link": "Topic", "title": "T", "description": "D", "heading": "H", "intro": "I"}
+        # The helper accepts a valid topic, so each failure below comes from its own rule.
+        _, pages, _ = build_with([dict(base, section="a")])
+        self.assertIn("topic/index.html", pages)
+        self.assertEqual(len([key for key in pages if key.startswith("p/")]), 4)
+        bad = {
+            "unknown slug": [dict(base, products=["one", "nope", "two"])],
+            "duplicate slug": [dict(base, products=["one", "two", "two"])],
+            "both products and section": [dict(base, products=["one", "two", "three"], section="a")],
+            "neither products nor section": [dict(base)],
+            "unknown section": [dict(base, section="zzz")],
+            "fewer than 3 cards": [dict(base, section="b")],
+            "repeated topic slug": [dict(base, section="a"), dict(base, section="a")],
+            "topic slug p": [dict(base, slug="p", section="a")],
+        }
+        for label, topics in bad.items():
+            with self.subTest(label):
+                with self.assertRaises(SystemExit) as caught:
+                    build_with(topics)
+                self.assertIn("fix TOPICS in tools/product_pages.py", str(caught.exception))
+
+    def test_topic_cards_match_the_table(self):
+        self.assertEqual([topic["slug"] for topic in self.tool.TOPICS], self.TOPIC_SLUGS)
+        expected = {
+            "resin-clocks": self.CLOCKS,
+            "couple-gifts": [slug for slug, card in zip(self.slugs, self.cards) if card["section"] == "romantic-keepsakes"],
+            "marriage-gifts": [slug for slug, card in zip(self.slugs, self.cards) if card["section"] == "marriage-gifts"],
+            "celebration-lights": self.LIGHTS,
+        }
+        for topic, product_slugs in expected.items():
+            with self.subTest(topic):
+                self.assertGreaterEqual(len(product_slugs), 3)
+                found = self.page_cards(topic)
+                self.assertEqual([href for href, _, _ in found], ["../p/%s/" % slug for slug in product_slugs])
+                for (href, attrs, heading), slug in zip(found, product_slugs):
+                    card = self.by_slug[slug]
+                    self.assertEqual(heading, card["name"], slug)
+                    self.assertTrue((ROOT / "p" / slug / "index.html").is_file(), slug)
+                    self.assertEqual(attrs["src"], "../assets/" + card["file"], slug)
+                    self.assertTrue((ROOT / "assets" / card["file"]).is_file(), slug)
+                    self.assertEqual(attrs["alt"], card["alt"] or card["name"], slug)
+                    self.assertEqual((attrs["width"], attrs["height"]), (card["width"], card["height"]), slug)
+                    self.assertEqual("srcset" in attrs, bool(card["srcset"]), slug)
+                    if card["srcset"]:
+                        self.assertEqual(attrs["srcset"], ", ".join("../" + part.strip() for part in card["srcset"].split(",")), slug)
+                        for part in attrs["srcset"].split(","):
+                            self.assertTrue((ROOT / topic / part.strip().rsplit(" ", 1)[0]).resolve().is_file(), slug)
+                hero = re.search(r'<figure class="collection-hero-image">\s*<img ([^>]*)>', self.text(topic)).group(1)
+                hero_attrs = {key: html.unescape(value) for key, value in re.findall(r'([\w-]+)="([^"]*)"', hero)}
+                first = self.by_slug[product_slugs[0]]
+                self.assertEqual(hero_attrs["src"], "../assets/" + first["file"])
+                self.assertEqual(hero_attrs["alt"], first["alt"] or first["name"])
+                self.assertEqual((hero_attrs["width"], hero_attrs["height"]), (first["width"], first["height"]))
+                self.assertNotIn("srcset", hero_attrs)
+
+    def test_topic_pages_state_no_price_and_only_collection_data(self):
+        def types(node):
+            found = set()
+            if isinstance(node, dict):
+                if "@type" in node:
+                    found.add(node["@type"])
+                for value in node.values():
+                    found |= types(value)
+            elif isinstance(node, list):
+                for value in node:
+                    found |= types(value)
+            return found
+
+        def keys(node):
+            found = set()
+            if isinstance(node, dict):
+                found |= set(node)
+                for value in node.values():
+                    found |= keys(value)
+            elif isinstance(node, list):
+                for value in node:
+                    found |= keys(value)
+            return found
+
+        for topic in self.TOPIC_SLUGS:
+            with self.subTest(topic):
+                text = self.text(topic)
+                self.assertNotIn("₹", text)
+                self.assertNotIn("product-pricing", text)
+                data = self.json_ld(topic)
+                self.assertTrue(types(data) <= {"CollectionPage", "WebSite", "ItemList", "ListItem"}, types(data))
+                self.assertEqual(data["@type"], "CollectionPage")
+                self.assertFalse({"offers", "price", "priceCurrency", "aggregateRating", "review"} & keys(data))
+                items = data["mainEntity"]["itemListElement"]
+                self.assertEqual([item["url"] for item in items], [self.SITE + "/p/" + href.split("/")[2] + "/" for href, _, _ in self.page_cards(topic)])
+                self.assertEqual([item["position"] for item in items], list(range(1, len(items) + 1)))
+                self.assertEqual([item["name"] for item in items], [heading for _, _, heading in self.page_cards(topic)])
+
+    def test_topic_metadata(self):
+        ids = {}
+        for topic in self.tool.TOPICS:
+            slug = topic["slug"]
+            with self.subTest(slug):
+                tags = self.meta(slug)
+                text = self.text(slug)
+                url = "%s/%s/" % (self.SITE, slug)
+                full_title = topic["title"] + " | Saloni Resin Art Studio"
+                self.assertEqual(tags.links["canonical"], url)
+                self.assertEqual(tags.meta["og:url"], url)
+                self.assertEqual(tags.title, full_title)
+                self.assertEqual(tags.meta["og:title"], full_title)
+                self.assertEqual(tags.meta["twitter:title"], full_title)
+                self.assertEqual(tags.meta["description"], topic["description"])
+                self.assertEqual(tags.meta["og:description"], topic["description"])
+                self.assertEqual(tags.meta["twitter:description"], topic["description"])
+                self.assertLessEqual(len(topic["description"]), 160)
+                first = self.by_slug[self.page_cards(slug)[0][0].split("/")[2]]
+                first_slug = self.page_cards(slug)[0][0].split("/")[2]
+                share = ROOT / "assets" / "share" / (first_slug + ".jpg")
+                width, height = jpeg_frame(share)["size"]
+                self.assertEqual(tags.meta["og:image"], "%s/assets/share/%s.jpg" % (self.SITE, first_slug))
+                self.assertEqual(tags.meta["twitter:image"], tags.meta["og:image"])
+                self.assertEqual((tags.meta["og:image:width"], tags.meta["og:image:height"]), (str(width), str(height)))
+                self.assertEqual(tags.meta["og:image:alt"], first["alt"] or first["name"])
+                self.assertEqual(tags.meta["twitter:image:alt"], tags.meta["og:image:alt"])
+                self.assertEqual(len(re.findall(r"<h1\b", text)), 1)
+                self.assertEqual(self.json_ld(slug)["description"], topic["description"])
+        pages = ["index.html"] + sorted(str(path.relative_to(ROOT)) for path in list(ROOT.glob("*/index.html")) + list(ROOT.glob("p/*/index.html")))
+        seen = {"title": {}, "description": {}, "h1": {}}
+        for page in pages:
+            text = (ROOT / page).read_text(encoding="utf-8")
+            tags = PageTags()
+            tags.feed(text)
+            h1 = re.search(r"<h1\b[^>]*>(.*?)</h1>", text, re.S)
+            for kind, value in (("title", tags.title), ("description", tags.meta.get("description")), ("h1", h1 and re.sub(r"<[^>]*>", "", h1.group(1)).strip())):
+                if value:
+                    self.assertNotIn(value, seen[kind], "%s repeats the %s of %s" % (page, kind, seen[kind].get(value)))
+                    seen[kind][value] = page
+
+    def test_topic_pages_keep_site_wide_contracts(self):
+        varmala = self.text("varmala-preservation")
+        nav = re.search(r'<nav class="collection-nav".*?</nav>', varmala, re.S).group(0)
+        header = re.search(r'<header class="site-header">.*?</header>', varmala, re.S).group(0)
+        for topic in self.TOPIC_SLUGS:
+            with self.subTest(topic):
+                text = self.text(topic)
+                self.assertIn('<meta name="theme-color" content="#fbd3e5">', text)
+                self.assertIn('<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">', text)
+                self.assertIn('<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">', text)
+                self.assertEqual(set(re.findall(r"\?v=(\d+)", text)), {self.version})
+                for asset in ("styles.css", "analytics.js", "script.js"):
+                    self.assertIn("../%s?v=%s" % (asset, self.version), text)
+                for banned in ("<iframe", "my-orders.js", "customizer.js"):
+                    self.assertNotIn(banned, text)
+                self.assertIn('<a class="skip-link" href="#main-content">', text)
+                self.assertIn('<main id="main-content" tabindex="-1">', text)
+                ids = re.findall(r'\bid="([^"]+)"', text)
+                self.assertEqual(len(ids), len(set(ids)))
+                for target in re.findall(r'aria-labelledby="([^"]+)"', text):
+                    self.assertIn(target, ids)
+                self.assertEqual(re.search(r'<nav class="collection-nav".*?</nav>', text, re.S).group(0), nav)
+                self.assertEqual(len(re.findall(r"<a\b", nav)), 4)
+                self.assertEqual(re.search(r'<header class="site-header">.*?</header>', text, re.S).group(0), header)
+                footer = re.search(r"<footer\b.*?</footer>", text, re.S).group(0)
+                self.assertIn('<a href="../#customer-reviews">Reviews</a>', footer)
+                self.assertIn('<a href="../varmala-preservation/">Varmala preservation</a>', footer)
+                visible = re.sub(r"<script\b.*?</script>", "", text, flags=re.S)
+                visible = re.sub(r"<[^>]*>", " ", visible)
+                self.assertNotIn("Illustrative preview", visible)
+                customer_markup = re.sub(r'\s(?:src|srcset|href)=["\'][^"\']*["\']', "", text, flags=re.IGNORECASE)
+                customer_markup = re.sub(r'\scontent=["\'][^"\']*(?:/assets/|\.(?:webp|jpe?g|png|svg))[^"\']*["\']', "", customer_markup, flags=re.IGNORECASE)
+                self.assertNotRegex(customer_markup, re.compile(r"\bconcept\b", re.IGNORECASE))
+                self.assertNotRegex(text, re.compile(r"\b(?:guarantee|lifetime|refund|returns)\b", re.IGNORECASE))
+                for tag in re.findall(r"<img\b[^>]*>", text):
+                    for attribute in ("alt=", "width=", "height=", 'loading="lazy"'):
+                        self.assertIn(attribute, tag)
+
+    def test_every_page_footer_links_every_topic_and_no_stray_pages(self):
+        pages = self.HAND_WRITTEN + [("%s/index.html" % topic, "../") for topic in self.TOPIC_SLUGS]
+        for page, prefix in pages:
+            footer = re.search(r"<footer\b.*?</footer>", (ROOT / page).read_text(encoding="utf-8"), re.S).group(0)
+            for topic in self.tool.TOPICS:
+                with self.subTest(page=page, topic=topic["slug"]):
+                    self.assertIn('<a href="%s%s/">%s</a>' % (prefix, topic["slug"], html.escape(topic["link"])), footer)
+        known = {"corporate-gifting", "partners", "resin-photo-frames", "namokar-mantra-frames", "reviews", "varmala-preservation", "customised-hampers"}
+        folders = {path.parent.name for path in ROOT.glob("*/index.html")}
+        self.assertEqual(folders, known | set(self.TOPIC_SLUGS))
+
+
 class ResponsiveCardImageTests(unittest.TestCase):
     """Card photos offer a 540 px copy (covers a 171 px card on a 3x phone), while src and the popup keep the full photo."""
 
@@ -2778,6 +3041,10 @@ class ResponsiveCardImageTests(unittest.TestCase):
         "index.html": 78,
         "corporate-gifting/index.html": 2,
         "resin-photo-frames/index.html": 2,
+        "resin-clocks/index.html": 3,
+        "couple-gifts/index.html": 9,
+        "marriage-gifts/index.html": 10,
+        "celebration-lights/index.html": 6,
     }
     CARD_WIDTH = 540
 
