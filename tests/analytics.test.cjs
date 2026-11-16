@@ -142,7 +142,7 @@ test("event paths are an allow-list of plain lowercase words, so names, phones, 
   assert.deepEqual(calls, ["product-silver-925-tray", "order-form-open", "advance-pay-googlepay"]);
 });
 
-test("product share pages redirect at once and carry no script tag, so they load nothing extra", () => {
+test("product pages load no external script, so they load nothing extra", () => {
   const shares = publicPages().filter((page) => page.startsWith("p" + path.sep));
   assert.ok(shares.length > 90);
   for (const page of shares) assert.doesNotMatch(read(page), /<script\b[^>]*\bsrc=/, page);
