@@ -31,7 +31,7 @@ class OrderFlowContractTests(unittest.TestCase):
         for gone in ("action=seed", 'seedField.name = "seed"', "order-form-frame", "createElement(\"iframe\")", "MessageChannel", "event.ports[0]"):
             with self.subTest(gone=gone):
                 self.assertNotIn(gone, self.script)
-        for page in ("index.html", "partners/index.html", "corporate-gifting/index.html", "reviews/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html"):
+        for page in ("index.html", "partners/index.html", "corporate-gifting/index.html", "reviews/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html", "varmala-preservation/index.html"):
             with self.subTest(page=page):
                 self.assertNotIn("<iframe", (ROOT / page).read_text(encoding="utf-8"))
 
