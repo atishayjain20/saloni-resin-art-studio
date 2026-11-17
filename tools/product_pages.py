@@ -12,11 +12,11 @@ price and photo. Products priced "Price on request" get no structured data. The 
 button opens /?product=<slug>#<section>, where script.js opens that product's popup. A price in a
 new format stops this script until price_offer() learns it.
 Each product page also has a path line (Home > topic > product; products no topic holds get Home > product)
-with BreadcrumbList data, and a "More like this" list of the next 4 products in the same group: the first
-topic in TOPICS that holds the product, else the cards of its home section that no topic holds, in card
-order and wrapping around. These links join the pages so Google can find and group all of them. The same list is
-stamped on each card's photo link as data-more-like-this, so the home page popup shows it too. Each item shows the
-product's thumbnail (assets/thumb/<slug>.jpg, made by tools/share_images.py; the script stops if one is missing).
+with BreadcrumbList data, and a "More like this" list of 4 products from the same group (the first topic in
+TOPICS that holds the product, else the cards of its home section that no topic holds): the ones that share the
+most words with it first (pick_more()), then the rest of the group in card order, then "Fresh from the studio".
+These links join the pages so Google can find and group all of them. The same list is stamped on each card's
+photo link as data-more-like-this, so the home page popup shows it too. Each item shows the product's thumbnail (assets/thumb/<slug>.jpg, made by tools/share_images.py; the script stops if one is missing).
 
 It also:
   * points og:image at assets/share/<slug>.jpg and reads its width and height from the JPEG,
@@ -339,11 +339,61 @@ def breadcrumb_json_ld(card, slug, topic):
     return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
 
 
-def more_like_this(slug, group):
-    """Up to 4 (card, slug) pairs: the ones after slug in group (a list of (card, slug)), wrapping to the start, never slug itself."""
-    order = [other for _, other in group]
-    at = order.index(slug)
-    return (group[at + 1:] + group[:at])[:4]
+STOP_WORDS = frozenset("""a an and the of for with in on to your you my our us it its this that is are be by from at as or into
+one two three four every all so up resin illustrative preview""".split())
+WORD_RE = re.compile(r"[a-z0-9]+")
+SIMILAR_WORDS = 3
+MORE_COUNT = 4
+STUDIO_SECTION = "studio-art"
+
+
+def words(card):
+    """The words that describe a card: its name, line and photo text, lower case, without 1-letter and stop words."""
+    text = " ".join((card.get("name", ""), card.get("line", ""), card.get("alt", ""))).lower()
+    return {word for word in WORD_RE.findall(text) if len(word) > 1 and word not in STOP_WORDS}
+
+
+def pick_more(cards, slugs, groups):
+    """{slug: [(card, slug) x 4]}: each product's "More like this" list. groups maps a slug to its category group,
+    a list of (card, slug) in order.
+      1. Similar: others in the group that share 3 or more words, most shared first, then group order.
+      2. Category: the rest of the group, after the product and wrapping round.
+      3. Studio: cards of the "Fresh from the studio" section (studio-art), in page order.
+    Then every product that no list holds is added to the list of the product before it in its group (the 4th pick is
+    replaced), so every page is linked from another. Depends only on the card order, so a rerun gives the same lists."""
+    by_slug = dict(zip(slugs, cards))
+    keywords = {slug: words(card) for slug, card in by_slug.items()}
+    studio = [(card, slug) for card, slug in zip(cards, slugs) if card["section"] == STUDIO_SECTION]
+    picks = {}
+    for slug in slugs:
+        group = groups[slug]
+        order = [other for _, other in group]
+        at = order.index(slug)
+        scored = [(-len(keywords[slug] & keywords[other]), place, other) for place, other in enumerate(order) if other != slug]
+        chosen = [other for score, _, other in sorted(scored) if -score >= SIMILAR_WORDS][:MORE_COUNT]
+        for other in order[at + 1:] + order[:at] + [other for _, other in studio]:
+            if len(chosen) == MORE_COUNT:
+                break
+            if other != slug and other not in chosen:
+                chosen.append(other)
+        picks[slug] = chosen
+    for _ in range(len(slugs) + 1):
+        listed = {other for chosen in picks.values() for other in chosen}
+        orphans = [slug for slug in slugs if slug not in listed]
+        if not orphans:
+            return {slug: [(by_slug[other], other) for other in chosen] for slug, chosen in picks.items()}
+        fixed = False
+        for slug in orphans:
+            order = [other for _, other in groups[slug]]
+            at = order.index(slug)
+            for before in order[:at][::-1] + order[at + 1:][::-1]:
+                if len(picks[before]) == MORE_COUNT and slug in [other for _, other in groups[before]] and slug not in picks[before]:
+                    picks[before][MORE_COUNT - 1] = slug
+                    fixed = True
+                    break
+        if not fixed:
+            raise SystemExit("No page can link to %s in its More like this list: add products to its group or section" % ", ".join(orphans))
+    raise SystemExit("More like this lists still leave pages with no link after %d passes: fix the cards" % (len(slugs) + 1))
 
 
 def merchant_feed(cards, slugs):
@@ -618,11 +668,12 @@ def build(index_html, sitemap, root=ROOT):
             sections.setdefault(card["section"], []).append((card, slug))
     thumbs = {slug: thumb(root, slug) for slug in slugs}
     pages = {}
-    more = {}
+    topics, groups = {}, {}
     for card, slug in zip(cards, slugs):
-        topic, group = placed[slug] if slug in placed else (None, sections[card["section"]])
-        more[slug] = more_like_this(slug, group)
-        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topic, more[slug])
+        topics[slug], groups[slug] = placed[slug] if slug in placed else (None, sections[card["section"]])
+    more = pick_more(cards, slugs, groups)
+    for card, slug in zip(cards, slugs):
+        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topics[slug], more[slug])
     for topic, items in topic_pages:
         pages[topic["slug"] + "/index.html"] = render_topic(topic, items, version, share_size(root, items[0][1]))
     return stamp(index_html, cards, slugs, more, thumbs), pages, sitemap_with_products(sitemap, slugs)

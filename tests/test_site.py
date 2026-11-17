@@ -2866,9 +2866,7 @@ class ProductSharePageTests(unittest.TestCase):
                 topic = next((t for t in tool.TOPICS if slug in topic_group(t)), None)
                 held = {s for t in tool.TOPICS for s in topic_group(t)}
                 group = topic_group(topic) if topic else [s for s, c in zip(slugs, cards) if c["section"] == card["section"] and s not in held]
-                at = group.index(slug)
-                expected = (group[at + 1:] + group[:at])[:4]
-                self.assertEqual(len(expected), 4)
+                allowed = set(group) | {s for s, c in zip(slugs, cards) if c["section"] == "studio-art"}
 
                 # The visible path line, and the BreadcrumbList that says the same thing.
                 canonical = self.SITE + "/p/" + slug + "/"
@@ -2895,15 +2893,18 @@ class ProductSharePageTests(unittest.TestCase):
                 self.assertEqual(urls, [self.SITE + (href or "/p/" + slug + "/") for href, _ in shown])
                 self.assertEqual(urls[-1], canonical)
 
-                # More like this: the next four in the group, never the page itself.
+                # More like this: four different products from the product's own group (or "Fresh from the studio"), never the page itself.
                 block = re.search(r'<section class="more" aria-labelledby="more-title"><h2 id="more-title">More like this</h2><ul>(.*?)</ul></section>', text, re.S).group(1)
                 more = re.findall(r'<li><a href="([^"]*)">(<img [^>]*>)<span>(.*?)</span></a></li>', block)
-                self.assertEqual([href for href, _, _ in more], ["/p/%s/" % other for other in expected])
-                self.assertEqual([html.unescape(name) for _, _, name in more], [by_slug[other]["name"] for other in expected])
-                self.assertEqual([img for _, img, _ in more], ['<img src="/assets/thumb/%s.jpg" alt="" width="300" height="300" loading="lazy" decoding="async">' % other for other in expected])
-                self.assertEqual(len(set(expected)), 4)
-                self.assertNotIn(slug, expected)
-                linked.update(expected)
+                picked = [href.split("/")[2] for href, _, _ in more]
+                self.assertEqual([href for href, _, _ in more], ["/p/%s/" % other for other in picked])
+                self.assertEqual([html.unescape(name) for _, _, name in more], [by_slug[other]["name"] for other in picked])
+                self.assertEqual([img for _, img, _ in more], ['<img src="/assets/thumb/%s.jpg" alt="" width="300" height="300" loading="lazy" decoding="async">' % other for other in picked])
+                self.assertEqual(len(set(picked)), 4)
+                self.assertNotIn(slug, picked)
+                self.assertTrue(set(picked) <= allowed, "every pick is from the product's own group")
+                self.assertTrue(all((ROOT / "p" / other / "index.html").is_file() for other in picked))
+                linked.update(picked)
 
                 # Every link on the page leads to a file in the site.
                 for href in tags.body_links:
@@ -2911,6 +2912,70 @@ class ProductSharePageTests(unittest.TestCase):
                     self.assertTrue(path.startswith("/"), href)
                     self.assertTrue((ROOT / path.strip("/") / "index.html").is_file(), href)
         self.assertEqual(linked, set(slugs), "every product page is linked from another product page")
+
+    def test_more_like_this_puts_the_most_similar_products_first(self):
+        def picks(slug):
+            text, _ = self.page(slug)
+            block = re.search(r'<section class="more".*?</section>', text, re.S).group(0)
+            return re.findall(r'<a href="/p/([^/]+)/">', block)
+
+        self.assertEqual(picks("lilac-symbol-medallion")[0], "little-brother-keepsake")
+        self.assertEqual(picks("blue-and-white-namokar-mantra-frame")[:2], ["white-and-gold-namokar-mantra-frame", "pearl-white-namokar-mantra-frame"])
+        self.assertFalse([slug for slug in picks("blue-and-white-namokar-mantra-frame") if slug.endswith("clock")], "no clock on a mantra frame page")
+        self.assertEqual(picks("teal-and-gold-roman-resin-clock")[0], "sage-and-gold-resin-clock")
+        self.assertTrue(all(slug.endswith("clock") for slug in picks("teal-and-gold-roman-resin-clock")))
+        tool = load_product_pages_tool()
+        cards = tool.parse_cards(self.home)
+        held = {}
+        for topic in reversed(tool.TOPICS):
+            for _, other in tool.topic_items(topic, cards, self.slugs):
+                held[other] = {s for _, s in tool.topic_items(topic, cards, self.slugs)}
+        for slug in ("mr-and-mrs-name-plate", "rose-and-gold-festive-set", "labh-floral-hanging-pair"):
+            card = cards[self.slugs.index(slug)]
+            group = held.get(slug) or {s for s, c in zip(self.slugs, cards) if c["section"] == card["section"] and s not in held}
+            self.assertEqual(len(picks(slug)), 4, slug)
+            self.assertTrue(set(picks(slug)) <= group, slug + ": all four picks are in its own group")
+
+    def test_pick_more_orders_similar_then_category_then_studio_and_leaves_no_product_unlinked(self):
+        tool = load_product_pages_tool()
+
+        def make(names, section="x"):
+            cards = [{"name": name, "line": "", "alt": "", "section": section} for name in names]
+            return cards, [name.lower().replace(" ", "-") for name in names]
+
+        def run(cards, slugs, groups=None):
+            pairs = list(zip(cards, slugs))
+            picks = tool.pick_more(cards, slugs, groups or {slug: pairs for slug in slugs})
+            return {slug: [other for _, other in picked] for slug, picked in picks.items()}
+
+        # Three shared words count, two do not; similar ones first (most shared first), then the group in order.
+        cards, slugs = make(["Blue Gold Lotus Tealight Holder", "Plain Cedar Box", "Blue Gold Mug", "Blue Gold Lotus Tray", "Blue Gold Lotus Tealight Tray", "Quiet Pine Tray", "Wide Oak Bowl"])
+        picked = run(cards, slugs)
+        self.assertEqual(picked[slugs[0]][:3], [slugs[4], slugs[3], slugs[1]], "4 shared, 3 shared, then the group order; 2 shared (blue gold mug) is not similar")
+        # With nothing in common, the category fill starts after the product and wraps.
+        cards, slugs = make(["Alpha Cedar", "Bravo Pine", "Charlie Oak", "Delta Elm", "Echo Fir", "Foxtrot Ash", "Golf Yew"])
+        picked = run(cards, slugs)
+        self.assertEqual(picked[slugs[5]], [slugs[6], slugs[0], slugs[1], slugs[2]])
+        # A group too small to give four: "Fresh from the studio" (section studio-art, in order) fills the rest.
+        group_cards, group_slugs = make(["Alpha Cedar", "Bravo Pine", "Charlie Oak"], "x")
+        studio_cards, studio_slugs = make(["Studio One", "Studio Two", "Studio Three", "Studio Four", "Studio Five", "Studio Six"], "studio-art")
+        cards, slugs = group_cards + studio_cards, group_slugs + studio_slugs
+        small, big = list(zip(group_cards, group_slugs)), list(zip(studio_cards, studio_slugs))
+        picked = run(cards, slugs, {**{s: small for s in group_slugs}, **{s: big for s in studio_slugs}})
+        self.assertEqual(picked[group_slugs[0]], [group_slugs[1], group_slugs[2], studio_slugs[0], studio_slugs[1]])
+        self.assertEqual(picked[group_slugs[1]], [group_slugs[2], group_slugs[0], studio_slugs[0], studio_slugs[1]])
+        # Orphan fix: five similar products list only each other, so the two others are not listed anywhere;
+        # the product before an unlisted one gives up its fourth pick for it.
+        cards, slugs = make(["Rose Gold Floral Alpha", "Rose Gold Floral Bravo", "Rose Gold Floral Charlie", "Rose Gold Floral Delta", "Rose Gold Floral Echo", "Plain Cedar Box", "Quiet Pine Tray"])
+        picked = run(cards, slugs)
+        self.assertEqual(picked[slugs[4]], [slugs[0], slugs[1], slugs[2], slugs[5]])
+        self.assertEqual({other for listed in picked.values() for other in listed}, set(slugs))
+        for slug, listed in picked.items():
+            self.assertEqual((len(listed), len(set(listed)), slug in listed), (4, 4, False))
+        # A product nobody can list stops the script.
+        cards, slugs = make(["Lonely Cedar"])
+        with self.assertRaises(SystemExit):
+            run(cards, slugs)
 
     def test_slugs_come_from_the_name_and_stay_stable_when_names_collide(self):
         tool = load_product_pages_tool()
@@ -3052,7 +3117,7 @@ class TopicPageTests(unittest.TestCase):
                 "price": "₹100", "size": "", "line": "A line.", "srcset": "", "start": 0, "end": 0,
             }
 
-        cards = [card("One", "a"), card("Two", "a"), card("Three", "a"), card("Four", "b")]
+        cards = [card("One", "a"), card("Two", "a"), card("Three", "a"), card("Four", "b"), card("Five", "b")]
         index = '<link rel="stylesheet" href="styles.css?v=1">'
         sitemap = ""
 
@@ -3068,7 +3133,7 @@ class TopicPageTests(unittest.TestCase):
         # The helper accepts a valid topic, so each failure below comes from its own rule.
         _, pages, _ = build_with([dict(base, section="a")])
         self.assertIn("topic/index.html", pages)
-        self.assertEqual(len([key for key in pages if key.startswith("p/")]), 4)
+        self.assertEqual(len([key for key in pages if key.startswith("p/")]), 5)
         bad = {
             "unknown slug": [dict(base, products=["one", "nope", "two"])],
             "duplicate slug": [dict(base, products=["one", "two", "two"])],
