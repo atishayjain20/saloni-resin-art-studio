@@ -1822,7 +1822,7 @@
         // The browser also scrolls to the link's #section once the page has loaded, so jump again then.
         var jumpToSharedCard = function () {
           if (typeof sharedCard.scrollIntoView !== "function") return;
-          try { sharedCard.scrollIntoView({ behavior: "instant", block: "center" }); } catch (error) { sharedCard.scrollIntoView(); }
+          try { sharedCard.scrollIntoView({ behavior: "instant", block: "start" }); } catch (error) { sharedCard.scrollIntoView(); }
         };
         jumpToSharedCard();
         if (document.readyState !== "complete") window.addEventListener("load", jumpToSharedCard);
@@ -2515,7 +2515,54 @@
       return base + "?text=" + encodeURIComponent(message);
     }
 
+    // One entry per quantity box in the cart: { input, item, line, error }.
+    var cartQuantityRecords = [];
+    // "" when the box holds a whole number from 1 to 100 and the total of all items stays within 100, else what to tell the shopper.
+    function cartQuantityProblem(record) {
+      var requested = String(record.input.value || "").trim();
+      var next = /^\d+$/.test(requested) ? Number(requested) : NaN;
+      if (!Number.isInteger(next) || next < 1 || next > 100) return "Enter a whole number from 1 to 100.";
+      var others = selectedCatalogueItems.reduce(function (total, other) { return other === record.item ? total : total + bundleQuantity(other); }, 0);
+      return others + next > 100 ? "The total for all items must be 100 or less." : "";
+    }
+    function clearCartQuantityError(record) {
+      if (record.error && record.line.removeChild) record.line.removeChild(record.error);
+      record.error = null;
+      record.input.removeAttribute("aria-invalid");
+      record.input.removeAttribute("aria-describedby");
+    }
+    // The typed number stays in the box; the error sits in the item's own line, with a way to ask for more than 100 pieces.
+    function showCartQuantityError(record, message) {
+      clearCartQuantityError(record);
+      var error = document.createElement("p");
+      error.className = "catalogue-selection-item-error";
+      error.id = record.input.id + "-error";
+      error.textContent = message + " For more than 100 pieces, ";
+      var link = document.createElement("a");
+      link.setAttribute("href", "corporate-gifting/");
+      link.textContent = "send a corporate gifting enquiry";
+      var stop = document.createElement("span");
+      stop.textContent = ".";
+      error.appendChild(link);
+      error.appendChild(stop);
+      record.line.appendChild(error);
+      record.error = error;
+      record.input.setAttribute("aria-invalid", "true");
+      record.input.setAttribute("aria-describedby", error.id);
+    }
+    // True (after showing every error and focusing the first wrong box) when a cart quantity cannot be sent.
+    function blockInvalidCartQuantities() {
+      var first = null;
+      cartQuantityRecords.forEach(function (record) {
+        var problem = cartQuantityProblem(record);
+        if (problem) { showCartQuantityError(record, problem); if (!first) first = record.input; }
+      });
+      if (first && typeof first.focus === "function") first.focus();
+      return Boolean(first);
+    }
+
     function renderCatalogueSelectionItems() {
+      cartQuantityRecords = [];
       if (!catalogueSelectionItems) return;
       while (catalogueSelectionItems.firstChild) catalogueSelectionItems.removeChild(catalogueSelectionItems.firstChild);
       selectedCatalogueItems.forEach(function (item) {
@@ -2538,22 +2585,14 @@
         input.inputMode = "numeric";
         input.value = String(bundleQuantity(item));
         input.setAttribute("aria-label", "Quantity for " + item.productName);
+        var record = { input: input, item: item, line: line, error: null };
+        cartQuantityRecords.push(record);
         input.addEventListener("change", function () {
-          var requested = String(input.value || "").trim();
-          var nextQuantity = /^\d+$/.test(requested) ? Number(requested) : NaN;
+          var problem = cartQuantityProblem(record);
+          if (problem) { showCartQuantityError(record, problem); return; }
+          clearCartQuantityError(record);
           var previous = bundleQuantity(item);
-          if (!Number.isInteger(nextQuantity) || nextQuantity < 1 || nextQuantity > 100) {
-            input.value = String(previous);
-            setCatalogueSelectionStatus("Each quantity must be a whole number from 1 to 100.");
-            return;
-          }
-          item.quantity = nextQuantity;
-          if (bundleTotal(selectedCatalogueItems) > 100) {
-            item.quantity = previous;
-            input.value = String(previous);
-            setCatalogueSelectionStatus("The total selected quantity must be from 1 to 100.");
-            return;
-          }
+          item.quantity = Number(String(input.value).trim());
           if (bundleDetails(selectedCatalogueItems).length > 2000) {
             item.quantity = previous;
             input.value = String(previous);
@@ -2790,8 +2829,14 @@
 
     restoreCatalogueSelection();
 
+    // A cart quantity that cannot be sent is shown and focused first; the WhatsApp links wait for the fix too.
+    catalogueWhatsappLinks.forEach(function (link) {
+      link.addEventListener("click", function (event) { if (blockInvalidCartQuantities()) event.preventDefault(); });
+    });
+
     function requestSelectedCatalogueItems(opener) {
       if (!selectedCatalogueItems.length) return;
+      if (blockInvalidCartQuantities()) return;
       var items = selectedCatalogueItems.slice();
       if (bundleTotal(items) > 100) {
         setCatalogueSelectionStatus("The total selected quantity must be from 1 to 100.");

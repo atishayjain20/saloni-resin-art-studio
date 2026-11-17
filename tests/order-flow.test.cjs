@@ -902,14 +902,34 @@ test("cart lists every selected line and submits independent quantities with a b
   quantities[1].value = "5"; quantities[1].dispatch("change");
   quantities[2].value = "1"; quantities[2].dispatch("change");
   let currentQuantities = flow.catalogueSelectionItems.children.map((line) => line.querySelector("input"));
+  const lineError = (index) => flow.catalogueSelectionItems.children[index].children.find((child) => child.className === "catalogue-selection-item-error");
   currentQuantities[0].value = "0"; currentQuantities[0].dispatch("change");
-  assert.equal(currentQuantities[0].value, "2");
-  currentQuantities = flow.catalogueSelectionItems.children.map((line) => line.querySelector("input"));
+  assert.equal(currentQuantities[0].value, "0", "the wrong number stays visible with its error");
+  assert.equal(currentQuantities[0].getAttribute("aria-invalid"), "true");
+  assert.equal(currentQuantities[0].getAttribute("aria-describedby"), lineError(0).id);
+  assert.equal(lineError(0).textContent, "Enter a whole number from 1 to 100. For more than 100 pieces, ");
+  const enquiryLink = lineError(0).children.find((child) => child.attributes.href);
+  assert.deepEqual([enquiryLink.attributes.href, enquiryLink.textContent], ["corporate-gifting/", "send a corporate gifting enquiry"]);
   currentQuantities[0].value = "1.5"; currentQuantities[0].dispatch("change");
-  assert.equal(currentQuantities[0].value, "2");
-  currentQuantities = flow.catalogueSelectionItems.children.map((line) => line.querySelector("input"));
+  assert.equal(currentQuantities[0].value, "1.5");
   currentQuantities[0].value = "100"; currentQuantities[0].dispatch("change");
-  assert.equal(currentQuantities[0].value, "2");
+  assert.equal(currentQuantities[0].value, "100");
+  assert.match(lineError(0).textContent, /^The total for all items must be 100 or less\./);
+  // Order now and both WhatsApp links stop, show the error and focus the wrong box, until the number is fixed.
+  flow.catalogueRequestSelected.dispatch("click");
+  flow.catalogueCartOrder.dispatch("click");
+  assert.equal(flow.posted.length, 0);
+  assert.equal(currentQuantities[0].focused, true);
+  [flow.catalogueSelectionWhatsapp, flow.catalogueCartWhatsapp].forEach((link) => {
+    let prevented = false;
+    link.dispatch("click", { preventDefault() { prevented = true; } });
+    assert.equal(prevented, true);
+  });
+  currentQuantities[0].value = "2"; currentQuantities[0].dispatch("change");
+  assert.equal(lineError(0), undefined, "a valid number removes the error");
+  let sent = false;
+  flow.catalogueCartWhatsapp.dispatch("click", { preventDefault() { sent = true; } });
+  assert.equal(sent, false, "a valid cart opens WhatsApp as before");
   flow.catalogueRequestSelected.dispatch("click");
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.quantity, "8");
@@ -917,10 +937,11 @@ test("cart lists every selected line and submits independent quantities with a b
   assert.match(seed.designDetails, /Test frame.*Qty 2/);
   assert.match(seed.designDetails, /Your flowers, held close.*Qty 5/);
   assert.equal(seed.productName, "Your flowers, held close + 2 more");
-  quantities[0].value = "101";
-  quantities[0].dispatch("change");
-  assert.equal(quantities[0].value, "2");
-  assert.match(flow.catalogueSelectionStatus.textContent, /1 to 100|100/);
+  const latest = flow.catalogueSelectionItems.children[0].querySelector("input");
+  latest.value = "101";
+  latest.dispatch("change");
+  assert.equal(latest.value, "101");
+  assert.match(flow.catalogueSelectionItems.children[0].children.find((child) => child.className === "catalogue-selection-item-error").textContent, /^Enter a whole number from 1 to 100\./);
 });
 
 test("restores selected catalogue items and quantities after a browser reload", () => {

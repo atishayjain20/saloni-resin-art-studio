@@ -1354,6 +1354,33 @@ function sendEmailAlert_(payload, receivedAt, referenceFile, properties) {
   });
 }
 
+// One email to the studio for each NEW corporate enquiry (a replay of a saved enquiry sends nothing).
+function sendCorporateAlert_(payload, receivedAt, properties) {
+  var to = String(properties.getProperty("ORDER_ALERT_EMAIL") || "").trim() || String(Session.getEffectiveUser().getEmail() || "").trim();
+  if (!to) return;
+  var lines = [
+    "Organisation: " + payload.organisationName,
+    "Contact: " + payload.contactName,
+    "Phone: " + payload.phone,
+    "Email: " + (payload.email || "-"),
+    "Type: " + payload.enquiryType,
+    "Occasion: " + payload.occasion,
+    "Approximate quantity: " + (payload.approximateQuantity || "-"),
+    "Budget: " + (payload.budgetRange || "-"),
+    "Required date: " + (payload.requiredDate || "-"),
+    "Delivery: " + payload.deliveryScope,
+    "Brief: " + payload.brief,
+    "Enquiry ID: " + payload.enquiryId,
+    "Received: " + Utilities.formatDate(receivedAt, "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " (IST)",
+    "Sheet: " + orderSheetUrl_(properties) + " (tab Corporate Enquiries)"
+  ];
+  MailApp.sendEmail({
+    to: to,
+    subject: "New corporate enquiry: " + String(payload.organisationName).slice(0, 80),
+    body: lines.join("\n")
+  });
+}
+
 // Public so it shows in the editor Run menu. Web visitors have an empty active user, so they are refused.
 function testOrderAlerts() {
   var active = String(Session.getActiveUser().getEmail() || "");
@@ -1447,7 +1474,7 @@ function submitCorporateEnquiry(form) {
     var receivedAt = new Date();
     var row = [
       neutralizeForSheet_(payload.enquiryId), receivedAt, neutralizeForSheet_(payload.organisationName),
-      neutralizeForSheet_(payload.contactName), neutralizeForSheet_(payload.phone), neutralizeForSheet_(payload.email),
+      neutralizeForSheet_(payload.contactName), asSheetText_(neutralizeForSheet_(payload.phone)), neutralizeForSheet_(payload.email),
       neutralizeForSheet_(payload.enquiryType), neutralizeForSheet_(payload.occasion),
       payload.approximateQuantity === "" ? "" : Number(payload.approximateQuantity),
       neutralizeForSheet_(payload.budgetRange), neutralizeForSheet_(payload.requiredDate),
@@ -1464,6 +1491,7 @@ function submitCorporateEnquiry(form) {
       if (afterAppend) return validationFailure_({ enquiryId: "Enquiry ID conflict: these details differ from the saved enquiry." });
       throw appendError;
     }
+    try { sendCorporateAlert_(payload, receivedAt, properties); } catch (alertError) { console.error("Corporate enquiry alert failed."); }
     return { ok: true, enquiryId: payload.enquiryId, receivedAt: receivedAt.toISOString() };
   } catch (error) {
     if (error && error.message && /Enquiry ID conflict/.test(error.message)) throw error;
@@ -1496,6 +1524,7 @@ function validateCorporateEnquiry_(payload) {
   if (payload.approximateQuantity && (!/^\d{1,9}$/.test(payload.approximateQuantity) || Number(payload.approximateQuantity) < 1)) errors.approximateQuantity = "Enter a positive whole number, or leave it blank.";
   bounded_(errors, "budgetRange", payload.budgetRange, 120, false);
   if (payload.requiredDate && !isIsoDate_(payload.requiredDate)) errors.requiredDate = "Use a valid required date.";
+  else if (payload.requiredDate && payload.requiredDate < todayIst_()) errors.requiredDate = "Choose today or a later date.";
   bounded_(errors, "deliveryScope", payload.deliveryScope, 300, true);
   bounded_(errors, "brief", payload.brief, 1000, true);
   if (payload.privacyAccepted !== true) errors.privacyAccepted = "Accept the privacy notice to send an enquiry.";
@@ -3074,6 +3103,12 @@ function neutralizeForSheet_(value) {
   // A leading apostrophe makes untrusted text display literally instead of executing as a formula.
   if (text.startsWith("=") || text.startsWith("+") || text.startsWith("-") || text.startsWith("@") || /^[\s\u0000-\u001f]*[=+\-@]/.test(text)) return "'" + text;
   return text;
+}
+
+// Text for a sheet cell that must stay text (a phone number would otherwise lose a leading zero or become a number).
+function asSheetText_(text) {
+  var value = String(text == null ? "" : text);
+  return value.charAt(0) === "'" ? value : "'" + value;
 }
 
 function parseSeed_(json) {

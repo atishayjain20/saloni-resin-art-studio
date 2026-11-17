@@ -659,6 +659,15 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertEqual(len(list(url)), 1)
         self.assertNotIn("#", sitemap_path.read_text(encoding="utf-8"))
 
+    def test_corporate_page_touch_targets_are_at_least_44px_and_form_inputs_2_75rem(self):
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        nav = re.search(r"(?m)^\.corporate-page \.site-nav a \{([^}]*)\}", css).group(1)
+        mark = re.search(r"(?m)^\.corporate-page \.site-header \.wordmark \{([^}]*)\}", css).group(1)
+        for rule in (nav, mark):
+            self.assertRegex(rule, r"min-height:\s*44px")
+        self.assertIn("#review-form) textarea { width: 100%; min-height: 2.75rem;", css, "the four forms' inputs are at least 44px tall")
+        self.assertRegex(css, r"#order-form \.bundle-item \.field-error, \.catalogue-selection-item-error \{[^}]*grid-column:\s*1 / -1")
+
     def test_collection_card_height_follows_content_on_desktop(self):
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         figure_rule = re.search(r"(?m)^\.collection-card figure \{([^}]*)\}", css).group(1)

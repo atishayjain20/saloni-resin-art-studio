@@ -152,7 +152,7 @@ test("bundle form renders every selected item and rebuilds authoritative quantit
   const quantities = list.children.map((line) => line.querySelector("input"));
   quantities[0].value = "2"; quantities[1].value = "5"; quantities[2].value = "1"; quantities[3].value = "0";
   quantities[3].dispatch("change");
-  assert.equal(quantities[3].value, "1");
+  assert.equal(quantities[3].value, "0", "a wrong number stays visible with its error instead of snapping back");
   quantities[3].value = "1";
   fillValid(runtime.fields);
   runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
@@ -166,6 +166,76 @@ test("bundle form renders every selected item and rebuilds authoritative quantit
   assert.match(runtime.fields.designDetails.value, /Four .*Qty 1/);
   assert.doesNotMatch(runtime.fields.designDetails.value, /Source:|catalogue:|Quantity:/);
   assert.equal(runtime.fields.bundleSourceIds.value, "catalogue:four.webp x1, catalogue:one.webp x2, catalogue:three.webp x1, catalogue:two.webp x5");
+});
+
+test("a quantity over 100 stays on screen with an inline error and a corporate link, and the form will not send until it is fixed", async () => {
+  const runtime = makeFormRuntime({
+    sourceId: "catalogue:multi-item", productName: "2 selected catalogue items",
+    bundleItems: [
+      { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 2 },
+      { sourceId: "catalogue:two.webp", productName: "Two", price: "399", size: "6 in", quantity: 5 },
+    ],
+  });
+  const lines = runtime.elements.get("bundle-items").children;
+  const [first, second] = lines.map((line) => line.querySelector("input"));
+  const errorIn = (line) => line.children.find((child) => child.className === "field-error");
+  first.value = "200";
+  first.dispatch("change");
+  assert.equal(first.value, "200");
+  assert.equal(first.getAttribute("aria-invalid"), "true");
+  assert.equal(first.getAttribute("aria-describedby"), "bundle-quantity-catalogue-one-webp-error");
+  const error = errorIn(lines[0]);
+  assert.equal(error.id, "bundle-quantity-catalogue-one-webp-error");
+  assert.equal(error.textContent, "Enter a whole number from 1 to 100. For more than 100 pieces, ");
+  const link = error.children.find((child) => child.attributes.href);
+  assert.deepEqual([link.attributes.href, link.textContent], ["corporate-gifting/", "send a corporate gifting enquiry"]);
+  assert.equal(runtime.fields.quantity.value, "7", "the saved quantity did not change");
+  // The form will not send, and the first wrong entry takes focus.
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  assert.equal(runtime.fetches.length, 0);
+  assert.equal(first.focused, true);
+  // A whole number from 1 to 100 that makes the total too big gets its own message; fixing it removes the error.
+  first.value = "2"; first.dispatch("change");
+  assert.equal(errorIn(lines[0]), undefined);
+  assert.equal(first.getAttribute("aria-invalid"), "");
+  second.value = "99"; second.dispatch("change");
+  assert.match(errorIn(lines[1]).textContent, /^The total for all items must be 100 or less\. For more than 100 pieces, $/);
+  assert.equal(second.value, "99");
+  second.value = "5"; second.dispatch("change");
+  assert.equal(errorIn(lines[1]), undefined);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(runtime.fetches.length, 1, "the corrected form is sent");
+});
+
+test("what is sent is what is on screen: a number that was too big becomes valid once another box is lowered", async () => {
+  const runtime = makeFormRuntime({
+    sourceId: "catalogue:multi-item", productName: "2 selected catalogue items",
+    bundleItems: [
+      { sourceId: "catalogue:one.webp", productName: "One", price: "249", size: "4 in", quantity: 10 },
+      { sourceId: "catalogue:two.webp", productName: "Two", price: "399", size: "6 in", quantity: 20 },
+    ],
+  });
+  const lines = runtime.elements.get("bundle-items").children;
+  const [one, two] = lines.map((line) => line.querySelector("input"));
+  one.value = "90"; one.dispatch("change");
+  assert.ok(lines[0].children.some((child) => child.className === "field-error"), "90 + 20 is over the total");
+  two.value = "5"; two.dispatch("change");
+  fillValid(runtime.fields);
+  runtime.elements.get("order-form").dispatch("submit", { preventDefault() {} });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(runtime.fetches.length, 1);
+  const sent = runtime.fetches[0].body;
+  assert.equal(sent.quantity, "95");
+  assert.match(sent.designDetails, /One .*Qty 90/);
+  assert.match(sent.designDetails, /Two .*Qty 5\b/);
+  assert.equal(one.value, "90");
+  assert.equal(one.getAttribute("aria-invalid"), "");
+  assert.equal(lines[0].children.some((child) => child.className === "field-error"), false, "no error is left behind");
 });
 
 test("bundle Product name shows the first product and a count of the rest", () => {

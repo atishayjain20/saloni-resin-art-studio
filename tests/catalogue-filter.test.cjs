@@ -1029,7 +1029,7 @@ test("a shared ?product= link shows that product's own section in full and scrol
   assert.equal(collapsed.hidden, true, "the card is hidden in the normal four-card preview");
   assert.equal(card.hidden, false);
   assert.deepEqual(card.events, ["scroll"]);
-  assert.match(script, /scrollIntoView\(\{ behavior: "instant", block: "center" \}\)/, "an instant jump: the page itself scrolls smoothly");
+  assert.match(script, /sharedCard\.scrollIntoView\(\{ behavior: "instant", block: "start" \}\)/, "an instant jump to the top of the card (scroll-padding keeps it under the header, and the tab bar names this section): the page itself scrolls smoothly");
   assert.equal(harness.cards.every((item) => !item.hidden), true, "the link opens every collapsed section");
   assert.equal(harness.windowObject.history.replacements.length, 0, "the shared URL stays as it was");
 });
