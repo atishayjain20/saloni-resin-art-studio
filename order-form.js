@@ -138,7 +138,65 @@
       bundleNotes = notes;
     }
   }
+  // One entry per quantity box in the selected-items list: { input, item, line, error }.
+  var quantityRecords = [];
+  // "" when the box holds a whole number from 1 to 100 and the total of all items stays within 100, else what to tell the shopper.
+  function quantityProblem(record) {
+    var requested = String(record.input.value || "").trim();
+    var next = /^\d+$/.test(requested) ? Number(requested) : NaN;
+    if (!Number.isInteger(next) || next < 1 || next > 100) return "Enter a whole number from 1 to 100.";
+    var others = bundleItems.reduce(function (total, other) { return other === record.item ? total : total + bundleQuantity(other); }, 0);
+    return others + next > 100 ? "The total for all items must be 100 or less." : "";
+  }
+  function clearQuantityError(record) {
+    if (record.error && record.line.removeChild) record.line.removeChild(record.error);
+    record.error = null;
+    record.input.removeAttribute("aria-invalid");
+    record.input.removeAttribute("aria-describedby");
+  }
+  // The typed number stays in the box; the error sits in the item's own line, with a way to ask for more than 100 pieces.
+  function showQuantityError(record, message) {
+    clearQuantityError(record);
+    var error = document.createElement("p");
+    error.className = "field-error";
+    error.id = record.input.id + "-error";
+    error.textContent = message + " For more than 100 pieces, ";
+    var link = document.createElement("a");
+    link.setAttribute("href", "corporate-gifting/");
+    link.textContent = "send a corporate gifting enquiry";
+    var stop = document.createElement("span");
+    stop.textContent = ".";
+    error.appendChild(link);
+    error.appendChild(stop);
+    record.line.appendChild(error);
+    record.error = error;
+    record.input.setAttribute("aria-invalid", "true");
+    record.input.setAttribute("aria-describedby", error.id);
+  }
+  // True (after showing every error and focusing the first wrong box) when any quantity box holds something that cannot be sent.
+  function blockInvalidQuantities() {
+    var first = null;
+    quantityRecords.forEach(function (record) {
+      var problem = quantityProblem(record);
+      if (problem) { showQuantityError(record, problem); if (!first) first = record.input; }
+    });
+    if (first) { if (first.focus) first.focus(); return true; }
+    // Every box is fine now. What was typed is what gets sent, even when an earlier change left an old error behind
+    // (a number that was too big until another box was lowered): write the typed numbers into the items and clear the errors.
+    var changed = quantityRecords.some(function (record) { return Number(String(record.input.value).trim()) !== bundleQuantity(record.item); });
+    var notes = String(bundleNotesFromField(value("designDetails")) || bundleNotes || "").trim();
+    var before = quantityRecords.map(function (record) { return bundleQuantity(record.item); });
+    quantityRecords.forEach(function (record) { record.item.quantity = Number(String(record.input.value).trim()); clearQuantityError(record); });
+    if (changed && bundleDetails(bundleItems).length > 2000) {
+      quantityRecords.forEach(function (record, index) { record.item.quantity = before[index]; record.input.value = String(before[index]); });
+      setStatus("Those quantities make the selected list too long. Lower a quantity before continuing.", "error");
+      return true;
+    }
+    if (changed) { bundleNotes = notes; updateBundleScalars(true, notes); }
+    return false;
+  }
   function renderBundleItems() {
+    quantityRecords = [];
     if (!bundleItemsElement) return;
     var visible = isBundle() && bundleItems.length > 0;
     bundleItemsElement.hidden = !visible;
@@ -163,21 +221,20 @@
       input.min = "1"; input.max = "100"; input.step = "1"; input.inputMode = "numeric";
       input.value = String(bundleQuantity(item));
       input.setAttribute("aria-label", "Quantity for " + item.productName);
+      var record = { input: input, item: item, line: line, error: null };
+      quantityRecords.push(record);
       input.addEventListener("change", function () {
-        var requested = String(input.value || "").trim();
-        var nextQuantity = /^\d+$/.test(requested) ? Number(requested) : NaN;
+        var problem = quantityProblem(record);
+        if (problem) { showQuantityError(record, problem); return; }
+        clearQuantityError(record);
+        var nextQuantity = Number(String(input.value).trim());
         var previous = bundleQuantity(item);
         var notesBeforeChange = String(bundleNotesFromField(value("designDetails")) || bundleNotes || "").trim();
-        if (!Number.isInteger(nextQuantity) || nextQuantity < 1 || nextQuantity > 100) {
-          input.value = String(previous);
-          setStatus("Each selected item quantity must be a whole number from 1 to 100.", "error");
-          return;
-        }
         item.quantity = nextQuantity;
-        if (bundleTotal(bundleItems) > 100 || bundleDetails(bundleItems).length > 2000) {
+        if (bundleDetails(bundleItems).length > 2000) {
           item.quantity = previous;
           input.value = String(previous);
-          setStatus(bundleTotal(bundleItems) > 100 ? "The total selected quantity must be from 1 to 100." : "Those quantities make the selected list too long. Lower a quantity before continuing.", "error");
+          setStatus("Those quantities make the selected list too long. Lower a quantity before continuing.", "error");
           return;
         }
         bundleNotes = notesBeforeChange;
@@ -782,6 +839,8 @@
     event.preventDefault();
     if (active) return;
     if (referencePreparing) { setStatus("Preparing your image… please try again in a moment.", ""); return; }
+    // A quantity the shopper typed that cannot be sent is shown and focused before anything else is checked.
+    if (isBundle() && blockInvalidQuantities()) return;
     if (isBundle()) updateBundleScalars(true);
     else if (!dimensionsRequired()) fillBlankSizeParts();
     clearErrors();

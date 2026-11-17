@@ -191,6 +191,9 @@
     form.elements.applicationId.value = newId("application");
   }
 
+  // Today's date in India (UTC+5:30), as YYYY-MM-DD: the earliest required date the studio can accept.
+  function istToday() { return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10); }
+
   function initCorporate(form) {
     var k = kit(form);
     var active = false;
@@ -214,6 +217,7 @@
       if (k.value("email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(k.value("email"))) errors.email = "Enter a valid email address or leave it blank.";
       if (k.value("approximateQuantity") && (!/^\d{1,9}$/.test(k.value("approximateQuantity")) || Number(k.value("approximateQuantity")) < 1)) errors.approximateQuantity = "Enter a positive whole number, or leave it blank.";
       if (k.value("requiredDate") && !/^\d{4}-\d{2}-\d{2}$/.test(k.value("requiredDate"))) errors.requiredDate = "Use a valid required date.";
+      else if (k.value("requiredDate") && k.value("requiredDate") < istToday()) errors.requiredDate = "Choose today or a later date.";
       if (!form.elements.privacyAccepted.checked) errors.privacyAccepted = "Accept the privacy notice to send an enquiry.";
       return errors;
     }
@@ -293,6 +297,7 @@
       k.setStatus("", "");
     });
     form.elements.enquiryId.value = newId("enquiry");
+    if (form.elements.requiredDate) form.elements.requiredDate.min = istToday();
   }
 
   function initReview(form) {

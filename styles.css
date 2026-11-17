@@ -75,6 +75,8 @@ html.js #primary-navigation { display: none; }
 html.js #primary-navigation.is-open { display: flex; }
 .site-nav a { text-decoration: none; }
 .site-nav a:not(.nav-cta) { display: inline-flex; align-items: center; min-height: 2.3rem; padding: 0.4rem 0.65rem; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease; white-space: nowrap; }
+.corporate-page .site-nav a { display: inline-flex; align-items: center; min-height: 44px; }
+.corporate-page .site-header .wordmark { min-height: 44px; justify-content: center; }
 .site-nav a:not(.nav-cta):hover, .site-nav a:not(.nav-cta):focus-visible { border-color: var(--ink); background: var(--paper); color: var(--ink); }
 .site-nav .nav-link-button, .site-nav .nav-link-fallback { display: inline-flex; align-items: center; min-height: 2.3rem; padding: 0.4rem 0.65rem; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink); font-size: inherit; font-weight: inherit; letter-spacing: inherit; white-space: nowrap; }
 .site-nav .nav-link-button:hover, .site-nav .nav-link-button:focus-visible, .site-nav .nav-link-fallback:hover, .site-nav .nav-link-fallback:focus-visible { border-color: var(--ink); background: var(--paper); color: var(--ink); }
@@ -1243,7 +1245,7 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 #order-form .reference-preview { display: block; width: min(100%, 18rem); max-height: 14rem; margin-top: .65rem; object-fit: contain; border: 1px solid #dccbc1; border-radius: .7rem; background: #fffaf4; }
 :is(#order-form, #partner-form, #corporate-form, #review-form) label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 650; }
 :is(#order-form, #partner-form, #corporate-form, #review-form) input, :is(#order-form, #partner-form, #corporate-form, #review-form) select, :is(#order-form, #partner-form, #corporate-form, #review-form) textarea, :is(#order-form, #partner-form, #corporate-form, #review-form) button { font: inherit; }
-:is(#order-form, #partner-form, #corporate-form, #review-form) input, :is(#order-form, #partner-form, #corporate-form, #review-form) select, :is(#order-form, #partner-form, #corporate-form, #review-form) textarea { width: 100%; min-height: 2.65rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; }
+:is(#order-form, #partner-form, #corporate-form, #review-form) input, :is(#order-form, #partner-form, #corporate-form, #review-form) select, :is(#order-form, #partner-form, #corporate-form, #review-form) textarea { width: 100%; min-height: 2.75rem; padding: .62rem .7rem; border: 1px solid #bca8a0; border-radius: .55rem; background: #fff; color: #2b2020; }
 #order-form input[readonly] { background: #f1e9e4; color: #5d4947; }
 :is(#order-form, #partner-form, #corporate-form, #review-form) textarea { min-height: 7rem; resize: vertical; }
 :is(#order-form, #partner-form, #corporate-form, #review-form) input:focus-visible, :is(#order-form, #partner-form, #corporate-form, #review-form) select:focus-visible, :is(#order-form, #partner-form, #corporate-form, #review-form) textarea:focus-visible, :is(#order-form, #partner-form, #corporate-form, #review-form) button:focus-visible, :is(#order-form, #partner-form, #corporate-form, #review-form) summary:focus-visible { outline: 3px solid #b24b60; outline-offset: 2px; }
@@ -1252,6 +1254,8 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 #order-form .bundle-size label { display: flex; flex-direction: column; justify-content: flex-end; gap: .35rem; font-size: .76rem; }
 #order-form .bundle-size input { min-height: 44px; padding-inline: .45rem; }
 #order-form .bundle-size .field-error { grid-column: 1 / -1; font-size: .8rem; }
+#order-form .bundle-item .field-error, .catalogue-selection-item-error { grid-column: 1 / -1; margin: 0; color: #a41f33; font-size: .8rem; }
+#order-form .bundle-item .field-error a, .catalogue-selection-item-error a { display: inline-flex; align-items: center; min-height: 44px; }
 #order-form .bundle-size-item { margin-bottom: .75rem; }
 #order-form .shipping-fields { margin-top: .85rem; }
 #order-form .more-details > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; padding: .55rem 1rem; border: 1px solid #dccbc1; border-radius: .9rem; background: #fffaf4; color: #5d4947; font-weight: 700; cursor: pointer; list-style: none; }

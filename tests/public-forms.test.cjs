@@ -116,10 +116,13 @@ function makeRuntime(kind, options = {}) {
   return runtime;
 }
 
+// India date (UTC+5:30) offset by whole days; the corporate form refuses a required date before today.
+const istDay = (offsetDays) => new Date(Date.now() + 5.5 * 3600 * 1000 + offsetDays * 86400000).toISOString().slice(0, 10);
+
 function fill(runtime, overrides = {}) {
   const values = runtime.config.form === "partner-form"
     ? { applicantName: "Asha", businessName: "Asha Studio", category: "Planner", serviceArea: "Ajmer", phone: "8209238541", email: "asha@example.com", website: "https://example.com", typicalCustomers: "Couples and families", referralPlan: "I will share stories" }
-    : { organisationName: "Acme Private Limited", contactName: "A Customer", phone: "8209238541", email: "contact@example.com", enquiryType: "one-off", occasion: "employee birthday", approximateQuantity: "25", budgetRange: "INR total to quote", requiredDate: "2027-02-20", deliveryScope: "Ajmer and Jaipur offices", brief: "Resin keepsakes for an employee celebration." };
+    : { organisationName: "Acme Private Limited", contactName: "A Customer", phone: "8209238541", email: "contact@example.com", enquiryType: "one-off", occasion: "employee birthday", approximateQuantity: "25", budgetRange: "INR total to quote", requiredDate: istDay(30), deliveryScope: "Ajmer and Jaipur offices", brief: "Resin keepsakes for an employee celebration." };
   Object.entries(Object.assign(values, overrides)).forEach(([name, value]) => { runtime.fields[name].value = value; });
   (runtime.fields.rulesAccepted || runtime.fields.privacyAccepted).checked = true;
   return runtime;
@@ -329,6 +332,19 @@ test("corporate: requires the organisation, contact, scope, brief, type, occasio
   await runtime.submit();
   for (const field of ["email", "approximateQuantity", "requiredDate"]) assert.equal(runtime.fields[field].getAttribute("aria-invalid"), "true", field);
   assert.equal(runtime.fetches.length, 0);
+});
+
+test("corporate: the required date cannot be before today (India time): the field's min is set and a past date shows the inline error", async () => {
+  const runtime = makeRuntime("corporate");
+  assert.equal(runtime.fields.requiredDate.min, istDay(0));
+  fill(runtime, { requiredDate: istDay(-1) });
+  await runtime.submit();
+  assert.equal(runtime.fields.requiredDate.getAttribute("aria-invalid"), "true");
+  assert.equal(runtime.errors.find((error) => error.id === "requiredDate-error").textContent, "Choose today or a later date.");
+  assert.equal(runtime.fetches.length, 0);
+  fill(runtime, { requiredDate: istDay(0) });
+  await runtime.submit();
+  assert.equal(runtime.fetches.length, 1, "today is accepted");
 });
 
 test("corporate: sends every business field and the privacy consent, and shows the receipt with the enquiry id", async () => {

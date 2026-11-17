@@ -16,7 +16,7 @@ function makeRuntime(options = {}) {
   const headers = (options.headers || ["Enquiry ID", "Received at", "Organisation name", "Contact name", "Phone / WhatsApp", "Email", "Enquiry type", "Occasion", "Approximate quantity", "Budget range", "Required date", "Delivery scope", "Brief", "Privacy accepted", "Status", "Staff notes", "Payload fingerprint"]).slice();
   const rows = (options.rows || []).map((row) => row.slice());
   const properties = Object.assign({ ORDER_SHEET_ID: "sheet", CORPORATE_PROGRAM_CONFIGURED: "true" }, options.properties || {});
-  const state = { appendCalls: 0, fetchCalls: 0, deletedRows: [], lock: options.lockAvailable !== false };
+  const state = { appendCalls: 0, fetchCalls: 0, deletedRows: [], mails: [], lock: options.lockAvailable !== false };
   const protections = [];
   const sheet = {
     getLastRow: () => rows.length + 1,
@@ -49,6 +49,7 @@ function makeRuntime(options = {}) {
     SpreadsheetApp: { ProtectionType: { RANGE: "RANGE" }, openById: () => ({ getSheetByName: () => sheet }) },
     Session: { getScriptTimeZone: () => "UTC", getActiveUser: () => ({ getEmail: () => options.activeEmail || "" }), getEffectiveUser: () => ({ getEmail: () => options.effectiveEmail || "" }) },
     UrlFetchApp: { fetch: () => { state.fetchCalls += 1; throw new Error("no reCAPTCHA request is expected"); } },
+    MailApp: { sendEmail: (message) => { if (options.mailFailure) throw new Error("mail down"); state.mails.push(message); } },
     ContentService: { MimeType: { JSON: "JSON" }, createTextOutput: (text) => ({ text, setMimeType(type) { this.mimeType = type; return this; } }) },
   };
   vm.createContext(context);
@@ -56,10 +57,14 @@ function makeRuntime(options = {}) {
   return { context, rows, headers, state };
 }
 
+// A date that stays in the future whenever the tests run (the backend and the page reject past dates).
+const istDay = (offsetDays) => new Date(Date.now() + 5.5 * 3600 * 1000 + offsetDays * 86400000).toISOString().slice(0, 10);
+const NEXT_MONTH = istDay(30);
+
 function validForm(overrides = {}) {
   return Object.assign({
     enquiryId: "enquiry-1234567890", organisationName: "Acme Private Limited", contactName: "A Customer", phone: "8209238541", email: "",
-    enquiryType: "one-off", occasion: "employee birthday", approximateQuantity: "25", budgetRange: "INR total to quote", requiredDate: "2027-02-20",
+    enquiryType: "one-off", occasion: "employee birthday", approximateQuantity: "25", budgetRange: "INR total to quote", requiredDate: NEXT_MONTH,
     deliveryScope: "Ajmer and Jaipur offices", brief: "Resin keepsakes for an employee celebration. Please suggest suitable options.", privacyAccepted: "true", captchaToken: "token",
     ignoredInternalField: "must not be saved"
   }, overrides);
@@ -121,6 +126,48 @@ test("corporate row neutralizes every untrusted text field before writing", () =
   ["enquiryId", "organisationName", "contactName", "phone", "email", "enquiryType", "occasion", "budgetRange", "requiredDate", "deliveryScope", "brief"].forEach((field) => {
     assert.match(writer, new RegExp("neutralizeForSheet_\\(payload\\." + field + "\\)"));
   });
+});
+
+test("a new enquiry emails the studio once, a replay does not, and a mail failure still saves the enquiry", () => {
+  const runtime = makeRuntime({ properties: { ORDER_ALERT_EMAIL: "studio@example.com" } });
+  assert.equal(runtime.context.submitCorporateEnquiry(validForm({ email: "a@example.com" })).ok, true);
+  assert.equal(runtime.state.mails.length, 1);
+  const mail = runtime.state.mails[0];
+  assert.equal(mail.to, "studio@example.com");
+  assert.equal(mail.subject, "New corporate enquiry: Acme Private Limited");
+  const lines = mail.body.split("\n");
+  [
+    "Organisation: Acme Private Limited", "Contact: A Customer", "Phone: 8209238541", "Email: a@example.com", "Type: one-off", "Occasion: employee birthday",
+    "Approximate quantity: 25", "Budget: INR total to quote", "Required date: " + NEXT_MONTH, "Delivery: Ajmer and Jaipur offices",
+    "Brief: Resin keepsakes for an employee celebration. Please suggest suitable options.", "Enquiry ID: enquiry-1234567890",
+    "Sheet: https://docs.google.com/spreadsheets/d/sheet/edit (tab Corporate Enquiries)",
+  ].forEach((line) => assert.ok(lines.includes(line), line));
+  assert.ok(lines.some((line) => /^Received: .+ \(IST\)$/.test(line)));
+  const replay = makeRuntime({ rows: runtime.rows, properties: { ORDER_ALERT_EMAIL: "studio@example.com" } });
+  assert.equal(replay.context.submitCorporateEnquiry(validForm({ email: "a@example.com" })).ok, true);
+  assert.equal(replay.state.mails.length, 0, "a replay of a saved enquiry sends no second email");
+  const blank = makeRuntime({ properties: { ORDER_ALERT_EMAIL: "studio@example.com" } });
+  blank.context.submitCorporateEnquiry(validForm({ email: "" }));
+  assert.ok(blank.state.mails[0].body.split("\n").includes("Email: -"));
+  const broken = makeRuntime({ mailFailure: true, properties: { ORDER_ALERT_EMAIL: "studio@example.com" } });
+  assert.equal(broken.context.submitCorporateEnquiry(validForm()).ok, true);
+  assert.equal(broken.rows.length, 1, "the enquiry is saved even when the email fails");
+  const nobody = makeRuntime();
+  assert.equal(nobody.context.submitCorporateEnquiry(validForm()).ok, true);
+  assert.equal(nobody.state.mails.length, 0, "no recipient: no email");
+});
+
+test("a phone number is stored as text, so a leading zero survives, and a past required date is refused", () => {
+  const runtime = makeRuntime();
+  runtime.context.submitCorporateEnquiry(validForm({ phone: "0000000000" }));
+  assert.equal(runtime.rows[0][4], "'0000000000");
+  assert.equal(runtime.context.asSheetText_("'already"), "'already");
+  assert.equal(runtime.context.asSheetText_("+91 82092 38541"), "'+91 82092 38541");
+  const dates = makeRuntime();
+  const check = (date) => dates.context.validateCorporateEnquiry_(dates.context.collectCorporateEnquiry_(validForm({ requiredDate: date }))).requiredDate;
+  assert.equal(check(istDay(-1)), "Choose today or a later date.");
+  assert.equal(check(istDay(0)), undefined);
+  assert.equal(check(""), undefined);
 });
 
 test("same ID and payload is idempotent, changed payload conflicts, and append uncertainty is reconciled", () => {
