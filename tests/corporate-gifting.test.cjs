@@ -247,26 +247,14 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   assert.doesNotMatch(formScript + formMarkup, /captcha/i);
 });
 
-test("corporate page names resin-art gifts and keeps a compact studio photo strip", () => {
+test("corporate hero has no photos, so the gift collection comes straight after the brief button", () => {
   assert.match(page, /resin-art gifts/i);
   assert.doesNotMatch(page, /hamper/i);
-  assert.match(page, /class="corporate-gift-strip"/);
-  assert.match(page, /aria-label="Resin-art gift examples"/);
-  for (const asset of [
-    "studio-floral-handled-tray.jpeg",
-    "studio-rose-hexagon-keepsake.jpeg",
-    "studio-lilac-scalloped-tray.jpeg"
-  ]) {
-    assert.match(page, new RegExp(`src="\\.\\./assets/${asset}"`));
-    assert.equal(fs.existsSync(path.join(__dirname, "..", "assets", asset)), true, `${asset} must remain a local studio asset`);
-  }
-  assert.match(page, /alt="Pressed-flower resin tray with a gold handle"/);
-  assert.match(page, /alt="Pressed-flower resin hexagon keepsake"/);
-  assert.match(page, /alt="Lilac resin trinket tray with gold details"/);
-  assert.match(page, /corporate-gift-strip/);
-  assert.doesNotMatch(page, /<section[^>]+corporate-gift-strip/);
-  assert.match(styles, /\.corporate-gift-strip \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(3/);
-  assert.match(styles, /@media \(max-width: 620px\)[\s\S]*\.corporate-gift-strip \{/);
+  const hero = page.match(/<section class="corporate-hero[^"]*"[\s\S]*?<\/section>/)[0];
+  assert.doesNotMatch(hero, /<img|<figure|corporate-gift-strip/);
+  assert.match(hero, /href="#enquire"/);
+  assert.doesNotMatch(styles, /corporate-gift-strip|corporate-hero-image/);
+  assert.doesNotMatch(styles, /\.corporate-hero \{[^}]*grid-template-columns/);
 });
 
 // --- JSON corporate endpoint used by the enquiry form built into the site ---
