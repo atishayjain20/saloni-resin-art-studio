@@ -8,7 +8,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 
 function sectionMarkup(id) {
-  const start = html.indexOf(`<section class="work-section`, html.indexOf(`id="${id}"`) - 200);
+  const start = html.lastIndexOf("<section", html.indexOf(`id="${id}"`));
   const end = html.indexOf("</section>", start);
   assert.ok(start !== -1 && end > start, `section ${id} exists`);
   return html.slice(start, end);
@@ -17,10 +17,13 @@ function sectionMarkup(id) {
 const reels = [
   { section: "marriage-gifts", file: "reel-varmala-couple", slug: "varmala-keepsake-frame" },
   { section: "studio-art", file: "reel-custom-clock", slug: "teal-and-gold-roman-resin-clock" },
+  { section: "romantic-keepsakes", file: "reel-couple-keepsakes", slug: "two-keys-one-little-us" },
+  { section: "corporate-resin-gifts", file: "reel-corporate-gifts", slug: "logo-resin-keychain" },
+  { section: "premium-collection", file: "reel-premium-collection", slug: "ivory-gold-tiered-set" },
 ];
 
-test("the page has exactly the two section videos", () => {
-  assert.equal((html.match(/<video\b/g) || []).length, 2);
+test("the page has exactly the five section videos", () => {
+  assert.equal((html.match(/<video\b/g) || []).length, 5);
 });
 
 for (const reel of reels) {
@@ -64,4 +67,10 @@ test("the video stays compact beside its text and can be hidden", () => {
   assert.match(css, /\.section-reel\s*\{[^}]*display:\s*flex/);
   assert.match(css, /^\[hidden\]\s*\{\s*display:\s*none\s*!important/m);
   assert.match(css, /\.section-reel video\s*\{[^}]*aspect-ratio:\s*9\s*\/\s*16/);
+});
+
+test("the premium video text stays readable on the dark section", () => {
+  assert.match(css, /\.premium-collection-section \.section-reel p\s*\{[^}]*color:\s*#e5d8ca/);
+  assert.match(css, /\.premium-collection-section \.section-reel \.text-link\s*\{[^}]*color:\s*#fbf5e9/);
+  assert.match(css, /\.premium-collection-section \.section-reel \.text-link span\s*\{[^}]*color:\s*var\(--premium-gold\)/);
 });
