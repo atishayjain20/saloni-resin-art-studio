@@ -3451,11 +3451,16 @@ class CorporateCollectionTests(unittest.TestCase):
                     self.assertTrue(html.unescape(alt).startswith("Illustrative preview:"))
                 self.assertEqual(html.unescape(name), card["name"])
                 self.assertEqual(html.unescape(price), "From " + card["price"])
-        for needed in ('id="process-title"', 'id="enquire-title"', 'id="corporate-form"'):
+        for needed in ('id="enquire-title"', 'id="corporate-form"'):
             self.assertIn(needed, self.page)
         self.assertEqual(self.page.count('id="collection-title"'), 1)
         self.assertNotIn('id="offering-title"', self.page)
         self.assertNotIn("For your occasion", self.page)
+        self.assertNotIn('id="process-title"', self.page)
+        self.assertNotIn("Enquire. Review. Quote.", self.page)
+        styles = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertNotIn("corporate-process", styles)
+        self.assertNotIn("corporate-note", styles)
 
     def test_corporate_page_collection_is_not_stale(self):
         self.assertEqual(self.tool.corporate_collection(self.page, self.cards, self.slugs), self.page,
