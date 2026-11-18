@@ -1201,6 +1201,18 @@
     initHeroBanner();
     initPhoneDropdowns();
 
+    // A playing section video pauses once it scrolls fully off screen (up or down); it never starts again by itself.
+    var sectionVideos = document.querySelectorAll(".section-reel video");
+    if (sectionVideos.length && "IntersectionObserver" in window) {
+      var sectionVideoObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          var clip = entry.target;
+          if (!entry.isIntersecting && !clip.paused && typeof clip.pause === "function") clip.pause();
+        });
+      });
+      Array.prototype.forEach.call(sectionVideos, function (clip) { sectionVideoObserver.observe(clip); });
+    }
+
     var reveals = document.querySelectorAll(".reveal");
     document.querySelectorAll(".catalogue-grid > :nth-child(-n+4)").forEach(function (element) {
       element.classList.add("is-visible");
