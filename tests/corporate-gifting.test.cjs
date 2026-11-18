@@ -239,12 +239,24 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   assert.match(page, /href="\.\.\/partners\/"/);
   assert.match(formMarkup, /name="enquiryId"/);
   assert.match(formMarkup, /name="privacyAccepted"/);
-  assert.match(formMarkup, /Please do not include employee names or lists, birth dates, recipient addresses, payment details/);
+  assert.doesNotMatch(formMarkup, /Please do not include/);
+  assert.doesNotMatch(page, /Leave quantity blank|quantity-hint/);
+  assert.match(formMarkup, /<details class="form-details"><summary>How Saloni reviews your enquiry<\/summary><p class="hint">Saloni will review feasibility/);
+  assert.match(styles, /\.form-details summary \{[^}]*min-height: 44px;/);
   assert.doesNotMatch(formMarkup, /type="file"|name="employeeNames"|name="birthDate"|name="paymentDetails"/);
   // The review form (later in the same script) reads the saved first name; the corporate form and the shared kit use no browser storage.
   const corporateScript = formScript.slice(0, formScript.indexOf("function initReview")) ;
   assert.doesNotMatch(formMarkup + corporateScript, /localStorage|sessionStorage/);
   assert.doesNotMatch(formScript + formMarkup, /captcha/i);
+});
+
+test("corporate occasion offers an All occasions choice that the server accepts", () => {
+  const option = '<option value="all occasions">All occasions</option>';
+  assert.match(page, new RegExp(option));
+  assert.match(fs.readFileSync(path.join(__dirname, "..", "apps-script", "CorporateForm.html"), "utf8"), new RegExp(option));
+  const runtime = makeRuntime();
+  const errors = runtime.context.validateCorporateEnquiry_(runtime.context.collectCorporateEnquiry_(validForm({ occasion: "all occasions" })));
+  assert.equal(errors.occasion, undefined);
 });
 
 test("corporate hero has no photos, so the gift collection comes straight after the brief button", () => {
@@ -331,7 +343,7 @@ test("corporate page collection grid is a list of tappable product tiles", () =>
   const items = grid[1].match(/<div role="listitem">[\s\S]*?<\/div>/g) || [];
   assert.ok(items.length >= 3, "the collection should list several products");
   items.forEach((item) => {
-    assert.match(item, /^<div role="listitem"><a class="lightbox-more-item" href="\.\.\/p\/[a-z0-9-]+\/">/);
+    assert.match(item, /^<div role="listitem"><a class="lightbox-more-item" href="\.\.\/\?product=[a-z0-9-]+#corporate-resin-gifts">/);
     assert.match(item, /<img src="\.\.\/assets\/thumb\/[a-z0-9-]+\.jpg" alt="[^"]+" width="300" height="300" loading="lazy" decoding="async">/);
   });
   assert.equal((section[0].match(/class="lightbox-more-item"/g) || []).length, items.length, "every tile is a.lightbox-more-item");

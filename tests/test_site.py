@@ -3440,7 +3440,7 @@ class CorporateCollectionTests(unittest.TestCase):
         self.assertRegex(body, r'<h2 id="collection-title">[^<]+</h2>')
         self.assertNotIn("Reference images", body)
         tiles = re.findall(r'<div role="listitem"><a class="lightbox-more-item" href="([^"]+)"><img src="([^"]+)" alt="([^"]*)" width="300" height="300" loading="lazy" decoding="async"><span>([^<]*)</span><span>([^<]*)</span></a></div>', body)
-        self.assertEqual([tile[0] for tile in tiles], ["../p/%s/" % slug for _, slug in expected])
+        self.assertEqual([tile[0] for tile in tiles], ["../?product=%s#corporate-resin-gifts" % slug for _, slug in expected])
         for (card, slug), (href, src, alt, name, price) in zip(expected, tiles):
             with self.subTest(slug=slug):
                 self.assertTrue((ROOT / "p" / slug / "index.html").is_file())
@@ -3451,11 +3451,16 @@ class CorporateCollectionTests(unittest.TestCase):
                     self.assertTrue(html.unescape(alt).startswith("Illustrative preview:"))
                 self.assertEqual(html.unescape(name), card["name"])
                 self.assertEqual(html.unescape(price), "From " + card["price"])
-        for needed in ('id="process-title"', 'id="enquire-title"', 'id="corporate-form"'):
+        for needed in ('id="enquire-title"', 'id="corporate-form"'):
             self.assertIn(needed, self.page)
         self.assertEqual(self.page.count('id="collection-title"'), 1)
         self.assertNotIn('id="offering-title"', self.page)
         self.assertNotIn("For your occasion", self.page)
+        self.assertNotIn('id="process-title"', self.page)
+        self.assertNotIn("Enquire. Review. Quote.", self.page)
+        styles = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertNotIn("corporate-process", styles)
+        self.assertNotIn("corporate-note", styles)
 
     def test_corporate_page_collection_is_not_stale(self):
         self.assertEqual(self.tool.corporate_collection(self.page, self.cards, self.slugs), self.page,

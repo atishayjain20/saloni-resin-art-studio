@@ -1520,7 +1520,7 @@ function validateCorporateEnquiry_(payload) {
   if (!payload.phone || payload.phone.length > 40 || (payload.phone.match(/[0-9]/g) || []).length < 7) errors.phone = "Enter a valid phone or WhatsApp number.";
   if (payload.email && (payload.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))) errors.email = "Enter a valid email address or leave it blank.";
   if (["one-off", "recurring", "exploring"].indexOf(payload.enquiryType) === -1) errors.enquiryType = "Choose the type of gifting enquiry.";
-  if (["festival", "employee birthday", "5-year milestone", "10-year milestone", "event", "mixed occasions", "other"].indexOf(payload.occasion) === -1) errors.occasion = "Choose the occasion that fits best.";
+  if (["all occasions", "festival", "employee birthday", "5-year milestone", "10-year milestone", "event", "mixed occasions", "other"].indexOf(payload.occasion) === -1) errors.occasion = "Choose the occasion that fits best.";
   if (payload.approximateQuantity && (!/^\d{1,9}$/.test(payload.approximateQuantity) || Number(payload.approximateQuantity) < 1)) errors.approximateQuantity = "Enter a positive whole number, or leave it blank.";
   bounded_(errors, "budgetRange", payload.budgetRange, 120, false);
   if (payload.requiredDate && !isIsoDate_(payload.requiredDate)) errors.requiredDate = "Use a valid required date.";
