@@ -257,6 +257,13 @@ test("corporate hero has no photos, so the gift collection comes straight after 
   assert.doesNotMatch(styles, /\.corporate-hero \{[^}]*grid-template-columns/);
 });
 
+test("corporate hero and collection keep tight spacing so phones scroll less", () => {
+  const phone = styles.slice(styles.indexOf("@media (max-width: 620px)"));
+  assert.match(phone, /\.corporate-hero \{ padding-block: 1\.5rem 1\.25rem; \}/);
+  assert.match(phone, /\.corporate-collection \{ padding-top: 1\.5rem; \}/);
+  assert.match(styles, /^\.corporate-hero \{ padding-block: clamp\(1\.5rem/m);
+});
+
 // --- JSON corporate endpoint used by the enquiry form built into the site ---
 function corporatePost(runtime, body, action = "corporate") {
   const output = runtime.context.doPost({ parameter: { action }, postData: { type: "text/plain", contents: typeof body === "string" ? body : JSON.stringify(body) } });
