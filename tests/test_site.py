@@ -3438,7 +3438,7 @@ class CorporateCollectionTests(unittest.TestCase):
         self.assertIsNotNone(section, "no #collection section on the corporate page")
         body = section.group(1)
         self.assertRegex(body, r'<h2 id="collection-title">[^<]+</h2>')
-        self.assertIn("Reference images · final design confirmed before making. Starting prices for one item; organisation discounts on quotation.", body)
+        self.assertNotIn("Reference images", body)
         tiles = re.findall(r'<div role="listitem"><a class="lightbox-more-item" href="([^"]+)"><img src="([^"]+)" alt="([^"]*)" width="300" height="300" loading="lazy" decoding="async"><span>([^<]*)</span><span>([^<]*)</span></a></div>', body)
         self.assertEqual([tile[0] for tile in tiles], ["../p/%s/" % slug for _, slug in expected])
         for (card, slug), (href, src, alt, name, price) in zip(expected, tiles):
@@ -3451,9 +3451,11 @@ class CorporateCollectionTests(unittest.TestCase):
                     self.assertTrue(html.unescape(alt).startswith("Illustrative preview:"))
                 self.assertEqual(html.unescape(name), card["name"])
                 self.assertEqual(html.unescape(price), "From " + card["price"])
-        for needed in ('id="offering-title"', 'id="process-title"', 'id="enquire-title"', 'id="corporate-form"'):
+        for needed in ('id="process-title"', 'id="enquire-title"', 'id="corporate-form"'):
             self.assertIn(needed, self.page)
         self.assertEqual(self.page.count('id="collection-title"'), 1)
+        self.assertNotIn('id="offering-title"', self.page)
+        self.assertNotIn("For your occasion", self.page)
 
     def test_corporate_page_collection_is_not_stale(self):
         self.assertEqual(self.tool.corporate_collection(self.page, self.cards, self.slugs), self.page,

@@ -262,6 +262,8 @@ test("corporate hero and collection keep tight spacing so phones scroll less", (
   assert.match(phone, /\.corporate-hero \{ padding-block: 1\.5rem 1\.25rem; \}/);
   assert.match(phone, /\.corporate-collection \{ padding-top: 1\.5rem; \}/);
   assert.match(styles, /^\.corporate-hero \{ padding-block: clamp\(1\.5rem/m);
+  assert.match(phone, /\.corporate-enquire \{ display: block; padding-block: 2rem; \}/);
+  assert.match(phone, /\.collection-list \{ padding-block: 2rem; \}/);
 });
 
 // --- JSON corporate endpoint used by the enquiry form built into the site ---
