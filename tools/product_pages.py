@@ -48,6 +48,9 @@ SITE = "https://saloniresinart.com"
 STUDIO = "Saloni Resin Art Studio"
 PAGE_DIR = "p"
 FEED_FILE = "merchant-feed.tsv"
+CORPORATE_SECTION = "corporate-resin-gifts"
+CORPORATE_PAGE = "corporate-gifting/index.html"
+CORPORATE_START, CORPORATE_END = "<!-- corporate-collection:start -->", "<!-- corporate-collection:end -->"
 FEED_COLUMNS = ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists"]
 
 ARTICLE_RE = re.compile(r'<article\b[^>]*\bclass="[^"]*\b(?:work-card|romantic-keepsake-card)\b[^"]*"[^>]*>.*?</article>', re.S)
@@ -679,6 +682,33 @@ def build(index_html, sitemap, root=ROOT):
     return stamp(index_html, cards, slugs, more, thumbs), pages, sitemap_with_products(sitemap, slugs)
 
 
+def corporate_collection(page, cards, slugs, root=ROOT):
+    """page (corporate-gifting/index.html) with the text between its corporate-collection markers replaced by a tile for each corporate card."""
+    if page.count(CORPORATE_START) != 1 or page.count(CORPORATE_END) != 1 or page.index(CORPORATE_START) > page.index(CORPORATE_END):
+        raise SystemExit("%s needs one %s then one %s" % (CORPORATE_PAGE, CORPORATE_START, CORPORATE_END))
+    chosen = [(card, slug) for card, slug in zip(cards, slugs) if card["section"] == CORPORATE_SECTION]
+    if not chosen:
+        raise SystemExit("No catalogue cards in the %s section of index.html" % CORPORATE_SECTION)
+    tiles = ""
+    for card, slug in chosen:
+        price = card["price"]
+        if price != "Price on request":
+            match = PRICE_RE.fullmatch(price)
+            if not match:
+                raise SystemExit("Unknown price format %r: extend corporate_collection() in tools/product_pages.py" % price)
+            price = "From ₹" + match.group(1)
+        tiles += ('        <div role="listitem"><a class="lightbox-more-item" href="../%s/%s/"><img src="../%s" alt="%s" width="%d" height="%d" loading="lazy" decoding="async"><span>%s</span><span>%s</span></a></div>\n'
+                  % (PAGE_DIR, slug, thumb(root, slug), esc(card["alt"] or card["name"]), THUMB_SIDE, THUMB_SIDE, esc(card["name"]), esc(price)))
+    block = (
+        '\n    <section class="corporate-offering corporate-collection shell" id="collection" aria-labelledby="collection-title">\n'
+        '      <div><p class="eyebrow">Corporate gift collection</p><h2 id="collection-title">Pieces to start from.</h2>'
+        '<p>Reference images · final design confirmed before making. Starting prices for one item; organisation discounts on quotation.</p></div>\n'
+        '      <div class="catalogue-grid" role="list" aria-label="Corporate gift collection">\n' + tiles +
+        '      </div>\n    </section>\n    ')
+    head, rest = page.split(CORPORATE_START)
+    return head + CORPORATE_START + block + CORPORATE_END + rest.split(CORPORATE_END, 1)[1]
+
+
 def remove_stale_pages(root, keep):
     for folder in (Path(root) / PAGE_DIR).glob("*/"):
         relative = "%s/%s/index.html" % (PAGE_DIR, folder.name)
@@ -697,7 +727,10 @@ def main():
     index_path.write_text(stamped, encoding="utf-8")
     sitemap_path.write_text(sitemap, encoding="utf-8")
     cards = parse_cards(stamped)
-    (ROOT / FEED_FILE).write_text(merchant_feed(cards, assign_slugs(cards)), encoding="utf-8")
+    slugs = assign_slugs(cards)
+    (ROOT / FEED_FILE).write_text(merchant_feed(cards, slugs), encoding="utf-8")
+    corporate_path = ROOT / CORPORATE_PAGE
+    corporate_path.write_text(corporate_collection(corporate_path.read_text(encoding="utf-8"), cards, slugs), encoding="utf-8")
     topic_count = len(TOPICS)
     print("Wrote %d product pages in %s/, %d topic pages, stamped index.html and updated sitemap.xml." % (len(pages) - topic_count, PAGE_DIR, topic_count))
 
