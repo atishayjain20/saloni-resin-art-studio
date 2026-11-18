@@ -3438,7 +3438,7 @@ class CorporateCollectionTests(unittest.TestCase):
         self.assertIsNotNone(section, "no #collection section on the corporate page")
         body = section.group(1)
         self.assertRegex(body, r'<h2 id="collection-title">[^<]+</h2>')
-        self.assertIn("Reference images · final design confirmed before making. Starting prices for one item; organisation discounts on quotation.", body)
+        self.assertNotIn("Reference images", body)
         tiles = re.findall(r'<div role="listitem"><a class="lightbox-more-item" href="([^"]+)"><img src="([^"]+)" alt="([^"]*)" width="300" height="300" loading="lazy" decoding="async"><span>([^<]*)</span><span>([^<]*)</span></a></div>', body)
         self.assertEqual([tile[0] for tile in tiles], ["../p/%s/" % slug for _, slug in expected])
         for (card, slug), (href, src, alt, name, price) in zip(expected, tiles):

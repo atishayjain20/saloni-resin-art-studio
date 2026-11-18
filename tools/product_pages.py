@@ -702,7 +702,7 @@ def corporate_collection(page, cards, slugs, root=ROOT):
     block = (
         '\n    <section class="corporate-offering corporate-collection shell" id="collection" aria-labelledby="collection-title">\n'
         '      <div><p class="eyebrow">Corporate gift collection</p><h2 id="collection-title">Pieces to start from.</h2>'
-        '<p>Reference images · final design confirmed before making. Starting prices for one item; organisation discounts on quotation.</p></div>\n'
+        '</div>\n'
         '      <div class="catalogue-grid" role="list" aria-label="Corporate gift collection">\n' + tiles +
         '      </div>\n    </section>\n    ')
     head, rest = page.split(CORPORATE_START)
