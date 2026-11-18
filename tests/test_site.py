@@ -867,9 +867,9 @@ class StaticSiteContractTests(unittest.TestCase):
         videos = re.findall(r"<video\b[^>]*>", page)
         self.assertEqual(len(videos), 1)
         video = videos[0]
-        for attribute in ("controls", "muted", "playsinline", 'preload="none"'):
+        for attribute in ("controls", "playsinline", 'preload="none"'):
             self.assertRegex(video, rf"\b{re.escape(attribute)}")
-        self.assertNotRegex(video, r"\b(autoplay|loop)\b")
+        self.assertNotRegex(video, r"\b(autoplay|loop|muted)\b")
         self.assertRegex(video, r'aria-label="Video: ')
         sources = [re.search(r'poster="([^"]+)"', video).group(1)] + re.findall(r'<source\b[^>]*\bsrc="([^"]+)"', page)
         self.assertEqual(len(sources), 2)
