@@ -250,6 +250,15 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   assert.doesNotMatch(formScript + formMarkup, /captcha/i);
 });
 
+test("corporate occasion offers an All occasions choice that the server accepts", () => {
+  const option = '<option value="all occasions">All occasions</option>';
+  assert.match(page, new RegExp(option));
+  assert.match(fs.readFileSync(path.join(__dirname, "..", "apps-script", "CorporateForm.html"), "utf8"), new RegExp(option));
+  const runtime = makeRuntime();
+  const errors = runtime.context.validateCorporateEnquiry_(runtime.context.collectCorporateEnquiry_(validForm({ occasion: "all occasions" })));
+  assert.equal(errors.occasion, undefined);
+});
+
 test("corporate hero has no photos, so the gift collection comes straight after the brief button", () => {
   assert.match(page, /resin-art gifts/i);
   assert.doesNotMatch(page, /hamper/i);
