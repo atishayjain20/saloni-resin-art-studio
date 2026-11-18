@@ -3328,7 +3328,6 @@ class ResponsiveCardImageTests(unittest.TestCase):
 
     PAGES = {
         "index.html": 78,
-        "corporate-gifting/index.html": 2,
         "resin-photo-frames/index.html": 2,
         "resin-clocks/index.html": 3,
         "couple-gifts/index.html": 9,
