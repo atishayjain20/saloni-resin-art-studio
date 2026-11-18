@@ -697,8 +697,8 @@ def corporate_collection(page, cards, slugs, root=ROOT):
             if not match:
                 raise SystemExit("Unknown price format %r: extend corporate_collection() in tools/product_pages.py" % price)
             price = "From ₹" + match.group(1)
-        tiles += ('        <div role="listitem"><a class="lightbox-more-item" href="../%s/%s/"><img src="../%s" alt="%s" width="%d" height="%d" loading="lazy" decoding="async"><span>%s</span><span>%s</span></a></div>\n'
-                  % (PAGE_DIR, slug, thumb(root, slug), esc(card["alt"] or card["name"]), THUMB_SIDE, THUMB_SIDE, esc(card["name"]), esc(price)))
+        tiles += ('        <div role="listitem"><a class="lightbox-more-item" href="../?product=%s#%s"><img src="../%s" alt="%s" width="%d" height="%d" loading="lazy" decoding="async"><span>%s</span><span>%s</span></a></div>\n'
+                  % (slug, CORPORATE_SECTION, thumb(root, slug), esc(card["alt"] or card["name"]), THUMB_SIDE, THUMB_SIDE, esc(card["name"]), esc(price)))
     block = (
         '\n    <section class="corporate-offering corporate-collection shell" id="collection" aria-labelledby="collection-title">\n'
         '      <div><p class="eyebrow">Corporate gift collection</p><h2 id="collection-title">Pieces to start from.</h2>'

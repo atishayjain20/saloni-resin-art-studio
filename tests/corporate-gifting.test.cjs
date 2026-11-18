@@ -343,7 +343,7 @@ test("corporate page collection grid is a list of tappable product tiles", () =>
   const items = grid[1].match(/<div role="listitem">[\s\S]*?<\/div>/g) || [];
   assert.ok(items.length >= 3, "the collection should list several products");
   items.forEach((item) => {
-    assert.match(item, /^<div role="listitem"><a class="lightbox-more-item" href="\.\.\/p\/[a-z0-9-]+\/">/);
+    assert.match(item, /^<div role="listitem"><a class="lightbox-more-item" href="\.\.\/\?product=[a-z0-9-]+#corporate-resin-gifts">/);
     assert.match(item, /<img src="\.\.\/assets\/thumb\/[a-z0-9-]+\.jpg" alt="[^"]+" width="300" height="300" loading="lazy" decoding="async">/);
   });
   assert.equal((section[0].match(/class="lightbox-more-item"/g) || []).length, items.length, "every tile is a.lightbox-more-item");
