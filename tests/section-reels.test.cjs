@@ -34,10 +34,11 @@ for (const reel of reels) {
 
   test(`${reel.section} video loads nothing until tapped and never plays by itself`, () => {
     const video = sectionMarkup(reel.section).match(/<video\b[^>]*>/)[0];
-    for (const attribute of ["controls", "muted", "playsinline", 'preload="none"', 'width="360"', 'height="640"']) {
+    for (const attribute of ["controls", "playsinline", 'preload="none"', 'width="360"', 'height="640"']) {
       assert.ok(video.includes(attribute), `${attribute} is set`);
     }
     assert.ok(!/autoplay|loop/.test(video), "no autoplay or loop");
+    assert.ok(!/\bmuted\b/.test(video), "plays with sound when tapped");
     assert.match(video, /aria-label="Video: [^"]{20,}"/);
     assert.ok(video.includes(`poster="assets/${reel.file}-poster.jpg"`));
     assert.ok(sectionMarkup(reel.section).includes(`<source src="assets/${reel.file}.mp4" type="video/mp4">`));
