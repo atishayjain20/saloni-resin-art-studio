@@ -239,7 +239,9 @@ test("corporate page has concise accessible SEO, navigation, wording and exclude
   assert.match(page, /href="\.\.\/partners\/"/);
   assert.match(formMarkup, /name="enquiryId"/);
   assert.match(formMarkup, /name="privacyAccepted"/);
-  assert.match(formMarkup, /Please do not include employee names or lists, birth dates, recipient addresses, payment details/);
+  assert.doesNotMatch(formMarkup, /Please do not include/);
+  assert.match(formMarkup, /<details class="form-details"><summary>How Saloni reviews your enquiry<\/summary><p class="hint">Saloni will review feasibility/);
+  assert.match(styles, /\.form-details summary \{[^}]*min-height: 44px;/);
   assert.doesNotMatch(formMarkup, /type="file"|name="employeeNames"|name="birthDate"|name="paymentDetails"/);
   // The review form (later in the same script) reads the saved first name; the corporate form and the shared kit use no browser storage.
   const corporateScript = formScript.slice(0, formScript.indexOf("function initReview")) ;
