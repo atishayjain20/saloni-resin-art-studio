@@ -3416,5 +3416,74 @@ class ResponsiveCardImageTests(unittest.TestCase):
         self.assertEqual(on_disk, used)
 
 
+class CorporateCollectionTests(unittest.TestCase):
+    """/corporate-gifting/ shows the home page's corporate-resin-gifts cards, stamped there by tools/product_pages.py."""
+
+    PAGE = ROOT / "corporate-gifting" / "index.html"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tool = load_product_pages_tool()
+        cls.home = (ROOT / "index.html").read_text(encoding="utf-8")
+        cls.cards = cls.tool.parse_cards(cls.home)
+        cls.slugs = cls.tool.assign_slugs(cls.cards)
+        cls.page = cls.PAGE.read_text(encoding="utf-8")
+
+    def corporate(self):
+        return [(card, slug) for card, slug in zip(self.cards, self.slugs) if card["section"] == "corporate-resin-gifts"]
+
+    def test_corporate_page_collection_matches_home_section(self):
+        expected = self.corporate()
+        self.assertGreater(len(expected), 0)
+        section = re.search(r'<section class="corporate-offering corporate-collection shell" id="collection" aria-labelledby="collection-title">(.*?)</section>', self.page, re.S)
+        self.assertIsNotNone(section, "no #collection section on the corporate page")
+        body = section.group(1)
+        self.assertRegex(body, r'<h2 id="collection-title">[^<]+</h2>')
+        self.assertIn("Reference images · final design confirmed before making. Starting prices for one item; organisation discounts on quotation.", body)
+        tiles = re.findall(r'<div role="listitem"><a class="lightbox-more-item" href="([^"]+)"><img src="([^"]+)" alt="([^"]*)" width="300" height="300" loading="lazy" decoding="async"><span>([^<]*)</span><span>([^<]*)</span></a></div>', body)
+        self.assertEqual([tile[0] for tile in tiles], ["../p/%s/" % slug for _, slug in expected])
+        for (card, slug), (href, src, alt, name, price) in zip(expected, tiles):
+            with self.subTest(slug=slug):
+                self.assertTrue((ROOT / "p" / slug / "index.html").is_file())
+                self.assertEqual(src, "../assets/thumb/%s.jpg" % slug)
+                self.assertTrue((ROOT / src[3:]).is_file())
+                self.assertEqual(html.unescape(alt), card["alt"])
+                if card["alt"].startswith("Illustrative preview:"):
+                    self.assertTrue(html.unescape(alt).startswith("Illustrative preview:"))
+                self.assertEqual(html.unescape(name), card["name"])
+                self.assertEqual(html.unescape(price), "From " + card["price"])
+        for needed in ('id="offering-title"', 'id="process-title"', 'id="enquire-title"', 'id="corporate-form"'):
+            self.assertIn(needed, self.page)
+        self.assertEqual(self.page.count('id="collection-title"'), 1)
+
+    def test_corporate_page_collection_is_not_stale(self):
+        self.assertEqual(self.tool.corporate_collection(self.page, self.cards, self.slugs), self.page,
+                         "corporate-gifting/index.html is stale: run python3 tools/product_pages.py")
+
+    def test_corporate_collection_stops_on_bad_input(self):
+        page = self.page
+        start, end = "<!-- corporate-collection:start -->", "<!-- corporate-collection:end -->"
+        self.assertEqual(page.count(start), 1)
+        self.assertEqual(page.count(end), 1)
+        for broken in (page.replace(start, ""), page.replace(end, "")):
+            with self.assertRaises(SystemExit):
+                self.tool.corporate_collection(broken, self.cards, self.slugs)
+        other = [dict(card, section="elsewhere") for card in self.cards]
+        with self.assertRaises(SystemExit):
+            self.tool.corporate_collection(page, other, self.slugs)
+        with mock.patch.object(self.tool, "thumb", side_effect=SystemExit("Missing thumbnail")):
+            with self.assertRaises(SystemExit):
+                self.tool.corporate_collection(page, self.cards, self.slugs)
+
+    def test_corporate_collection_keeps_price_on_request_and_escapes_text(self):
+        first = self.corporate()[0][0]
+        cards = [dict(card, name='Pen & "Cup" <b>', alt='A <b> "preview"', price="Price on request" if card is first else card["price"])
+                 for card in self.cards]
+        stamped = self.tool.corporate_collection(self.page, cards, self.slugs)
+        self.assertIn("<span>Price on request</span>", stamped)
+        self.assertIn("<span>Pen &amp; &quot;Cup&quot; &lt;b&gt;</span>", stamped)
+        self.assertNotIn("<b>", stamped.split("corporate-collection:start")[1].split("corporate-collection:end")[0])
+
+
 if __name__ == "__main__":
     unittest.main()

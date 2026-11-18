@@ -671,6 +671,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .lightbox-more-item img { display: block; width: 6.25rem; height: 6.25rem; object-fit: cover; border-radius: 0.6rem; background: var(--ivory); }
 .lightbox-more-item span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .lightbox-more-item:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.corporate-collection .lightbox-more-item { text-decoration: none; }
 .lightbox-order-summary { display: grid; flex: 0 0 auto; justify-items: center; gap: .3rem; margin-top: .9rem; text-align: center; }
 .lightbox-order-summary strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
 .lightbox-order-summary #lightbox-product-price { color: var(--cocoa); font-weight: 800; }

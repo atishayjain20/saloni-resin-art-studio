@@ -325,3 +325,23 @@ test("action=seed still renders the corporate form for pages cached before the c
   runtime.context.doPost({ parameter: { action: "seed", mode: "corporate", seed: JSON.stringify({ enquiryId: "enquiry-cached-page" }) } });
   assert.equal(templateName, "CorporateForm");
 });
+
+test("corporate page collection grid is a list of tappable product tiles", () => {
+  const section = page.match(/<section class="corporate-offering corporate-collection shell" id="collection"[\s\S]*?<\/section>/);
+  assert.ok(section, "#collection section is missing");
+  const grid = section[0].match(/<div class="catalogue-grid" role="list" aria-label="Corporate gift collection">([\s\S]*?)<\/div>\s*<\/section>/);
+  assert.ok(grid, "the catalogue-grid list is missing");
+  const items = grid[1].match(/<div role="listitem">[\s\S]*?<\/div>/g) || [];
+  assert.ok(items.length >= 3, "the collection should list several products");
+  items.forEach((item) => {
+    assert.match(item, /^<div role="listitem"><a class="lightbox-more-item" href="\.\.\/p\/[a-z0-9-]+\/">/);
+    assert.match(item, /<img src="\.\.\/assets\/thumb\/[a-z0-9-]+\.jpg" alt="[^"]+" width="300" height="300" loading="lazy" decoding="async">/);
+  });
+  assert.equal((section[0].match(/class="lightbox-more-item"/g) || []).length, items.length, "every tile is a.lightbox-more-item");
+});
+
+test("collection tiles are links without an underline, and keep a focus outline", () => {
+  assert.match(styles, /\.corporate-collection \.lightbox-more-item \{[^}]*text-decoration: none/);
+  assert.match(styles, /\.lightbox-more-item:focus-visible \{[^}]*outline: 2px solid/);
+  assert.match(styles, /\.lightbox-more-item \{[^}]*min-height: 44px/);
+});
