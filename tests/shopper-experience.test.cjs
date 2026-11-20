@@ -331,10 +331,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261199">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261199" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261199" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261199" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261200">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261200" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261200" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261200" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -342,9 +342,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261199"], page);
+    assert.deepEqual([...new Set(versions)], ["20261200"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261199/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261200/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -2784,4 +2784,16 @@ test("Remove from cart looks different from Add to cart, on cards, in the popup 
   const premium = rule('.premium-collection-section .catalogue-order-button[aria-pressed="true"]');
   assert.match(premium, /background: var\(--premium-gold\)/, "filled gold instead of the gold outline");
   assert.ok(css.indexOf('.catalogue-order-button[aria-pressed="true"], .lightbox-request.is-in-cart {') > css.indexOf(".premium-collection-section .catalogue-order-button:focus-visible {"), "comes after the normal rules, so it wins");
+});
+
+test("the product popup is warm ivory with the name, price and buttons in a blush box, on phones too", () => {
+  assert.match(css, /\.lightbox-panel \{[^}]*background: var\(--ivory\)/);
+  assert.doesNotMatch(css, /\.lightbox-panel \{[^}]*background: var\(--paper\)/);
+  const boxes = css.match(/\.lightbox-order-summary \{[^}]*\}/g) || [];
+  assert.ok(boxes.length >= 2, "desktop rule and phone rule");
+  boxes.forEach((rule) => {
+    assert.match(rule, /background: #fde7f0/);
+    assert.match(rule, /border-radius: 1rem/);
+    assert.doesNotMatch(rule, /var\(--paper\)|border-top/);
+  });
 });
