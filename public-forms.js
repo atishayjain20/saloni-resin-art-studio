@@ -535,7 +535,25 @@
       var now = Date.now();
       var expiresAt = Number(record && record.expiresAt);
       var savedName = record && record.version === 1 && record.profile && typeof record.profile.customerName === "string" ? record.profile.customerName.trim().split(/\s+/)[0] : "";
-      if (Number.isInteger(expiresAt) && expiresAt > now && expiresAt <= now + 30 * 24 * 60 * 60 * 1000 && validFirstName(savedName)) form.elements.firstName.value = savedName;
+      var profileFresh = Number.isInteger(expiresAt) && expiresAt > now && expiresAt <= now + 30 * 24 * 60 * 60 * 1000;
+      if (profileFresh && validFirstName(savedName)) form.elements.firstName.value = savedName;
+      // The city too, when it passes the same check the form uses on submit.
+      var savedCity = profileFresh && record.version === 1 && typeof record.profile.city === "string" ? record.profile.city.trim() : "";
+      if (savedCity && savedCity.length <= 60 && !/[0-9@]/.test(savedCity) && !hasContact(savedCity)) form.elements.city.value = savedCity;
+    } catch (error) {}
+    // The product of this phone's newest order (from "My orders", kept 30 days), when that order had exactly one product.
+    var orderedName = "";
+    try {
+      var ordersRecord = JSON.parse((window.localStorage && window.localStorage.getItem("saloniMyOrders")) || "null");
+      var newestOrder = null;
+      (ordersRecord && ordersRecord.version === 1 && Array.isArray(ordersRecord.orders) ? ordersRecord.orders : []).forEach(function (order) {
+        var at = order && Number(order.at);
+        if (!Number.isInteger(at) || at <= Date.now() - 30 * 24 * 60 * 60 * 1000 || at > Date.now() + 5 * 60 * 1000) return;
+        if (!newestOrder || at > newestOrder.at) newestOrder = { at: at, items: order.items };
+      });
+      if (newestOrder && Array.isArray(newestOrder.items) && newestOrder.items.length === 1 && newestOrder.items[0] && typeof newestOrder.items[0].name === "string") {
+        orderedName = newestOrder.items[0].name.replace(/ \(colour: [^)]*\)$/, "").trim();
+      }
     } catch (error) {}
     // The product list is a small file on this site. Until it arrives, "The studio in general" is already usable.
     function showProducts(list) {
@@ -552,6 +570,9 @@
       });
       if (ids.length) productSelect.appendChild(group); else productHint.hidden = false;
       if (PRODUCT_ID.test(productHintId) && ids.indexOf(productHintId) !== -1 && productSelect.value === "studio") productSelect.value = productHintId;
+      else if (orderedName && productSelect.value === "studio") {
+        list.forEach(function (item) { if (item && item.name === orderedName && ids.indexOf(item.id) !== -1 && productSelect.value === "studio") productSelect.value = item.id; });
+      }
     }
     var productsUrl = form.getAttribute("data-products-url");
     if (productsUrl && typeof window.fetch === "function") {
