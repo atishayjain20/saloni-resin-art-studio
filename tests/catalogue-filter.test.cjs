@@ -342,10 +342,10 @@ test("search metadata covers requested item kinds without taxonomy drift", () =>
   const assertKindTitle = (kind, title) => {
     assert.ok(kindArticles.some((article) => article.includes(`data-product-kind="${kind}"`) && article.includes(title)), `${kind} metadata must stay on ${title}`);
   };
-  assertKindTitle("rakhi", "<strong>Lilac symbol medallion</strong>");
-  assertKindTitle("rakhi", "<strong>Little brother keepsake</strong>");
+  assertKindTitle("rakhi", "<strong>Lilac Pearl Rakhi</strong>");
+  assertKindTitle("rakhi", "<strong>Little Brother Name Rakhi</strong>");
   assertKindTitle("rose preservation", "id=\"rose-hexagon\"");
-  assertKindTitle("rose preservation", "<h3 id=\"romantic-rose-display-title\">Preserved rose display</h3>");
+  assertKindTitle("rose preservation", "<h3 id=\"romantic-rose-display-title\">Preserved Red Rose Resin Display</h3>");
   ["mantra", "tealight", "bookmark", "nameplate", "coaster"].forEach((kind) => {
     assert.match(html.toLowerCase(), new RegExp("<(?:strong|h3)[^>]*>[^<]*" + kind + "[^<]*<\\/(?:strong|h3)>"));
   });
@@ -379,8 +379,8 @@ test("Jain search terms find exactly the Jain mantra pieces", () => {
   const jainPieces = [
     "Blue and white Namokar (Navkar) mantra frame",
     "White and gold Namokar (Navkar) mantra frame",
-    "Om asiausa mantra plaque",
-    "Rose mantra door strips",
+    "Om Asiausa Mantra Resin Plaque",
+    "Jain Mantra Door Strips, Rose Red",
     "Pearl white Namokar (Navkar) mantra frame",
   ];
   ["jain", "जैन"].forEach((term) => {
@@ -390,9 +390,9 @@ test("Jain search terms find exactly the Jain mantra pieces", () => {
     assert.deepEqual(titlesFor(term).sort(), [jainPieces[0], jainPieces[1], jainPieces[4]].sort(), `${term} must find the Namokar frames`);
   });
   ["asiausa", "arham"].forEach((term) => {
-    assert.ok(titlesFor(term).includes("Om asiausa mantra plaque"), `${term} must find the plaque`);
+    assert.ok(titlesFor(term).includes("Om Asiausa Mantra Resin Plaque"), `${term} must find the plaque`);
   });
-  assert.ok(titlesFor("asiausa").includes("Rose mantra door strips"), "asiausa must find the door strips");
+  assert.ok(titlesFor("asiausa").includes("Jain Mantra Door Strips, Rose Red"), "asiausa must find the door strips");
 });
 
 test("Explore gifts reveals every matching item in one continuous view", () => {
@@ -430,7 +430,7 @@ test("a section video hides while a search or budget is narrowing the results", 
 test("search matches title, type, and kind while ignoring descriptions", () => {
   const harness = createHarness({ count: 12 });
   const beyondPreview = harness.cards[8];
-  beyondPreview.title = "Jewel Glow Tealight";
+  beyondPreview.title = "Jewel Resin Tealight Holder";
   beyondPreview.kind = "tealight";
   beyondPreview.description = "bookmark details stay outside search";
   beyondPreview.textContent = `${beyondPreview.title} ${beyondPreview.description}`;
@@ -439,11 +439,11 @@ test("search matches title, type, and kind while ignoring descriptions", () => {
   assert.equal(harness.searchToggle.getAttribute("aria-expanded"), "true");
   assert.equal(harness.searchPanel.hidden, false);
   assert.equal(harness.searchFilter.focused, true);
-  harness.searchFilter.value = "  Jewel   Glow ";
+  harness.searchFilter.value = "  Jewel   Resin ";
   harness.searchFilter.dispatch("input");
-  assert.equal(harness.searchFilter.value, "  Jewel   Glow ");
+  assert.equal(harness.searchFilter.value, "  Jewel   Resin ");
   assert.deepEqual(visibleCards(harness).map((card) => card.id), [beyondPreview.id]);
-  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "Jewel Glow");
+  assert.equal(new URL(harness.windowObject.location.href).searchParams.get("q"), "Jewel Resin");
   assert.equal(harness.status.textContent, "");
 
   harness.searchForm.dispatch("submit");
@@ -899,8 +899,8 @@ test("Bestsellers tab shows the first four gifts of every section with View all"
 test("searching from the Bestsellers home looks through every gift and clearing returns to Bestsellers", () => {
   const harness = createHarness({ count: 12, withTabs: true });
   const beyondPreview = harness.cards[8];
-  beyondPreview.title = "Jewel Glow Tealight";
-  harness.searchFilter.value = "Jewel Glow";
+  beyondPreview.title = "Jewel Resin Tealight Holder";
+  harness.searchFilter.value = "Jewel Resin";
   harness.searchFilter.dispatch("input");
   assert.deepEqual(visibleCards(harness).map((card) => card.id), [beyondPreview.id]);
   assert.deepEqual(harness.currentTabs(), ["all"]);

@@ -116,7 +116,8 @@ PAGE_CSS = ('.product-detail{max-width:32rem;margin:0 auto;padding:.75rem 1rem 2
             '.product-detail h1{max-width:none;margin:1.1rem 0 .4rem;font-size:clamp(1.75rem,6vw,2.4rem);line-height:1.1;letter-spacing:-.02em}'
             '.product-detail .price{display:inline-block;margin:.25rem 0;padding:.2rem .7rem;border-radius:999px;background:#f2a007;font-size:1.15rem;font-weight:700}'
             '.product-detail .size{margin:.4rem 0 .25rem;color:#6a4a5b}'
-            '.product-detail .order{display:flex;align-items:center;justify-content:center;min-height:3rem;margin:1.25rem 0 2rem;padding:.75rem 1rem;border-radius:999px;background:#b0125b;color:#fff;font-weight:700;text-decoration:none}'
+            '.product-detail .order{display:flex;align-items:center;justify-content:center;min-height:3rem;margin:1.25rem 0 .4rem;padding:.75rem 1rem;border-radius:999px;background:#b0125b;color:#fff;font-weight:700;text-decoration:none}'
+            '.product-detail .delivery-note{margin:0 0 1.5rem;color:#6a4a5b;font-size:.8rem;line-height:1.35;text-align:center}'
             '.product-detail .path{margin:0 0 .5rem}.product-detail .path ol,.product-detail .more ul{margin:0;padding:0;list-style:none}.product-detail .path ol{display:flex;flex-wrap:nowrap;align-items:center}'
             '.product-detail .path li{display:flex;flex:none;align-items:center;color:#6a4a5b;white-space:nowrap}.product-detail .path li span{margin:0 .4rem}'
             '.product-detail .path li[aria-current]{display:block;flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;line-height:2.75rem}'
@@ -289,6 +290,65 @@ KEEP_SLUGS = {
     "Blue and white Namokar (Navkar) mantra frame": "blue-and-white-namokar-mantra-frame",
     "White and gold Namokar (Navkar) mantra frame": "white-and-gold-namokar-mantra-frame",
     "Pearl white Namokar (Navkar) mantra frame": "pearl-white-namokar-mantra-frame",
+    "Couple Name Keychain Pair": "two-keys-one-little-us",
+    "Pressed Flower Bookmark Set": "save-our-page",
+    "Couple Date Calendar Coaster": "our-date-every-day",
+    "Rose Petal Resin Bracelet": "the-first-rose-still-with-me",
+    "Heart Resin Trinket Tray": "tiny-tray-big-feelings",
+    "Couple Initials Desk Stand": "your-initial-mine-ours",
+    "Pressed Flower Name Pendant": "a-little-piece-of-our-season",
+    "Ocean Memory Resin Tray": "our-place-held-in-waves",
+    "Preserved Rose Hexagon Frame": "rose-hexagon",
+    "Couple Photo Resin Clock": "personalized-photo-clock",
+    "Preserved Red Rose Resin Display": "preserved-rose-display",
+    "Lilac Pearl Rakhi": "lilac-symbol-medallion",
+    "Little Brother Name Rakhi": "little-brother-keepsake",
+    "Om Asiausa Mantra Resin Plaque": "om-asiausa-mantra-plaque",
+    "Jain Mantra Door Strips, Rose Red": "rose-mantra-door-strips",
+    "Lilac Resin Trinket Tray": "lilac-scalloped-tray",
+    "Pressed Bouquet Square Resin Frame": "pressed-flower-square",
+    "Pressed Flower Hexagon Frame": "lilac-flower-hexagon",
+    "Pressed Flower Handled Tray": "handled-flower-tray",
+    "Pressed Flower Arch Frame": "your-flowers-held-close",
+    "Shoreline Resin Wall Clock": "a-little-blue-hour",
+    "Personalised Floral Coaster Set": "little-messages-shared",
+    "Blue Ocean Resin Wall Clock": "blue-hour-resin-clock",
+    "Sage and Gold Resin Wall Clock": "sage-and-gold-resin-clock",
+    "Lilac and Silver Resin Wall Clock": "lilac-and-silver-resin-clock",
+    "Ivory Diamond Resin Wall Clock": "ivory-diamond-resin-clock",
+    "Sky Blue Roman Resin Wall Clock": "sky-blue-roman-resin-clock",
+    "Teal and Gold Roman Resin Wall Clock": "teal-and-gold-roman-resin-clock",
+    "Pearl Geode Resin Wall Clock": "pearl-geode-resin-clock",
+    "Personalised Message Coaster Set": "personalized-message-coasters",
+    "Personalised Floral Hoop Frame": "a-tiny-beginning",
+    "Sunflower Resin Night Lamp": "sunflower-resin-lamp",
+    "Sunflower Resin Platter Set": "sunflower-floral-keepsakes",
+    "Personalised Sunflower Name Plaque": "personalised-sunflower-plaque",
+    "Sunflower Name Plaque, Close-up": "sunflower-plaque-in-hand",
+    "Sunflower Tray, Keychain and Heart Set": "sunflower-keepsake-set",
+    "Midnight Blue 3-Tier Resin Serving Set": "midnight-blue-tiered-set",
+    "Ivory Gold 3-Tier Resin Serving Set": "ivory-gold-tiered-set",
+    "Champagne 2-Tier Resin Cake Stand Set": "champagne-two-tier-set",
+    "Turquoise Resin Tray with 4 Coasters": "turquoise-tray-and-coasters",
+    "Smoky Bronze Resin Serving Tray": "smoky-bronze-handled-tray",
+    "Geode Mug and Coaster Set of 6": "gemstone-mug-collection",
+    "Pastel Butterfly Resin Trays, Set of 3": "pastel-butterfly-trays",
+    "Champagne White Resin Serving Tray": "champagne-white-handled-tray",
+    "Silver Icy Blue Resin Serving Tray": "silver-icy-blue-handled-tray",
+    "Ocean Seashell Resin Serving Tray": "ocean-seashell-tray",
+    "Turquoise Geode Wine Glass": "turquoise-geode-glass",
+    "Turquoise Gold Wine Glasses, Pair": "turquoise-gold-wine-glasses",
+    "Turquoise Geode Wine Glasses, Pair": "turquoise-geode-glass-pair",
+    "Black Gold Resin Glassware Set": "black-gold-glassware-set",
+    "Jewel Resin Tealight Holder": "jewel-glow-tealight",
+    "Happy Diwali Resin Tealight Holder": "happy-diwali-glow",
+    "Gold Fleck Lotus Tealight Holder": "gold-fleck-lotus-light",
+    "Pastel Lotus Tealight Holder": "pastel-lotus-tealight",
+    "Emerald Tealight Holder Pair": "emerald-glow-pair",
+    "Marigold Tealight Holder": "marigold-petal-holder",
+    "Ivory Mandala Tealight Holder": "ivory-mandala-holder",
+    "Shubh Labh Door Hanging Pair": "shubh-labh-welcome-pair",
+    "Labh Floral Door Hanging Pair": "labh-floral-hanging-pair",
 }
 
 
@@ -501,6 +561,7 @@ def render_page(card, slug, share_size, topic, more, version):
     <h1>{name}</h1>
     <p class="price">{price}</p>
 {size_line}{line_html}    <a class="order" href="{target}">Add to cart</a>
+    <p class="delivery-note">Handmade in 4–5 days · delivered in 2–5 days after dispatch</p>
 {more_html}  </main>
 {footer}</body>
 </html>

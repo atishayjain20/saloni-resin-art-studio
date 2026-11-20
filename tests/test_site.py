@@ -83,23 +83,23 @@ ROOT = Path(__file__).resolve().parents[1]
 FINAL_QUOTE_NOTE = "Final quote after size, materials and delivery."
 
 ROMANTIC_CONCEPTS = (
-    ("romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "599", "399", 33),
-    ("romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "999", "699", 30),
-    ("romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25),
-    ("romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "899", "599", 33),
-    ("romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30),
-    ("romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30),
-    ("romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33),
-    ("romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28),
+    ("romantic-us-keychain-pair.webp", "Couple Name Keychain Pair", "Made to travel together, even when you cannot.", "599", "399", 33),
+    ("romantic-floral-bookmark-set.webp", "Pressed Flower Bookmark Set", "Three little places to keep the chapters that feel like yours.", "999", "699", 30),
+    ("romantic-calendar-coaster.webp", "Couple Date Calendar Coaster", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25),
+    ("romantic-first-rose-bracelet.webp", "Rose Petal Resin Bracelet", "One petal from the beginning, made wearable.", "899", "599", 33),
+    ("romantic-heart-trinket-tray.webp", "Heart Resin Trinket Tray", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30),
+    ("romantic-initial-desk-stand.webp", "Couple Initials Desk Stand", "Two letters, one small corner that belongs to both of you.", "999", "699", 30),
+    ("romantic-botanical-pendant.webp", "Pressed Flower Name Pendant", "Pressed flowers and a name, kept close.", "599", "399", 33),
+    ("romantic-ocean-memory-tray.webp", "Ocean Memory Resin Tray", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28),
 )
 
 DIWALI_NEW_CONCEPTS = (
-    ("diwali-marigold-petal-holder", "diwali-marigold-petal-holder-concept.webp", "Marigold Petal Holder", "349", "249", 29, 'one LED tealight holder · LED not included · shown palette or custom colours', "A warm marigold-inspired cup for a soft festive glow."),
-    ("diwali-ivory-mandala-holder", "diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Holder", "399", "299", 25, 'one LED tealight holder · LED not included · shown palette or custom colours', "An ivory mandala cup with a calm, hand-finished festive feel."),
+    ("diwali-marigold-petal-holder", "diwali-marigold-petal-holder-concept.webp", "Marigold Tealight Holder", "349", "249", 29, 'one LED tealight holder · LED not included · shown palette or custom colours', "A warm marigold-inspired cup for a soft festive glow."),
+    ("diwali-ivory-mandala-holder", "diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Tealight Holder", "399", "299", 25, 'one LED tealight holder · LED not included · shown palette or custom colours', "An ivory mandala cup with a calm, hand-finished festive feel."),
     ("diwali-ruby-leaf-dish", "diwali-ruby-leaf-dish-concept.webp", "Ruby Leaf Dish", "999", "799", 20, 'one decorative dish · ritual items not included · shown palette or custom colours', "A ruby-red leaf dish for a small festive offering or accent."),
     ("diwali-saffron-tilak-duo", "diwali-saffron-tilak-duo-concept.webp", "Saffron Tilak Duo", "449", "349", 22, 'two mini dishes · tilak and rice not included · shown palette or custom colours', "Two saffron-toned mini dishes for tilak and rice."),
     ("diwali-pearl-rangoli-accent", "diwali-pearl-rangoli-accent-concept.webp", "Pearl Rangoli Accent", "499", "399", 20, 'one decorative accent · flowers and ritual items not included · shown palette or custom colours', "A pearly rangoli-inspired accent for an entryway or prayer corner."),
-    ("diwali-emerald-led-holder-pair", "diwali-emerald-led-holder-pair-concept.webp", "Emerald Glow Pair", "999", "799", 20, 'pair of LED tealight holders · LEDs not included · shown palette or custom colours', "A pair of emerald cups for a jewel-toned LED-lit arrangement."),
+    ("diwali-emerald-led-holder-pair", "diwali-emerald-led-holder-pair-concept.webp", "Emerald Tealight Holder Pair", "999", "799", 20, 'pair of LED tealight holders · LEDs not included · shown palette or custom colours', "A pair of emerald cups for a jewel-toned LED-lit arrangement."),
     ("diwali-rose-petal-offering-plate", "diwali-rose-petal-offering-plate-concept.webp", "Rose Petal Offering Plate", "599", "449", 25, 'one decorative ritual plate · offerings not included · shown palette or custom colours', "A rosy ritual plate with a gentle petal-inspired edge."),
     ("diwali-golden-toran-charms", "diwali-golden-toran-charms-concept.webp", "Golden Toran Charms", "599", "449", 25, 'set of three hanging charms with cords · display props not included · shown palette or custom colours', "Three golden hanging charms to style a festive doorway or wall."),
     ("diwali-lotus-rangoli-duo", "diwali-lotus-rangoli-duo-concept.webp", "Lotus Rangoli Duo", "499", "399", 20, 'set of two decorative lotus pieces · flowers and ritual items not included · shown palette or custom colours', "Two lotus pieces for a small layered rangoli arrangement."),
@@ -329,12 +329,12 @@ class StaticSiteContractTests(unittest.TestCase):
             "diwali-floral-swastik-tealight-set.webp": 'two holders and one flower (three-piece set) · tealights not included · shown palette or custom colours',
         }
         price_matrix = {
-            "Jewel Glow Tealight": ("349", "249", "29"),
-            "Shubh Labh Welcome Pair": ("499", "399", "20"),
+            "Jewel Resin Tealight Holder": ("349", "249", "29"),
+            "Shubh Labh Door Hanging Pair": ("499", "399", "20"),
             "Rose &amp; Gold Festive Set": ("1,099", "849", "23"),
             "Lotus Blue Festive Set": ("1,199", "899", "25"),
-            "Gold-Fleck Lotus Light": ("399", "299", "25"),
-            "Pastel Lotus Tealight": ("349", "249", "29"),
+            "Gold Fleck Lotus Tealight Holder": ("399", "299", "25"),
+            "Pastel Lotus Tealight Holder": ("349", "249", "29"),
             "Ocean Bloom Pooja Platter": ("2,399", "1,499", "25"),
             "Golden Ganesha Pooja Plate": ("499", "649", "30"),
             "Om Mini Tilak Plate": ("349", "599", "29"),
@@ -1039,9 +1039,9 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn('<h2 id="romantic-keepsakes-title">Keep the moment close.</h2>', section_html)
         self.assertNotIn('href="#romantic-keepsakes" data-category-shortcut="couple">Explore the keepsakes', section_html)
         for phrase in (
-            "Rose hexagon",
-            "Personalized photo clock",
-            "Preserved rose display",
+            "Preserved Rose Hexagon Frame",
+            "Couple Photo Resin Clock",
+            "Preserved Red Rose Resin Display",
             "Preserved red roses, held close for a lasting moment.",
         ):
             with self.subTest(phrase=phrase):
@@ -1355,10 +1355,10 @@ class StaticSiteContractTests(unittest.TestCase):
     def test_buyer_copy_and_order_questions_are_native(self):
         for phrase in (
             "Resin keepsakes from the studio",
-            "Blue hour resin clock",
-            "Personalized message coasters",
+            "Blue Ocean Resin Wall Clock",
+            "Personalised Message Coaster Set",
             "Pearl white Namokar (Navkar) mantra frame",
-            "Personalized photo clock",
+            "Couple Photo Resin Clock",
             "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM.",
         ):
             with self.subTest(phrase=phrase):
@@ -1954,9 +1954,9 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(studio_match)
         studio = studio_match.group(0)
         expected = {
-            "concept-floral-memory-frame.webp": ("Your flowers, held close", "4,999", "3,999", 20),
-            "concept-ocean-clock.webp": ("A little blue hour", "2,999", "2,199", 27),
-            "concept-floral-coasters.webp": ("Little messages, shared", "1,299", "999", 23),
+            "concept-floral-memory-frame.webp": ("Pressed Flower Arch Frame", "4,999", "3,999", 20),
+            "concept-ocean-clock.webp": ("Shoreline Resin Wall Clock", "2,999", "2,199", 27),
+            "concept-floral-coasters.webp": ("Personalised Floral Coaster Set", "1,299", "999", 23),
         }
         cards = re.findall(r'<article\b[^>]*class=["\'][^"\']*work-card[^"\']*["\'][\s\S]*?</article>', studio)
         self.assertEqual(len(cards), 28)
@@ -2631,6 +2631,46 @@ class ProductSharePageTests(unittest.TestCase):
         self.assertEqual(on_disk, sorted(self.slugs), "p/ holds exactly one page per card and nothing else")
         self.assertEqual([path.name for path in (ROOT / "p").iterdir() if path.name != "index.html" and not path.is_dir()], [])
 
+    DELIVERY_LINE = "Handmade in 4\u20135 days \u00b7 delivered in 2\u20135 days after dispatch"
+
+    def test_every_product_page_shows_the_delivery_line_right_under_add_to_cart(self):
+        for slug in self.slugs:
+            text, _ = self.page(slug)
+            self.assertRegex(
+                text,
+                r'<a class="order" href="[^"]+">Add to cart</a>\s*<p class="delivery-note">' + re.escape(self.DELIVERY_LINE) + r"</p>",
+                slug)
+            self.assertEqual(text.count(self.DELIVERY_LINE), 1, slug)
+
+    def test_popup_shows_the_delivery_line_right_under_its_add_to_cart_button_and_not_on_cards(self):
+        self.assertRegex(
+            self.home,
+            r'<button class="[^"]*lightbox-request[^"]*" id="lightbox-request"[^>]*>Add to cart</button>\s*<p class="lightbox-delivery-note" id="lightbox-delivery-note">'
+            + re.escape(self.DELIVERY_LINE) + r"</p>")
+        self.assertEqual(self.home.count(self.DELIVERY_LINE), 1, "once in the popup, never on the 106 cards")
+        styles = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertRegex(styles, r"\.lightbox-request\[hidden\]\s*\+\s*\.lightbox-delivery-note\s*\{\s*display:\s*none")
+
+    def test_renamed_cards_keep_their_old_address_and_merchant_feed_id(self):
+        keep = {
+            "Couple Name Keychain Pair": "two-keys-one-little-us",
+            "Rose Petal Resin Bracelet": "the-first-rose-still-with-me",
+            "Lilac Pearl Rakhi": "lilac-symbol-medallion",
+            "Blue Ocean Resin Wall Clock": "blue-hour-resin-clock",
+            "Turquoise Resin Tray with 4 Coasters": "turquoise-tray-and-coasters",
+            "Jewel Resin Tealight Holder": "jewel-glow-tealight",
+            "Shubh Labh Door Hanging Pair": "shubh-labh-welcome-pair",
+        }
+        tool = load_product_pages_tool()
+        cards = tool.parse_cards(self.home)
+        by_name = dict(zip((card["name"] for card in cards), self.slugs))
+        feed_ids = [line.split("\t")[0] for line in (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8").splitlines()[1:]]
+        for name, slug in keep.items():
+            self.assertEqual(by_name.get(name), slug, name)
+            self.assertIn("<h1>" + html.escape(name, quote=False) + "</h1>", self.page(slug)[0], name)
+        self.assertEqual(len(self.slugs), 106)
+        self.assertEqual(len(feed_ids), 52)
+
     def test_pages_and_card_slugs_are_in_step_with_index_html(self):
         tool = load_product_pages_tool()
         stamped, pages, sitemap = tool.build(self.home, (ROOT / "sitemap.xml").read_text(encoding="utf-8"))
@@ -2699,7 +2739,7 @@ class ProductSharePageTests(unittest.TestCase):
 
     def test_og_description_carries_the_cards_own_price_and_size(self):
         text, tags = self.page("jewel-glow-tealight")
-        self.assertEqual(tags.meta["og:title"], "Jewel Glow Tealight | Saloni Resin Art Studio")
+        self.assertEqual(tags.meta["og:title"], "Jewel Resin Tealight Holder | Saloni Resin Art Studio")
         self.assertTrue(tags.meta["og:description"].startswith("₹249 · 4 in. "), tags.meta["og:description"])
         self.assertIn("Rich colour and golden flecks for a festive corner", tags.meta["og:description"])
         self.assertEqual(tags.meta["og:image"], "https://saloniresinart.com/assets/share/jewel-glow-tealight.jpg")

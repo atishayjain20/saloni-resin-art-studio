@@ -10,7 +10,7 @@ const source = fs.readFileSync(path.join(root, "apps-script", "Code.gs"), "utf8"
 
 const REVIEW_HEADERS = ["Review ID", "Received at", "Status", "Rating", "Product ID", "Product name", "First name", "City", "Comment", "Photo file IDs", "Public consent", "Payload fingerprint", "Staff notes"];
 const PRODUCTS_URL = "https://saloniresinart.com/reviews/products.json";
-const DEFAULT_PRODUCTS = [{ id: "catalogue:resin-clock.jpg", name: "Blue hour resin clock" }, { id: "catalogue:personalized-floral-hoop.jpg", name: "A tiny beginning" }];
+const DEFAULT_PRODUCTS = [{ id: "catalogue:resin-clock.jpg", name: "Blue Ocean Resin Wall Clock" }, { id: "catalogue:personalized-floral-hoop.jpg", name: "Personalised Floral Hoop Frame" }];
 const LEGACY_ORDER_HEADERS = ["Request ID", "Payload fingerprint", "Received at", "Source kind", "Source ID", "Product name", "Quantity", "Height value", "Height unit", "Height (in)", "Width value", "Width unit", "Width (in)", "Design details", "Customer name", "Phone", "Email", "Fulfilment", "Shipping address", "City", "State", "PIN", "Requested date", "Reference file link", "Status", "Staff notes"];
 
 function plain(value) { return JSON.parse(JSON.stringify(value)); }
@@ -553,7 +553,7 @@ test("products come from the server list, never from the client", () => {
   const known = runtime.context.submitReview(validForm({ reviewId: "review-2234567890", productId: "catalogue:resin-clock.jpg", productName: "Client supplied name" }));
   assert.equal(known.ok, true);
   assert.equal(runtime.rows[2][4], "catalogue:resin-clock.jpg");
-  assert.equal(runtime.rows[2][5], "Blue hour resin clock");
+  assert.equal(runtime.rows[2][5], "Blue Ocean Resin Wall Clock");
   const unknown = runtime.context.submitReview(validForm({ reviewId: "review-3234567890", productId: "catalogue:nope.jpg" }));
   assert.equal(unknown.ok, false);
   assert.ok(unknown.errors.productId);
@@ -752,7 +752,7 @@ const read = (runtime) => JSON.parse(runtime.context.publicReviewsResponse_().ge
 
 test("the public read endpoint returns only exact Published rows with an allowlisted shape", () => {
   const runtime = makeRuntime({ rows: [
-    reviewRow({ id: "review-row-published1", rating: 5, at: new Date("2026-11-01T10:00:00Z"), photos: FILE_A + "," + FILE_B, productId: "catalogue:resin-clock.jpg", productName: "Blue hour resin clock" }),
+    reviewRow({ id: "review-row-published1", rating: 5, at: new Date("2026-11-01T10:00:00Z"), photos: FILE_A + "," + FILE_B, productId: "catalogue:resin-clock.jpg", productName: "Blue Ocean Resin Wall Clock" }),
     reviewRow({ id: "review-row-hidden0001", status: "Hidden" }),
     reviewRow({ id: "review-row-removed001", status: "Removed" }),
     reviewRow({ id: "review-row-spaced0001", status: "published " }),
@@ -1135,21 +1135,21 @@ test("the saved order on this phone fills in the city and, for a one-product ord
   const orders = (list) => JSON.stringify({ version: 1, orders: list });
   const order = (names, at = Date.now() - day) => ({ requestId: "r-" + at, at, items: names.map((name) => ({ name, quantity: 1 })) });
 
-  const both = makeFormRuntime({ storage: { saloniRepeatProfile: profile("  Ajmer "), saloniMyOrders: orders([order(["Blue hour resin clock"])]) } });
+  const both = makeFormRuntime({ storage: { saloniRepeatProfile: profile("  Ajmer "), saloniMyOrders: orders([order(["Blue Ocean Resin Wall Clock"])]) } });
   await settle();
   assert.equal(both.fields.city.value, "Ajmer");
   assert.equal(both.fields.productId.value, DEFAULT_PRODUCTS[0].id);
 
-  const newest = makeFormRuntime({ storage: { saloniMyOrders: orders([order(["Blue hour resin clock"], Date.now() - 3 * day), order(["A tiny beginning (colour: Teal)"], Date.now() - day)]) } });
+  const newest = makeFormRuntime({ storage: { saloniMyOrders: orders([order(["Blue Ocean Resin Wall Clock"], Date.now() - 3 * day), order(["Personalised Floral Hoop Frame (colour: Teal)"], Date.now() - day)]) } });
   await settle();
   assert.equal(newest.fields.productId.value, DEFAULT_PRODUCTS[1].id, "the newest order wins, and a chosen colour still matches");
 
-  for (const [label, list] of [["two products", [order(["Blue hour resin clock", "A tiny beginning"])]], ["unknown product", [order(["Something else"])]], ["older than 30 days", [order(["Blue hour resin clock"], Date.now() - 31 * day)]]]) {
+  for (const [label, list] of [["two products", [order(["Blue Ocean Resin Wall Clock", "Personalised Floral Hoop Frame"])]], ["unknown product", [order(["Something else"])]], ["older than 30 days", [order(["Blue Ocean Resin Wall Clock"], Date.now() - 31 * day)]]]) {
     const runtime = makeFormRuntime({ storage: { saloniMyOrders: orders(list) } });
     await settle();
     assert.equal(runtime.fields.productId.value, "studio", label);
   }
-  const hinted = makeFormRuntime({ search: "?product=" + encodeURIComponent(DEFAULT_PRODUCTS[1].id), storage: { saloniMyOrders: orders([order(["Blue hour resin clock"])]) } });
+  const hinted = makeFormRuntime({ search: "?product=" + encodeURIComponent(DEFAULT_PRODUCTS[1].id), storage: { saloniMyOrders: orders([order(["Blue Ocean Resin Wall Clock"])]) } });
   await settle();
   assert.equal(hinted.fields.productId.value, DEFAULT_PRODUCTS[1].id, "a product named in the link wins over the saved order");
 
@@ -1581,7 +1581,7 @@ test("a single review reads as one review and an empty list invites the first on
 
 test("review cards show stars, name, product, date and comment as text only", async () => {
   const hostile = "<img src=x onerror=alert(1)> line one\nline two";
-  const page = runReviewsPage({ home: true, body: openBody([sampleReview({ comment: hostile, firstName: "<b>Asha</b>", city: "Ajmer", productId: "catalogue:resin-clock.jpg", productName: "Blue hour resin clock", date: "2026-11-08" }), sampleReview({ id: "review-sample-0002", city: "", productName: "", rating: 5, date: "2026-01-02" })]) });
+  const page = runReviewsPage({ home: true, body: openBody([sampleReview({ comment: hostile, firstName: "<b>Asha</b>", city: "Ajmer", productId: "catalogue:resin-clock.jpg", productName: "Blue Ocean Resin Wall Clock", date: "2026-11-08" }), sampleReview({ id: "review-sample-0002", city: "", productName: "", rating: 5, date: "2026-01-02" })]) });
   await settle();
   const [first, second] = page.list.children;
   assert.equal(first.tag, "li");
@@ -1592,7 +1592,7 @@ test("review cards show stars, name, product, date and comment as text only", as
   assert.equal(findAll(first, (item) => item.className === "review-stars")[0].getAttribute("aria-hidden"), "true");
   assert.deepEqual(text(first, "sr-only"), ["Rated 4 out of 5"]);
   assert.deepEqual(text(first, "review-author"), ["<b>Asha</b>, Ajmer"]);
-  assert.deepEqual(text(first, "review-product"), ["Blue hour resin clock"]);
+  assert.deepEqual(text(first, "review-product"), ["Blue Ocean Resin Wall Clock"]);
   assert.deepEqual(text(first, "review-date"), ["8 Nov 2026"]);
   assert.deepEqual(text(second, "review-author"), ["Asha"]);
   assert.deepEqual(text(second, "review-product"), ["Studio review"]);
@@ -1618,14 +1618,14 @@ test("malformed review items are skipped and bad photo IDs are dropped", async (
 });
 
 test("review photos use the googleusercontent URL, then the Drive thumbnail, then are removed", async () => {
-  const page = runReviewsPage({ home: true, body: openBody([sampleReview({ productId: "catalogue:resin-clock.jpg", productName: "Blue hour resin clock", photos: [PHOTO_ONE] })]) });
+  const page = runReviewsPage({ home: true, body: openBody([sampleReview({ productId: "catalogue:resin-clock.jpg", productName: "Blue Ocean Resin Wall Clock", photos: [PHOTO_ONE] })]) });
   await settle();
   const image = findAll(page.list, (item) => item.tag === "img")[0];
   assert.equal(image.src, "https://lh3.googleusercontent.com/d/" + PHOTO_ONE + "=w800");
   assert.equal(image.getAttribute("loading"), "lazy");
   assert.equal(image.getAttribute("decoding"), "async");
   assert.equal(image.getAttribute("referrerpolicy"), "no-referrer");
-  assert.equal(image.getAttribute("alt"), "Customer photo 1 for Blue hour resin clock");
+  assert.equal(image.getAttribute("alt"), "Customer photo 1 for Blue Ocean Resin Wall Clock");
   const link = image.parentNode;
   image.dispatch("error");
   assert.equal(image.src, "https://drive.google.com/thumbnail?id=" + PHOTO_ONE + "&sz=w800");

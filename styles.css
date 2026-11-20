@@ -688,6 +688,8 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .lightbox-order-summary strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
 .lightbox-order-summary #lightbox-product-price { color: var(--cocoa); font-weight: 800; }
 .lightbox-request { width: 100%; align-self: stretch; justify-content: center; flex: 0 0 auto; margin-top: 1rem; }
+.lightbox-delivery-note { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.35; text-align: center; }
+.lightbox-request[hidden] + .lightbox-delivery-note { display: none; }
 .lightbox-share { display: grid; width: 100%; gap: .5rem; }
 .lightbox-share[hidden], .lightbox-share-options[hidden] { display: none; }
 .lightbox-share .button-line:not(:hover):not(:focus-visible) { background: transparent; }
