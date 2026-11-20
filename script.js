@@ -409,7 +409,14 @@
     var openSharedProduct = null;
     // Read now: the catalogue may tidy the address before the popup opens.
     var sharedSlug = "";
-    try { sharedSlug = new URLSearchParams((window.location && window.location.search) || "").get("product") || ""; } catch (error) {}
+    // add=1 comes from the product page's Add to cart: put the item straight in the cart instead of opening its popup.
+    // The page then shows that card (marked as in the cart) with the cart bar's Order now below it.
+    var sharedAdd = false;
+    try {
+      var sharedParams = new URLSearchParams((window.location && window.location.search) || "");
+      sharedSlug = sharedParams.get("product") || "";
+      sharedAdd = sharedParams.get("add") === "1";
+    } catch (error) {}
     var lastTrigger = null;
     var lightboxItems = [];
     var lightboxIndex = 0;
@@ -898,9 +905,16 @@
           if (window.history && typeof window.history.replaceState === "function" && window.location && window.location.href) {
             var clean = new URL(window.location.href);
             clean.searchParams.delete("product");
+            clean.searchParams.delete("add");
             window.history.replaceState(window.history.state, "", clean.pathname + clean.search + clean.hash);
           }
         } catch (error) {}
+        var sharedCard = sharedAdd && typeof match.closest === "function" ? match.closest("article") : null;
+        var sharedCartButton = sharedCard ? sharedCard.querySelector('[data-order-prefill="catalogue"]') : null;
+        if (sharedCartButton) {
+          if (sharedCartButton.getAttribute("aria-pressed") !== "true") sharedCartButton.click();
+          return;
+        }
         // Back from the popup must leave the page where the link scrolled it, not where the browser saved it before the jump.
         if (window.history) window.history.scrollRestoration = "manual";
         openLightbox(match, match);

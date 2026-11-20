@@ -27,7 +27,8 @@ test("share helpers build the product page URL and an encoded WhatsApp message",
   assert.equal(decodeURIComponent(api.whatsappShareUrl("Rose Tray", "", `${SITE}/p/rose-tray/`).split("text=")[1]), `Rose Tray – ${SITE}/p/rose-tray/`, "no price, no dangling dash");
 });
 
-function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {}, thumbs = false } = {}) {
+function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {}, thumbs = false, inCart = false } = {}) {
+  const cartButtons = {};
   const make = (extra = {}) => Object.assign({
     hidden: false, textContent: "", attributes: {}, listeners: {},
     addEventListener(type, listener) { this.listeners[type] = listener; },
@@ -39,8 +40,12 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
   }, extra);
   const triggers = Object.entries(slugs).map(([slug, name], index) => {
     const rows = [["Price", index ? "₹1,799" : "₹249"], ["Size", "8 in"]].map(([label, value]) => make({ querySelector: (selector) => (selector === "dt" ? { textContent: label } : selector === "dd" ? { textContent: value } : null) }));
+    // The card's own Add to cart button, as the catalogue makes it; a click toggles it like the real one.
+    const cartButton = make({ clicks: 0, attributes: { "data-order-prefill": "catalogue", "aria-pressed": inCart ? "true" : "false" } });
+    cartButton.click = function () { this.clicks += 1; this.attributes["aria-pressed"] = this.attributes["aria-pressed"] === "true" ? "false" : "true"; };
+    cartButtons[slug] = cartButton;
     const card = make({
-      querySelector: (selector) => (selector === "figcaption strong" ? { textContent: name } : null),
+      querySelector: (selector) => (selector === "figcaption strong" ? { textContent: name } : selector === '[data-order-prefill="catalogue"]' ? cartButton : null),
       querySelectorAll: (selector) => (selector === ".product-pricing > div" ? rows : selector === "figcaption p" ? [{ textContent: "A short line." }] : []),
     });
     return make({
@@ -87,7 +92,7 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
     querySelectorAll: (selector) => (selector === "[data-lightbox-trigger]" ? triggers : []),
   };
   const result = vm.runInNewContext(`(function () { ${helpers}${lightboxBlock}\n return { openSharedProduct: typeof openSharedProduct === "function" ? openSharedProduct : null }; })()`, { document: documentObject, window: windowObject, URLSearchParams, URL });
-  return { elements, triggers, lightbox, image, figure, moreList, pushes, replaces, order, calls, windowObject, openSharedProduct: result.openSharedProduct };
+  return { elements, triggers, lightbox, image, figure, moreList, pushes, replaces, order, calls, windowObject, cartButtons, openSharedProduct: result.openSharedProduct };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -311,7 +316,7 @@ test("every card photo link carries its own data-product-slug and the version is
   assert.ok(slugs.length > 90);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.doesNotMatch(html, /\?v=20261165/);
-  assert.match(html, /script\.js\?v=20261195/);
+  assert.match(html, /script\.js\?v=20261196/);
 });
 
 // --- Visitor counts: the product popup, the share button and a shared link, with no personal data ---
@@ -361,4 +366,30 @@ test("analytics: pressing Share counts share-tap and never the link or product n
   page.windowObject.saloniTrack = (name) => events.push(name);
   page.elements["lightbox-share-button"].listeners.click();
   assert.deepEqual(events, ["share-tap"]);
+});
+
+test("?product=<slug>&add=1 from a product page puts it in the cart, with no popup step", () => {
+  const page = harness({ search: "?product=mr-and-mrs-name-plate&add=1", hash: "#marriage-gifts" });
+  page.openSharedProduct();
+  assert.equal(page.cartButtons["mr-and-mrs-name-plate"].clicks, 1, "the card's own Add to cart runs once");
+  assert.equal(page.cartButtons["mr-and-mrs-name-plate"].attributes["aria-pressed"], "true");
+  assert.equal(page.cartButtons["jewel-glow-tealight"].clicks, 0);
+  assert.notEqual(page.lightbox.open, true, "the popup does not open");
+  assert.deepEqual(page.replaces, ["/#marriage-gifts"], "product and add leave the address, so a reload does not add it again");
+  assert.equal(page.pushes.length, 0);
+});
+
+test("add=1 for an item already in the cart does not take it out again", () => {
+  const page = harness({ search: "?product=jewel-glow-tealight&add=1", inCart: true });
+  page.openSharedProduct();
+  assert.equal(page.cartButtons["jewel-glow-tealight"].clicks, 0);
+  assert.equal(page.cartButtons["jewel-glow-tealight"].attributes["aria-pressed"], "true");
+  assert.notEqual(page.lightbox.open, true);
+});
+
+test("without add=1 a shared link still opens the popup and leaves the cart alone", () => {
+  const page = harness({ search: "?product=jewel-glow-tealight&add=0" });
+  page.openSharedProduct();
+  assert.equal(page.lightbox.open, true);
+  assert.equal(page.cartButtons["jewel-glow-tealight"].clicks, 0);
 });
