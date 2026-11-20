@@ -363,6 +363,7 @@ function makeRuntime(options = {}) {
     captchaResponse: options.captchaResponse || { success: true, hostname: "saloniresinart.com", action: "order_request", score: 0.9 },
     driveDeletes: [], retentionTrashed: 0, rowDeletes: [], triggerCreates: 0, triggerConfig: null,
     richReads: [], richWrites: [], noteReads: [], noteWrites: [], links: {}, notes: {}, styles: {},
+    headerWrites: [], numberFormats: [], columnInserts: [], maxColumns: options.maxColumns || headers.length,
     logs: [], rangeReads: [], locked: false, whatsappFetches: [], emails: [], base64Decodes: 0, cellWrites: [], formats: [],
   };
   const sheet = {
@@ -400,9 +401,14 @@ function makeRuntime(options = {}) {
       },
       setNote: (text) => { state.noteWrites.push({ row, column, text, lockHeld: state.locked }); state.notes[row + "," + column] = text; },
     } : {
-      getValues: () => [headers],
-      setValues: (values) => { headers.splice(0, headers.length, ...values[0]); },
+      // The header row: honours the column offset and width, like Sheets (the migration tests write one column at a time).
+      getValues: () => [headers.slice(column - 1, column - 1 + numColumns)],
+      setValues: (values) => { state.headerWrites.push({ column, values: values[0].slice() }); values[0].forEach((value, index) => { headers[column - 1 + index] = value; }); },
+      setNumberFormat: (format) => { state.numberFormats.push({ row, column, numRows, numColumns, format }); },
     }),
+    getMaxColumns: () => state.maxColumns,
+    getMaxRows: () => rows.length + 1,
+    insertColumnsAfter: (after, count) => { state.columnInserts.push({ after, count }); state.maxColumns += count; },
     getDataRange: () => {
       state.dataReads += 1;
       if (state.failRecheck && state.appendCalls > 0) throw new Error("sheet read uncertain");
@@ -2370,4 +2376,235 @@ test("the throttle stamp is not written while the kill switch is on, and the own
   const owner = waRuntime([{}], { activeEmail: "o@example.com", effectiveEmail: "o@example.com" });
   owner.properties.WHATSAPP_ADVANCE_LAST_PASS = String(Date.now());
   assert.equal(owner.context.setupWhatsAppAdvanceLinks().links.set, 1);
+});
+
+// --- Visit source: a NEW LAST column "Visit source" (AN, the 40th) after the advance columns ---
+const SOURCE_LAYOUT = ADVANCE_LAYOUT.concat(["Visit source"]);
+const owned = { activeEmail: "owner@example.com", effectiveEmail: "owner@example.com" };
+const AN = 39; // 0-based index of column AN
+
+function sourceRuntime(headers, options = {}) {
+  return makeRuntime(Object.assign({ headers, properties: Object.assign({}, ALERT_PROPERTIES, VALID_UPI) }, options));
+}
+
+test("the visit source constants name one header after the advance headers and one allowed value", () => {
+  const runtime = makeRuntime();
+  assert.equal(runtime.context.VISIT_SOURCE_HEADERS.join("|"), "Visit source");
+  assert.equal(runtime.context.ORDER_HEADERS_WITH_SOURCE.join("|"), SOURCE_LAYOUT.join("|"));
+  assert.equal(runtime.context.ORDER_HEADERS_WITH_SOURCE.length, 40);
+  assert.equal(runtime.context.VISIT_SOURCES.join("|"), "google-shopping");
+});
+
+test("ensureSchema_ accepts the 40-column visit source layout and rejects a wrong AN header", () => {
+  const sheetWith = (headers) => ({ getLastRow: () => 1, getLastColumn: () => headers.length, getRange: (_r, _c, _n, count) => ({ getValues: () => [headers.slice(0, count)] }) });
+  const runtime = makeRuntime();
+  assert.equal(runtime.context.ensureSchema_(sheetWith(SOURCE_LAYOUT)), 40);
+  assert.equal(runtime.context.ensureSchema_(sheetWith(ADVANCE_LAYOUT)), 39);
+  for (const wrong of ["Visit sources", "visit source", "", "Advance status", "Source"]) {
+    assert.throws(() => runtime.context.ensureSchema_(sheetWith(ADVANCE_LAYOUT.concat([wrong]))), /schema does not match/, JSON.stringify(wrong));
+  }
+  assert.throws(() => runtime.context.ensureSchema_(sheetWith(SOURCE_LAYOUT.concat(["Extra"]))), /schema does not match/);
+  const bad = sourceRuntime(ADVANCE_LAYOUT.concat(["Wrong"]));
+  assert.throws(() => bad.context.submitOrder(validForm()), /Unable to confirm|schema does not match/);
+  assert.equal(bad.state.appendCalls, 0);
+});
+
+test("collectPayload_ keeps only an allowlisted visitSource and never turns another value into an error", () => {
+  const ctx = makeRuntime().context;
+  assert.equal(ctx.collectPayload_(validForm({ visitSource: "google-shopping" })).visitSource, "google-shopping");
+  for (const value of ["evil", "=HYPERLINK(\"http://x\")", "Google-Shopping", " google-shopping", "", null, undefined, 5, {}, ["google-shopping"]]) {
+    const payload = ctx.collectPayload_(validForm({ visitSource: value }));
+    assert.equal(payload.visitSource, "", JSON.stringify(value));
+    assert.deepEqual(Object.keys(ctx.validatePayload_(payload).errors), [], JSON.stringify(value));
+  }
+  assert.equal(ctx.collectPayload_(validForm()).visitSource, "");
+  assert.ok(Array.from(ctx.ORDER_POST_FIELDS).includes("visitSource"));
+});
+
+test("a google-shopping order writes the value into AN and leaves the advance cells blank", () => {
+  const runtime = sourceRuntime(SOURCE_LAYOUT);
+  const result = orderPost(runtime, postedOrder({ visitSource: "google-shopping" }));
+  assert.equal(result.ok, true);
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.rows[0].length, 40);
+  assert.equal(runtime.rows[0][AN], "google-shopping");
+  assert.deepEqual(Array.from(runtime.rows[0].slice(26, 39)), new Array(13).fill(""), "partner and advance cells stay blank");
+  assert.equal(runtime.rows[0][0], "request-1234567890");
+  assert.equal(runtime.rows[0][24], "New request");
+});
+
+test("an unknown or formula-like visitSource leaves AN blank and the order still succeeds", () => {
+  for (const value of ["=HYPERLINK(\"http://evil.example\",\"x\")", "+1", "-1", "@SUM(1)", "evil", "google-shopping ", "GOOGLE-SHOPPING"]) {
+    const runtime = sourceRuntime(SOURCE_LAYOUT);
+    const result = orderPost(runtime, postedOrder({ visitSource: value }));
+    assert.equal(result.ok, true, JSON.stringify(value));
+    assert.equal(runtime.rows.length, 1);
+    assert.equal(runtime.rows[0].length, 40);
+    assert.equal(runtime.rows[0][AN], "", JSON.stringify(value));
+  }
+});
+
+test("an old payload without visitSource on 40 columns is accepted with AN blank", () => {
+  const runtime = sourceRuntime(SOURCE_LAYOUT);
+  assert.equal(orderPost(runtime, postedOrder()).ok, true);
+  assert.equal(runtime.rows[0].length, 40);
+  assert.equal(runtime.rows[0][AN], "");
+  assert.deepEqual(Array.from(runtime.rows[0].slice(26)), new Array(14).fill(""));
+});
+
+test("a referred google-shopping order keeps its partner columns and the advance cells blank", () => {
+  const runtime = sourceRuntime(SOURCE_LAYOUT);
+  runtime.context.resolveReferralForOrder_ = () => ({ active: true, status: "active", code: "FRIEND-10", partnerId: "partner-1", displayName: "Friend Studio", rate: 0.1 });
+  assert.equal(orderPost(runtime, postedOrder({ referralCode: "FRIEND-10", visitSource: "google-shopping" })).ok, true);
+  assert.equal(runtime.rows[0].length, 40);
+  assert.equal(runtime.rows[0][26], "FRIEND-10");
+  assert.deepEqual(Array.from(runtime.rows[0].slice(37, 39)), ["", ""]);
+  assert.equal(runtime.rows[0][AN], "google-shopping");
+});
+
+test("older layouts with a visitSource accept the order, keep the row length and write nothing for the source", () => {
+  for (const [headers, width] of [[LEGACY_LAYOUT, 26], [PARTNER_LAYOUT, 37], [ADVANCE_LAYOUT, 39]]) {
+    const runtime = sourceRuntime(headers);
+    const result = orderPost(runtime, postedOrder({ visitSource: "google-shopping" }));
+    assert.equal(result.ok, true, "layout " + width);
+    assert.equal(runtime.rows.length, 1);
+    assert.equal(runtime.rows[0].length, width);
+    assert.equal(runtime.rows[0].includes("google-shopping"), false, "layout " + width);
+    assert.deepEqual(Array.from(runtime.rows[0].slice(26)), new Array(width - 26).fill(""));
+  }
+});
+
+test("visitSource stays out of the payload fingerprint, so a replay never conflicts", () => {
+  const ctx = makeRuntime().context;
+  const base = ctx.collectPayload_(validForm());
+  const withSource = ctx.collectPayload_(validForm({ visitSource: "google-shopping" }));
+  assert.equal(ctx.payloadFingerprint_(withSource), ctx.payloadFingerprint_(base));
+  const runtime = sourceRuntime(SOURCE_LAYOUT);
+  assert.equal(orderPost(runtime, postedOrder({ visitSource: "google-shopping" })).ok, true);
+  // The same request again, with and without the source, finds the saved row: no conflict, no second row.
+  for (const overrides of [{ visitSource: "google-shopping" }, {}, { visitSource: "evil" }]) {
+    const replay = orderPost(runtime, postedOrder(overrides));
+    assert.equal(replay.ok, true, JSON.stringify(overrides));
+    assert.equal(replay.errors, undefined);
+  }
+  assert.equal(runtime.rows.length, 1);
+  assert.equal(runtime.rows[0][AN], "google-shopping");
+});
+
+test("the advance status check still works on a 40-column sheet and never returns the source", () => {
+  const rows = [["Confirmed", 500, ""], ["Confirmed", 300, "Paid"]].map(([status, amount, advanceStatus], index) => {
+    const row = new Array(40).fill("");
+    row[0] = "request-advance-" + String(index).padStart(4, "0");
+    row[24] = status; row[37] = amount; row[38] = advanceStatus; row[AN] = "google-shopping";
+    return row;
+  });
+  const runtime = makeRuntime({ rows, headers: SOURCE_LAYOUT, properties: VALID_UPI });
+  runtime.ids = rows.map((row) => row[0]);
+  const text = runtime.context.doPost({ parameter: { action: "status" }, postData: { contents: JSON.stringify({ requestIds: runtime.ids }) } }).text;
+  const reply = JSON.parse(text);
+  assert.deepEqual(reply.statuses, { [runtime.ids[0]]: "confirmed", [runtime.ids[1]]: "advance_paid" });
+  assert.equal(reply.advance[runtime.ids[0]].amount, 500);
+  assert.deepEqual(Object.keys(reply.advance), [runtime.ids[0]]);
+  assert.equal(text.includes("google-shopping"), false);
+  assert.equal(runtime.state.rangeReads[0].column + runtime.state.rangeReads[0].numColumns - 1, 39, "reads to Advance status, not AN");
+});
+
+test("the WhatsApp link pass still works on a 40-column sheet and does not touch AN", () => {
+  const runtime = waRuntime([{ amount: "500" }, { amount: "700", name: "Asha Rao", phone: "9123456789" }]);
+  runtime.rows.forEach((row) => { row.push("google-shopping"); });
+  runtime.headers.push("Visit source");
+  assert.equal(runtime.headers.length, 40);
+  const counts = runtime.refresh();
+  assert.ok(counts, "the pass runs instead of silently returning null");
+  assert.equal(counts.set, 2);
+  assert.match(waMessage(runtime.link(0)), /advance of ₹500 to/);
+  assert.match(waMessage(runtime.link(1)), /advance of ₹700 to/);
+  assert.ok(runtime.state.richWrites.every((write) => write.column === WA_AMOUNT_COLUMN));
+  assert.deepEqual(runtime.rows.map((row) => row[AN]), ["google-shopping", "google-shopping"]);
+});
+
+test("migrateAdvanceSchema_ on a 40-column sheet writes no header and inserts no column", () => {
+  const runtime = sourceRuntime(SOURCE_LAYOUT);
+  assert.equal(runtime.context.migrateAdvanceSchema_(sheetOf(runtime)), false);
+  assert.deepEqual(runtime.headers, SOURCE_LAYOUT);
+  assert.deepEqual(runtime.state.headerWrites, []);
+  assert.deepEqual(runtime.state.columnInserts, []);
+  assert.ok(runtime.state.numberFormats.every((entry) => entry.column === 38 && entry.numColumns === 2), "only the two advance columns get a format");
+});
+
+// The migration helpers take the sheet; the test runtime hides it behind SpreadsheetApp.
+function sheetOf(runtime) {
+  return runtime.context.SpreadsheetApp.openById("sheet").getSheetByName("Orders");
+}
+
+test("setupVisitSource adds AN from the 26, 37 and 39 column layouts and verifies all 40 headers", () => {
+  for (const [headers, width] of [[LEGACY_LAYOUT, 26], [PARTNER_LAYOUT, 37], [ADVANCE_LAYOUT, 39]]) {
+    const runtime = sourceRuntime(headers, owned);
+    const result = runtime.context.setupVisitSource();
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), { orderColumns: 40, changed: true }, "from " + width);
+    assert.deepEqual(runtime.headers, SOURCE_LAYOUT);
+    assert.equal(runtime.headers[AN], "Visit source");
+    assert.equal(runtime.rows.length, 0, "no order row is touched");
+    assert.equal(runtime.state.released, true, "the lock is released");
+    // The sheet now takes an order with a source.
+    assert.equal(orderPost(runtime, postedOrder({ visitSource: "google-shopping" })).ok, true);
+    assert.equal(runtime.rows[0].length, 40);
+    assert.equal(runtime.rows[0][AN], "google-shopping");
+  }
+});
+
+test("setupVisitSource is idempotent: a second run changes nothing", () => {
+  const runtime = sourceRuntime(PARTNER_LAYOUT, owned);
+  assert.equal(runtime.context.setupVisitSource().changed, true);
+  const writes = runtime.state.headerWrites.length;
+  const inserts = runtime.state.columnInserts.length;
+  const again = runtime.context.setupVisitSource();
+  assert.deepEqual(JSON.parse(JSON.stringify(again)), { orderColumns: 40, changed: false });
+  assert.equal(runtime.state.headerWrites.length, writes);
+  assert.equal(runtime.state.columnInserts.length, inserts);
+  assert.deepEqual(runtime.headers, SOURCE_LAYOUT);
+  const start = sourceRuntime(SOURCE_LAYOUT, owned);
+  assert.equal(start.context.setupVisitSource().changed, false);
+  assert.deepEqual(start.state.headerWrites, []);
+});
+
+test("setupVisitSource inserts a physical column only when the sheet has no room", () => {
+  const tight = sourceRuntime(ADVANCE_LAYOUT, Object.assign({ maxColumns: 39 }, owned));
+  tight.context.setupVisitSource();
+  assert.deepEqual(tight.state.columnInserts, [{ after: 39, count: 1 }]);
+  const roomy = sourceRuntime(ADVANCE_LAYOUT, Object.assign({ maxColumns: 60 }, owned));
+  roomy.context.setupVisitSource();
+  assert.deepEqual(roomy.state.columnInserts, []);
+  assert.deepEqual(roomy.headers, SOURCE_LAYOUT);
+});
+
+test("setupVisitSource throws for anyone but the owner and writes nothing", () => {
+  for (const options of [{}, { activeEmail: "", effectiveEmail: "owner@example.com" }, { activeEmail: "visitor@example.com", effectiveEmail: "owner@example.com" }]) {
+    const runtime = sourceRuntime(ADVANCE_LAYOUT, options);
+    assert.throws(() => runtime.context.setupVisitSource(), /Run this from the Apps Script editor as the owner/);
+    assert.deepEqual(runtime.headers, ADVANCE_LAYOUT);
+    assert.deepEqual(runtime.state.headerWrites, []);
+  }
+});
+
+test("setupVisitSource refuses a sheet that does not match any known layout and releases the lock", () => {
+  const runtime = sourceRuntime(ADVANCE_LAYOUT.concat(["Wrong"]), owned);
+  assert.throws(() => runtime.context.setupVisitSource(), /schema does not match/);
+  assert.equal(runtime.state.released, true);
+  assert.deepEqual(runtime.state.headerWrites, []);
+});
+
+test("setupVisitSource fails when the headers cannot be verified after writing", () => {
+  const runtime = sourceRuntime(ADVANCE_LAYOUT, owned);
+  const sheet = sheetOf(runtime);
+  const original = sheet.getRange;
+  // A sheet that silently drops the new header (for example a protected range).
+  runtime.context.SpreadsheetApp.openById = () => ({ getSheetByName: () => Object.assign({}, sheet, {
+    getRange: (row, column, numRows, numColumns) => {
+      const range = original(row, column, numRows, numColumns);
+      return row === 1 ? Object.assign({}, range, { setValues: () => {} }) : range;
+    },
+  }) });
+  assert.throws(() => runtime.context.setupVisitSource(), /could not verify|schema does not match/);
+  assert.equal(runtime.state.released, true);
 });

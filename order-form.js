@@ -658,6 +658,47 @@
     }
     return { requestId: String(result && result.requestId || value("requestId")), items: items, fulfillment: value("fulfillment"), notes: String(notes || "").trim().slice(0, 300).trim() };
   }
+  // The Google purchase event (google.js, after the shopper accepted cookies): the request ID and, for each product with a
+  // page, its product ID, price and quantity. Never a name, phone, address, product name or note.
+  function priceNumber(text) {
+    var match = /^\u20b9\s?([\d,]+)$/.exec(String(text || "").trim());
+    return match ? Number(match[1].replace(/,/g, "")) : null;
+  }
+  function productSlug(sourceId) {
+    var imagePath = catalogueImagePath(sourceId);
+    if (!imagePath) return "";
+    try {
+      var link = document.querySelector('a[data-product-slug][href="' + imagePath + '"]');
+      return link ? String(link.getAttribute("data-product-slug") || "") : "";
+    } catch (error) { return ""; }
+  }
+  function purchaseItems() {
+    var lines;
+    if (isBundle() && bundleItems.length) {
+      lines = sortedBundleItems(bundleItems).map(function (item) { return { sourceId: item.sourceId, price: item.price, quantity: bundleQuantity(item) }; });
+    } else {
+      var quantity = Number(value("quantity"));
+      lines = [{ sourceId: seed.sourceId, price: seed.price, quantity: Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 1 }];
+    }
+    var items = [];
+    lines.forEach(function (line) {
+      var slug = productSlug(line.sourceId);
+      if (!slug) return;
+      var item = { item_id: slug, quantity: line.quantity };
+      var price = priceNumber(line.price);
+      if (price !== null) item.price = price;
+      items.push(item);
+    });
+    return items;
+  }
+  function reportPurchase(result) {
+    try {
+      if (!window.saloniGoogle || typeof window.saloniGoogle.purchase !== "function") return;
+      var items = purchaseItems();
+      var total = items.reduce(function (sum, item) { return sum + (item.price || 0) * item.quantity; }, 0);
+      window.saloniGoogle.purchase({ transaction_id: String(result && result.requestId || value("requestId")), value: total, items: items });
+    } catch (error) {}
+  }
   function saveMyOrder(result) {
     var store = window.saloniMyOrders;
     if (!store || typeof store.save !== "function") return;
@@ -675,6 +716,7 @@
     }
     saveMyOrder(result);
     track("order-sent");
+    reportPurchase(result);
     // A visual "it worked" moment, so shoppers know without reading; the status text stays the accessible message.
     if (celebration) celebration.hidden = false;
     setStatus("Request received. Saloni will contact you to confirm the design, price, and delivery. Production is not confirmed." + referralMessage + " Request ID: " + result.requestId, "success");
@@ -772,6 +814,8 @@
   function orderPayload() {
     var payload = {};
     ORDER_FIELDS.forEach(function (field) { payload[field] = value(field); });
+    // Where the visit came from (google.js); not a form field, so it is not in ORDER_FIELDS.
+    try { payload.visitSource = window.saloniVisitSource ? String(window.saloniVisitSource.read() || "") : ""; } catch (error) { payload.visitSource = ""; }
     return payload;
   }
   function imageMimeType(image) {

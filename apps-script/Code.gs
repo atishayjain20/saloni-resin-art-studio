@@ -39,9 +39,15 @@ var PARTNER_ORDER_HEADERS = [
 ];
 var ORDER_HEADERS = LEGACY_ORDER_HEADERS.concat(PARTNER_ORDER_HEADERS);
 // Saloni types these two by hand (see the README, "Advance payment by UPI"). They sit after the partner columns, so every
-// older column keeps its position. setupAdvancePayments() adds them; the three layouts below are the only ones accepted.
+// older column keeps its position. setupAdvancePayments() adds them; the four layouts here and below are the only ones accepted.
 var ADVANCE_ORDER_HEADERS = ["Advance amount", "Advance status"];
 var ORDER_HEADERS_WITH_ADVANCE = ORDER_HEADERS.concat(ADVANCE_ORDER_HEADERS);
+// "Visit source" is the 40th and last column (AN): it marks orders that came from Google Shopping. setupVisitSource() adds it
+// (run once as the owner, after setupAdvancePayments() or on its own: it runs that setup first when the sheet is older).
+// The site sends visitSource; only the allowlisted values below are stored, anything else is stored as blank.
+var VISIT_SOURCE_HEADERS = ["Visit source"];
+var ORDER_HEADERS_WITH_SOURCE = ORDER_HEADERS_WITH_ADVANCE.concat(VISIT_SOURCE_HEADERS);
+var VISIT_SOURCES = ["google-shopping"];
 var PARTNER_APPLICATION_HEADERS = [
   "Application ID", "Received at", "Applicant name", "Business name", "Category", "City / service area",
   "Phone / WhatsApp", "Email", "Instagram / website", "Typical customers", "Referral plan", "Rules accepted",
@@ -125,7 +131,7 @@ var ORDER_POST_FIELDS = [
   "requestId", "requestStage", "sourceKind", "sourceId", "productName", "quantity", "dimensionFormat",
   "heightFeet", "heightInchesPart", "widthFeet", "widthInchesPart", "height", "heightUnit", "width", "widthUnit",
   "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin",
-  "requestedDate", "referralCode", "bundleSourceIds"
+  "requestedDate", "referralCode", "bundleSourceIds", "visitSource"
 ];
 
 function postedJson_(event) {
@@ -757,6 +763,8 @@ function submitOrder(form) {
         : rowForPayload_(payload, fingerprint, receivedAt, referenceFile);
       // The advance cells (last two columns, when the sheet has them) start empty: Saloni types them.
       while (row.length < schemaLength) row.push("");
+      // The visit source is the last column, on the newest layout only; older layouts get nothing and keep their width.
+      if (schemaLength === ORDER_HEADERS_WITH_SOURCE.length) row[schemaLength - 1] = neutralizeForSheet_(payload.visitSource);
       sheet.appendRow(row);
       newOrder = { receivedAt: receivedAt, referenceFile: referenceFile };
       return {
@@ -895,7 +903,7 @@ function orderStatuses_(requestIds) {
   if (rows > 0) {
     var statusColumn = LEGACY_ORDER_HEADERS.indexOf("Status");
     // The advance columns exist only on the newest layout, and the kill switch stops reading them.
-    var withAdvance = !isTrue_(properties.getProperty("UPI_ADVANCE_DISABLED")) && orderSchemaLength_(sheet) === ORDER_HEADERS_WITH_ADVANCE.length;
+    var withAdvance = !isTrue_(properties.getProperty("UPI_ADVANCE_DISABLED")) && orderSchemaLength_(sheet) >= ORDER_HEADERS_WITH_ADVANCE.length;
     var amountColumn = ORDER_HEADERS.length;
     var payee = withAdvance ? upiPayee_(properties) : null;
     // One read of the Request ID .. Status columns (to Advance status when the sheet has it); the schema check in
@@ -1160,6 +1168,28 @@ function setupAdvancePayments() {
   }
 }
 
+// Public so it shows in the editor Run menu; run once as the owner after deploying. Adds the "Visit source" header (column AN,
+// the last one) to the Orders sheet, which marks orders that came from Google Shopping. It runs the advance setup first when the
+// sheet is older (the partner and advance columns). Never touches order rows, and no web request can reach it: a visitor has an
+// empty active user. Safe to run twice (the second run changes nothing).
+function setupVisitSource() {
+  var active = String(Session.getActiveUser().getEmail() || "");
+  if (!active || active !== String(Session.getEffectiveUser().getEmail() || "")) {
+    throw new Error("Run this from the Apps Script editor as the owner.");
+  }
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to start visit source setup.");
+  try {
+    var sheet = openOrderSheet_(PropertiesService.getScriptProperties());
+    var changed = migrateVisitSourceSchema_(sheet);
+    var result = { orderColumns: orderSchemaLength_(sheet), changed: changed };
+    console.log(JSON.stringify(result));
+    return result;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // --- WhatsApp advance message ---------------------------------------------
 // For every order that shows an advance on the site, the "Advance amount" cell becomes a link: wa.me/<shopper's number> with
 // the message already typed. Saloni taps the amount on her phone, WhatsApp opens, she checks the text and presses Send.
@@ -1223,7 +1253,7 @@ function refreshWhatsAppAdvanceLinks_() {
   if (!lock.tryLock(5000)) return null;
   try {
     var sheet = openOrderSheet_(properties);
-    if (orderSchemaLength_(sheet) !== ORDER_HEADERS_WITH_ADVANCE.length) return null; // the advance columns are on the newest layout only
+    if (orderSchemaLength_(sheet) < ORDER_HEADERS_WITH_ADVANCE.length) return null; // the advance columns exist on the two newest layouts only
     var rows = sheet.getLastRow() - 1;
     var counts = { set: 0, removed: 0, noted: 0, checked: 0 };
     if (rows < 1) return counts;
@@ -2617,8 +2647,14 @@ function collectPayload_(form) {
     requestedDate: stringValue_(form.requestedDate),
     referralCode: normalizeReferralCode_(form.referralCode),
     bundleSourceIds: stringValue_(form.bundleSourceIds),
+    visitSource: normalizeVisitSource_(form.visitSource),
     referenceImage: normalizeReferenceImage_(form.referenceImage)
   };
+}
+
+// An allowlisted value or "". An unknown value is never an error: it must not stop an order.
+function normalizeVisitSource_(value) {
+  return typeof value === "string" && VISIT_SOURCES.indexOf(value) >= 0 ? value : "";
 }
 
 function validBundleSourceIds_(payload) {
@@ -2934,7 +2970,8 @@ function ensureSchema_(sheet) {
   var columns = Number(sheet.getLastColumn && sheet.getLastColumn()) || LEGACY_ORDER_HEADERS.length;
   var expected = columns === LEGACY_ORDER_HEADERS.length ? LEGACY_ORDER_HEADERS
     : columns === ORDER_HEADERS.length ? ORDER_HEADERS
-    : columns === ORDER_HEADERS_WITH_ADVANCE.length ? ORDER_HEADERS_WITH_ADVANCE : null;
+    : columns === ORDER_HEADERS_WITH_ADVANCE.length ? ORDER_HEADERS_WITH_ADVANCE
+    : columns === ORDER_HEADERS_WITH_SOURCE.length ? ORDER_HEADERS_WITH_SOURCE : null;
   if (!expected) throw new Error("Order sheet schema does not match the allowlist.");
   var existing = sheet.getRange(1, 1, 1, expected.length).getValues()[0].map(String);
   if (existing.join("\u001f") !== expected.join("\u001f")) throw new Error("Order sheet schema does not match the allowlist.");
@@ -2958,7 +2995,7 @@ function migrateOrdersSchema_(sheet) {
 // layout. Headers only: no data row is read or written. Safe to run twice (the second run changes nothing).
 function migrateAdvanceSchema_(sheet) {
   var columns = ensureSchema_(sheet);
-  if (columns === ORDER_HEADERS_WITH_ADVANCE.length) {
+  if (columns >= ORDER_HEADERS_WITH_ADVANCE.length) {
     plainTextAdvanceColumns_(sheet);
     return false;
   }
@@ -2973,6 +3010,24 @@ function migrateAdvanceSchema_(sheet) {
     throw new Error("Order sheet migration could not verify the advance headers.");
   }
   plainTextAdvanceColumns_(sheet);
+  return true;
+}
+
+// Adds the "Visit source" header (AN) after the advance columns, running the advance setup first when the sheet is older.
+// Headers only: no data row is read or written. Returns true when it added the header, false when it was already there.
+function migrateVisitSourceSchema_(sheet) {
+  var columns = ensureSchema_(sheet);
+  if (columns === ORDER_HEADERS_WITH_SOURCE.length) return false;
+  if (columns < ORDER_HEADERS_WITH_ADVANCE.length) {
+    migrateAdvanceSchema_(sheet);
+    columns = ensureSchema_(sheet);
+  }
+  var maxColumns = Number(sheet.getMaxColumns && sheet.getMaxColumns()) || columns;
+  if (maxColumns < ORDER_HEADERS_WITH_SOURCE.length) sheet.insertColumnsAfter(maxColumns, ORDER_HEADERS_WITH_SOURCE.length - maxColumns);
+  sheet.getRange(1, columns + 1, 1, VISIT_SOURCE_HEADERS.length).setValues([VISIT_SOURCE_HEADERS]);
+  if (sheet.getRange(1, 1, 1, ORDER_HEADERS_WITH_SOURCE.length).getValues()[0].map(String).join("\u001f") !== ORDER_HEADERS_WITH_SOURCE.join("\u001f")) {
+    throw new Error("Order sheet migration could not verify the visit source header.");
+  }
   return true;
 }
 
