@@ -8,8 +8,8 @@ Run it from anywhere after adding, renaming or removing a catalogue card in inde
 Each product gets p/<slug>/index.html: a small real product page (photo, name, price, size,
 description line) with its own Open Graph tags for link previews (WhatsApp, Facebook and X read
 them without running JavaScript) and Product structured data (JSON-LD) so Google can show the
-price and photo. Products priced "Price on request" get no structured data. The "View and order"
-button opens /?product=<slug>#<section>, where script.js opens that product's popup. A price in a
+price and photo. Products priced "Price on request" get no structured data. The "Add to cart"
+button opens /?product=<slug>&add=1#<section>, where script.js puts that product in the cart and shows its card. A price in a
 new format stops this script until price_offer() learns it.
 Each product page also has a path line (Home > topic > product; products no topic holds get Home > product)
 with BreadcrumbList data, and a "More like this" list of 4 products from the same group (the first topic in
@@ -448,7 +448,7 @@ def jpeg_size(path):
 
 def render_page(card, slug, share_size, topic, more, version):
     url = "%s/%s/%s/" % (SITE, PAGE_DIR, slug)
-    target = "/?product=%s#%s" % (slug, card["section"])
+    target = "/?product=%s&add=1#%s" % (slug, card["section"])
     title = "%s | %s" % (card["name"], STUDIO)
     desc = description(card)
     image = "%s/assets/share/%s.jpg" % (SITE, slug)
@@ -500,7 +500,7 @@ def render_page(card, slug, share_size, topic, more, version):
     <img src="/assets/{file}" alt="{alt}"{dims} class="photo" fetchpriority="high">
     <h1>{name}</h1>
     <p class="price">{price}</p>
-{size_line}{line_html}    <a class="order" href="{target}">View and order</a>
+{size_line}{line_html}    <a class="order" href="{target}">Add to cart</a>
 {more_html}  </main>
 {footer}</body>
 </html>

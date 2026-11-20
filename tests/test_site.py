@@ -2798,7 +2798,7 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertNotIn("<noscript", text, slug)
             self.assertIn(card["section"], section_ids, slug)
             self.assertEqual(tags.body_links[:2], ["#main-content", "/"], slug + ": skip link, then the site header wordmark")
-            self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=" + slug + "#" + card["section"]], slug)
+            self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=" + slug + "&add=1#" + card["section"]], slug)
             self.assertEqual(tags.noscript_links, [], slug)
             self.assertEqual(re.findall(r"<h1>([^<]*)</h1>", text), [html.escape(card["name"], quote=True)], slug)
             sizes = re.findall(r'<p class="size">Size: ([^<]*)</p>', text)
@@ -2812,9 +2812,9 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertEqual(re.findall(r"<script\b([^>]*)>", text), [' type="application/ld+json"'] * len(re.findall(r"application/ld\+json", text)) + [' src="/google.js?v=%s" defer' % self.version], slug)
         # The button lands in the section the card sits in.
         _, tags = self.page("jewel-glow-tealight")
-        self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=jewel-glow-tealight#diwali"])
+        self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=jewel-glow-tealight&add=1#diwali"])
         _, tags = self.page("two-keys-one-little-us")
-        self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=two-keys-one-little-us#romantic-keepsakes"])
+        self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=two-keys-one-little-us&add=1#romantic-keepsakes"])
 
     def test_every_product_has_a_small_progressive_thumb_that_its_card_points_to(self):
         for slug in self.slugs:
