@@ -377,11 +377,11 @@ test("Jain search terms find exactly the Jain mantra pieces", () => {
     .filter((article) => searchableText(article).includes(term))
     .map((article) => (article.match(/<strong>([^<]*)<\/strong>/) || [])[1]);
   const jainPieces = [
-    "Blue and white Namokar mantra frame",
-    "White and gold Namokar mantra frame",
+    "Blue and white Namokar (Navkar) mantra frame",
+    "White and gold Namokar (Navkar) mantra frame",
     "Om asiausa mantra plaque",
     "Rose mantra door strips",
-    "Pearl white Namokar mantra frame",
+    "Pearl white Namokar (Navkar) mantra frame",
   ];
   ["jain", "जैन"].forEach((term) => {
     assert.deepEqual(titlesFor(term).sort(), [...jainPieces].sort(), `${term} must find every Jain piece and nothing else`);
