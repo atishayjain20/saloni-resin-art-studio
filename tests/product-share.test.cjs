@@ -27,7 +27,7 @@ test("share helpers build the product page URL and an encoded WhatsApp message",
   assert.equal(decodeURIComponent(api.whatsappShareUrl("Rose Tray", "", `${SITE}/p/rose-tray/`).split("text=")[1]), `Rose Tray – ${SITE}/p/rose-tray/`, "no price, no dangling dash");
 });
 
-function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Glow Tealight", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {}, thumbs = false, inCart = false } = {}) {
+function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Resin Tealight Holder", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {}, thumbs = false, inCart = false } = {}) {
   const cartButtons = {};
   const make = (extra = {}) => Object.assign({
     hidden: false, textContent: "", attributes: {}, listeners: {},
@@ -110,7 +110,7 @@ test("?product=<slug> opens that product's own popup", () => {
   assert.equal(first.windowObject.history.scrollRestoration, "manual", "Back keeps the page where the link scrolled it");
   const second = harness({ search: "?ref=ABC&product=jewel-glow-tealight" });
   second.openSharedProduct();
-  assert.equal(second.elements["lightbox-product-name"].textContent, "Jewel Glow Tealight");
+  assert.equal(second.elements["lightbox-product-name"].textContent, "Jewel Resin Tealight Holder");
 });
 
 test("opening a shared product takes ?product= out of the address (keeping the hash and other params) before the popup's own history step", () => {
@@ -128,7 +128,7 @@ test("the shared slug is read when the page loads, so the catalogue tidying the 
   page.windowObject.location.search = "";
   page.openSharedProduct();
   assert.equal(page.lightbox.open, true);
-  assert.equal(page.elements["lightbox-product-name"].textContent, "Jewel Glow Tealight");
+  assert.equal(page.elements["lightbox-product-name"].textContent, "Jewel Resin Tealight Holder");
 });
 
 test("an unknown, empty or missing product leaves the home page as it is", () => {
@@ -157,7 +157,7 @@ test("the popup's Share button uses the phone's own share sheet when there is on
   assert.equal(page.elements["lightbox-share"].hidden, false);
   assert.equal(page.elements["lightbox-share-button"].attributes["aria-expanded"], "false");
   page.elements["lightbox-share-button"].listeners.click();
-  assert.deepEqual(JSON.parse(JSON.stringify(page.calls.share)), [{ title: "Jewel Glow Tealight", text: "Jewel Glow Tealight – ₹249", url: `${SITE}/p/jewel-glow-tealight/` }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(page.calls.share)), [{ title: "Jewel Resin Tealight Holder", text: "Jewel Resin Tealight Holder – ₹249", url: `${SITE}/p/jewel-glow-tealight/` }]);
   await settle();
   assert.equal(page.elements["lightbox-share-options"].hidden, true, "no extra options beside the share sheet");
 });
@@ -239,7 +239,7 @@ test("the popup markup has an accessible Share button, the two options and a pol
   assert.match(css, /\.lightbox-share-options\[hidden\]\s*\{\s*display:\s*none/);
 });
 
-const MORE_SLUGS = { "jewel-glow-tealight": "Jewel Glow Tealight", "gold-fleck-lotus-light": "Gold-Fleck Lotus Light", "pastel-lotus-tealight": "Pastel Lotus Tealight", "ivory-mandala-holder": "Ivory Mandala Holder", "emerald-glow-pair": "Emerald Glow Pair" };
+const MORE_SLUGS = { "jewel-glow-tealight": "Jewel Resin Tealight Holder", "gold-fleck-lotus-light": "Gold Fleck Lotus Tealight Holder", "pastel-lotus-tealight": "Pastel Lotus Tealight Holder", "ivory-mandala-holder": "Ivory Mandala Tealight Holder", "emerald-glow-pair": "Emerald Tealight Holder Pair" };
 const MORE = { "jewel-glow-tealight": "gold-fleck-lotus-light pastel-lotus-tealight ivory-mandala-holder emerald-glow-pair", "gold-fleck-lotus-light": "pastel-lotus-tealight jewel-glow-tealight" };
 const moreNames = (page) => page.moreList.children.map((li) => li.children[0].textContent);
 
@@ -249,7 +249,7 @@ test("popup More like this: the card's own list becomes text buttons, and a tap 
   page.windowObject.saloniTrack = (name) => events.push(name);
   page.triggers[0].listeners.click({ button: 0, preventDefault() {} });
   assert.equal(page.elements["lightbox-more"].hidden, false);
-  assert.deepEqual(moreNames(page), ["Gold-Fleck Lotus Light", "Pastel Lotus Tealight", "Ivory Mandala Holder", "Emerald Glow Pair"]);
+  assert.deepEqual(moreNames(page), ["Gold Fleck Lotus Tealight Holder", "Pastel Lotus Tealight Holder", "Ivory Mandala Tealight Holder", "Emerald Tealight Holder Pair"]);
   assert.deepEqual(page.moreList.children.map((li) => li.children[0].attributes["data-more-slug"]), ["gold-fleck-lotus-light", "pastel-lotus-tealight", "ivory-mandala-holder", "emerald-glow-pair"]);
   assert.equal(page.moreList.children[0].children[0].attributes.type, "button");
   assert.deepEqual(page.moreList.children[0].children[0].children.map((child) => child.tagName), ["span"], "a card with no data-thumb gives a text-only item");
@@ -258,12 +258,12 @@ test("popup More like this: the card's own list becomes text buttons, and a tap 
   page.figure.scrollTop = 400;
   page.moreList.listeners.click({ target: page.moreList.children[0].children[0] });
   assert.equal(page.lightbox.open, true);
-  assert.equal(page.elements["lightbox-product-name"].textContent, "Gold-Fleck Lotus Light");
+  assert.equal(page.elements["lightbox-product-name"].textContent, "Gold Fleck Lotus Tealight Holder");
   assert.deepEqual(events, ["product-jewel-glow-tealight", "product-gold-fleck-lotus-light"]);
   assert.equal(page.pushes.length, 1, "no new history entry: Back closes the popup");
   assert.equal(page.figure.scrollTop, 0);
   assert.deepEqual(page.figure.focused, true, "focus moves to the scrolling area");
-  assert.deepEqual(moreNames(page), ["Pastel Lotus Tealight", "Jewel Glow Tealight"], "the new product's own list, never itself");
+  assert.deepEqual(moreNames(page), ["Pastel Lotus Tealight Holder", "Jewel Resin Tealight Holder"], "the new product's own list, never itself");
   // Closing returns focus to the card that first opened the popup, and empties the section.
   page.lightbox.close();
   assert.equal(page.triggers[0].focused, true);
@@ -281,7 +281,7 @@ test("popup More like this: the item shows the target card's own thumbnail, with
   assert.equal(img.attributes.src, "assets/thumb/gold-fleck-lotus-light.jpg", "the URL comes from the target card's data-thumb");
   assert.equal(img.attributes.alt, "");
   assert.deepEqual([img.attributes.width, img.attributes.height, img.attributes.loading], ["300", "300", "lazy"]);
-  assert.equal(button.textContent, "Gold-Fleck Lotus Light");
+  assert.equal(button.textContent, "Gold Fleck Lotus Tealight Holder");
   assert.equal(button.attributes["data-more-slug"], "gold-fleck-lotus-light");
 });
 
@@ -290,10 +290,10 @@ test("popup More like this: works after a shared link, skips unknown or own slug
   shared.openSharedProduct();
   assert.equal(shared.moreList.children.length, 4);
   shared.moreList.listeners.click({ target: shared.moreList.children[1].children[0] });
-  assert.equal(shared.elements["lightbox-product-name"].textContent, "Pastel Lotus Tealight");
+  assert.equal(shared.elements["lightbox-product-name"].textContent, "Pastel Lotus Tealight Holder");
   const odd = harness({ slugs: MORE_SLUGS, more: { "jewel-glow-tealight": "jewel-glow-tealight no-such-gift emerald-glow-pair" } });
   odd.triggers[0].listeners.click({ button: 0, preventDefault() {} });
-  assert.deepEqual(moreNames(odd), ["Emerald Glow Pair"]);
+  assert.deepEqual(moreNames(odd), ["Emerald Tealight Holder Pair"]);
   const none = harness({ slugs: MORE_SLUGS, more: MORE });
   none.triggers[2].listeners.click({ button: 0, preventDefault() {} });
   assert.equal(none.elements["lightbox-more"].hidden, true);
@@ -316,7 +316,7 @@ test("every card photo link carries its own data-product-slug and the version is
   assert.ok(slugs.length > 90);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.doesNotMatch(html, /\?v=20261165/);
-  assert.match(html, /script\.js\?v=20261198/);
+  assert.match(html, /script\.js\?v=20261199/);
 });
 
 // --- Visitor counts: the product popup, the share button and a shared link, with no personal data ---

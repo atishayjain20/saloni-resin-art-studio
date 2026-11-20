@@ -49,7 +49,7 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
   assert.doesNotMatch(sale, /ends|hurry|only today|countdown|left/i);
   assert.equal((sale.match(/<a\b/g) || []).length, 1);
   assert.match(sale, /<a class="button hero-promo-cta" href="#catalogue-filters" data-browse-all>Shop the sale<\/a>/);
-  [["Rose hexagon", "₹3,124", "₹2,499"], ["Sunflower resin lamp", "₹749", "₹599"], ["Little brother keepsake", "₹499", "₹399"]].forEach(([title, was, now]) => {
+  [["Preserved Rose Hexagon Frame", "₹3,124", "₹2,499"], ["Sunflower Resin Night Lamp", "₹749", "₹599"], ["Little Brother Name Rakhi", "₹499", "₹399"]].forEach(([title, was, now]) => {
     const card = html.match(new RegExp(`<article\\b(?:(?!<\\/article>)[\\s\\S])*?<(?:strong|h3)[^>]*>${title}<\\/(?:strong|h3)>[\\s\\S]*?<\\/article>`))?.[0] || "";
     assert.match(card, new RegExp(`<dd>${now}<\\/dd>[\\s\\S]*?<s>${was}<\\/s>`), `${title} card price must match the sale slide`);
     assert.match(sale, new RegExp(`<s>${was}<\\/s> <span class="sr-only">now <\\/span><strong>${now}<\\/strong>`), `${title} sticker reads "was … now …"`);
@@ -331,10 +331,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261198">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261198" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261198" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261198" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261199">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261199" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261199" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261199" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -342,9 +342,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261198"], page);
+    assert.deepEqual([...new Set(versions)], ["20261199"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261198/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261199/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -2040,7 +2040,7 @@ test("hero lightbox targets the hidden canonical card and restores focus to the 
     return null;
   } });
   const orderButton = makeElement();
-  const title = { textContent: "Tiny tray, big feelings" };
+  const title = { textContent: "Heart Resin Trinket Tray" };
   const paragraph = { textContent: "A soft place for rings, earbuds, and the little things you share." };
   const canonicalTrigger = makeElement({ href: "assets/romantic-heart-trinket-tray.webp", querySelector(selector) { return selector === "img" ? canonicalImage : null; } });
   const canonicalCard = makeElement({ hidden: true, querySelector(selector) {
@@ -2075,7 +2075,7 @@ test("hero lightbox targets the hidden canonical card and restores focus to the 
   vm.runInNewContext(`(function () { ${aiPhotoHelpers}${script.slice(start, end)} })();`, { document: documentObject, window: {} });
   heroTrigger.listeners.click({ defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, preventDefault() {} });
   assert.equal(imageTarget.src, "assets/romantic-heart-trinket-tray.webp");
-  assert.equal(docElements["lightbox-product-name"].textContent, "Tiny tray, big feelings");
+  assert.equal(docElements["lightbox-product-name"].textContent, "Heart Resin Trinket Tray");
   assert.equal(docElements["lightbox-product-price"].textContent, "From: ₹349");
   assert.equal(docElements["lightbox-product-size"].textContent, "Size: 4 in");
   assert.match(docElements["lightbox-image-description"].textContent, /A soft place for rings/);
@@ -2563,9 +2563,9 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
     return start < 0 || end < 0 ? "" : html.slice(start, end + "</article>".length);
   };
   const rowsFor = (title) => [...(cardFor(title).match(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-regular-price">.*?<\/dd>)?<\/div>/g) || [])].map((row) => row.match(/<dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>/).slice(1));
-  assert.deepEqual(rowsFor("Shubh Labh Welcome Pair").slice(1), [["Size", "4–6 in"]]);
+  assert.deepEqual(rowsFor("Shubh Labh Door Hanging Pair").slice(1), [["Size", "4–6 in"]]);
   assert.equal(cardFor("Festive Welcome Hamper"), "");
-  assert.deepEqual(rowsFor("Ivory Mandala Holder").slice(1), [["Size", "3 in"]]);
+  assert.deepEqual(rowsFor("Ivory Mandala Tealight Holder").slice(1), [["Size", "3 in"]]);
   assert.deepEqual(rowsFor("Pearl Rangoli Accent").slice(1), [["Size", "3–4 in"]]);
   assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "4–5 in"]]);
 });

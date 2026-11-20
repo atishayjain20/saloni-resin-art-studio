@@ -32,12 +32,12 @@ const CORPORATE_RESIN_GIFTS = [
 ];
 
 const DIWALI_NEW_CONCEPTS = [
-  ["diwali-marigold-petal-holder-concept.webp", "Marigold Petal Holder", "A warm marigold-inspired cup for a soft festive glow.", "one LED tealight holder · LED not included", "349", "249", 29],
-  ["diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Holder", "An ivory mandala cup with a calm, hand-finished festive feel.", "one LED tealight holder · LED not included", "399", "299", 25],
+  ["diwali-marigold-petal-holder-concept.webp", "Marigold Tealight Holder", "A warm marigold-inspired cup for a soft festive glow.", "one LED tealight holder · LED not included", "349", "249", 29],
+  ["diwali-ivory-mandala-holder-concept.webp", "Ivory Mandala Tealight Holder", "An ivory mandala cup with a calm, hand-finished festive feel.", "one LED tealight holder · LED not included", "399", "299", 25],
   ["diwali-ruby-leaf-dish-concept.webp", "Ruby Leaf Dish", "A ruby-red leaf dish for a small festive offering or accent.", "one decorative dish", "399", "299", 25],
   ["diwali-saffron-tilak-duo-concept.webp", "Saffron Tilak Duo", "Two saffron-toned mini dishes for tilak and rice.", "two mini dishes", "449", "349", 22],
   ["diwali-pearl-rangoli-accent-concept.webp", "Pearl Rangoli Accent", "A pearly rangoli-inspired accent for an entryway or prayer corner.", "one decorative accent", "499", "399", 20],
-  ["diwali-emerald-led-holder-pair-concept.webp", "Emerald Glow Pair", "A pair of emerald cups for a jewel-toned LED-lit arrangement.", "pair of LED tealight holders · LEDs not included", "549", "399", 27],
+  ["diwali-emerald-led-holder-pair-concept.webp", "Emerald Tealight Holder Pair", "A pair of emerald cups for a jewel-toned LED-lit arrangement.", "pair of LED tealight holders · LEDs not included", "549", "399", 27],
   ["diwali-rose-petal-offering-plate-concept.webp", "Rose Petal Offering Plate", "A rosy ritual plate with a gentle petal-inspired edge.", "one decorative ritual plate", "499", "349", 30],
   ["diwali-golden-toran-charms-concept.webp", "Golden Toran Charms", "Three golden hanging charms to style a festive doorway or wall.", "set of three hanging charms with cords", "599", "449", 25],
   ["diwali-lotus-rangoli-duo-concept.webp", "Lotus Rangoli Duo", "Two lotus pieces for a small layered rangoli arrangement.", "set of two decorative lotus pieces", "499", "399", 20],
@@ -156,9 +156,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     ["Size", "4 in"],
   ].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
   const romanticExistingCatalogue = [
-    ["studio-rose-hexagon-keepsake.jpeg", "Rose hexagon", "First rose from a boyfriend, held in love."],
-    ["studio-personalized-photo-clock.jpeg", "Personalized photo clock", "A favourite couple photo, held in a clock."],
-    ["studio-red-rose-resin-display.jpeg", "Preserved rose display", "Preserved red roses, held close for a lasting moment."],
+    ["studio-rose-hexagon-keepsake.jpeg", "Preserved Rose Hexagon Frame", "First rose from a boyfriend, held in love."],
+    ["studio-personalized-photo-clock.jpeg", "Couple Photo Resin Clock", "A favourite couple photo, held in a clock."],
+    ["studio-red-rose-resin-display.jpeg", "Preserved Red Rose Resin Display", "Preserved red roses, held close for a lasting moment."],
   ];
   const romanticExistingCards = romanticExistingCatalogue.map(([asset, title, copy]) => {
     const existingCard = new Element("romantic-keepsake-card");
@@ -167,7 +167,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     existingCard.title = { textContent: title };
     existingCard.titleTag = "h3";
     existingCard.detailNodes = [{ textContent: copy }];
-    const size = title === "Rose hexagon" ? ["Size", "8–10 in"] : title === "Personalized photo clock" ? ["Size", "16–18 in"] : null;
+    const size = title === "Preserved Rose Hexagon Frame" ? ["Size", "8–10 in"] : title === "Couple Photo Resin Clock" ? ["Size", "16–18 in"] : null;
     existingCard.priceRows = [
       ["Price", "₹599"],
       size,
@@ -176,10 +176,10 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   });
   const highlightCard = romanticExistingCards[2];
   const movedStudioCatalogue = [
-    ["resin-clock.jpg", "Blue hour resin clock", "A little sky, a little shoreline, and a moment that keeps time."],
-    ["resin-message-coasters.jpg", "Personalized message coasters", "Playful coasters for the person who makes ordinary days better."],
+    ["resin-clock.jpg", "Blue Ocean Resin Wall Clock", "A little sky, a little shoreline, and a moment that keeps time."],
+    ["resin-message-coasters.jpg", "Personalised Message Coaster Set", "Playful coasters for the person who makes ordinary days better."],
     ["navkar-resin-frame.jpg", "Pearl white Namokar (Navkar) mantra frame", "Soft white texture, gold detail, and words that belong at home."],
-    ["personalized-floral-hoop.jpg", "A tiny beginning", "Floral detail arranged around a memory worth marking."],
+    ["personalized-floral-hoop.jpg", "Personalised Floral Hoop Frame", "Floral detail arranged around a memory worth marking."],
   ];
   const movedStudioCards = movedStudioCatalogue.map(([asset, title, copy]) => {
     const studioCard = new Element("work-card");
@@ -191,9 +191,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     return studioCard;
   });
   const generatedCatalogue = [
-    ["concept-floral-memory-frame.webp", "Your flowers, held close", "4,999", "3,999", 20],
-    ["concept-ocean-clock.webp", "A little blue hour", "2,999", "2,199", 27],
-    ["concept-floral-coasters.webp", "Little messages, shared", "1,299", "999", 23],
+    ["concept-floral-memory-frame.webp", "Pressed Flower Arch Frame", "4,999", "3,999", 20],
+    ["concept-ocean-clock.webp", "Shoreline Resin Wall Clock", "2,999", "2,199", 27],
+    ["concept-floral-coasters.webp", "Personalised Floral Coaster Set", "1,299", "999", 23],
   ];
   const generatedCards = generatedCatalogue.map(([asset, title, regular, festive, discount], index) => {
     const generatedCard = new Element("generated-catalogue-card");
@@ -213,14 +213,14 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   });
   if (longCatalogueTitle) generatedCards[1].title.textContent = "x".repeat(2050);
   const romanticCatalogue = [
-    ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "599", "399", 33],
-    ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "999", "699", 30],
-    ["romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25],
-    ["romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "899", "599", 33],
-    ["romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30],
-    ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30],
-    ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33],
-    ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28],
+    ["romantic-us-keychain-pair.webp", "Couple Name Keychain Pair", "Made to travel together, even when you cannot.", "599", "399", 33],
+    ["romantic-floral-bookmark-set.webp", "Pressed Flower Bookmark Set", "Three little places to keep the chapters that feel like yours.", "999", "699", 30],
+    ["romantic-calendar-coaster.webp", "Couple Date Calendar Coaster", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25],
+    ["romantic-first-rose-bracelet.webp", "Rose Petal Resin Bracelet", "One petal from the beginning, made wearable.", "899", "599", 33],
+    ["romantic-heart-trinket-tray.webp", "Heart Resin Trinket Tray", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30],
+    ["romantic-initial-desk-stand.webp", "Couple Initials Desk Stand", "Two letters, one small corner that belongs to both of you.", "999", "699", 30],
+    ["romantic-botanical-pendant.webp", "Pressed Flower Name Pendant", "Pressed flowers and a name, kept close.", "599", "399", 33],
+    ["romantic-ocean-memory-tray.webp", "Ocean Memory Resin Tray", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28],
   ];
   const romanticConceptCards = romanticCatalogue.map(([asset, title, copy, regular, festive, discount], index) => {
     const romanticCard = new Element("romantic-keepsake-card");
@@ -295,8 +295,8 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     if (override) pricedCard.priceRows[0] = { querySelector(selector) { return selector === "dt" ? { textContent: "Price" } : { textContent: override }; } };
   });
   const premiumCards = [
-    ["premium-midnight-blue-tiered-set.jpeg", "Midnight blue tiered set", "₹22,500"],
-    ["premium-ivory-gold-tiered-set.jpeg", "Ivory-gold tiered set", "Price on request"],
+    ["premium-midnight-blue-tiered-set.jpeg", "Midnight Blue 3-Tier Resin Serving Set", "₹22,500"],
+    ["premium-ivory-gold-tiered-set.jpeg", "Ivory Gold 3-Tier Resin Serving Set", "Price on request"],
   ].map(([asset, title, price]) => {
     const premiumCard = new Element("work-card");
     premiumCard.caption = new Element("figcaption");
@@ -438,10 +438,10 @@ test("builds one deterministic request for multiple catalogue selections", () =>
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.sourceKind, "catalogue");
   assert.equal(seed.sourceId, "catalogue:multi-item");
-  assert.equal(seed.productName, "Your flowers, held close + 1 more");
+  assert.equal(seed.productName, "Pressed Flower Arch Frame + 1 more");
   assert.equal(seed.quantity, "2");
   assert.match(seed.designDetails, /Test frame/);
-  assert.match(seed.designDetails, /Your flowers, held close/);
+  assert.match(seed.designDetails, /Pressed Flower Arch Frame/);
   assert.match(seed.designDetails, /Qty 1/);
   assert.doesNotMatch(seed.designDetails, /Source:|catalogue:|Quantity:|Item \d+:/);
   assert.deepEqual(seed.bundleItems.map((item) => item.sourceId).sort(), ["catalogue:concept-floral-memory-frame.webp", "catalogue:test-frame.png"]);
@@ -459,9 +459,9 @@ test("dedupes and removes catalogue selections before requesting the remaining i
   flow.catalogueRequestSelected.dispatch("click");
   assert.equal(flow.posted.length, 1, "rapid cart changes open nothing; Order now opens the final cart once");
   const seed = submittedSeed(flow.posted);
-  assert.equal(seed.productName, "Your flowers, held close");
+  assert.equal(seed.productName, "Pressed Flower Arch Frame");
   assert.doesNotMatch(seed.designDetails, /Test frame/);
-  assert.match(seed.designDetails, /Your flowers, held close/);
+  assert.match(seed.designDetails, /Pressed Flower Arch Frame/);
 });
 
 test("keeps the bundle bounded and explains when another catalogue item cannot be added", () => {
@@ -682,7 +682,7 @@ test("premium sets use Add to cart like every other card, and join the same cart
   assert.ok(button, "premium card has an Add to cart button");
   assert.equal(flow.premiumCards[0].caption.children.some((child) => child.attributes["data-order-prefill"] === "quote"), false, "no quote button left");
   assert.equal(button.textContent, "Add to cart");
-  assert.equal(button.getAttribute("aria-label"), "Add Midnight blue tiered set to cart");
+  assert.equal(button.getAttribute("aria-label"), "Add Midnight Blue 3-Tier Resin Serving Set to cart");
   assert.equal(button.getAttribute("aria-pressed"), "false");
   flow.catalogueButton.dispatch("click");
   button.dispatch("click");
@@ -755,7 +755,7 @@ test("Order on WhatsApp links open wa.me with the cart as an encoded message and
     const message = decodeURIComponent(href.slice(href.indexOf("=") + 1));
     assert.match(message, /^Hi Saloni/);
     assert.match(message, /Test frame \u00b7 4 in \u00b7 ₹249 × 2/);
-    assert.match(message, /Little messages, shared \u00b7 3 in each \u00b7 ₹999 × 1/);
+    assert.match(message, /Personalised Floral Coaster Set \u00b7 3 in each \u00b7 ₹999 × 1/);
     assert.match(message, /Estimated total: ₹1,497 \+ shipping/);
     assert.doesNotMatch(message, /catalogue:/);
   });
@@ -878,7 +878,7 @@ test("cart lists every selected line and submits independent quantities with a b
   const flow = runFlow();
   [flow.catalogueButton, flow.generatedCatalogueButtons[0], flow.generatedCatalogueButtons[1], flow.generatedCatalogueButtons[2]].forEach((button) => button.dispatch("click"));
   assert.equal(flow.catalogueSelectionItems.children.length, 4);
-  assert.deepEqual(flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "Your flowers, held close", "A little blue hour", "Little messages, shared"]);
+  assert.deepEqual(flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "Pressed Flower Arch Frame", "Shoreline Resin Wall Clock", "Personalised Floral Coaster Set"]);
   flow.generatedCatalogueButtons[2].dispatch("click");
   const quantities = flow.catalogueSelectionItems.children.map((line) => line.querySelector("input"));
   quantities[0].value = "2"; quantities[0].dispatch("change");
@@ -916,10 +916,10 @@ test("cart lists every selected line and submits independent quantities with a b
   flow.catalogueRequestSelected.dispatch("click");
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.quantity, "8");
-  assert.deepEqual(seed.bundleItems.map((item) => [item.productName, item.quantity]), [["Test frame", 2], ["Your flowers, held close", 5], ["A little blue hour", 1]]);
+  assert.deepEqual(seed.bundleItems.map((item) => [item.productName, item.quantity]), [["Test frame", 2], ["Pressed Flower Arch Frame", 5], ["Shoreline Resin Wall Clock", 1]]);
   assert.match(seed.designDetails, /Test frame.*Qty 2/);
-  assert.match(seed.designDetails, /Your flowers, held close.*Qty 5/);
-  assert.equal(seed.productName, "Your flowers, held close + 2 more");
+  assert.match(seed.designDetails, /Pressed Flower Arch Frame.*Qty 5/);
+  assert.equal(seed.productName, "Pressed Flower Arch Frame + 2 more");
   const latest = flow.catalogueSelectionItems.children[0].querySelector("input");
   latest.value = "101";
   latest.dispatch("change");
@@ -946,7 +946,7 @@ test("restores selected catalogue items and quantities after a browser reload", 
 
   const reloaded = runFlow({ storage });
   assert.equal(reloaded.catalogueSelection.hidden, false);
-  assert.deepEqual(reloaded.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "Your flowers, held close"]);
+  assert.deepEqual(reloaded.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "Pressed Flower Arch Frame"]);
   assert.deepEqual(reloaded.catalogueSelectionItems.children.map((line) => line.querySelector("input").value), ["3", "1"]);
   assert.equal(reloaded.catalogueButton.textContent, "Remove from cart");
   assert.equal(reloaded.generatedCatalogueButtons[0].textContent, "Remove from cart");
@@ -1036,10 +1036,10 @@ test("cart rows expose an accessible remove action for the exact selected item",
   const removeButton = row.children.find((child) => child.type === "button");
   assert.ok(removeButton);
   assert.equal(removeButton.textContent, "×");
-  assert.equal(removeButton.getAttribute("aria-label"), "Remove Your flowers, held close from cart");
+  assert.equal(removeButton.getAttribute("aria-label"), "Remove Pressed Flower Arch Frame from cart");
 
   removeButton.dispatch("click");
-  assert.deepEqual(flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "A little blue hour"]);
+  assert.deepEqual(flow.catalogueSelectionItems.children.map((line) => line.getAttribute("data-product-name")), ["Test frame", "Shoreline Resin Wall Clock"]);
   assert.equal(flow.catalogueCartCount.textContent, "2 selected");
   assert.equal(flow.generatedCatalogueButtons[0].textContent, "Add to cart");
   assert.equal(flow.generatedCatalogueButtons[1].textContent, "Remove from cart");
@@ -1054,9 +1054,9 @@ test("keeps selected catalogue items while pagination or filters change the visi
   assert.match(flow.catalogueSelectionSummary.textContent, /2 items selected/);
   flow.catalogueRequestSelected.dispatch("click");
   const seed = submittedSeed(flow.posted);
-  assert.equal(seed.productName, "Your flowers, held close + 1 more");
+  assert.equal(seed.productName, "Pressed Flower Arch Frame + 1 more");
   assert.match(seed.designDetails, /Test frame/);
-  assert.match(seed.designDetails, /Your flowers, held close/);
+  assert.match(seed.designDetails, /Pressed Flower Arch Frame/);
 });
 
 test("clears catalogue selections when general or customizer ordering takes over", () => {
@@ -1214,9 +1214,9 @@ test("adds the catalogue order control to highlighted keepsake cards", () => {
   assert.ok(flow.highlightCatalogueButton);
   assert.equal(flow.highlightCatalogueButton.textContent, "Add to cart");
   const seed = requestCatalogue(flow, flow.highlightCatalogueButton);
-  assert.equal(seed.productName, "Preserved rose display");
+  assert.equal(seed.productName, "Preserved Red Rose Resin Display");
   assert.equal(seed.sourceId, "catalogue:multi-item");
-  assert.match(seed.designDetails, /^Preserved rose display/);
+  assert.match(seed.designDetails, /^Preserved Red Rose Resin Display/);
   assert.doesNotMatch(seed.designDetails, /catalogue:/);
   assert.equal(seed.bundleItems[0].sourceId, "catalogue:studio-red-rose-resin-display.jpeg");
 });
@@ -1224,10 +1224,10 @@ test("adds the catalogue order control to highlighted keepsake cards", () => {
 test("keeps moved studio art cards on the shared catalogue order path", () => {
   const flow = runFlow();
   const expected = [
-    ["resin-clock.jpg", "Blue hour resin clock"],
-    ["resin-message-coasters.jpg", "Personalized message coasters"],
+    ["resin-clock.jpg", "Blue Ocean Resin Wall Clock"],
+    ["resin-message-coasters.jpg", "Personalised Message Coaster Set"],
     ["navkar-resin-frame.jpg", "Pearl white Namokar (Navkar) mantra frame"],
-    ["personalized-floral-hoop.jpg", "A tiny beginning"],
+    ["personalized-floral-hoop.jpg", "Personalised Floral Hoop Frame"],
   ];
   expected.forEach(([asset, title], index) => {
     assert.equal(flow.movedStudioButtons[index].textContent, "Add to cart");
@@ -1339,9 +1339,9 @@ test("carries known catalogue sizes and preserves no-size selections in order de
   const flow = runFlow();
   const cases = [
     [flow.catalogueButton, "4 in", "Test frame"],
-    [flow.romanticExistingButtons[0], "8–10 in", "Rose hexagon"],
-    [flow.generatedCatalogueButtons[2], "3 in each", "Little messages, shared"],
-    [flow.generatedCatalogueButtons[1], null, "A little blue hour"],
+    [flow.romanticExistingButtons[0], "8–10 in", "Preserved Rose Hexagon Frame"],
+    [flow.generatedCatalogueButtons[2], "3 in each", "Personalised Floral Coaster Set"],
+    [flow.generatedCatalogueButtons[1], null, "Shoreline Resin Wall Clock"],
   ];
   cases.forEach(([button, sizeDetails, productName]) => {
     const seed = requestCatalogue(flow, button);
@@ -1361,7 +1361,7 @@ test("uses the shared catalogue CTA and preserves generated-design details in a 
   assert.equal(seed.sourceKind, "catalogue");
   assert.equal(seed.sourceId, "catalogue:multi-item");
   assert.equal(seed.bundleItems[0].sourceId, "catalogue:concept-floral-memory-frame.webp");
-  assert.match(seed.designDetails, /^Your flowers, held close/);
+  assert.match(seed.designDetails, /^Pressed Flower Arch Frame/);
   assert.doesNotMatch(seed.designDetails, /Source:|catalogue:/);
   assert.deepEqual([seed.heightFeet, seed.heightInchesPart, seed.widthFeet, seed.widthInchesPart], ["", "", "", ""]);
   assert.doesNotMatch(seed.designDetails, /Market reference/);
@@ -1426,14 +1426,14 @@ test("seeds every new Diwali concept with identity, unit, concept, and pricing d
 test("seeds every romantic concept with its disclosure, exact price, and blank dimensions", () => {
   const flow = runFlow();
   const expected = [
-    ["romantic-us-keychain-pair.webp", "Two keys, one little us", "Made to travel together, even when you cannot.", "599", "399", 33],
-    ["romantic-floral-bookmark-set.webp", "Save our page", "Three little places to keep the chapters that feel like yours.", "999", "699", 30],
-    ["romantic-calendar-coaster.webp", "Our date, every day", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25],
-    ["romantic-first-rose-bracelet.webp", "The first rose, still with me", "One petal from the beginning, made wearable.", "899", "599", 33],
-    ["romantic-heart-trinket-tray.webp", "Tiny tray, big feelings", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30],
-    ["romantic-initial-desk-stand.webp", "Your initial. Mine. Ours.", "Two letters, one small corner that belongs to both of you.", "999", "699", 30],
-    ["romantic-botanical-pendant.webp", "A little piece of our season", "Pressed flowers and a name, kept close.", "599", "399", 33],
-    ["romantic-ocean-memory-tray.webp", "Our place, held in waves", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28],
+    ["romantic-us-keychain-pair.webp", "Couple Name Keychain Pair", "Made to travel together, even when you cannot.", "599", "399", 33],
+    ["romantic-floral-bookmark-set.webp", "Pressed Flower Bookmark Set", "Three little places to keep the chapters that feel like yours.", "999", "699", 30],
+    ["romantic-calendar-coaster.webp", "Couple Date Calendar Coaster", "The day everything changed, circled for every ordinary morning after.", "1,199", "899", 25],
+    ["romantic-first-rose-bracelet.webp", "Rose Petal Resin Bracelet", "One petal from the beginning, made wearable.", "899", "599", 33],
+    ["romantic-heart-trinket-tray.webp", "Heart Resin Trinket Tray", "A soft place for rings, earbuds, and the little things you share.", "499", "349", 30],
+    ["romantic-initial-desk-stand.webp", "Couple Initials Desk Stand", "Two letters, one small corner that belongs to both of you.", "999", "699", 30],
+    ["romantic-botanical-pendant.webp", "Pressed Flower Name Pendant", "Pressed flowers and a name, kept close.", "599", "399", 33],
+    ["romantic-ocean-memory-tray.webp", "Ocean Memory Resin Tray", "For the beach, trip, or city that became part of your story.", "1,799", "1,299", 28],
   ];
   expected.forEach(([asset, title, copy, regular, festive, discount], index) => {
     const button = flow.romanticConceptButtons[index];
@@ -1452,10 +1452,10 @@ test("seeds every romantic concept with its disclosure, exact price, and blank d
 test("keeps order seeds correct at the first, eighth, ninth, and eleventh romantic cards", () => {
   const flow = runFlow();
   const selected = [
-    [flow.romanticConceptButtons[0], "catalogue:romantic-us-keychain-pair.webp", "Two keys, one little us"],
-    [flow.romanticConceptButtons[7], "catalogue:romantic-ocean-memory-tray.webp", "Our place, held in waves"],
-    [flow.romanticExistingButtons[0], "catalogue:studio-rose-hexagon-keepsake.jpeg", "Rose hexagon"],
-    [flow.romanticExistingButtons[2], "catalogue:studio-red-rose-resin-display.jpeg", "Preserved rose display"],
+    [flow.romanticConceptButtons[0], "catalogue:romantic-us-keychain-pair.webp", "Couple Name Keychain Pair"],
+    [flow.romanticConceptButtons[7], "catalogue:romantic-ocean-memory-tray.webp", "Ocean Memory Resin Tray"],
+    [flow.romanticExistingButtons[0], "catalogue:studio-rose-hexagon-keepsake.jpeg", "Preserved Rose Hexagon Frame"],
+    [flow.romanticExistingButtons[2], "catalogue:studio-red-rose-resin-display.jpeg", "Preserved Red Rose Resin Display"],
   ];
   selected.forEach(([button, sourceId, productName]) => {
     const seed = requestCatalogue(flow, button);
@@ -1605,9 +1605,9 @@ test("a premium set added to the cart carries the colour on view", () => {
   flow.photoTriggers[1].__saloniPhotoName = "emerald";
   const seed = requestCatalogue(flow, flow.premiumCartButtons[0]);
   assert.equal(seed.bundleItems[0].sourceId, "catalogue:premium-midnight-blue-tiered-set.jpeg");
-  assert.equal(seed.productName, "Midnight blue tiered set (colour: Emerald)");
+  assert.equal(seed.productName, "Midnight Blue 3-Tier Resin Serving Set (colour: Emerald)");
   flow.photoTriggers[1].__saloniPhotoName = "";
-  assert.equal(requestCatalogue(flow, flow.premiumCartButtons[0]).productName, "Midnight blue tiered set");
+  assert.equal(requestCatalogue(flow, flow.premiumCartButtons[0]).productName, "Midnight Blue 3-Tier Resin Serving Set");
 });
 
 test("saves the chosen colour and restores it after a reload", () => {
@@ -1621,7 +1621,7 @@ test("saves the chosen colour and restores it after a reload", () => {
     { sourceId: "catalogue:concept-floral-memory-frame.webp", quantity: 1 },
   ]);
   const reloaded = runFlow({ storage, aiImages: "emerald styled" });
-  assert.deepEqual(cartLines(reloaded), [EMERALD_NAME, "Your flowers, held close"]);
+  assert.deepEqual(cartLines(reloaded), [EMERALD_NAME, "Pressed Flower Arch Frame"]);
   assert.equal(reloaded.catalogueSelectionPreviews.children[0].attributes.src, EMERALD_IMAGE);
 });
 
