@@ -3597,6 +3597,21 @@ class GoogleConsentTests(unittest.TestCase):
                 self.assertEqual(footer.group(0).count('<button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button>'), 1)
                 self.assertEqual(text.count("data-cookie-settings"), 1)
 
+    def test_product_pages_use_the_popup_colours_with_a_blush_buy_box(self):
+        tool = load_product_pages_tool()
+        self.assertIn(".product-detail{", tool.PAGE_CSS)
+        self.assertRegex(tool.PAGE_CSS, r"\.product-detail\{[^}]*background:#fff6e9", "ivory panel like the popup")
+        self.assertRegex(tool.PAGE_CSS, r"\.product-detail \.buy-box\{[^}]*background:#fde7f0[^}]*\}", "blush box like the popup")
+        for path in self.product_pages:
+            with self.subTest(page=path.parent.name):
+                text = path.read_text(encoding="utf-8")
+                box = re.search(r'<div class="buy-box">(.*?)</div>', text, re.S)
+                self.assertIsNotNone(box)
+                inside = box.group(1)
+                for part in ("<h1>", '<p class="price">', '<a class="order"', '<p class="delivery-note">'):
+                    self.assertIn(part, inside)
+                self.assertLess(inside.index('<a class="order"'), inside.index('<p class="delivery-note">'))
+
     def test_every_product_page_loads_google_js_and_has_the_button_in_the_site_footer(self):
         for path in self.product_pages:
             with self.subTest(page=path.parent.name):
