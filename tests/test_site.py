@@ -181,8 +181,8 @@ class StaticSiteContractTests(unittest.TestCase):
             "₹799", "₹749", "₹179", "₹179", "₹899", "₹999", "₹449", "₹499", "₹699", "₹449", "₹199", "₹299",
             "₹299", "₹999", "₹449", "₹1,199", "₹4,099", "₹349", "₹399", "₹4,599", "₹1,799", "₹1,799", "₹399", "₹1,999",
             "₹1,999", "₹2,299", "₹3,999", "₹2,199", "₹999", "₹2,199", "₹2,199", "₹2,199", "₹2,199", "₹2,199", "₹2,199", "₹2,199",
-            "₹1,299", "₹3,499", "₹599", "₹599", "₹599", "₹599", "₹599", "₹599", "₹20,000–₹25,000", "₹20,000–₹25,000", "₹15,000", "₹10,000–₹12,000",
-            "Price on request", "Price on request", "Price on request", "Price on request", "Price on request", "₹5,000", "Price on request", "Price on request", "Price on request", "₹10,000–₹12,000", "₹249", "₹250–₹400",
+            "₹1,299", "₹3,499", "₹599", "₹599", "₹599", "₹599", "₹599", "₹599", "₹22,500", "₹22,500", "₹15,000", "₹11,000",
+            "₹5,000", "₹7,500", "₹12,000", "₹5,000", "₹5,000", "₹5,000", "₹1,800", "₹2,500", "₹3,500", "₹11,000", "₹249", "₹325",
             "₹399", "₹399", "₹849", "₹899", "₹299", "₹249", "₹1,499", "₹649", "₹599", "₹349", "₹449", "₹399",
             "₹249", "₹299", "₹799", "₹349", "₹399", "₹799", "₹449", "₹449", "₹399", "₹649",
         ]
@@ -197,7 +197,7 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertNotIn("Starting at", pricing.group(0))
             actual_prices.append(rows[0][1])
         self.assertEqual(actual_prices, expected_prices)
-        self.assertEqual(actual_prices.count("Price on request"), 8)
+        self.assertEqual(actual_prices.count("Price on request"), 0)
 
         jewel = re.search(r'<article\b[^>]*id=["\']diwali-jewel-glow["\'][\s\S]*?</article>', self.html).group(0)
         self.assertIn("one holder", jewel)
@@ -315,7 +315,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn('data-order-prefill="catalogue"', section_html)
         reference_notes = {
             "diwali-jewel-glow-tealight.jpg": 'one holder · tealight not included · shown palette or custom colours',
-            "diwali-happy-diwali-glow.webp": 'one holder · tealight not included · shown palette or custom colours. Price varies by size.',
+            "diwali-happy-diwali-glow.webp": 'one holder · tealight not included · shown palette or custom colours.',
             "diwali-shubh-labh-welcome-pair.jpg": 'pair shown · ritual items not included · shown palette or custom colours',
             "diwali-rose-gold-festive-set.jpeg": '1 main platter (6 in) + 3 tealight holders + 2 Shubh/Labh plaques + 1 flower diya (7 pieces) · tealights and display props not included · shown palette or custom colours',
             "diwali-lotus-blue-festive-set.jpeg": '1 main platter (6 in) + 3 tealight holders + 2 Shubh/Labh plaques + 1 flower diya (7 pieces) · tealights and display props not included · shown palette or custom colours',
@@ -378,7 +378,7 @@ class StaticSiteContractTests(unittest.TestCase):
         happy_diwali_card = re.search(r'<article\b[^>]*id=["\']diwali-happy-glow["\'][\s\S]*?</article>', section_html)
         self.assertIsNotNone(happy_diwali_card)
         happy_diwali_pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', happy_diwali_card.group(0)).group(0)
-        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹250–₹400</dd>')
+        self.assertRegex(happy_diwali_pricing, r'<dt[^>]*>(?:Price|From)</dt>\s*<dd[^>]*>₹325</dd>')
         self.assertIn(happy_diwali_pricing.count("<dt"), (1, 2))
         css = (ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".diwali-section", css)
@@ -2004,20 +2004,20 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(section.count('data-lightbox-trigger'), 14)
         self.assertEqual(section.count('class="product-pricing"'), 14)
         prices = {
-            "premium-midnight-blue-tiered-set.jpeg": "₹20,000–₹25,000",
-            "premium-ivory-gold-tiered-set.jpeg": "₹20,000–₹25,000",
+            "premium-midnight-blue-tiered-set.jpeg": "₹22,500",
+            "premium-ivory-gold-tiered-set.jpeg": "₹22,500",
             "premium-champagne-two-tier-set.jpeg": "₹15,000",
-            "premium-turquoise-tray-coasters.jpeg": "₹10,000–₹12,000",
-            "premium-smoky-bronze-tray.jpeg": "Price on request",
-            "premium-gemstone-mug-collection.jpeg": "Price on request",
-            "premium-pastel-butterfly-trays.jpeg": "Price on request",
-            "premium-champagne-white-tray.jpeg": "Price on request",
-            "premium-silver-icy-blue-tray.jpeg": "Price on request",
+            "premium-turquoise-tray-coasters.jpeg": "₹11,000",
+            "premium-smoky-bronze-tray.jpeg": "₹5,000",
+            "premium-gemstone-mug-collection.jpeg": "₹7,500",
+            "premium-pastel-butterfly-trays.jpeg": "₹12,000",
+            "premium-champagne-white-tray.jpeg": "₹5,000",
+            "premium-silver-icy-blue-tray.jpeg": "₹5,000",
             "premium-ocean-seashell-tray.jpeg": "₹5,000",
-            "premium-turquoise-geode-glass-closeup.jpeg": "Price on request",
-            "premium-turquoise-gold-wine-glasses.jpeg": "Price on request",
-            "premium-turquoise-geode-glass-pair.jpeg": "Price on request",
-            "premium-black-gold-glassware-set.jpeg": "₹10,000–₹12,000",
+            "premium-turquoise-geode-glass-closeup.jpeg": "₹1,800",
+            "premium-turquoise-gold-wine-glasses.jpeg": "₹2,500",
+            "premium-turquoise-geode-glass-pair.jpeg": "₹3,500",
+            "premium-black-gold-glassware-set.jpeg": "₹11,000",
         }
         form = (ROOT / "apps-script" / "Form.html").read_text(encoding="utf-8")
         for asset, price in prices.items():
@@ -2705,7 +2705,7 @@ class ProductSharePageTests(unittest.TestCase):
         self.assertEqual(tags.meta["og:image"], "https://saloniresinart.com/assets/share/jewel-glow-tealight.jpg")
         self.assertEqual(tags.meta["og:image:alt"], "Jewel-toned resin tealight holder with golden flecks")
         _, range_tags = self.page("happy-diwali-glow")
-        self.assertTrue(range_tags.meta["og:description"].startswith("₹250–₹400 · "), range_tags.meta["og:description"])
+        self.assertTrue(range_tags.meta["og:description"].startswith("₹325 · "), range_tags.meta["og:description"])
 
     def cards(self):
         """(slug, card) for each catalogue card; the price is read from index.html itself, not from the tool."""
@@ -2786,8 +2786,8 @@ class ProductSharePageTests(unittest.TestCase):
                 kinds["Offer"] += 1
             self.assertFalse(forbidden & set(keys(data)), slug)
         self.assertEqual(sum(kinds.values()), len(self.products))
-        for kind, count in kinds.items():
-            self.assertGreater(count, 0, kind)
+        # Since 2026-11-20 every card has one exact price; ranges and "on request" stay covered by the price_offer unit test.
+        self.assertEqual(kinds, {"Offer": len(self.products), "AggregateOffer": 0, "none": 0})
 
     def test_pages_are_real_product_pages_with_one_order_button(self):
         section_ids = set(re.findall(r'<section[^>]*\bid="([^"]+)"', self.home))

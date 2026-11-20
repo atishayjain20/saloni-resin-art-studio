@@ -295,7 +295,7 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     if (override) pricedCard.priceRows[0] = { querySelector(selector) { return selector === "dt" ? { textContent: "Price" } : { textContent: override }; } };
   });
   const premiumCards = [
-    ["premium-midnight-blue-tiered-set.jpeg", "Midnight blue tiered set", "₹20,000–₹25,000"],
+    ["premium-midnight-blue-tiered-set.jpeg", "Midnight blue tiered set", "₹22,500"],
     ["premium-ivory-gold-tiered-set.jpeg", "Ivory-gold tiered set", "Price on request"],
   ].map(([asset, title, price]) => {
     const premiumCard = new Element("work-card");
@@ -393,9 +393,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
   const romanticConceptButtons = romanticConceptCards.map((romanticCard) => romanticCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const corporateCatalogueButtons = corporateCards.map((corporateCard) => corporateCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const diwaliCatalogueButtons = diwaliCards.map((diwaliCard) => diwaliCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  const premiumQuoteButtons = premiumCards.map((premiumCard) => premiumCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "quote"));
+  const premiumCartButtons = premiumCards.map((premiumCard) => premiumCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
   const movedStudioButtons = movedStudioCards.map((studioCard) => studioCard.caption.children.find((child) => child.attributes["data-order-prefill"] === "catalogue"));
-  return { orderOpens, orderForm, orderFormIntro, scheduledTimers, elements, photoTriggers: [card.lightboxTrigger, premiumCards[0].lightboxTrigger], premiumCards, premiumQuoteButtons, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
+  return { orderOpens, orderForm, orderFormIntro, scheduledTimers, elements, photoTriggers: [card.lightboxTrigger, premiumCards[0].lightboxTrigger], premiumCards, premiumCartButtons, card, generalRequest, designHelp, catalogueButton, highlightCard, highlightCatalogueButton, movedStudioCards, movedStudioButtons, romanticExistingCards, romanticExistingButtons, generatedCards, generatedCatalogueButtons, generatedCard: generatedCards[0], generatedCatalogueButton: generatedCatalogueButtons[0], romanticConceptCards, romanticConceptButtons, corporateCards, corporateCatalogueButtons, diwaliCards, diwaliCatalogueButtons, customizer, continueWithoutPreview, continueOrder, catalogueSelection, catalogueSelectionPreviews, catalogueSelectionItems, catalogueSelectionSummary, catalogueSelectionStatus, catalogueSelectionTotal, catalogueSelectionWhatsapp, catalogueCartWhatsapp, catalogueRequestSelected, catalogueCartJump, catalogueCartCount, catalogueCartView, catalogueCartOrder, headerCart, headerCartCount, posted, customizerOutcomes, windowObject, orderDialog, orderDialogClose };
 }
 
 function submittedSeed(posted) {
@@ -676,40 +676,23 @@ test("previews selected catalogue items and provides an accessible cart jump", (
   assert.equal(flow.catalogueSelectionPreviews.children.length, 0);
 });
 
-test("premium sets open a one-item quote request and never touch the cart", () => {
+test("premium sets use Add to cart like every other card, and join the same cart request", () => {
   const flow = runFlow();
-  const [button] = flow.premiumQuoteButtons;
-  assert.ok(button, "premium card has a quote button");
-  assert.equal(button.textContent, "Ask for a quote");
-  assert.equal(button.getAttribute("aria-label"), "Ask for a quote for Midnight blue tiered set");
-  assert.equal(button.hasAttribute("aria-pressed"), false);
-  assert.equal(flow.posted.length, 0);
-  button.dispatch("click");
-  assert.equal(flow.posted.length, 1);
-  const seed = submittedSeed(flow.posted);
-  assert.equal(seed.sourceKind, "catalogue");
-  assert.equal(seed.sourceId, "catalogue:premium-midnight-blue-tiered-set.jpeg");
-  assert.equal(seed.productName, "Midnight blue tiered set");
-  assert.equal(seed.quantity, "1");
-  assert.equal(Object.prototype.hasOwnProperty.call(seed, "bundleItems"), false);
-  assert.equal(flow.orderDialog.open, true);
-  assert.equal(flow.elements.get("selected-product-name").textContent, "Midnight blue tiered set");
-  assert.equal(flow.catalogueSelection.hidden, true);
-  assert.equal(flow.catalogueCartJump.hidden, true);
-  assert.equal(flow.headerCart.hidden, true);
-});
-
-test("a premium quote keeps the cart and Order now still opens the cart request", () => {
-  const flow = runFlow();
+  const [button] = flow.premiumCartButtons;
+  assert.ok(button, "premium card has an Add to cart button");
+  assert.equal(flow.premiumCards[0].caption.children.some((child) => child.attributes["data-order-prefill"] === "quote"), false, "no quote button left");
+  assert.equal(button.textContent, "Add to cart");
+  assert.equal(button.getAttribute("aria-label"), "Add Midnight blue tiered set to cart");
+  assert.equal(button.getAttribute("aria-pressed"), "false");
   flow.catalogueButton.dispatch("click");
-  flow.premiumQuoteButtons[0].dispatch("click");
-  assert.equal(submittedSeed(flow.posted).sourceId, "catalogue:premium-midnight-blue-tiered-set.jpeg");
-  assert.equal(flow.catalogueCartCount.textContent, "1 selected");
-  flow.orderDialog.close();
+  button.dispatch("click");
+  assert.equal(flow.posted.length, 0, "adding to the cart sends nothing");
+  assert.equal(button.textContent, "Remove from cart");
+  assert.equal(flow.catalogueCartCount.textContent, "2 selected");
   flow.catalogueCartOrder.dispatch("click");
   const seed = submittedSeed(flow.posted);
   assert.equal(seed.sourceId, "catalogue:multi-item");
-  assert.deepEqual(seed.bundleItems.map((item) => item.sourceId), ["catalogue:test-frame.png"]);
+  assert.deepEqual(seed.bundleItems.map((item) => item.sourceId), ["catalogue:test-frame.png", "catalogue:premium-midnight-blue-tiered-set.jpeg"]);
   assert.equal(flow.orderDialog.open, true);
 });
 
@@ -1226,18 +1209,6 @@ test("emptying the cart removes the old cart's request", () => {
   assert.equal(flow.orderForm.hidden, true);
 });
 
-test("a quote opened from a product card is not replaced just by the cart, and Continue your request still opens it", () => {
-  const flow = runFlow({ storage: savedCartStorage() });
-  flow.premiumQuoteButtons[0].dispatch("click");
-  const quoteRequestId = submittedSeed(flow.posted).requestId;
-  flow.orderDialog.close();
-  assert.equal(flow.continueOrder.hidden, false);
-  flow.continueOrder.dispatch("click");
-  assert.equal(flow.orderDialog.open, true);
-  assert.equal(flow.posted.length, 1);
-  assert.equal(submittedSeed(flow.posted).requestId, quoteRequestId);
-});
-
 test("adds the catalogue order control to highlighted keepsake cards", () => {
   const flow = runFlow();
   assert.ok(flow.highlightCatalogueButton);
@@ -1629,16 +1600,14 @@ test("removes the item from the cart even when another colour is on show", () =>
   assert.equal(flow.catalogueButton.textContent, "Add to cart");
 });
 
-test("sends the colour on view with a quote request", () => {
+test("a premium set added to the cart carries the colour on view", () => {
   const flow = runFlow({ aiImages: "emerald styled" });
   flow.photoTriggers[1].__saloniPhotoName = "emerald";
-  flow.premiumQuoteButtons[0].dispatch("click");
-  const seed = submittedSeed(flow.posted);
-  assert.equal(seed.sourceId, "catalogue:premium-midnight-blue-tiered-set.jpeg");
+  const seed = requestCatalogue(flow, flow.premiumCartButtons[0]);
+  assert.equal(seed.bundleItems[0].sourceId, "catalogue:premium-midnight-blue-tiered-set.jpeg");
   assert.equal(seed.productName, "Midnight blue tiered set (colour: Emerald)");
   flow.photoTriggers[1].__saloniPhotoName = "";
-  flow.premiumQuoteButtons[0].dispatch("click");
-  assert.equal(submittedSeed(flow.posted).productName, "Midnight blue tiered set");
+  assert.equal(requestCatalogue(flow, flow.premiumCartButtons[0]).productName, "Midnight blue tiered set");
 });
 
 test("saves the chosen colour and restores it after a reload", () => {
