@@ -280,11 +280,19 @@ def slugify(name):
     return re.sub(r"[^a-z0-9]+", "-", text).strip("-")
 
 
+# A renamed product keeps its old slug, so its /p/ address and Google Merchant Center ID do not change.
+KEEP_SLUGS = {
+    "Blue and white Namokar (Navkar) mantra frame": "blue-and-white-namokar-mantra-frame",
+    "White and gold Namokar (Navkar) mantra frame": "white-and-gold-namokar-mantra-frame",
+    "Pearl white Namokar (Navkar) mantra frame": "pearl-white-namokar-mantra-frame",
+}
+
+
 def assign_slugs(cards):
     """One slug per card, in order. The first card with a slug keeps it; later ones add 4 letters from their photo file name."""
     slugs, seen = [], set()
     for card in cards:
-        slug = slugify(card["name"])
+        slug = KEEP_SLUGS.get(card["name"]) or slugify(card["name"])
         if slug in seen:
             slug += "-" + hashlib.sha1(card["file"].encode("utf-8")).hexdigest()[:4]
         if slug in seen:

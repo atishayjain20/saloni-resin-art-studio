@@ -585,9 +585,9 @@ class StaticSiteContractTests(unittest.TestCase):
 
     def test_namokar_frames_are_named_by_colour(self):
         titles = {
-            "blue-mantra-frame": "Blue and white Namokar mantra frame",
-            "white-mantra-frame": "White and gold Namokar mantra frame",
-            "navkar-resin-frame": "Pearl white Namokar mantra frame",
+            "blue-mantra-frame": "Blue and white Namokar (Navkar) mantra frame",
+            "white-mantra-frame": "White and gold Namokar (Navkar) mantra frame",
+            "navkar-resin-frame": "Pearl white Namokar (Navkar) mantra frame",
         }
         self.assertEqual(len(set(titles.values())), 3)
         sub_page = (ROOT / "namokar-mantra-frames" / "index.html").read_text(encoding="utf-8")
@@ -1357,7 +1357,7 @@ class StaticSiteContractTests(unittest.TestCase):
             "Resin keepsakes from the studio",
             "Blue hour resin clock",
             "Personalized message coasters",
-            "Pearl white Namokar mantra frame",
+            "Pearl white Namokar (Navkar) mantra frame",
             "Personalized photo clock",
             "Visit Saloni Resin Art Studio at House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM.",
         ):
@@ -3489,6 +3489,34 @@ class CorporateCollectionTests(unittest.TestCase):
         self.assertIn("<span>Price on request</span>", stamped)
         self.assertIn("<span>Pen &amp; &quot;Cup&quot; &lt;b&gt;</span>", stamped)
         self.assertNotIn("<b>", stamped.split("corporate-collection:start")[1].split("corporate-collection:end")[0])
+
+
+
+class NavkarTitleTests(unittest.TestCase):
+    """Buyers search "Navkar"; the Namokar frames carry both words, but keep their old address and Google product ID."""
+
+    KEPT = {
+        "Blue and white Namokar (Navkar) mantra frame": "blue-and-white-namokar-mantra-frame",
+        "White and gold Namokar (Navkar) mantra frame": "white-and-gold-namokar-mantra-frame",
+        "Pearl white Namokar (Navkar) mantra frame": "pearl-white-namokar-mantra-frame",
+    }
+
+    def test_namokar_frames_show_navkar_and_keep_their_slugs(self):
+        tool = load_product_pages_tool()
+        cards = tool.parse_cards((ROOT / "index.html").read_text(encoding="utf-8"))
+        slugs = dict(zip([card["name"] for card in cards], tool.assign_slugs(cards)))
+        for name, slug in self.KEPT.items():
+            with self.subTest(name=name):
+                self.assertEqual(slugs.get(name), slug)
+                self.assertTrue((ROOT / "p" / slug / "index.html").is_file())
+        self.assertFalse([name for name in slugs if "Namokar" in name and "Navkar" not in name])
+
+    def test_google_feed_titles_say_navkar_with_the_same_ids(self):
+        feed = (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8").splitlines()
+        rows = {line.split("\t")[0]: line.split("\t")[1] for line in feed[1:]}
+        for name, slug in self.KEPT.items():
+            with self.subTest(slug=slug):
+                self.assertEqual(rows.get(slug), name)
 
 
 if __name__ == "__main__":
