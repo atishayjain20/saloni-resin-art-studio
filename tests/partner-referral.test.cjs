@@ -831,7 +831,20 @@ test("setupAdvancePayments is owner-only and needs the script lock", () => {
 test("the advance setup is never run by a web request or by ordinary sheet access", () => {
   const lines = code.split("\n").map((line) => line.trim()).filter((line) => !line.startsWith("//"));
   assert.deepEqual(lines.filter((line) => line.includes("setupAdvancePayments(")), ["function setupAdvancePayments() {"]);
-  assert.deepEqual(lines.filter((line) => line.includes("migrateAdvanceSchema_(")), ["var changed = migrateAdvanceSchema_(sheet);", "function migrateAdvanceSchema_(sheet) {"]);
+  // migrateAdvanceSchema_ has two callers, both owner-only: setupAdvancePayments, and migrateVisitSourceSchema_ for an older sheet.
+  assert.deepEqual(lines.filter((line) => line.includes("migrateAdvanceSchema_(")), ["var changed = migrateAdvanceSchema_(sheet);", "function migrateAdvanceSchema_(sheet) {", "migrateAdvanceSchema_(sheet);"]);
+  const bodyOf = (name) => {
+    const start = code.indexOf("function " + name + "(");
+    assert.ok(start >= 0, name);
+    const end = code.indexOf("\n}\n", start);
+    return code.slice(start, end).split("\n").map((line) => line.trim()).filter((line) => !line.startsWith("//"));
+  };
+  assert.deepEqual(bodyOf("migrateVisitSourceSchema_").filter((line) => line.includes("migrateAdvanceSchema_(")), ["migrateAdvanceSchema_(sheet);"]);
+  // migrateVisitSourceSchema_ is itself reached only from the owner-only setupVisitSource, and nothing else calls setupVisitSource.
+  assert.deepEqual(lines.filter((line) => line.includes("migrateVisitSourceSchema_(")), ["var changed = migrateVisitSourceSchema_(sheet);", "function migrateVisitSourceSchema_(sheet) {"]);
+  assert.deepEqual(bodyOf("setupVisitSource").filter((line) => line.includes("migrateVisitSourceSchema_(")), ["var changed = migrateVisitSourceSchema_(sheet);"]);
+  assert.ok(bodyOf("setupVisitSource").some((line) => line.includes("Session.getActiveUser()")), "setupVisitSource keeps its owner check");
+  assert.deepEqual(lines.filter((line) => line.includes("setupVisitSource(")), ["function setupVisitSource() {"]);
 });
 
 test("retention, sync and correction keep working on the advance layout, and correction never writes the advance cells", () => {

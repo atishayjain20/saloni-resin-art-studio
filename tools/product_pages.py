@@ -25,7 +25,9 @@ It also:
   * deletes p/<slug>/ folders of products that no longer exist,
   * also writes the topic pages (/resin-clocks/ and others) from the TOPICS table below,
   * writes merchant-feed.tsv, the product list Google Merchant Center fetches every day. It holds only
-    products with a photo of the real piece and one price.
+    products with a photo of the real piece and one price. Each link ends in ?source=google-shopping (google.js
+    marks the visit); the canonical tag and sitemap stay clean,
+  * loads /google.js (cookie banner, Google tag after Accept) on every page and adds a Cookie settings button.
 
 The slug comes from the product name. If two names give the same slug, the first card in
 page order keeps it and later ones get a 4-letter suffix taken from their photo file name,
@@ -128,7 +130,7 @@ NOT_A_SIZE_RE = re.compile(r"suggested size|confirm with saloni|custom size in i
 
 # The topic page's header and footer are the ones on varmala-preservation/index.html, plus the topic links.
 TOPIC_HEADER = '  <header class="site-header">\n    <div class="shell header-inner">\n      <a class="wordmark" href="../" aria-label="Saloni Resin Art Studio home">\n        <span class="wordmark-name">Saloni</span>\n        <span class="wordmark-subtitle">resin art studio</span>\n      </a>\n      <nav class="collection-nav" aria-label="Collection navigation">\n        <a href="../">Studio home</a>\n        <a href="../resin-photo-frames/">Photo frames</a>\n        <a href="../namokar-mantra-frames/">Namokar frames</a>\n        <a href="../corporate-gifting/">Corporate gifting</a>\n      </nav>\n    </div>\n  </header>\n'
-TOPIC_FOOTER = '  <footer class="site-footer" id="footer">\n    <div class="shell footer-inner">\n      <div><a class="wordmark wordmark-footer" href="../"><span class="wordmark-name">Saloni</span><span class="wordmark-subtitle">resin art studio</span></a><p>Small details. Lasting feelings.</p></div>\n      <div class="footer-links"><a href="../resin-photo-frames/">Photo frames</a><a href="../namokar-mantra-frames/">Namokar frames</a><a href="../varmala-preservation/">Varmala preservation</a>{topic_links}<a href="../partners/">Partner Circle</a><a href="../corporate-gifting/">Corporate gifting</a><a href="../#customer-reviews">Reviews</a><a href="../#order">Order</a><a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Instagram</a></div>\n      <p class="footer-credit">© Saloni Resin Art Studio</p>\n    </div>\n  </footer>\n'
+TOPIC_FOOTER = '  <footer class="site-footer" id="footer">\n    <div class="shell footer-inner">\n      <div><a class="wordmark wordmark-footer" href="../"><span class="wordmark-name">Saloni</span><span class="wordmark-subtitle">resin art studio</span></a><p>Small details. Lasting feelings.</p></div>\n      <div class="footer-links"><a href="../resin-photo-frames/">Photo frames</a><a href="../namokar-mantra-frames/">Namokar frames</a><a href="../varmala-preservation/">Varmala preservation</a>{topic_links}<a href="../partners/">Partner Circle</a><a href="../corporate-gifting/">Corporate gifting</a><a href="../#customer-reviews">Reviews</a><a href="../#order">Order</a><a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">Instagram</a></div>\n      <p class="footer-credit">© Saloni Resin Art Studio <button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button></p>\n    </div>\n  </footer>\n'
 TOPIC_PAGE = """<!doctype html>
 <html lang="en">
 <head>
@@ -157,6 +159,7 @@ TOPIC_PAGE = """<!doctype html>
   <title>{title}</title>
   <link rel="stylesheet" href="../styles.css?v={version}">
   <script class="analytics-script" src="../analytics.js?v={version}" defer></script>
+  <script class="google-script" src="../google.js?v={version}" defer></script>
   <script>(function () {{ var script = document.createElement("script"); script.src = "../script.js?v={version}"; script.defer = true; document.head.appendChild(script); }}());</script>
 </head>
 <body class="collection-page">
@@ -416,7 +419,7 @@ def merchant_feed(cards, slugs):
             continue
         about = " ".join(part for part in (card["line"], "Size: %s." % card["size"] if card["size"] else "",
                                            "Handmade to order by Saloni in Ajmer, Rajasthan.") if part)
-        rows.append([slug, card["name"], about, "%s/%s/%s/" % (SITE, PAGE_DIR, slug),
+        rows.append([slug, card["name"], about, "%s/%s/%s/?source=google-shopping" % (SITE, PAGE_DIR, slug),
                      SITE + "/assets/" + urllib.parse.quote(card["file"]), "in_stock", offer["price"] + " INR", STUDIO, "new", "no"])
     for row in rows:
         if any(re.search(r'[\t\n\r"]', value) for value in row):
@@ -442,7 +445,7 @@ def jpeg_size(path):
     raise SystemExit("Not a JPEG: " + str(path))
 
 
-def render_page(card, slug, share_size, topic, more):
+def render_page(card, slug, share_size, topic, more, version):
     url = "%s/%s/%s/" % (SITE, PAGE_DIR, slug)
     target = "/?product=%s#%s" % (slug, card["section"])
     title = "%s | %s" % (card["name"], STUDIO)
@@ -486,6 +489,7 @@ def render_page(card, slug, share_size, topic, more):
   <meta name="twitter:image:alt" content="{alt}">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 {ld}  <style>{css}</style>
+  <script src="/google.js?v={version}" defer></script>
 </head>
 <body>
   <header><a href="/">{studio}</a></header>
@@ -495,13 +499,14 @@ def render_page(card, slug, share_size, topic, more):
     <h1>{name}</h1>
     <p class="price">{price}</p>
 {size_line}{line_html}    <a class="order" href="{target}">View and order</a>
-{more_html}  </main>
+{more_html}    <p><button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button></p>
+  </main>
 </body>
 </html>
 """.format(
         title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
         ld=("".join('  <script type="application/ld+json">%s</script>\n' % block for block in (data, crumbs) if block)), css=PAGE_CSS,
-        path=path, more_html=more_html,
+        path=path, more_html=more_html, version=version,
         target=esc(target), name=esc(card["name"]), file=esc(card["file"]), price=esc(card["price"]),
         size_line='    <p class="size">Size: %s</p>\n' % esc(card["size"]) if card["size"] else "",
         line_html='    <p>%s</p>\n' % esc(card["line"]) if card["line"] else "",
@@ -684,7 +689,7 @@ def build(index_html, sitemap, root=ROOT):
         topics[slug], groups[slug] = placed[slug] if slug in placed else (None, sections[card["section"]])
     more = pick_more(cards, slugs, groups)
     for card, slug in zip(cards, slugs):
-        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topics[slug], more[slug])
+        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topics[slug], more[slug], version)
     for topic, items in topic_pages:
         pages[topic["slug"] + "/index.html"] = render_topic(topic, items, version, share_size(root, items[0][1]))
     return stamp(index_html, cards, slugs, more, thumbs), pages, sitemap_with_products(sitemap, slugs)

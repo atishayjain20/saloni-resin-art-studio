@@ -784,7 +784,7 @@ class StaticSiteContractTests(unittest.TestCase):
             self.assertEqual(collection["name"], spec["title"].split(" | ")[0])
             self.assertTrue(collection.get("mainEntity"))
             self.assertNotRegex(scripts[0], re.compile(r"Product|Offer|AggregateRating|Review|rating|price|availability|stock", re.I))
-            self.assertNotRegex(html, re.compile(r'<script\b(?![^>]*analytics\.js)[^>]+src=', re.I), slug)
+            self.assertNotRegex(html, re.compile(r'<script\b(?![^>]*(?:analytics|google)\.js)[^>]+src=', re.I), slug)
             self.assertNotIn("₹", html, slug)
             image_tags = re.findall(r"<img\b[^>]*>", html)
             self.assertGreaterEqual(len(image_tags), 3, slug)
@@ -2607,6 +2607,7 @@ class ProductSharePageTests(unittest.TestCase):
         cls.tool_path = ROOT / "tools" / "product_pages.py"
         cls.products = catalogue_products(cls.home)
         cls.slugs = card_slugs(cls.home)
+        cls.version = re.search(r'href="styles\.css\?v=(\d+)"', cls.home).group(1)
 
     def page(self, slug):
         path = ROOT / "p" / slug / "index.html"
@@ -2806,8 +2807,9 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertIsNotNone(image, slug)
             self.assertEqual(html.unescape(image.group(1)), card["alt"] or card["name"], slug)
             self.assertEqual((image.group(3) or "", image.group(4) or ""), (card["width"], card["height"]), slug)
-            self.assertNotRegex(text, r"<script\b[^>]*\bsrc=", slug)
-            self.assertEqual(re.findall(r"<script\b([^>]*)>", text), [' type="application/ld+json"'] * len(re.findall(r"application/ld\+json", text)), slug)
+            # The only script file is google.js (the cookie banner); the tag itself loads only after Accept.
+            self.assertEqual(re.findall(r'<script\b[^>]*\bsrc="([^"]+)"', text), ["/google.js?v=" + self.version], slug)
+            self.assertEqual(re.findall(r"<script\b([^>]*)>", text), [' type="application/ld+json"'] * len(re.findall(r"application/ld\+json", text)) + [' src="/google.js?v=%s" defer' % self.version], slug)
         # The button lands in the section the card sits in.
         _, tags = self.page("jewel-glow-tealight")
         self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=jewel-glow-tealight#diwali"])
@@ -3042,8 +3044,9 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertTrue(all(value.strip() for value in fields), slug)
             self.assertEqual(row["title"], card["name"])
             self.assertIn(card["line"], row["description"])
-            self.assertEqual(row["link"], "%s/p/%s/" % (self.SITE, slug))
+            self.assertEqual(row["link"], "%s/p/%s/?source=google-shopping" % (self.SITE, slug))
             page, _ = self.page(slug)
+            self.assertNotIn("source=", page, "the product page, its canonical tag and its share tags stay clean: " + slug)
             prefix = self.SITE + "/assets/"
             self.assertTrue(row["image_link"].startswith(prefix), slug)
             self.assertTrue((ROOT / "assets" / unquote(row["image_link"][len(prefix):])).is_file(), slug)
@@ -3517,6 +3520,78 @@ class NavkarTitleTests(unittest.TestCase):
         for name, slug in self.KEPT.items():
             with self.subTest(slug=slug):
                 self.assertEqual(rows.get(slug), name)
+
+
+class GoogleConsentTests(unittest.TestCase):
+    """google.js (visit source, cookie banner, Google tag) is on every public page that counts visits and on every product page."""
+
+    PRIVACY_LINE = "If you tap Accept on the cookie banner, Google sets cookies to measure which Google listings lead to order requests; only the request ID, product IDs, prices and quantities are sent, never your name, phone or address. Change it any time with Cookie settings."
+
+    @classmethod
+    def setUpClass(cls):
+        cls.home = (ROOT / "index.html").read_text(encoding="utf-8")
+        cls.version = re.search(r'href="styles\.css\?v=(\d+)"', cls.home).group(1)
+        cls.product_pages = sorted((ROOT / "p").glob("*/index.html"))
+        cls.counted_pages = sorted(path for path in ROOT.rglob("index.html") if "p" not in path.relative_to(ROOT).parts[:1]
+                                   and not {"node_modules", "tests", "work", "apps-script", ".git", ".codegraph"} & set(path.relative_to(ROOT).parts)
+                                   and "analytics.js" in path.read_text(encoding="utf-8"))
+
+    def test_the_page_lists_are_not_empty(self):
+        self.assertGreaterEqual(len(self.counted_pages), 13)
+        self.assertEqual(len(self.product_pages), 106)
+
+    def test_every_analytics_page_loads_google_js_the_same_way_and_has_a_cookie_settings_button(self):
+        for path in self.counted_pages:
+            with self.subTest(page=str(path.relative_to(ROOT))):
+                text = path.read_text(encoding="utf-8")
+                analytics = re.search(r'<script class="analytics-script" src="((?:\.\./)?)analytics\.js\?v=(\d+)" defer></script>', text)
+                self.assertIsNotNone(analytics)
+                prefix = analytics.group(1)
+                self.assertEqual(text.count("google.js"), 1)
+                self.assertIn('<script class="google-script" src="%sgoogle.js?v=%s" defer></script>' % (prefix, self.version), text)
+                self.assertEqual(analytics.group(2), self.version)
+                footer = re.search(r"<footer\b.*?</footer>", text, re.S)
+                self.assertIsNotNone(footer, "a footer holds the button")
+                self.assertEqual(footer.group(0).count('<button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button>'), 1)
+                self.assertEqual(text.count("data-cookie-settings"), 1)
+
+    def test_every_product_page_loads_google_js_and_has_the_button_after_more_like_this(self):
+        for path in self.product_pages:
+            with self.subTest(page=path.parent.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertEqual(text.count('<script src="/google.js?v=%s" defer></script>' % self.version), 1)
+                button = '<p><button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button></p>'
+                self.assertEqual(text.count(button), 1)
+                self.assertEqual(text.count("data-cookie-settings"), 1)
+                if '<section class="more"' in text:
+                    self.assertGreater(text.index(button), text.index('<section class="more"'))
+                self.assertLess(text.index(button), text.index("</main>"))
+                self.assertIn("/google.js", text)
+
+    def test_topic_pages_use_the_footer_button_and_the_shared_version(self):
+        tool = load_product_pages_tool()
+        self.assertIn("../google.js?v={version}", tool.TOPIC_PAGE)
+        self.assertIn("data-cookie-settings", tool.TOPIC_FOOTER)
+
+    def test_the_cookie_settings_button_is_styled_by_google_js_only(self):
+        source = (ROOT / "google.js").read_text(encoding="utf-8")
+        self.assertIn(".cookie-settings", source)
+
+    def test_feed_links_carry_the_source_but_canonical_urls_and_the_sitemap_stay_clean(self):
+        rows = (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8").splitlines()[1:]
+        self.assertGreater(len(rows), 0)
+        for row in rows:
+            fields = row.split("\t")
+            self.assertRegex(fields[3], r"^https://saloniresinart\.com/p/[a-z0-9-]+/\?source=google-shopping$")
+        self.assertNotIn("source=", (ROOT / "sitemap.xml").read_text(encoding="utf-8"))
+        for path in self.product_pages:
+            self.assertNotIn("google-shopping", path.read_text(encoding="utf-8"), path.parent.name)
+
+    def test_privacy_text_names_the_cookie_choice_in_both_privacy_blocks_and_the_readme(self):
+        self.assertEqual(self.home.count(self.PRIVACY_LINE), 2)
+        for block in re.findall(r'<details class="privacy-details" id="(?:order-)?privacy-details">.*?</details>', self.home, re.S):
+            self.assertIn(self.PRIVACY_LINE, block)
+        self.assertIn(self.PRIVACY_LINE, (ROOT / "README.md").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

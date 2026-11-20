@@ -8,7 +8,7 @@ const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const analyticsPath = path.join(root, "analytics.js");
 const source = fs.existsSync(analyticsPath) ? fs.readFileSync(analyticsPath, "utf8") : "";
-const VERSION = "20261192";
+const VERSION = "20261193";
 // The versioned file GoatCounter publishes for SRI, and the hash its help page lists for it (https://www.goatcounter.com/help/countjs-versions).
 const OFFICIAL_SRC = "https://gc.zgo.at/count.v5.js";
 const OFFICIAL_HASH = "sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ";
@@ -142,10 +142,13 @@ test("event paths are an allow-list of plain lowercase words, so names, phones, 
   assert.deepEqual(calls, ["product-silver-925-tray", "order-form-open", "advance-pay-googlepay"]);
 });
 
-test("product pages load no external script, so they load nothing extra", () => {
+test("product pages load no script file except google.js (the cookie banner; the Google tag waits for Accept), and no visit counter", () => {
   const shares = publicPages().filter((page) => page.startsWith("p" + path.sep));
   assert.ok(shares.length > 90);
-  for (const page of shares) assert.doesNotMatch(read(page), /<script\b[^>]*\bsrc=/, page);
+  for (const page of shares) {
+    const sources = [...read(page).matchAll(/<script\b[^>]*\bsrc="([^"]*)"/g)].map((match) => match[1]);
+    assert.deepEqual(sources, ["/google.js?v=" + VERSION], page);
+  }
 });
 
 test("every public page loads analytics.js once with the shared cache version, before the page's own scripts", () => {
@@ -170,7 +173,7 @@ test("the shared cache version is bumped everywhere it is stamped", () => {
     assert.doesNotMatch(read(page), /\?v=20261173/, page);
   }
   assert.doesNotMatch(read("README.md"), /Cache version `20261173`/);
-  assert.match(read("README.md"), /Cache version `20261192`/);
+  assert.match(read("README.md"), /Cache version `20261193`/);
 });
 
 test("no page carries a Content-Security-Policy meta tag that would block GoatCounter", () => {

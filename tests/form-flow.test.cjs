@@ -868,7 +868,7 @@ class FakeFileReader {
   }
 }
 
-function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], previewExpected = false, omitPreviewExpected = false, previewBlob = null, seedOverrides = {} } = {}) {
+function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], previewExpected = false, omitPreviewExpected = false, previewBlob = null, seedOverrides = {}, slugLinks = {} } = {}) {
   const ids = ["order-form-embed", "order-form-intro", "success-celebration", "request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "order-reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "more-details", "bundle-source-ids"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   elements.get("order-form-embed").setAttribute("data-order-form-url", "https://script.google.com/macros/s/test/exec");
@@ -967,6 +967,12 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
     },
   };
   const documentObject = {
+    // The home page's photo links: only the ones named in slugLinks (href -> data-product-slug) exist.
+    querySelector(selector) {
+      const match = /^a\[data-product-slug\]\[href="([^"]+)"\]$/.exec(selector);
+      const slug = match && slugLinks[match[1]];
+      return slug ? { getAttribute: (name) => (name === "data-product-slug" ? slug : null) } : null;
+    },
     getElementById(id) { return elements.get(id) || errors.find((error) => error.id === id) || created.find((element) => element.id === id) || null; },
     createElement(tag) {
       if (tag === "canvas") return new FakeCanvas();
@@ -1720,4 +1726,107 @@ test("analytics: a missing or throwing saloniTrack does not stop the success scr
   submitOrderForm(bare);
   await bare.callbacks[0].success({ ok: true, requestId: "request-seed", receivedAt: "now" });
   assert.equal(bare.elements.get("success-celebration").hidden, false);
+});
+
+// ---- Visit source and the Google purchase event ----
+const SHOP_LINKS = { "assets/rose-tray.webp": "rose-tray", "assets/lotus-diya.webp": "lotus-diya-pair" };
+function googleSpy(runtime) {
+  const calls = [];
+  runtime.windowObject.saloniGoogle = { purchase: (data) => calls.push(JSON.parse(JSON.stringify(data))) };
+  return calls;
+}
+async function sendOk(runtime, requestId = "request-seed") {
+  submitOrderForm(runtime);
+  await settle();
+  await runtime.callbacks[0].success({ ok: true, requestId, receivedAt: "now" });
+}
+
+test("the order request carries visitSource from google.js, and an empty one when google.js is absent", async () => {
+  const withSource = makeFormRuntime();
+  withSource.windowObject.saloniVisitSource = { read: () => "google-shopping" };
+  fillValid(withSource.fields);
+  submitOrderForm(withSource);
+  await settle();
+  assert.equal(withSource.submissions[0].visitSource, "google-shopping");
+  const without = makeFormRuntime();
+  fillValid(without.fields);
+  submitOrderForm(without);
+  await settle();
+  assert.equal(without.submissions[0].visitSource, "");
+  const broken = makeFormRuntime();
+  broken.windowObject.saloniVisitSource = { read() { throw new Error("blocked"); } };
+  fillValid(broken.fields);
+  submitOrderForm(broken);
+  await settle();
+  assert.equal(broken.submissions[0].visitSource, "", "a failing read never blocks the order");
+  assert.doesNotMatch(formSource.match(/var ORDER_FIELDS = \[[^\]]*\]/)[0], /visitSource/, "visitSource is not a form field");
+});
+
+test("a sent single-item request fires one purchase with the product slug, price and quantity", async () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:rose-tray.webp", seedOverrides: { price: "\u20b91,299" }, slugLinks: SHOP_LINKS });
+  const calls = googleSpy(runtime);
+  fillValid(runtime.fields);
+  runtime.fields.quantity.value = "2";
+  await sendOk(runtime, "req-abc");
+  assert.deepEqual(calls, [{ transaction_id: "req-abc", value: 2598, items: [{ item_id: "rose-tray", price: 1299, quantity: 2 }] }]);
+  assert.doesNotMatch(JSON.stringify(calls), /Customer|8209238541|Blue and gold|Test frame/, "no name, phone, notes or product name");
+});
+
+test("a sent multi-item request fires one purchase with one entry per item", async () => {
+  const items = [
+    { sourceId: "catalogue:rose-tray.webp", productName: "Rose tray", price: "\u20b9599", size: "", quantity: 2 },
+    { sourceId: "catalogue:lotus-diya.webp", productName: "Lotus diya pair", price: "\u20b9 299", size: "", quantity: 1 },
+  ];
+  const linked = makeFormRuntime({ sourceId: "catalogue:multi-item", bundleItems: items.map((item) => Object.assign({}, item)), slugLinks: SHOP_LINKS });
+  fillValid(linked.fields);
+  linked.fields.designDetails.value = "";
+  const calls = googleSpy(linked);
+  await sendOk(linked, "req-multi");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].transaction_id, "req-multi");
+  assert.equal(calls[0].value, 599 * 2 + 299);
+  assert.deepEqual(calls[0].items.slice().sort((left, right) => left.item_id.localeCompare(right.item_id)), [
+    { item_id: "lotus-diya-pair", price: 299, quantity: 1 },
+    { item_id: "rose-tray", price: 599, quantity: 2 },
+  ]);
+});
+
+test("a customizer request fires purchase with the request ID and no items", async () => {
+  const runtime = makeFormRuntime(Object.assign({ slugLinks: SHOP_LINKS, seedOverrides: { price: "\u20b9599" } }, customizerOptions));
+  const calls = googleSpy(runtime);
+  fillValid(runtime.fields);
+  await sendOk(runtime, "req-custom");
+  assert.deepEqual(calls, [{ transaction_id: "req-custom", value: 0, items: [] }]);
+});
+
+test("an item with no product page link, or a price that is not a plain rupee amount, is left out or has no price", async () => {
+  const noLink = makeFormRuntime({ sourceId: "catalogue:rose-tray.webp", seedOverrides: { price: "\u20b9599" } });
+  const noLinkCalls = googleSpy(noLink);
+  fillValid(noLink.fields);
+  await sendOk(noLink, "req-nolink");
+  assert.deepEqual(noLinkCalls, [{ transaction_id: "req-nolink", value: 0, items: [] }]);
+  const range = makeFormRuntime({ sourceId: "catalogue:rose-tray.webp", seedOverrides: { price: "\u20b9599 - \u20b9799" }, slugLinks: SHOP_LINKS });
+  const rangeCalls = googleSpy(range);
+  fillValid(range.fields);
+  await sendOk(range, "req-range");
+  assert.deepEqual(rangeCalls, [{ transaction_id: "req-range", value: 0, items: [{ item_id: "rose-tray", quantity: 1 }] }]);
+});
+
+test("no purchase is reported when the request fails, and a missing google.js changes nothing", async () => {
+  const failing = makeFormRuntime({ sourceId: "catalogue:rose-tray.webp", seedOverrides: { price: "\u20b9599" }, slugLinks: SHOP_LINKS });
+  const calls = googleSpy(failing);
+  fillValid(failing.fields);
+  submitOrderForm(failing);
+  await settle();
+  await failing.callbacks[0].failure(new Error("offline"));
+  assert.deepEqual(calls, []);
+  const absent = makeFormRuntime({ sourceId: "catalogue:rose-tray.webp", slugLinks: SHOP_LINKS });
+  fillValid(absent.fields);
+  await assert.doesNotReject(sendOk(absent));
+  assert.match(absent.status.textContent, /Request received/);
+  const throwing = makeFormRuntime({ sourceId: "catalogue:rose-tray.webp", slugLinks: SHOP_LINKS });
+  throwing.windowObject.saloniGoogle = { purchase() { throw new Error("blocked"); } };
+  fillValid(throwing.fields);
+  await sendOk(throwing);
+  assert.match(throwing.status.textContent, /Request received/, "a failing report never hides the success message");
 });
