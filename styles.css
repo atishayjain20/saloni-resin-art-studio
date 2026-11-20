@@ -459,6 +459,13 @@ h1 em { color: var(--rose); font-style: italic; }
 .premium-collection-section .catalogue-section-disclosure:focus-visible,
 .premium-collection-section .catalogue-order-button:hover,
 .premium-collection-section .catalogue-order-button:focus-visible { border-color: var(--premium-gold); background: var(--premium-gold); color: var(--ink); }
+/* In the cart: the button reads "Remove from cart", so it switches to the outline look to stand apart from Add to cart. */
+.catalogue-order-button[aria-pressed="true"], .lightbox-request.is-in-cart { border: 1px solid var(--rose); background: var(--paper); color: var(--rose-ink); }
+.catalogue-order-button[aria-pressed="true"]:hover, .catalogue-order-button[aria-pressed="true"]:focus-visible,
+.lightbox-request.is-in-cart:hover, .lightbox-request.is-in-cart:focus-visible { border-color: var(--rose-ink); background: #fde7f1; color: var(--rose-ink); }
+.premium-collection-section .catalogue-order-button[aria-pressed="true"] { border-color: var(--premium-gold); background: var(--premium-gold); color: var(--ink); }
+.premium-collection-section .catalogue-order-button[aria-pressed="true"]:hover,
+.premium-collection-section .catalogue-order-button[aria-pressed="true"]:focus-visible { border-color: #fbf5e9; background: #fbf5e9; color: var(--ink); }
 .premium-collection-section .catalogue-results .catalogue-filter-status { color: #fbf5e9; }
 .premium-collection-section .catalogue-results .catalogue-filter-status,
 .premium-collection-section .premium-photo-card img,

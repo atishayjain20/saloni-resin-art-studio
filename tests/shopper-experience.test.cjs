@@ -331,10 +331,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261196">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261196" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261196" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261196" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261197">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261197" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261197" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261197" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -342,9 +342,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261196"], page);
+    assert.deepEqual([...new Set(versions)], ["20261197"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261196/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261197/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -1130,6 +1130,8 @@ function galleryHarness({ colours, paragraphs, href = "assets/sample-gift.jpg?v=
     setAttribute(name, value) { this.attributes[name] = String(value); },
     removeAttribute(name) { delete this.attributes[name]; },
     focus() { this.focused = true; },
+    classes: [],
+    get classList() { const self = this; return { toggle(name, on) { self.classes = self.classes.filter((c) => c !== name).concat(on ? [name] : []); }, contains(name) { return self.classes.includes(name); } }; },
   }, extra);
   const requestButton = makeElement({ clicked: 0, click() { this.clicked += 1; }, attributes: { "data-order-prefill": "sample" } });
   const paras = (paragraphs || ["Rich colour and golden flecks", "one holder · tealight not included · shown palette or custom colours"]).map((textContent) => ({ textContent }));
@@ -1744,8 +1746,11 @@ test("lightbox hint tells a shopper to remove the item first when it is already 
   inCart.open();
   inCart.docElements["lightbox-photo-next"].listeners.click();
   assert.equal(inCart.docElements["lightbox-request"].textContent, "Remove from cart");
+  assert.equal(inCart.docElements["lightbox-request"].classList.contains("is-in-cart"), true, "the popup button takes the in-cart look");
   assert.match(inCart.docElements["lightbox-photo-label"].textContent, /\nRemove it from the cart first to choose "Teal" instead\.$/);
   const notInCart = galleryHarness({ colours: "teal" });
+  notInCart.open();
+  assert.equal(notInCart.docElements["lightbox-request"].classList.contains("is-in-cart"), false, "Add to cart keeps the filled look");
   notInCart.open();
   notInCart.docElements["lightbox-photo-next"].listeners.click();
   assert.match(notInCart.docElements["lightbox-photo-label"].textContent, /\nUse the button below on this photo to choose "Teal"\.$/);
@@ -2764,4 +2769,19 @@ test("the Diwali wish and offer replace the Dhanteras pop-up and show only on 8 
   assert.equal(again.greeting.open, true, "a tap on blank space inside the card keeps it open");
   again.listeners.click.forEach((fn) => fn({ target: again.greeting, clientX: 200, clientY: 700 }));
   assert.equal(again.greeting.open, false, "a tap outside the card closes it");
+});
+
+test("Remove from cart looks different from Add to cart, on cards, in the popup and in the dark premium section", () => {
+  const rule = (selector) => {
+    const at = css.indexOf(selector + " {");
+    assert.ok(at !== -1, "missing rule " + selector);
+    return css.slice(at, css.indexOf("}", at));
+  };
+  const added = rule('.catalogue-order-button[aria-pressed="true"], .lightbox-request.is-in-cart');
+  assert.match(added, /background: var\(--paper\)/, "white instead of the filled pink");
+  assert.match(added, /color: var\(--rose-ink\)/);
+  assert.match(added, /border: 1px solid var\(--rose\)/);
+  const premium = rule('.premium-collection-section .catalogue-order-button[aria-pressed="true"]');
+  assert.match(premium, /background: var\(--premium-gold\)/, "filled gold instead of the gold outline");
+  assert.ok(css.indexOf('.catalogue-order-button[aria-pressed="true"], .lightbox-request.is-in-cart {') > css.indexOf(".premium-collection-section .catalogue-order-button:focus-visible {"), "comes after the normal rules, so it wins");
 });

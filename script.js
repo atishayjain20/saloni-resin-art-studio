@@ -825,6 +825,7 @@
           if (!lightboxRequest.hidden) {
             var selected = typeof itemRequestButton.getAttribute === "function" && itemRequestButton.getAttribute("aria-pressed") === "true";
             lightboxRequest.textContent = selected ? "Remove from cart" : "Add to cart";
+            if (lightboxRequest.classList) lightboxRequest.classList.toggle("is-in-cart", selected);
             lightboxRequest.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from cart" : " to cart"));
           }
         }
