@@ -109,22 +109,23 @@ TOPICS = [
 REFERENCE_KICKER = "Reference image · final design confirmed before making"
 CARD_SIZES = "(max-width: 620px) 40vw, (max-width: 1320px) 26vw, 344px"
 VERSION_RE = re.compile(r'href="styles\.css\?v=(\d+)"')
-PAGE_CSS = ('*{box-sizing:border-box}body{margin:0;background:#ffeaf2;color:#2a0e1f;font:1rem/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif}'
-            'header,main{max-width:30rem;margin:0 auto;padding:0 1rem}header a,.path a,.more a{display:inline-flex;align-items:center;min-height:2.75rem;color:#8f0d49;font-weight:700;text-decoration:none}'
-            'img{display:block;width:auto;max-width:100%;height:auto;max-height:55vh;margin:0 auto;border-radius:.75rem;background:#fff}'
-            'h1{margin:1rem 0 .25rem;font:500 1.75rem/1.15 Georgia,"Times New Roman",serif}'
-            '.price{display:inline-block;margin:.25rem 0;padding:.2rem .6rem;border-radius:999px;background:#f2a007;font-size:1.15rem;font-weight:700}'
-            '.size{margin:.25rem 0;color:#6a4a5b}'
-            '.order{display:flex;align-items:center;justify-content:center;min-height:3rem;margin:1.25rem 0 2rem;padding:.75rem 1rem;border-radius:999px;background:#b0125b;color:#fff;font-weight:700;text-decoration:none}'
-            '.path{margin:.25rem 0 .5rem}.path ol,.more ul{margin:0;padding:0;list-style:none}.path ol{display:flex;flex-wrap:nowrap;align-items:center}'
-            '.path li{display:flex;flex:none;align-items:center;color:#6a4a5b;white-space:nowrap}.path li span{margin:0 .4rem}'
-            '.path li[aria-current]{display:block;flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;line-height:2.75rem}'
-            '.more{margin:0 0 2rem}.more h2{margin:0 0 .25rem;font:500 1.25rem/1.2 Georgia,"Times New Roman",serif}'
-            '.more ul{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem}'
-            '.more a{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.35rem;height:100%;padding:.4rem;text-align:center}'
-            '.more a:focus-visible{outline-offset:-3px}.more img{width:6.25rem;height:6.25rem;max-height:none}'
-            '.more span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-size:.9rem;line-height:1.25}'
-            'a:focus-visible{outline:3px solid #b0125b;outline-offset:4px}')
+# Product pages use the site stylesheet, header and footer; this only lays out the product block.
+PAGE_CSS = ('.product-detail{max-width:32rem;margin:0 auto;padding:.75rem 1rem 2.5rem}'
+            '.product-detail .path a,.product-detail .more a{display:inline-flex;align-items:center;min-height:2.75rem;color:#8f0d49;font-weight:700;text-decoration:none}'
+            '.product-detail .photo{display:block;width:auto;max-width:100%;height:auto;max-height:58vh;margin:.25rem auto 0;border-radius:1rem;background:#fff;box-shadow:0 .75rem 2rem rgba(84,22,52,.14)}'
+            '.product-detail h1{max-width:none;margin:1.1rem 0 .4rem;font-size:clamp(1.75rem,6vw,2.4rem);line-height:1.1;letter-spacing:-.02em}'
+            '.product-detail .price{display:inline-block;margin:.25rem 0;padding:.2rem .7rem;border-radius:999px;background:#f2a007;font-size:1.15rem;font-weight:700}'
+            '.product-detail .size{margin:.4rem 0 .25rem;color:#6a4a5b}'
+            '.product-detail .order{display:flex;align-items:center;justify-content:center;min-height:3rem;margin:1.25rem 0 2rem;padding:.75rem 1rem;border-radius:999px;background:#b0125b;color:#fff;font-weight:700;text-decoration:none}'
+            '.product-detail .path{margin:0 0 .5rem}.product-detail .path ol,.product-detail .more ul{margin:0;padding:0;list-style:none}.product-detail .path ol{display:flex;flex-wrap:nowrap;align-items:center}'
+            '.product-detail .path li{display:flex;flex:none;align-items:center;color:#6a4a5b;white-space:nowrap}.product-detail .path li span{margin:0 .4rem}'
+            '.product-detail .path li[aria-current]{display:block;flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;line-height:2.75rem}'
+            '.product-detail .more{margin:0}.product-detail .more h2{margin:0 0 .5rem;font-size:1.4rem;letter-spacing:-.02em}'
+            '.product-detail .more ul{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem}'
+            '.product-detail .more a{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.35rem;height:100%;padding:.4rem;text-align:center}'
+            '.product-detail .more a:focus-visible{outline-offset:-3px}.product-detail .more img{width:6.25rem;height:6.25rem;border-radius:.75rem;object-fit:cover}'
+            '.product-detail .more span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-size:.9rem;line-height:1.25}'
+            '.product-detail a:focus-visible{outline:3px solid #b0125b;outline-offset:4px}')
 # Sizes the popup also hides: they are not a real size yet.
 NOT_A_SIZE_RE = re.compile(r"suggested size|confirm with saloni|custom size in inches|component size to confirm", re.I)
 
@@ -488,25 +489,26 @@ def render_page(card, slug, share_size, topic, more, version):
   <meta name="twitter:image" content="{image}">
   <meta name="twitter:image:alt" content="{alt}">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-{ld}  <style>{css}</style>
+{ld}  <link rel="stylesheet" href="/styles.css?v={version}">
+  <style>{css}</style>
   <script src="/google.js?v={version}" defer></script>
 </head>
-<body>
-  <header><a href="/">{studio}</a></header>
-  <main>
+<body class="collection-page">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+{header}  <main class="product-detail" id="main-content" tabindex="-1">
     <nav class="path" aria-label="Breadcrumb"><ol>{path}</ol></nav>
-    <img src="/assets/{file}" alt="{alt}"{dims} fetchpriority="high">
+    <img src="/assets/{file}" alt="{alt}"{dims} class="photo" fetchpriority="high">
     <h1>{name}</h1>
     <p class="price">{price}</p>
 {size_line}{line_html}    <a class="order" href="{target}">View and order</a>
-{more_html}    <p><button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button></p>
-  </main>
-</body>
+{more_html}  </main>
+{footer}</body>
 </html>
 """.format(
         title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
         ld=("".join('  <script type="application/ld+json">%s</script>\n' % block for block in (data, crumbs) if block)), css=PAGE_CSS,
         path=path, more_html=more_html, version=version,
+        header=TOPIC_HEADER.replace('href="../', 'href="/'), footer=TOPIC_FOOTER.replace('href="../', 'href="/').replace("{topic_links}", ""),
         target=esc(target), name=esc(card["name"]), file=esc(card["file"]), price=esc(card["price"]),
         size_line='    <p class="size">Size: %s</p>\n' % esc(card["size"]) if card["size"] else "",
         line_html='    <p>%s</p>\n' % esc(card["line"]) if card["line"] else "",
