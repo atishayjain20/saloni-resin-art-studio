@@ -60,13 +60,38 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
   assert.match(design, /^<article class="hero-slide hero-promo hero-promo-design" role="group" aria-roledescription="slide" aria-label="2 of 7: Design your own frame">/);
   assert.equal((design.match(/<a\b/g) || []).length, 1);
   assert.match(design, /<a class="button hero-promo-cta" href="#customizer" data-customizer-open>Start designing<\/a>/);
+  // Slides 3-7 use the same layout as slides 1-2: copy on the left, three priced photos on the right.
+  const promoCopy = [
+    { theme: "premium", kicker: "Premium collection", big: "Statement pieces", sub: "Tiered sets, trays &amp; glassware", cta: "Shop premium", section: "premium-collection" },
+    { theme: "couple", kicker: "For the two of you", big: "Couple gifts", sub: "Keychains, trays &amp; keepsakes", cta: "Shop couple gifts", section: "romantic-keepsakes" },
+    { theme: "marriage", kicker: "Wedding season", big: "Marriage gifts", sub: "Ring platters, varmala frames &amp; name plates", cta: "Shop marriage gifts", section: "marriage-gifts" },
+    { theme: "corporate", kicker: "For teams &amp; clients", big: "Corporate gifts", sub: "Desk pieces, coasters &amp; awards", cta: "Shop corporate gifts", section: "corporate-resin-gifts" },
+    { theme: "diwali", kicker: "Festive glow", big: "Diwali gifts", sub: "Welcome pairs, festive sets &amp; pooja plates", cta: "Shop Diwali gifts", section: "diwali" },
+  ];
   slides.slice(2).forEach((slide, index) => {
     const expected = bannerSlides[index];
-    assert.match(slide, new RegExp(`role="group" aria-roledescription="slide" aria-label="${index + 3} of 7: ${expected.label}"`));
-    assert.doesNotMatch(slide, /<h2|class="eyebrow"|hero-slide-copy/);
+    const copy = promoCopy[index];
+    assert.match(slide, new RegExp(`^<article class="hero-slide hero-promo hero-promo-${copy.theme}" role="group" aria-roledescription="slide" aria-label="${index + 3} of 7: ${expected.label}"`));
+    assert.doesNotMatch(slide, /<h2|class="eyebrow"|hero-slide-copy|hero-slide-photos|hero-slide-cta/);
     assert.equal((slide.match(/<a\b/g) || []).length, 1);
-    assert.match(slide, new RegExp(`<a class="button button-dark hero-slide-cta" href="${expected.href}" data-category-shortcut="${expected.shortcut}" aria-label="Shop now: ${expected.name}">Shop now</a>`));
+    assert.match(slide, /<div class="hero-promo-copy">/);
+    assert.match(slide, new RegExp(`<p class="hero-promo-kicker">${copy.kicker}</p>`));
+    assert.match(slide, new RegExp(`<p class="hero-promo-big hero-promo-title">${copy.big}</p>`));
+    assert.match(slide, new RegExp(`<a class="button hero-promo-cta" href="${expected.href}" data-category-shortcut="${expected.shortcut}">${copy.cta}</a>`));
+    assert.match(slide, /<ul class="hero-promo-picks" aria-label="[^"]+">/);
     assert.deepEqual(Array.from(slide.matchAll(/<img\b[^>]*src="assets\/([^"]+)"/g), (match) => match[1]), expected.images);
+    const tags = Array.from(slide.matchAll(/<li><img\b[^>]*><span class="hero-promo-tag"><span class="sr-only">([^<]+), was <\/span><s>(₹[\d,]+)<\/s> <span class="sr-only">now <\/span><strong>(₹[\d,]+)<\/strong><\/span><\/li>/g));
+    assert.equal(tags.length, 3, "each photo has a was/now price tag");
+    // Each tag must match that photo's own catalogue card.
+    tags.forEach(([, title, was, now], tagIndex) => {
+      const file = expected.images[tagIndex].replace(/\./g, "\\.");
+      const card = html.slice(html.indexOf("data-banner-prev")).match(new RegExp(`assets/${file}[\\s\\S]*?<\\/figcaption>`))?.[0] || "";
+      assert.match(card, new RegExp(`<dd>${now}<\\/dd>[\\s\\S]*?<s>${was}<\\/s>`), `${title} tag matches its catalogue card`);
+    });
+    // "from ₹X" is the lowest single price in the section the button opens.
+    const target = section(copy.section);
+    const lowest = Math.min(...Array.from(target.matchAll(/<dt>Price<\/dt><dd>₹([\d,]+)<\/dd>/g), (match) => Number(match[1].replace(/,/g, ""))));
+    assert.match(slide, new RegExp(`<p class="hero-promo-sub">${copy.sub} · from ₹${lowest.toLocaleString("en-IN")}</p>`));
   });
   assert.deepEqual(Array.from(hero.matchAll(/data-category-shortcut="([^"]+)"/g), (match) => match[1]), ["premium", "couple", "marriage", "corporate", "diwali"]);
   assert.match(hero, /<a href="#customizer" data-customizer-open>Or design a custom frame<\/a>/);
@@ -331,10 +356,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261200">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261200" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261200" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261200" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261201">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261201" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261201" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261201" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -342,9 +367,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261200"], page);
+    assert.deepEqual([...new Set(versions)], ["20261201"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261200/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261201/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -451,9 +476,6 @@ test("hero banner CSS snaps full-bleed photo slides with a bottom-centre Shop no
   const mobileNavRule = mobileCss.match(/\.nav-toggle\s*\{([^}]*)\}/)?.[1] || "";
   const trackRule = css.match(/\.hero-banner-track\s*\{([^}]*)\}/)?.[1] || "";
   const slideRule = css.match(/\.hero-slide\s*\{([^}]*)\}/)?.[1] || "";
-  const photosRule = css.match(/\.hero-slide-photos\s*\{([^}]*)\}/)?.[1] || "";
-  const ctaRule = css.match(/\.hero-slide-cta\s*\{([^}]*)\}/)?.[1] || "";
-  const imageRule = css.match(/\.hero-slide-photos img\s*\{([^}]*)\}/)?.[1] || "";
   const arrowRule = css.match(/\.hero-banner-arrow,\s*\.hero-banner-dot\s*\{([^}]*)\}/)?.[1] || "";
   const wideCss = css.slice(css.indexOf("@media (min-width: 621px)"), css.indexOf("@media (max-width: 840px)"));
 
@@ -469,22 +491,14 @@ test("hero banner CSS snaps full-bleed photo slides with a bottom-centre Shop no
   assert.match(css, /\.hero-banner-track::-webkit-scrollbar\s*\{[^}]*display:\s*none/);
   assert.match(slideRule, /flex:\s*0 0 100%/);
   assert.match(slideRule, /scroll-snap-align:\s*start/);
-  assert.match(photosRule, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  assert.doesNotMatch(css, /\.hero-slide-photos|\.hero-slide-cta/, "all seven slides use the promo layout");
   assert.match(slideRule, /position:\s*relative/);
   assert.doesNotMatch(slideRule, /padding\s*:/);
   assert.match(slideRule, /aspect-ratio:\s*16\s*\/\s*9/);
   assert.doesNotMatch(slideRule, /50svh/, "owner preferred the earlier banner size");
-  assert.match(photosRule, /height:\s*100%/);
-  assert.match(ctaRule, /position:\s*absolute/);
-  assert.match(ctaRule, /bottom:\s*[^;]+;/);
-  assert.match(ctaRule, /left:\s*0/);
-  assert.match(ctaRule, /right:\s*0/);
-  assert.match(ctaRule, /margin-inline:\s*auto/);
-  assert.match(ctaRule, /width:\s*max-content/);
-  assert.match(ctaRule, /min-height:\s*44px/);
-  assert.match(ctaRule, /box-shadow:/);
+  ["premium", "couple", "marriage", "corporate", "diwali"].forEach((theme) => assert.match(css, new RegExp(`\\.hero-promo-${theme}\\s*\\{[^}]*background:`), `${theme} slide has its own colour theme`));
   assert.doesNotMatch(css, /\.hero-slide(?:-copy|-narrow)\b|\.hero-slide \.eyebrow|\.hero-slide h2|\.hero-banner-title|\.hero-slide:nth-child/);
-  assert.match(imageRule, /object-fit:\s*cover/);
+  assert.match(css.match(/\.hero-promo-picks img\s*\{([^}]*)\}/)?.[1] || "", /object-fit:\s*cover/);
   assert.match(wideCss, /\.hero-slide\s*\{[^}]*aspect-ratio:\s*21\s*\/\s*9/);
   assert.doesNotMatch(wideCss, /grid-template-columns:\s*minmax\(0,\s*0?\.8fr\)/);
   assert.match(arrowRule, /width:\s*44px/);
@@ -2651,6 +2665,22 @@ test("the page background is a very pale blush token used for the body and the c
   assert.ok(link, "the custom-frame link on the page sets its own readable teal");
   ["#6a4a5b", "#b0125b", link[1]].forEach((colour) => assert.ok(contrast(colour, "#ffeaf2") >= 4.5, colour + " on the page"));
   assert.match(css, /\nbody\s*\{[^}]*background:\s*var\(--page\)/);
+});
+
+test("hero slides 3-7 keep text, buttons and price tags at WCAG AA contrast on their own colours", () => {
+  const colour = (value) => (value.startsWith("var(") ? rootToken(value.slice(6, -1)) : value);
+  ["premium", "couple", "marriage", "corporate", "diwali"].forEach((theme) => {
+    const rule = css.match(new RegExp(`\\.hero-promo-${theme}\\s*\\{([^}]*)\\}`))[1];
+    const prop = (name) => colour(rule.match(new RegExp(`(?:^|[\\s;{])${name}:\\s*([^;]+);`))[1].trim());
+    const [accent, on, text] = [prop("--hp-accent"), prop("--hp-on"), prop("color")];
+    const stops = rule.match(/linear-gradient\([^)]*\)/)[0].match(/#[0-9a-f]{6}/gi);
+    assert.ok(stops.length >= 2, `${theme} gradient stops`);
+    stops.forEach((stop) => {
+      assert.ok(contrast(text, stop) >= 4.5, `${theme} text on ${stop}`);
+      assert.ok(contrast(accent, stop) >= 4.5, `${theme} kicker on ${stop}`);
+    });
+    assert.ok(contrast(on, accent) >= 4.5, `${theme} button and tag text on its colour`);
+  });
 });
 
 test("on 8 and 9 November the Diwali hero slide moves first and shows the offer", () => {
