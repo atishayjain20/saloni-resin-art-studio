@@ -127,19 +127,6 @@ html:not(.js) .site-nav .nav-link-button { display: none; }
   scroll-snap-stop: always;
   background: var(--paper);
 }
-.hero-slide-photos {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.125rem;
-  width: 100%;
-  height: 100%;
-}
-.hero-slide-photos img {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  object-fit: cover;
-}
 .hero-banner-controls {
   display: flex;
   align-items: center;
@@ -296,19 +283,6 @@ h1 em { color: var(--rose); font-style: italic; }
 .button-dark:hover, .button-dark:focus-visible { background: var(--rose-ink); }
 .button-line { border-color: var(--ink); color: var(--ink); }
 .button-line:hover, .button-line:focus-visible { background: var(--ink); color: var(--ivory); }
-.hero-slide-cta {
-  position: absolute;
-  right: 0;
-  bottom: 0.75rem;
-  left: 0;
-  justify-content: center;
-  width: max-content;
-  min-height: 44px;
-  margin-inline: auto;
-  padding: 0.5rem 1.4rem;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  white-space: nowrap;
-}
 .hero-slide-offer {
   position: absolute;
   top: 0.75rem;
@@ -328,16 +302,23 @@ h1 em { color: var(--rose); font-style: italic; }
   text-align: center;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
-.hero-slide-cta:focus-visible {
-  outline: 3px solid var(--ivory);
-  outline-offset: 2px;
-}
 /* Promo slides: the 20% sale and design-your-frame banners lead the carousel. */
 .hero-promo { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: clamp(0.5rem, 2vw, 1.5rem); padding-inline: clamp(0.9rem, 4vw, 3.5rem); overflow: hidden; }
 .hero-promo-sale { background: radial-gradient(circle at 12% 18%, rgba(242, 160, 7, 0.28), transparent 40%), linear-gradient(135deg, #2a0e1f 0%, #5c0f36 55%, #8f0d49 100%); color: var(--ivory); }
 /* Gold flecks, like the gold flakes set in the resin. */
 .hero-promo-sale::before { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(242, 160, 7, 0.95) 0 1.2px, transparent 1.7px), radial-gradient(circle, rgba(255, 246, 233, 0.6) 0 1px, transparent 1.5px); background-position: 0 0, 19px 11px; background-size: 38px 34px, 57px 49px; content: ""; opacity: 0.35; pointer-events: none; }
 .hero-promo-design { background: radial-gradient(circle at 85% 20%, rgba(176, 18, 91, 0.12), transparent 45%), linear-gradient(135deg, var(--ivory) 0%, #ffe3ee 100%); color: var(--ink); }
+/* Slides 3-7 reuse the promo layout; each one only sets its own colours (all text and stickers pass WCAG AA). */
+.hero-promo-premium { --hp-accent: var(--marigold); --hp-on: var(--ink); --hp-sub: rgba(255, 246, 233, 0.9); --hp-ring: var(--ivory); background: linear-gradient(135deg, #0b1d3a 0%, #12294d 55%, #173a6b 100%); color: var(--ivory); }
+.hero-promo-couple { --hp-accent: #5e2a8c; --hp-on: var(--ivory); --hp-sub: var(--ink); --hp-ring: var(--ink); background: linear-gradient(135deg, #f3e8ff 0%, #dcc6f5 100%); color: var(--ink); }
+.hero-promo-marriage { --hp-accent: #8a2b0e; --hp-on: var(--ivory); --hp-sub: var(--ink); --hp-ring: var(--ink); background: linear-gradient(135deg, #fff1d6 0%, #ffd6a5 100%); color: var(--ink); }
+.hero-promo-corporate { --hp-accent: #8fe3d4; --hp-on: var(--ink); --hp-sub: rgba(255, 246, 233, 0.9); --hp-ring: var(--ivory); background: linear-gradient(135deg, #0b2a2e 0%, #0e4d4b 55%, #115e59 100%); color: var(--ivory); }
+.hero-promo-diwali { --hp-accent: var(--marigold); --hp-on: var(--ink); --hp-sub: rgba(255, 246, 233, 0.9); --hp-ring: var(--ivory); background: linear-gradient(135deg, #3f1204 0%, #5e1b05 55%, #7a2406 100%); color: var(--ivory); }
+:is(.hero-promo-premium, .hero-promo-couple, .hero-promo-marriage, .hero-promo-corporate, .hero-promo-diwali) .hero-promo-kicker { color: var(--hp-accent); }
+:is(.hero-promo-premium, .hero-promo-couple, .hero-promo-marriage, .hero-promo-corporate, .hero-promo-diwali) .hero-promo-sub { color: var(--hp-sub); }
+:is(.hero-promo-premium, .hero-promo-couple, .hero-promo-marriage, .hero-promo-corporate, .hero-promo-diwali) :is(.hero-promo-cta, .hero-promo-tag) { background: var(--hp-accent); color: var(--hp-on); }
+:is(.hero-promo-premium, .hero-promo-couple, .hero-promo-marriage, .hero-promo-corporate, .hero-promo-diwali) .hero-promo-cta { border-color: var(--hp-accent); }
+:is(.hero-promo-premium, .hero-promo-couple, .hero-promo-marriage, .hero-promo-corporate, .hero-promo-diwali) .hero-promo-cta:focus-visible { outline-color: var(--hp-ring); }
 .hero-promo-copy { position: relative; z-index: 1; display: grid; justify-items: start; gap: clamp(0.15rem, 0.8vw, 0.55rem); min-width: 0; }
 .hero-promo-kicker { margin: 0; color: var(--marigold); font-size: clamp(0.66rem, 1.6vw, 0.85rem); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
 .hero-promo-design .hero-promo-kicker { color: var(--rose-ink); }
@@ -828,8 +809,8 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 
 @media (max-width: 620px) {
   /* Phone stickers stack the old and new price so the side stickers stay narrow. */
-  .hero-promo-sale .hero-promo-tag { display: grid; justify-items: center; padding: 0.1rem 0.45rem; border-radius: 0.6rem; line-height: 1.15; }
-  .hero-promo-sale .hero-promo-tag s { margin: 0; font-size: 0.85em; }
+  .hero-promo:not(.hero-promo-design) .hero-promo-tag { display: grid; justify-items: center; padding: 0.1rem 0.45rem; border-radius: 0.6rem; line-height: 1.15; }
+  .hero-promo:not(.hero-promo-design) .hero-promo-tag s { margin: 0; font-size: 0.85em; }
   :root { --sticky-offset: 7.5rem; }
   :root:has(.category-tabs) { --sticky-offset: calc(5.5rem + var(--category-tabs-height)); }
   html { scroll-padding-top: var(--sticky-offset); }

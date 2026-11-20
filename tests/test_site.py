@@ -1027,7 +1027,28 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertNotIn('class="hero-intro"', self.html)
         hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html).group(0)
         self.assertNotRegex(hero, r'<h2|class="eyebrow"')
-        self.assertEqual(len(re.findall(r'>Shop now</a>', hero)), 5)
+        self.assertEqual(len(re.findall(r'>Shop now</a>', hero)), 0)
+        self.assertNotIn('hero-slide-photos', hero)
+        self.assertNotIn('hero-slide-cta', hero)
+        # Slides 3-7 share the promo layout of slides 1-2: copy on the left, three priced photos on the right.
+        slides = re.findall(r'<article class="hero-slide[^"]*"[\s\S]*?</article>', hero)
+        ctas = [
+            ("premium", "#premium-collection", "Shop premium"),
+            ("couple", "#romantic-keepsakes", "Shop couple gifts"),
+            ("marriage", "#marriage-gifts", "Shop marriage gifts"),
+            ("corporate", "#corporate-resin-gifts", "Shop corporate gifts"),
+            ("diwali", "#diwali", "Shop Diwali gifts"),
+        ]
+        for slide, (shortcut, href, label) in zip(slides[2:], ctas):
+            with self.subTest(slide=shortcut):
+                self.assertIn(f'class="hero-slide hero-promo hero-promo-{shortcut}"', slide)
+                self.assertIn('<div class="hero-promo-copy">', slide)
+                self.assertIn('<ul class="hero-promo-picks"', slide)
+                self.assertEqual(len(re.findall(r'<span class="hero-promo-tag"><span class="sr-only">[^<]+, was </span><s>₹[\d,]+</s> <span class="sr-only">now </span><strong>₹[\d,]+</strong></span>', slide)), 3)
+                self.assertIn(f'<a class="button hero-promo-cta" href="{href}" data-category-shortcut="{shortcut}">{label}</a>', slide)
+                self.assertEqual(len(re.findall(r'<a\b', slide)), 1)
+        self.assertIn('id="hero-diwali-slide"', slides[6])
+        self.assertIn('<p class="hero-slide-offer" hidden>', slides[6])
         self.assertNotIn("Thoughtful custom resin frames, resin art, and personalized gifts from Ajmer, Rajasthan", self.html)
 
     def test_romantic_keepsake_highlight_contract(self):
