@@ -1129,6 +1129,38 @@ test("the form starts on the product and rating from the address, and the saved 
   assert.equal(makeFormRuntime({ storage: { saloniRepeatProfile: JSON.stringify({ version: 2, expiresAt: Date.now() + 1000, profile: { customerName: "Asha" } }) } }).fields.firstName.value, "");
 });
 
+test("the saved order on this phone fills in the city and, for a one-product order, the product", async () => {
+  const day = 24 * 60 * 60 * 1000;
+  const profile = (city, expiresAt = Date.now() + day) => JSON.stringify({ version: 1, expiresAt, profile: { customerName: "Asha Sharma", phone: "98765 43210", fulfillment: "shipping", city, pin: "305001" } });
+  const orders = (list) => JSON.stringify({ version: 1, orders: list });
+  const order = (names, at = Date.now() - day) => ({ requestId: "r-" + at, at, items: names.map((name) => ({ name, quantity: 1 })) });
+
+  const both = makeFormRuntime({ storage: { saloniRepeatProfile: profile("  Ajmer "), saloniMyOrders: orders([order(["Blue hour resin clock"])]) } });
+  await settle();
+  assert.equal(both.fields.city.value, "Ajmer");
+  assert.equal(both.fields.productId.value, DEFAULT_PRODUCTS[0].id);
+
+  const newest = makeFormRuntime({ storage: { saloniMyOrders: orders([order(["Blue hour resin clock"], Date.now() - 3 * day), order(["A tiny beginning (colour: Teal)"], Date.now() - day)]) } });
+  await settle();
+  assert.equal(newest.fields.productId.value, DEFAULT_PRODUCTS[1].id, "the newest order wins, and a chosen colour still matches");
+
+  for (const [label, list] of [["two products", [order(["Blue hour resin clock", "A tiny beginning"])]], ["unknown product", [order(["Something else"])]], ["older than 30 days", [order(["Blue hour resin clock"], Date.now() - 31 * day)]]]) {
+    const runtime = makeFormRuntime({ storage: { saloniMyOrders: orders(list) } });
+    await settle();
+    assert.equal(runtime.fields.productId.value, "studio", label);
+  }
+  const hinted = makeFormRuntime({ search: "?product=" + encodeURIComponent(DEFAULT_PRODUCTS[1].id), storage: { saloniMyOrders: orders([order(["Blue hour resin clock"])]) } });
+  await settle();
+  assert.equal(hinted.fields.productId.value, DEFAULT_PRODUCTS[1].id, "a product named in the link wins over the saved order");
+
+  for (const [label, storage] of [["expired profile", { saloniRepeatProfile: profile("Ajmer", Date.now() - 1000) }], ["city with digits", { saloniRepeatProfile: profile("Ajmer 305001") }], ["city with @", { saloniRepeatProfile: profile("a@b") }], ["broken orders", { saloniMyOrders: "not json" }], ["nothing saved", {}]]) {
+    const runtime = makeFormRuntime({ storage });
+    await settle();
+    assert.equal(runtime.fields.city.value, "", label);
+    assert.equal(runtime.fields.productId.value, "studio", label);
+  }
+});
+
 test("the review form has the specified fields and no consent checkbox, consent text or intro", () => {
   for (const name of ["productId", "rating", "firstName", "city", "comment", "reviewId", "photos"]) assert.match(formMarkup, new RegExp('name="' + name + '"'));
   assert.equal((formMarkup.match(/type="radio" name="rating"/g) || []).length, 5);
