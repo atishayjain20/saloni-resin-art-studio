@@ -331,10 +331,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261194">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261194" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261194" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261194" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261195">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261195" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261195" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261195" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -342,9 +342,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261194"], page);
+    assert.deepEqual([...new Set(versions)], ["20261195"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261194/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261195/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -807,7 +807,7 @@ test("each priced gift shows a crossed-out regular price 25% above today's price
     assert.equal((card.match(/<dt>/g) || []).length <= 2, true, "no extra row, so the phone price grid keeps its two rows");
     withRegular += 1;
   });
-  assert.equal(withRegular, 98);
+  assert.equal(withRegular, 106);
   assert.match(html, /<dt>Price<\/dt><dd>₹249<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>₹311<\/s> <span>20% off<\/span><\/dd>/);
   assert.match(css, /figcaption \.product-pricing > div > dd\.product-regular-price\s*\{[^}]*grid-column:\s*1 \/ -1/);
   assert.doesNotMatch(html, /<dt>Estimated from<\/dt>/);
@@ -825,7 +825,6 @@ test("narrow catalogue cards give ranged prices room beside the PRICE label", ()
   const reducedMotionStart = css.indexOf("@media (prefers-reduced-motion: reduce)", mobileStart);
   const mobileCss = css.slice(mobileStart, reducedMotionStart);
   assert.match(mobileCss, /\.catalogue-grid > :is\(\.work-card, \.romantic-keepsake-card\) figcaption \.product-pricing > div:first-child\s*\{[^}]*grid-template-columns:\s*max-content minmax\(0, 1fr\)/);
-  assert.match(section("diwali"), /<dt>Price<\/dt><dd>₹250–₹400<\/dd>/);
 });
 
 test("festive banner is absent while Diwali remains in the collection", () => {
@@ -1035,7 +1034,7 @@ test("lightbox keeps product details and request action without catalogue naviga
   assert.doesNotMatch(script, /lightbox-(?:previous|next|position)/);
   assert.match(script, /pendingLightboxRequest[\s\S]*requestButton\.click\(\)[\s\S]*focusOrderLocation/);
   assert.match(script, /selected \? "Remove from cart" : "Add to cart"/);
-  assert.match(script, /getAttribute\("data-order-prefill"\) === "quote"[\s\S]*"Ask for a quote"[\s\S]*"Ask for a quote for "/);
+  assert.doesNotMatch(script, /Ask for a quote/, "premium cards use Add to cart like the rest");
   assert.match(script, /selected \? " from cart" : " to cart"/);
   assert.match(html, /id="order"[^>]*tabindex="-1"/);
   assert.match(script, /data-lightbox-trigger/);
@@ -1750,12 +1749,6 @@ test("lightbox hint tells a shopper to remove the item first when it is already 
   notInCart.open();
   notInCart.docElements["lightbox-photo-next"].listeners.click();
   assert.match(notInCart.docElements["lightbox-photo-label"].textContent, /\nUse the button below on this photo to choose "Teal"\.$/);
-  const quote = galleryHarness({ colours: "teal" });
-  quote.requestButton.setAttribute("data-order-prefill", "quote");
-  quote.open();
-  quote.docElements["lightbox-photo-next"].listeners.click();
-  assert.equal(quote.docElements["lightbox-request"].textContent, "Ask for a quote");
-  assert.match(quote.docElements["lightbox-photo-label"].textContent, /\nUse the button below on this photo to choose "Teal"\.$/);
 });
 
 test("card image box stays a single photo without valid AI images", () => {
