@@ -24,6 +24,11 @@ class FakeElement {
     this.className = "";
     this.hidden = false;
     this.id = "";
+    this.offsetHeight = 96;
+    const classes = new Set();
+    this.classList = { add: (name) => classes.add(name), remove: (name) => classes.delete(name), contains: (name) => classes.has(name) };
+    const props = {};
+    this.style = { setProperty: (name, value) => { props[name] = String(value); }, removeProperty: (name) => { delete props[name]; }, getPropertyValue: (name) => props[name] || "" };
   }
   setAttribute(name, value) { this.attributes[name] = String(value); if (name === "id") this.id = String(value); if (name === "class") this.className = String(value); }
   getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null; }
@@ -302,13 +307,17 @@ test("without a skip link the banner is the first child of body", () => {
   assert.equal(page.documentObject.body.children[0], page.banner());
 });
 
-test("one injected style element gives the banner 44px buttons and keeps it in the page flow", () => {
+test("one injected style element puts the banner at the bottom of the screen with 44px buttons, without hiding the page or the cart button", () => {
   const page = load();
   const styles = findAll(page.documentObject.head, (node) => node.tagName === "STYLE");
   assert.equal(styles.length, 1);
   const css = styles[0].textContent;
   assert.match(css, /min-height:\s*44px/);
-  assert.doesNotMatch(css, /position:\s*(fixed|sticky|absolute)/, "it must not cover the cart jump or the customizer actions");
+  assert.match(css, /\.saloni-cookie-banner\{[^}]*position:fixed;left:0;right:0;bottom:0/, "fixed to the bottom edge");
+  assert.match(css, /\.saloni-cookie-open body\{padding-bottom:var\(--saloni-cookie-height/, "page gets room under it");
+  assert.match(css, /\.saloni-cookie-open \.catalogue-cart-jump\{bottom:calc\(var\(--saloni-cookie-height/, "cart jump button moves above it");
+  assert.match(css, /\.saloni-cookie-open \.customizer-mobile-actions\{bottom:var\(--saloni-cookie-height/, "custom design action bar moves above it");
+  assert.match(css, /html\.saloni-cookie-open body:has\(#customizer-mobile-actions:not\(\[hidden\]\)\)\{padding-bottom:calc\(var\(--saloni-cookie-height,0px\) \+ 4\.5rem/, "room for both bars");
   assert.match(css, /var\(--[a-z-]+,\s*#[0-9a-f]{3,8}\)/i, "site colour tokens with fallbacks");
 });
 
@@ -346,4 +355,16 @@ test("the container ID lives in google.js only", () => {
   const others = ["script.js", "order-form.js", "my-orders.js", "public-forms.js", "customizer.js", "analytics.js", "index.html", "tools/product_pages.py"];
   for (const file of others) assert.doesNotMatch(fs.readFileSync(path.join(root, file), "utf8"), /GTM-[A-Z0-9]+|googletagmanager/i, file);
   assert.doesNotMatch(source, /document\.cookie/, "google.js sets no cookies itself");
+});
+
+test("showing the banner marks the page and sets its height; closing it removes both", () => {
+  const page = load();
+  const root = page.documentObject.documentElement;
+  assert.ok(page.banner(), "banner shown on first visit");
+  assert.equal(root.classList.contains("saloni-cookie-open"), true);
+  assert.match(String(root.style.getPropertyValue("--saloni-cookie-height")), /px$/);
+  page.buttonsOf(page.banner()).find((button) => button.textContent === "Decline").click();
+  assert.equal(page.banner(), null);
+  assert.equal(root.classList.contains("saloni-cookie-open"), false);
+  assert.equal(root.style.getPropertyValue("--saloni-cookie-height"), "");
 });

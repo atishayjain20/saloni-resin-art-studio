@@ -2797,7 +2797,7 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertNotRegex(text, r"location\.(?:replace|assign)|location\.href\s*=", slug)
             self.assertNotIn("<noscript", text, slug)
             self.assertIn(card["section"], section_ids, slug)
-            self.assertEqual(tags.body_links[0], "/", slug)
+            self.assertEqual(tags.body_links[:2], ["#main-content", "/"], slug + ": skip link, then the site header wordmark")
             self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=" + slug + "#" + card["section"]], slug)
             self.assertEqual(tags.noscript_links, [], slug)
             self.assertEqual(re.findall(r"<h1>([^<]*)</h1>", text), [html.escape(card["name"], quote=True)], slug)
@@ -2919,6 +2919,8 @@ class ProductSharePageTests(unittest.TestCase):
 
                 # Every link on the page leads to a file in the site.
                 for href in tags.body_links:
+                    if href == "#main-content" or href == "https://www.instagram.com/saloniresin_art_studio/":
+                        continue  # skip link, and the studio Instagram in the site footer
                     path = re.split(r"[?#]", href)[0]
                     self.assertTrue(path.startswith("/"), href)
                     self.assertTrue((ROOT / path.strip("/") / "index.html").is_file(), href)
@@ -3555,17 +3557,18 @@ class GoogleConsentTests(unittest.TestCase):
                 self.assertEqual(footer.group(0).count('<button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button>'), 1)
                 self.assertEqual(text.count("data-cookie-settings"), 1)
 
-    def test_every_product_page_loads_google_js_and_has_the_button_after_more_like_this(self):
+    def test_every_product_page_loads_google_js_and_has_the_button_in_the_site_footer(self):
         for path in self.product_pages:
             with self.subTest(page=path.parent.name):
                 text = path.read_text(encoding="utf-8")
                 self.assertEqual(text.count('<script src="/google.js?v=%s" defer></script>' % self.version), 1)
-                button = '<p><button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button></p>'
+                self.assertEqual(text.count('<link rel="stylesheet" href="/styles.css?v=%s">' % self.version), 1)
+                self.assertEqual(text.count('<header class="site-header">'), 1)
+                button = '<p class="footer-credit">© Saloni Resin Art Studio <button type="button" class="cookie-settings" data-cookie-settings hidden>Cookie settings</button></p>'
                 self.assertEqual(text.count(button), 1)
                 self.assertEqual(text.count("data-cookie-settings"), 1)
-                if '<section class="more"' in text:
-                    self.assertGreater(text.index(button), text.index('<section class="more"'))
-                self.assertLess(text.index(button), text.index("</main>"))
+                self.assertGreater(text.index(button), text.index("</main>"))
+                self.assertNotIn('href="../', text, "pages sit two folders deep, so site links are absolute")
                 self.assertIn("/google.js", text)
 
     def test_topic_pages_use_the_footer_button_and_the_shared_version(self):

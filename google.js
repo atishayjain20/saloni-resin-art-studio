@@ -143,7 +143,11 @@
 
   // ---- Banner ----
   var CSS = [
-    ".saloni-cookie-banner{box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:.6rem var(--gutter,1rem);background:var(--paper,#fff);color:var(--ink,#2a0e1f);border-bottom:1px solid var(--line,rgba(42,14,31,.16));font:.9rem/1.35 var(--sans,\"Helvetica Neue\",Helvetica,Arial,sans-serif)}",
+    ".saloni-cookie-banner{box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;position:fixed;left:0;right:0;bottom:0;z-index:30;padding:.6rem var(--gutter,1rem) calc(.6rem + env(safe-area-inset-bottom));background:var(--paper,#fff);color:var(--ink,#2a0e1f);border-top:1px solid var(--line,rgba(42,14,31,.16));box-shadow:0 -.45rem 1.1rem rgba(42,14,31,.12);font:.9rem/1.35 var(--sans,\"Helvetica Neue\",Helvetica,Arial,sans-serif)}",
+    ".saloni-cookie-open body{padding-bottom:var(--saloni-cookie-height,0)}",
+    ".saloni-cookie-open .catalogue-cart-jump{bottom:calc(var(--saloni-cookie-height,0px) + 1rem)}",
+    ".saloni-cookie-open .customizer-mobile-actions{bottom:var(--saloni-cookie-height,0px)}",
+    "html.saloni-cookie-open body:has(#customizer-mobile-actions:not([hidden])){padding-bottom:calc(var(--saloni-cookie-height,0px) + 4.5rem + env(safe-area-inset-bottom))}",
     ".saloni-cookie-banner p{flex:1 1 16rem;margin:0}",
     ".saloni-cookie-banner a{color:var(--rose-ink,#8f0d49);text-decoration:underline}",
     ".saloni-cookie-actions{display:flex;gap:.5rem}",
@@ -190,18 +194,37 @@
       if (from) opener = from;
       if (!banner) {
         banner = buildBanner();
-        // In the page flow, never fixed: it must not cover the cart jump button or the customizer actions.
+        // Shown fixed at the bottom of the screen, but kept right after the skip link so keyboard users reach it first.
+        // While it shows, the page gets bottom padding and the cart jump button moves up, so nothing is hidden under it.
         var skip = document.querySelector(".skip-link");
         if (skip && skip.parentNode) skip.parentNode.insertBefore(banner, skip.nextSibling);
         else document.body.insertBefore(banner, document.body.firstChild);
+        var root = document.documentElement;
+        if (root && root.classList) root.classList.add("saloni-cookie-open");
+        measureBanner();
       }
       if (from && acceptButton && acceptButton.focus) acceptButton.focus();
     } catch (error) {}
   }
 
+  // Keeps the room under the page equal to the banner height, also after the phone rotates.
+  function measureBanner() {
+    try {
+      var root = document.documentElement;
+      if (banner && root && root.style && root.style.setProperty) root.style.setProperty("--saloni-cookie-height", banner.offsetHeight + "px");
+    } catch (error) {}
+  }
+
+  try { window.addEventListener("resize", measureBanner); } catch (error) {}
+
   function hideBanner() {
     try {
       if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+    } catch (error) {}
+    try {
+      var root = document.documentElement;
+      if (root && root.classList) root.classList.remove("saloni-cookie-open");
+      if (root && root.style && root.style.removeProperty) root.style.removeProperty("--saloni-cookie-height");
     } catch (error) {}
     banner = null;
     acceptButton = null;
