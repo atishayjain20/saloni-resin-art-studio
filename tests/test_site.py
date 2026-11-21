@@ -3994,5 +3994,93 @@ class ProductSizeTests(unittest.TestCase):
         self.assertEqual(html.unescape(tiles["branded-coaster-set"]), "From ₹399")
 
 
+class OnlinePaymentSiteTests(unittest.TestCase):
+    """Razorpay checkout, site side: prices.json for the server, payments off by default, and the refund wording."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tool = load_product_pages_tool()
+        cls.home = (ROOT / "index.html").read_text(encoding="utf-8")
+        cls.cards = cls.tool.parse_cards(cls.home)
+        cls.slugs = cls.tool.assign_slugs(cls.cards)
+        cls.sizes = cls.tool.load_sizes(ROOT)
+        cls.prices = json.loads((ROOT / "prices.json").read_text(encoding="utf-8"))
+
+    def test_prices_json_is_the_generated_price_table_for_the_server(self):
+        text = (ROOT / "prices.json").read_text(encoding="utf-8")
+        self.assertEqual(text, self.tool.prices_json(self.cards, self.slugs, self.sizes), "prices.json is stale: run python3 tools/product_pages.py")
+
+    def test_prices_json_is_keyed_by_the_cart_source_id_with_whole_rupees(self):
+        for card, slug in zip(self.cards, self.slugs):
+            entry = self.sizes.get(slug)
+            key = "catalogue:" + card["file"]
+            if not entry:
+                self.assertNotIn(key, self.prices, slug)
+                continue
+            with self.subTest(slug=slug):
+                item = self.prices[key]
+                self.assertEqual(item["name"], card["name"])
+                self.assertIs(type(item["price"]), int)
+                self.assertEqual(item["price"], entry["price"])
+                if entry["options"]:
+                    self.assertEqual(item["sizes"], {option["code"]: option["price"] for option in entry["options"]})
+                    self.assertEqual(item["sizes"][entry["default"]], item["price"])
+                    self.assertTrue(all(type(price) is int for price in item["sizes"].values()))
+                else:
+                    self.assertFalse(item.get("sizes"))
+
+    def test_every_card_with_one_rupee_price_can_be_priced_by_the_server(self):
+        for card, slug in zip(self.cards, self.slugs):
+            if re.fullmatch(r"\u20b9[\d,]+", card["price"]):
+                with self.subTest(slug=slug):
+                    self.assertIn("catalogue:" + card["file"], self.prices)
+                    self.assertEqual(self.prices["catalogue:" + card["file"]]["price"], int(card["price"][1:].replace(",", "")))
+
+    def test_the_site_ships_with_payments_off_and_the_captcha_key_on_the_order_form(self):
+        embed = re.search(r'<div class="order-panel order-form-panel" id="order-form-embed"[^>]*>', self.home).group(0)
+        self.assertIn('data-payments="off"', embed)
+        rating_key = re.search(r'id="lightbox-rate" data-captcha-site-key="([^"]+)"', self.home).group(1)
+        self.assertIn('data-captcha-site-key="%s"' % rating_key, embed)
+
+    def test_the_checkout_summary_shows_the_refund_rule_with_a_link_that_keeps_the_form_open(self):
+        summary = re.search(r'<section class="checkout-summary" id="checkout-summary".*?</section>', self.home, re.S).group(0)
+        self.assertIn("hidden", summary.split(">", 1)[0])
+        self.assertIn("Full refund if you cancel within 24 hours of paying, before work starts.", summary)
+        self.assertIn("not refundable except for damage in transit", summary)
+        self.assertRegex(summary, r'<a href="shipping-and-returns/#refunds" target="_blank" rel="noopener">')
+        for part in ("checkout-lines", "checkout-subtotal", "checkout-shipping", "checkout-total", "checkout-test-note"):
+            self.assertIn('id="%s"' % part, summary)
+        self.assertRegex(summary, r'<dd id="checkout-total" aria-live="polite">')
+        self.assertNotIn("No real money", summary, "the test note says so only after the server's key is a test key")
+        self.assertIn('id="reference-image-fieldset"', self.home)
+
+    def test_the_shipping_page_does_not_promise_online_payment_while_payments_are_off(self):
+        page = (ROOT / "shipping-and-returns" / "index.html").read_text(encoding="utf-8")
+        for absent in ("Razorpay", "Pay online", 'id="refunds"', "within 24 hours of paying"):
+            self.assertNotIn(absent, page)
+
+    def test_the_go_live_checklist_holds_the_exact_payment_and_refund_copy_for_the_shipping_page(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        section = readme.split("## Go-live checklist (online payments, site side)", 1)[1].split("\n## ", 1)[0]
+        self.assertIn('data-payments="live"', section)
+        refund = re.search(r'<li id="refunds"><strong>Refund for online payments</strong><span>(.*?)</span></li>', section, re.S).group(1)
+        self.assertIn("full refund", refund)
+        self.assertIn("within 24 hours of paying", refund)
+        self.assertIn("before Saloni starts making", refund)
+        self.assertIn("except for damage in transit", refund)
+        paying = re.search(r"<strong>Pay online</strong><span>(.*?)</span>", section, re.S).group(1)
+        for part in ("Razorpay", "A paid order is confirmed at once", "\u20b90 for pickup", "\u20b9100", "\u20b9150", "30 to 34", "once per order"):
+            self.assertIn(part, paying)
+        self.assertIn("Before you pay the advance", (ROOT / "shipping-and-returns" / "index.html").read_text(encoding="utf-8"))
+        self.assertIn("For a paid order, Cancel order shows for 24 hours after you pay.", section)
+
+    def test_both_privacy_texts_say_razorpay_processes_payments(self):
+        for text in (re.search(r'<details class="privacy-details" id="privacy-details">.*?</details>', self.home, re.S).group(0),
+                     re.search(r'<details class="privacy-details" id="order-privacy-details">.*?</details>', self.home, re.S).group(0)):
+            self.assertIn("When you pay online, Razorpay processes the payment", text)
+            self.assertIn("12 months", text)
+            self.assertIn("never sees", text)
+
+
 if __name__ == "__main__":
     unittest.main()

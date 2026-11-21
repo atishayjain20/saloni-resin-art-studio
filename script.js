@@ -2372,6 +2372,8 @@
             productName: String(item && item.productName || "").slice(0, 160),
             price: String(item && item.price || "").slice(0, 120),
             size: String(item && item.size || "").slice(0, 120),
+            sizeCode: String(item && item.sizeCode || "").slice(0, 40),
+            photo: String(item && item.photo || "").slice(0, 40),
             quantity: Number.isInteger(Number(item && item.quantity)) ? Number(item.quantity) : 1
           };
         });
@@ -2414,7 +2416,7 @@
       }
       status.hidden = true;
       track("order-form-open");
-      window.saloniOrderForm.open(seed, { previewBlob: frameState.previewSnapshot ? frameState.previewSnapshot.blob : null, onSent: saveRepeatProfile });
+      window.saloniOrderForm.open(seed, { previewBlob: frameState.previewSnapshot ? frameState.previewSnapshot.blob : null, onSent: saveRepeatProfile, onPaid: clearCartAfterPayment });
       frameState.loaded = true;
       if (continueOrderButton) continueOrderButton.hidden = false;
       if (orderDialogEnabled) openOrderDialog(opener, true);
@@ -2626,23 +2628,17 @@
       var sum = 0;
       var priced = 0;
       var anyRange = false;
-      var units = [];
       items.forEach(function (item) {
         var parsed = cataloguePriceFrom(item.price);
         if (!parsed) return;
         priced += 1;
         sum += parsed.amount * bundleQuantity(item);
-        for (var unit = 0; unit < bundleQuantity(item); unit += 1) units.push(parsed.amount);
         if (parsed.isRange) anyRange = true;
       });
       if (!items.length) return "";
       if (!priced) return "Estimated total: price on request";
       var rest = priced < items.length ? " (plus price-on-request items)" : "";
-      var offerBar = document.getElementById("diwali-offer-bar");
-      if (!offerBar || offerBar.hidden) return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum) + " + shipping" + rest;
-      // Diwali buy 2, get 1 free: one gift free for every three, and the free ones are the lowest-priced.
-      var free = units.sort(function (a, b) { return a - b; }).slice(0, Math.floor(units.length / 3)).reduce(function (total, amount) { return total + amount; }, 0);
-      return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum - free) + " + free shipping (Diwali offer: " + (free ? formatRupees(free) + " off, buy 2 get 1 free)" : "buy 2, get 1 free)") + rest;
+      return "Estimated total: " + (anyRange ? "from " : "") + formatRupees(sum) + " + shipping" + rest;
     }
 
     function catalogueWhatsappHref(items) {
@@ -2810,6 +2806,14 @@
         button.setAttribute("aria-pressed", String(selected));
         button.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (button.__saloniCatalogueTitle || "item") + (selected ? " from cart" : " to cart"));
       });
+    }
+
+    // A paid order empties the cart. The order form stays on its own confirmation, and the next Order now opens a fresh request.
+    function clearCartAfterPayment() {
+      selectedCatalogueItems = [];
+      frameState.catalogueSeedKey = "";
+      setCatalogueSelectionStatus("");
+      updateCatalogueSelection();
     }
 
     function resetCatalogueSelection() {

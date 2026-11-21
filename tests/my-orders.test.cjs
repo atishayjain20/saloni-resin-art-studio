@@ -47,7 +47,7 @@ function createStorage(initial = {}) {
 
 const EXEC_URL = "https://script.google.test/exec";
 
-function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false, statusImpl = null, clock = null, navigator = undefined, withoutPopup = false } = {}) {
+function makeRuntime({ storage = createStorage(), dialogSupported = true, noHistory = false, manualFrames = false, execUrl = EXEC_URL, fetchImpl = null, noFetch = false, statusImpl = null, clock = null, navigator = undefined, withoutPopup = false, payments = "", search = "" } = {}) {
   const ids = ["my-orders-dialog", "my-orders-close", "my-orders-list", "my-orders-empty", "my-orders-contact", "nav-toggle", "advance-popup", "advance-popup-text", "advance-popup-more", "advance-popup-pay", "advance-popup-later"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id === "my-orders-list" ? "ol" : "div", id)]));
   const dialog = elements.get("my-orders-dialog");
@@ -57,7 +57,7 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
   const otherDialog = new FakeElement("dialog", "other-dialog");
   if (!dialogSupported) { dialog.showModal = undefined; }
   // The order form's embed element carries the Apps Script URL; my-orders.js reads it the same way order-form.js does.
-  if (execUrl !== null) { const embed = new FakeElement("div", "order-form-embed"); embed.attributes["data-order-form-url"] = execUrl; elements.set("order-form-embed", embed); }
+  if (execUrl !== null) { const embed = new FakeElement("div", "order-form-embed"); embed.attributes["data-order-form-url"] = execUrl; if (payments) embed.attributes["data-payments"] = payments; elements.set("order-form-embed", embed); }
   const link = new FakeElement("a"); link.attributes["data-my-orders-open"] = "";
   const browseLink = new FakeElement("a"); browseLink.attributes["data-browse-all"] = "";
   dialog.querySelectorAll = (selector) => (selector === "[data-browse-all]" ? [browseLink] : []);
@@ -79,7 +79,7 @@ function makeRuntime({ storage = createStorage(), dialogSupported = true, noHist
     back() { this.backs += 1; },
   };
   const popstateListeners = [];
-  const windowObject = { localStorage: storage, document: documentObject, navigator, history, location: { href: "https://saloniresinart.com/" }, addEventListener(type, listener) { if (type === "popstate") popstateListeners.push(listener); } };
+  const windowObject = { localStorage: storage, document: documentObject, navigator, history, location: { href: "https://saloniresinart.com/", search }, addEventListener(type, listener) { if (type === "popstate") popstateListeners.push(listener); } };
   // fetch is a stub that records the call; each test decides what it answers. Timers are manual so the 25 s limit can be fired.
   // Status checks (action=status) are recorded apart, so the cancel tests keep counting only their own calls.
   // By default the status check answers "not available" and changes nothing.
@@ -854,7 +854,7 @@ test("a stored status or time that is not valid is ignored, and the order itself
   }
 });
 
-test("save never writes a status, even if the summary carries one", () => {
+test("save never writes a status, even if the summary carries one, except the paid order's own paid or payment_pending", () => {
   const { api, storage } = makeRuntime();
   api.save(order({ requestId: CANCEL_ID, status: "delivered", statusCheckedAt: Date.now() }));
   assert.deepEqual(Object.keys(stored(storage).orders[0]).sort(), ["at", "fulfillment", "items", "notes", "requestId"]);
@@ -1853,4 +1853,164 @@ test("analytics: the advance popup is counted when it is shown, once, without th
   const none = spyTrack(quiet);
   await load(quiet);
   assert.deepEqual(none, [], "no popup, no event");
+});
+
+// ---- Online payment: paid / payment_pending / unpaid, the 24 hour cancel window, and no UPI advance in payments mode ----
+const PAID_ID = "request-paid-1234567";
+// The server sends paid: {requestId: {amount, paidAt}} next to statuses (Code.gs orderStatuses_).
+const paidReply = (code, paidAt, id = PAID_ID) => jsonReply({ ok: true, statuses: { [id]: code }, paid: paidAt === undefined ? undefined : { [id]: { amount: 2697, paidAt } } });
+
+test("the payment statuses have their own wording and badge style", async () => {
+  const wording = {
+    paid: "Paid — your order is confirmed",
+    payment_pending: "Waiting for your payment to be confirmed — this updates by itself",
+    unpaid: "Payment not completed. If money was taken, contact Saloni.",
+  };
+  for (const [code, label] of Object.entries(wording)) {
+    const runtime = makeRuntime({ statusImpl: statusReply({ [PAID_ID]: code }) });
+    runtime.api.save(order({ requestId: PAID_ID }));
+    openDialog(runtime);
+    await settle();
+    const status = statusOf(runtime.elements.get("my-orders-list").children[0]);
+    assert.equal(text(status), label, code);
+    assert.equal(status.className, "my-order-status is-" + code.replace(/_/g, "-"));
+    assert.match(css, new RegExp("\\.my-order-status\\.is-" + code.replace(/_/g, "-") + "\\b"));
+  }
+});
+
+test("a paid order saved by the order form reads Paid at once and keeps its paid time; unknown statuses are still never written", () => {
+  const { api, storage } = makeRuntime();
+  const now = Date.now();
+  api.save(order({ requestId: PAID_ID, status: "paid", paidAt: now }));
+  const saved = stored(storage).orders[0];
+  assert.equal(saved.status, "paid");
+  assert.equal(saved.paidAt, now);
+  assert.equal(typeof saved.statusCheckedAt, "number");
+  const pending = makeRuntime();
+  pending.api.save(order({ requestId: PAID_ID, status: "payment_pending" }));
+  assert.equal(stored(pending.storage).orders[0].status, "payment_pending");
+  assert.equal(Object.hasOwn(stored(pending.storage).orders[0], "paidAt"), false);
+  const other = makeRuntime();
+  other.api.save(order({ requestId: PAID_ID, status: "dispatched", paidAt: now }));
+  assert.equal(Object.hasOwn(stored(other.storage).orders[0], "status"), false);
+  assert.equal(Object.hasOwn(stored(other.storage).orders[0], "paidAt"), false);
+});
+
+test("Cancel order shows for a paid order only within 24 hours of the paid time", async () => {
+  const cases = [[1 * HOUR, true], [23 * HOUR, true], [24 * HOUR + 1000, false], [3 * 24 * HOUR, false]];
+  for (const [age, offered] of cases) {
+    const runtime = makeRuntime({ statusImpl: paidReply("paid", Date.now() - age) });
+    runtime.api.save(order({ requestId: PAID_ID }));
+    openDialog(runtime);
+    await settle();
+    const card = runtime.elements.get("my-orders-list").children[0];
+    assert.equal(Boolean(button(card, "Cancel order")), offered, age / HOUR + " h");
+  }
+  const unknown = makeRuntime({ statusImpl: paidReply("paid", undefined) });
+  unknown.api.save(order({ requestId: PAID_ID }));
+  openDialog(unknown);
+  await settle();
+  assert.equal(button(unknown.elements.get("my-orders-list").children[0], "Cancel order"), null, "no paid time, no proof of the window");
+  for (const code of ["payment_pending", "unpaid"]) {
+    const runtime = makeRuntime({ statusImpl: paidReply(code, undefined) });
+    runtime.api.save(order({ requestId: PAID_ID }));
+    openDialog(runtime);
+    await settle();
+    assert.equal(button(runtime.elements.get("my-orders-list").children[0], "Cancel order"), null, code);
+  }
+});
+
+test("the paid time from the server is stored, accepted as milliseconds or an ISO date, and ignored when it is odd", async () => {
+  const at = Date.now() - 2 * HOUR;
+  for (const value of [at, new Date(at).toISOString()]) {
+    const runtime = makeRuntime({ statusImpl: paidReply("paid", value) });
+    runtime.api.save(order({ requestId: PAID_ID }));
+    openDialog(runtime);
+    await settle();
+    const saved = stored(runtime.storage).orders[0];
+    assert.equal(saved.status, "paid");
+    assert.ok(Math.abs(saved.paidAt - at) < 1000);
+  }
+  for (const value of ["tomorrow", -5, 1.5, Date.now() + 10 * 24 * HOUR, {}]) {
+    const runtime = makeRuntime({ statusImpl: paidReply("paid", value) });
+    runtime.api.save(order({ requestId: PAID_ID }));
+    openDialog(runtime);
+    await settle();
+    assert.equal(Object.hasOwn(stored(runtime.storage).orders[0], "paidAt"), false, String(value));
+  }
+});
+
+test("cancelling a paid order says a full refund is due, and the request is the same action=cancel", async () => {
+  const runtime = makeRuntime({ statusImpl: paidReply("paid", Date.now() - HOUR), fetchImpl: jsonReply({ ok: true }) });
+  runtime.api.save(order({ requestId: PAID_ID }));
+  openDialog(runtime);
+  await settle();
+  const card = runtime.elements.get("my-orders-list").children[0];
+  button(card, "Cancel order").dispatch("click");
+  assert.match(text(byClass(card, "my-order-confirm-text")), /full refund/);
+  button(card, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  assert.deepEqual(JSON.parse(runtime.fetchCalls[0].init.body), { requestId: PAID_ID });
+  assert.equal(runtime.fetchCalls[0].url, EXEC_URL + "?action=cancel");
+  assert.match(text(card), /Cancellation requested — Saloni will confirm/);
+});
+
+test("when the server says the 24 hours are over, the order says so, the button goes and nothing is stored", async () => {
+  const runtime = makeRuntime({ statusImpl: paidReply("paid", Date.now() - HOUR), fetchImpl: jsonReply({ ok: false, error: "window_closed" }) });
+  runtime.api.save(order({ requestId: PAID_ID }));
+  openDialog(runtime);
+  await settle();
+  const card = runtime.elements.get("my-orders-list").children[0];
+  button(card, "Cancel order").dispatch("click");
+  button(card, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  assert.match(text(card), /24 hours for cancelling online are over/);
+  assert.equal(button(card, "Cancel order"), null);
+  assert.equal(Object.hasOwn(stored(runtime.storage).orders[0], "cancelRequestedAt"), false);
+});
+
+test("in payments mode (test address or data-payments) no UPI advance is shown, the load popup stays away and the status check is not run for it", async () => {
+  for (const options of [{ search: "?payments=test" }, { payments: "live" }]) {
+    const runtime = withAdvanceOrder(advanceReply("confirmed", ADV), options);
+    await settle();
+    assert.equal(advanceBox(runtime.card).hidden, true, JSON.stringify(options));
+    assert.equal(payLink(runtime.card), null);
+    const idle = dueRuntime(options);
+    await load(idle);
+    assert.equal(idle.popup.open, false);
+    assert.equal(idle.statusCalls.length, 0, "nothing can owe an advance, so nothing is asked");
+  }
+  const off = withAdvanceOrder(advanceReply("confirmed", ADV));
+  await settle();
+  assert.ok(payLink(off.card), "payments off: the advance flow is unchanged");
+});
+
+test("the my-orders script knows the payment codes and the server's window_closed answer", () => {
+  for (const word of ["payment_pending", "unpaid", "paidAt", "window_closed", "reply.paid"]) assert.match(source, new RegExp(word));
+});
+
+test("a stored payment_pending or unpaid status hides Cancel order from the first paint, even inside 24 hours", () => {
+  for (const status of ["payment_pending", "unpaid"]) {
+    const now = Date.now();
+    const storage = createStorage({ [KEY]: JSON.stringify({ version: 1, orders: [Object.assign({ at: now - 1000, status, statusCheckedAt: now - 10, paidAt: now - 1000 }, order({ requestId: PAID_ID }))] }) });
+    const runtime = makeRuntime({ storage });
+    openDialog(runtime);
+    assert.equal(button(runtime.elements.get("my-orders-list").children[0], "Cancel order"), null, status);
+  }
+});
+
+test("a not_paid answer to a cancel request is handled quietly: the button goes, no error is shown and nothing is stored", async () => {
+  const runtime = makeRuntime({ statusImpl: paidReply("paid", Date.now() - HOUR), fetchImpl: jsonReply({ ok: false, error: "not_paid" }) });
+  runtime.api.save(order({ requestId: PAID_ID }));
+  openDialog(runtime);
+  await settle();
+  const card = runtime.elements.get("my-orders-list").children[0];
+  button(card, "Cancel order").dispatch("click");
+  button(card, "Yes, ask to cancel").dispatch("click");
+  await settle();
+  assert.equal(button(card, "Cancel order"), null);
+  assert.doesNotMatch(text(card), /Could not send|24 hours for cancelling/);
+  assert.equal(byClass(card, "my-order-note").hidden, true);
+  assert.equal(Object.hasOwn(stored(runtime.storage).orders[0], "cancelRequestedAt"), false);
+  assert.match(source, /not_paid/);
 });

@@ -23,6 +23,7 @@ var REVIEW_PRODUCTS_URL = "https://saloniresinart.com/reviews/products.json";
 var ORDER_CAPTCHA_ACTION = "order_request";
 var RETENTION_DAYS = 90;
 var RETENTION_MILLISECONDS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
+var PAID_RETENTION_MILLISECONDS = 365 * 24 * 60 * 60 * 1000;
 var ORDER_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{12,80}$/;
 var ORDER_FILE_NAME_PATTERN = /^order-([A-Za-z0-9_-]{12,80})\.(jpg|png)$/;
 var LEGACY_ORDER_HEADERS = [
@@ -48,6 +49,12 @@ var ORDER_HEADERS_WITH_ADVANCE = ORDER_HEADERS.concat(ADVANCE_ORDER_HEADERS);
 var VISIT_SOURCE_HEADERS = ["Visit source"];
 var ORDER_HEADERS_WITH_SOURCE = ORDER_HEADERS_WITH_ADVANCE.concat(VISIT_SOURCE_HEADERS);
 var VISIT_SOURCES = ["google-shopping"];
+// Full payment by Razorpay adds four columns after "Visit source" (AO to AR). setupPayments() adds them (run once as the owner).
+// After that the sheet has 44 columns, and the older layouts are accepted only until then: roll back with PAYMENTS_MODE=off,
+// never by deploying an older script version (it rejects the 44-column sheet and orders stop).
+var PAYMENT_ORDER_HEADERS = ["Razorpay order ID", "Razorpay payment ID", "Amount paid (\u20B9)", "Paid at"];
+var ORDER_HEADERS_WITH_PAYMENT = ORDER_HEADERS_WITH_SOURCE.concat(PAYMENT_ORDER_HEADERS);
+var PAYMENT_ID_COLUMN = ORDER_HEADERS_WITH_PAYMENT.indexOf("Razorpay payment ID");
 var PARTNER_APPLICATION_HEADERS = [
   "Application ID", "Received at", "Applicant name", "Business name", "Category", "City / service area",
   "Phone / WhatsApp", "Email", "Instagram / website", "Typical customers", "Referral plan", "Rules accepted",
@@ -100,6 +107,7 @@ function doPost(event) {
   if (action === "rate") return ContentService.createTextOutput(JSON.stringify(submitQuickRating_(parameters))).setMimeType(ContentService.MimeType.JSON);
   // The order, partner, corporate and review forms live in the site itself and talk to these JSON actions; "seed" below stays so older cached pages keep working.
   if (action === "order") return json_(orderFromPost_(event));
+  if (action === "verify") return json_(verifyFromPost_(event));
   if (action === "cancel") return json_(cancelFromPost_(event));
   if (action === "status") return json_(statusFromPost_(event));
   if (action === "referral") return json_(referralFromPost_(event));
@@ -158,6 +166,14 @@ function orderFromPost_(event) {
         if (!/^[A-Za-z0-9+\/]*={0,2}$/.test(data) || data.length % 4 !== 0) return validationFailure_({ referenceImage: "Attach one JPG or PNG image." });
         form.referenceImage = Utilities.newBlob(Utilities.base64Decode(data), type, type === "image/png" ? "reference.png" : "reference.jpg");
       }
+    }
+    var properties = PropertiesService.getScriptProperties();
+    var payments = paymentsContext_(body, properties);
+    if (payments.active) {
+      // Paid path: catalogue cart orders. Everything else (custom designs, quotes) stays a request, plus a captcha check.
+      if (isPayable_(body, form)) return startPayment_(body, form, properties, payments);
+      var gate = verifyCaptcha_(body.captchaToken, properties, ORDER_CAPTCHA_ACTION, payments.test);
+      if (!gate.ok) return validationFailure_({ form: gate.error });
     }
     return submitOrder(form);
   } catch (error) {
@@ -296,6 +312,7 @@ function purgeExpiredOrdersAt_(now) {
   var orderColumns = orderSchemaLength_(sheet);
   var values = sheet.getDataRange().getValues();
   var cutoff = new Date(runAt.getTime() - RETENTION_MILLISECONDS);
+  var paidCutoff = new Date(runAt.getTime() - PAID_RETENTION_MILLISECONDS);
   var knownRequestIds = {};
   var expiredRows = [];
   var errors = 0;
@@ -311,6 +328,9 @@ function purgeExpiredOrdersAt_(now) {
       continue;
     }
     if (receivedAt.getTime() > cutoff.getTime()) continue;
+    // A paid order (it has a Razorpay payment ID) is kept for 12 months; a hand-typed "Paid" does not count.
+    if (orderColumns >= ORDER_HEADERS_WITH_PAYMENT.length && String(row[PAYMENT_ID_COLUMN] == null ? "" : row[PAYMENT_ID_COLUMN]).trim() &&
+        receivedAt.getTime() > paidCutoff.getTime()) continue;
     if (!ORDER_REQUEST_ID_PATTERN.test(requestId)) {
       errors += 1;
       continue;
@@ -764,7 +784,7 @@ function submitOrder(form) {
       // The advance cells (last two columns, when the sheet has them) start empty: Saloni types them.
       while (row.length < schemaLength) row.push("");
       // The visit source is the last column, on the newest layout only; older layouts get nothing and keep their width.
-      if (schemaLength === ORDER_HEADERS_WITH_SOURCE.length) row[schemaLength - 1] = neutralizeForSheet_(payload.visitSource);
+      if (schemaLength >= ORDER_HEADERS_WITH_SOURCE.length) row[ORDER_HEADERS_WITH_SOURCE.length - 1] = neutralizeForSheet_(payload.visitSource);
       sheet.appendRow(row);
       newOrder = { receivedAt: receivedAt, referenceFile: referenceFile };
       return {
@@ -852,17 +872,26 @@ function requestOrderCancellation_(requestId) {
     var statusColumn = headers["Status"];
     var notesColumn = headers["Staff notes"];
     var before = String(target.values[statusColumn] == null ? "" : target.values[statusColumn]).trim();
+    // An order that was never paid has nothing to cancel or refund: nothing is written and nobody is emailed.
+    if (headers["Razorpay order ID"] !== undefined && (before === AWAITING_PAYMENT_STATUS || before === PAYMENT_NOT_COMPLETED_STATUS)) return { ok: false, error: "not_paid" };
     if (before === CANCEL_REQUESTED_STATUS) return { ok: true, already: true };
     var notes = String(target.values[notesColumn] == null ? "" : target.values[notesColumn]);
     var open = before === "" || before === "New request";
     if (!open && notes.indexOf(CANCEL_NOTE_PREFIX) !== -1) return { ok: true, already: true };
 
     var now = new Date();
+    // A paid order can be cancelled for a full refund within 24 hours of payment, while Saloni still has it at Confirmed.
+    // Later (or once she has started) the shopper must contact Saloni, and nothing is written.
+    var paid = paidOrderDetails_(target.values, headers);
+    if (paid) {
+      if (before !== "Confirmed" || !paid.paidAt || now.getTime() - paid.paidAt.getTime() > PAID_CANCEL_WINDOW_MS) return { ok: false, error: "window_closed" };
+      open = true;
+    }
     var line = CANCEL_NOTE_PREFIX + " on " + Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " IST via My orders";
     // Only Staff notes (and Status, when it was still open) are written; every other column keeps its value.
     sheet.getRange(target.number, notesColumn + 1).setValue(neutralizeForSheet_(notes ? notes + " | " + line : line));
     if (open) sheet.getRange(target.number, statusColumn + 1).setValue(CANCEL_REQUESTED_STATUS);
-    alert = { requestId: requestId, values: target.values, headers: headers, statusBefore: before, statusKept: !open };
+    alert = { requestId: requestId, values: target.values, headers: headers, statusBefore: before, statusKept: !open, paid: paid };
     return { ok: true };
   } finally {
     lock.releaseLock();
@@ -899,21 +928,32 @@ function orderStatuses_(requestIds) {
   var statuses = {};
   var advances = {};
   var advanceCount = 0;
+  var paidInfo = {};
+  var paidCount = 0;
   var rows = sheet.getLastRow() - 1;
   if (rows > 0) {
     var statusColumn = LEGACY_ORDER_HEADERS.indexOf("Status");
     // The advance columns exist only on the newest layout, and the kill switch stops reading them.
-    var withAdvance = !isTrue_(properties.getProperty("UPI_ADVANCE_DISABLED")) && orderSchemaLength_(sheet) >= ORDER_HEADERS_WITH_ADVANCE.length;
+    var schemaLength = orderSchemaLength_(sheet);
+    var withAdvance = !isTrue_(properties.getProperty("UPI_ADVANCE_DISABLED")) && schemaLength >= ORDER_HEADERS_WITH_ADVANCE.length;
+    // The payment columns exist on the 44-column layout only; they are read whatever the payments mode is, so a paid order keeps showing as paid.
+    var withPayment = schemaLength >= ORDER_HEADERS_WITH_PAYMENT.length;
     var amountColumn = ORDER_HEADERS.length;
     var payee = withAdvance ? upiPayee_(properties) : null;
-    // One read of the Request ID .. Status columns (to Advance status when the sheet has it); the schema check in
+    // One read of the Request ID .. Status columns (to Advance status, or to Paid at, when the sheet has them); the schema check in
     // openOrderSheet_ has already pinned the header order.
-    var values = sheet.getRange(2, 1, rows, withAdvance ? ORDER_HEADERS_WITH_ADVANCE.length : statusColumn + 1).getValues();
+    var values = sheet.getRange(2, 1, rows, withPayment ? ORDER_HEADERS_WITH_PAYMENT.length : withAdvance ? ORDER_HEADERS_WITH_ADVANCE.length : statusColumn + 1).getValues();
     for (var row = 0; row < values.length; row += 1) {
       var id = String(values[row][0]);
       if (!has(wanted, id) || has(statuses, id)) continue;
       var code = orderStatusCode_(values[row][statusColumn]);
-      if (withAdvance) {
+      var payment = withPayment ? paidOrderDetails_(values[row], PAYMENT_HEADER_INDEX) : null;
+      if (payment) {
+        paidInfo[id] = { amount: payment.amount, paidAt: payment.paidAt ? payment.paidAt.toISOString() : "" };
+        paidCount += 1;
+        if (code === "received" || code === "confirmed" || code === "payment_pending" || code === "unpaid") code = "paid";
+      }
+      if (withAdvance && !payment) {
         var paid = advanceIsPaid_(values[row][amountColumn + 1]);
         if (paid && (code === "received" || code === "confirmed" || code === "in_progress")) {
           code = "advance_paid";
@@ -927,6 +967,7 @@ function orderStatuses_(requestIds) {
   }
   var reply = { ok: true, statuses: statuses };
   if (advanceCount) reply.advance = advances;
+  if (paidCount) reply.paid = paidInfo;
   return reply;
 }
 
@@ -967,6 +1008,8 @@ function orderStatusCode_(cell) {
   var status = String(cell == null ? "" : cell).trim().toLowerCase();
   if (status === "" || status === "new request") return "received";
   if (status === "cancellation requested") return "cancel_requested";
+  if (status === "awaiting payment") return "payment_pending";
+  if (status === "payment not completed") return "unpaid";
   // Saloni types "Cancellation declined" when she will not cancel; it must be checked before the "cancel" rule below.
   if (status.indexOf("cancel") !== -1 && status.indexOf("declin") !== -1) return "cancel_declined";
   // A plain "Declined" or "Rejected" means Saloni turned the order down, so the shopper sees Cancelled.
@@ -996,9 +1039,12 @@ function sendCancellationAlert_(alert, properties) {
       "Product: " + product + " x " + cell("Quantity"),
       "Received: " + receivedText,
       "Status before this request: " + (alert.statusBefore || "-"),
-      alert.statusKept ? "Status was not changed because the order is already past New request. Please contact the customer." : "Status is now: " + CANCEL_REQUESTED_STATUS,
+      alert.statusKept ? "Status was not changed because the order is already past New request. Please contact the customer." : "Status is now: " + CANCEL_REQUESTED_STATUS
+    ].concat(alert.paid ? [
+      "Refund due: \u20B9" + alert.paid.amount + " (paid online" + (alert.paid.paymentId ? ", Razorpay payment " + alert.paid.paymentId : "") + "). Refund it in the Razorpay dashboard: nothing was refunded automatically."
+    ] : [], [
       "Orders sheet: " + orderSheetUrl_(properties)
-    ].join("\n")
+    ]).join("\n")
   });
 }
 
@@ -1036,9 +1082,9 @@ function enqueueOrderAlert_(payload, receivedAt, referenceFile, properties) {
   if (pending.length > ORDER_ALERT_QUEUE_LIMIT) return false; // the trigger is probably broken
   var stored = {};
   ORDER_ALERT_FIELDS.forEach(function (name) { stored[name] = payload[name]; });
-  properties.setProperty(ORDER_ALERT_QUEUE_PREFIX + payload.requestId, JSON.stringify({
-    p: stored, r: receivedAt.toISOString(), f: referenceFile ? String(referenceFile.getId()) : "", a: 0, w: 0
-  }));
+  var job = { p: stored, r: receivedAt.toISOString(), f: referenceFile ? String(referenceFile.getId()) : "", a: 0, w: 0 };
+  if (payload.payment) job.x = payload.payment; // a paid order: amount and payment id for the alert
+  properties.setProperty(ORDER_ALERT_QUEUE_PREFIX + payload.requestId, JSON.stringify(job));
   return true;
 }
 
@@ -1080,11 +1126,14 @@ function sendQueuedOrderAlerts_() {
   // This trigger already runs every minute, so it also keeps the WhatsApp advance links up to date (no second trigger), about every 5 minutes.
   // Never lets a link problem stop alerts, and logs no customer data.
   try { refreshWhatsAppAdvanceLinksIfDue_(); } catch (linkError) { console.error("Could not refresh the WhatsApp advance links."); }
+  // Same trigger, about every 5 minutes: settle pending Razorpay orders the shopper's browser never reported. No second trigger.
+  try { reconcilePaymentsIfDue_(); } catch (paymentError) { console.error("Could not check pending payments."); }
   return sent;
 }
 
 function sendQueuedOrderAlert_(key, job, properties) {
   var payload = collectPayload_(job.p);
+  if (job.x) payload.payment = job.x;
   var receivedAt = new Date(job.r);
   var referenceFile = null;
   if (job.f) {
@@ -1188,6 +1237,644 @@ function setupVisitSource() {
   } finally {
     lock.releaseLock();
   }
+}
+
+// --- Online payments (Razorpay) -------------------------------------------
+// PAYMENTS_MODE (script property): off (default, also when unset or anything else), test, or live. With off the order action behaves
+// exactly as before. With live, a catalogue cart order (the site sends structured "lines") is PAID at checkout: the server prices it
+// from /prices.json (never from the page), creates a Razorpay order, stores the row as "Awaiting payment", and the row becomes
+// "Confirmed" / "Paid" only after the payment is checked with Razorpay (the browser's signed reply, or the 5-minute poll below).
+// With test, only requests that say paymentTest:true take that path, so real visitors are untouched while the owner tests.
+// Secrets live in script properties only: RAZORPAY_KEY_ID (public key id) and RAZORPAY_KEY_SECRET. Custom designs, quotes and
+// corporate enquiries stay requests. Refunds are made by hand in the Razorpay dashboard: nothing here refunds money.
+var PAYMENT_PRICES_URL = "https://saloniresinart.com/prices.json";
+var PAYMENT_PRICES_CACHE_KEY = "payment-prices-v1";
+var PAYMENT_PRICES_FAILED_KEY = "payment-prices-failed-v1";
+var PAYMENT_MAX_TOTAL = 100000;
+var PAYMENT_MAX_LINES = 30;
+var PAYMENT_MAX_LINE_QTY = 20;
+var PAYMENT_MAX_ITEMS = 100;
+var PAID_CANCEL_WINDOW_MS = 24 * 60 * 60 * 1000;
+var PAYMENT_UNPAID_AFTER_MS = 2 * 60 * 60 * 1000;
+var PAYMENT_POLL_WINDOW_MS = 48 * 60 * 60 * 1000;
+var PAYMENT_POLL_BATCH = 10;
+var PAYMENT_PASS_INTERVAL_MS = 4.5 * 60 * 1000;
+var PAYMENT_CHECK_SECONDS = 60;
+var PAYMENT_PASS_BUDGET_MS = 120 * 1000;
+var PAYMENT_POLLED_PREFIX = "pay-polled-";
+var RAZORPAY_API = "https://api.razorpay.com";
+var AWAITING_PAYMENT_STATUS = "Awaiting payment";
+var PAYMENT_NOT_COMPLETED_STATUS = "Payment not completed";
+var PAYMENT_HEADER_INDEX = headerIndex_(ORDER_HEADERS_WITH_PAYMENT);
+var PAYMENT_MESSAGES = {
+  payments_unavailable: "Payments are briefly unavailable. Please try again in a few minutes, or message Saloni on WhatsApp.",
+  unknown_item: "An item in your cart could not be priced. Please reload the page and try again.",
+  too_large: "This order is above the online payment limit. Please message Saloni on WhatsApp to place it.",
+  captcha_failed: "We could not check that you are a person. Please try again.",
+  rate_limited: "The studio's daily order limit has been reached. Please try again tomorrow.",
+  invalid: "Please check your details and try again."
+};
+
+function paymentsMode_(properties) {
+  var mode = String(properties.getProperty("PAYMENTS_MODE") || "").trim().toLowerCase();
+  return mode === "test" || mode === "live" ? mode : "off";
+}
+
+// active: this request takes the payments flow. In test mode only a request that sets paymentTest:true does.
+function paymentsContext_(body, properties) {
+  var mode = paymentsMode_(properties);
+  var test = mode === "test" && body.paymentTest === true;
+  return { mode: mode, test: test, active: mode === "live" || test };
+}
+
+// A catalogue cart order that carries structured lines. Custom designs, customizer quotes and orders without lines are requests.
+function isPayable_(body, form) {
+  var kind = stringValue_(form.sourceKind).toLowerCase();
+  // The site's cart sends requestStage "quote" for every cart; what makes it a paid order is the catalogue kind plus the lines.
+  var stage = form.requestStage;
+  return kind === "catalogue" && (stage === undefined || stage === "" || stage === "quote") && body.lines !== undefined && body.lines !== null;
+}
+
+function paymentFailure_(code, errors) {
+  var reply = { ok: false, error: code, message: PAYMENT_MESSAGES[code] || PAYMENT_MESSAGES.payments_unavailable };
+  if (errors) reply.errors = errors;
+  return reply;
+}
+
+// The key pair, or null. A test key must go with test mode and a live key with live mode, so a mix-up cannot take real money in a test.
+function paymentKeys_(properties, mode) {
+  var id = String(properties.getProperty("RAZORPAY_KEY_ID") || "").trim();
+  var secret = String(properties.getProperty("RAZORPAY_KEY_SECRET") || "").trim();
+  if (!id || !secret) return null;
+  if (mode === "test" && id.indexOf("rzp_test_") !== 0) return null;
+  if (mode === "live" && id.indexOf("rzp_live_") !== 0) return null;
+  return { id: id, secret: secret };
+}
+
+// Shipping once per order: pickup 0; PIN starting 30 to 34 (Rajasthan) 100; any other PIN 150.
+function shippingFee_(fulfillment, pin) {
+  if (String(fulfillment).toLowerCase() !== "shipping") return 0;
+  var prefix = Number(String(pin).slice(0, 2));
+  return prefix >= 30 && prefix <= 34 ? 100 : 150;
+}
+
+function receiptFor_(requestId) { return String(requestId).slice(0, 40); } // Razorpay allows 40 characters in a receipt
+
+// One call to the Razorpay API. Throws on any non-2xx answer with the status code only: the answer can hold customer details.
+function razorpay_(method, path, body, keys) {
+  var options = { method: method, muteHttpExceptions: true, headers: { Authorization: "Basic " + Utilities.base64Encode(keys.id + ":" + keys.secret) } };
+  if (body) { options.contentType = "application/json"; options.payload = JSON.stringify(body); }
+  var response = UrlFetchApp.fetch(RAZORPAY_API + path, options);
+  var code = Number(response.getResponseCode());
+  if (code < 200 || code > 299) throw new Error("Razorpay request failed (HTTP " + code + ").");
+  return JSON.parse(String(response.getContentText() || "{}"));
+}
+
+function hmacHex_(value, secret) {
+  return Utilities.computeHmacSha256Signature(value, secret)
+    .map(function (byte) { return (byte < 0 ? byte + 256 : byte).toString(16).padStart(2, "0"); }).join("");
+}
+
+function safeEqual_(left, right) {
+  var a = String(left);
+  var b = String(right);
+  if (a.length !== b.length) return false;
+  var difference = 0;
+  for (var index = 0; index < a.length; index += 1) difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  return difference === 0;
+}
+
+// --- Prices (read from the site, like reviewProducts_) ---
+function paymentPrices_() {
+  var cache = CacheService.getScriptCache();
+  try {
+    var cached = cache.get(PAYMENT_PRICES_CACHE_KEY);
+    if (cached) return JSON.parse(cached);
+    if (cache.get(PAYMENT_PRICES_FAILED_KEY)) return null; // a failure is remembered for a minute
+  } catch (cacheError) { /* fall through to a fresh fetch */ }
+  var prices = null;
+  try {
+    var response = UrlFetchApp.fetch(PAYMENT_PRICES_URL, { muteHttpExceptions: true });
+    if (response.getResponseCode() === 200) prices = parsePaymentPrices_(response.getContentText());
+  } catch (fetchError) { prices = null; }
+  try {
+    if (prices) cache.put(PAYMENT_PRICES_CACHE_KEY, JSON.stringify(prices), 600);
+    else cache.put(PAYMENT_PRICES_FAILED_KEY, "1", 60);
+  } catch (putError) { /* the result is still used for this request */ }
+  return prices;
+}
+
+// { "catalogue:<file>": { name, price, sizes? } } with whole-rupee prices, or null when anything is off (the paid path then fails closed).
+function parsePaymentPrices_(text) {
+  var table;
+  try { table = JSON.parse(String(text || "")); } catch (parseError) { return null; }
+  if (!table || typeof table !== "object" || Array.isArray(table)) return null;
+  var ids = Object.keys(table);
+  if (!ids.length || ids.length > 500) return null;
+  var prices = {};
+  var wholeRupees = function (value) { return typeof value === "number" && value % 1 === 0 && value >= 1 && value <= PAYMENT_MAX_TOTAL; };
+  for (var index = 0; index < ids.length; index += 1) {
+    var id = ids[index];
+    var entry = table[id];
+    if (!/^catalogue:[A-Za-z0-9_.\/-]{1,150}$/.test(id) || !entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+    var name = typeof entry.name === "string" ? entry.name.trim() : "";
+    if (!name || name.length > 120 || !wholeRupees(entry.price)) return null;
+    var sizes = {};
+    if (entry.sizes !== undefined && entry.sizes !== null) {
+      if (typeof entry.sizes !== "object" || Array.isArray(entry.sizes)) return null;
+      var codes = Object.keys(entry.sizes);
+      if (codes.length > 40) return null;
+      for (var position = 0; position < codes.length; position += 1) {
+        if (!/^[a-z0-9-]{1,40}$/.test(codes[position]) || !wholeRupees(entry.sizes[codes[position]])) return null;
+        sizes[codes[position]] = entry.sizes[codes[position]];
+      }
+    }
+    prices[id] = { name: name, price: entry.price, sizes: sizes };
+  }
+  return prices;
+}
+
+// The lines the page sent, reduced to the four fields the server uses, or null when the shape is wrong. Prices are never read from them.
+function normalizeLines_(raw) {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > PAYMENT_MAX_LINES) return null;
+  var lines = [];
+  var items = 0;
+  for (var index = 0; index < raw.length; index += 1) {
+    var line = raw[index];
+    if (!line || typeof line !== "object" || Array.isArray(line) || typeof line.sourceId !== "string") return null;
+    if (typeof line.qty !== "number" || line.qty % 1 !== 0 || line.qty < 1 || line.qty > PAYMENT_MAX_LINE_QTY) return null;
+    var size = typeof line.size === "string" ? line.size.trim() : "";
+    var photo = typeof line.photo === "string" ? line.photo.trim() : "";
+    items += line.qty;
+    lines.push({ sourceId: line.sourceId.trim(), size: size, photo: /^[a-z0-9-]{1,40}$/.test(photo) ? photo : "", qty: line.qty });
+  }
+  return items <= PAYMENT_MAX_ITEMS ? lines : null;
+}
+
+// Prices every line from the table. An unknown product or size is "unknown_item". An empty size means the default size (the item's price).
+function priceLines_(lines, prices) {
+  var has = function (map, key) { return Object.prototype.hasOwnProperty.call(map, key); };
+  var items = [];
+  var subtotal = 0;
+  var quantity = 0;
+  for (var index = 0; index < lines.length; index += 1) {
+    var line = lines[index];
+    if (!has(prices, line.sourceId)) return { ok: false, error: "unknown_item" };
+    var entry = prices[line.sourceId];
+    var unit = entry.price;
+    if (line.size) {
+      if (!has(entry.sizes, line.size)) return { ok: false, error: "unknown_item" };
+      unit = entry.sizes[line.size];
+    }
+    subtotal += unit * line.qty;
+    quantity += line.qty;
+    items.push({ sourceId: line.sourceId, name: entry.name, size: line.size, photo: line.photo, qty: line.qty });
+  }
+  return { ok: true, items: items, subtotal: subtotal, quantity: quantity };
+}
+
+// The Product name, Source ID and bundle text the row gets, rebuilt by the server from the price table (the page's own text is dropped).
+function paidProductText_(items) {
+  var labels = items.map(function (item) {
+    return item.name + (item.size ? " (" + item.size + ")" : "") + (item.photo ? " [" + item.photo + "]" : "") + (item.qty > 1 ? " x" + item.qty : "");
+  });
+  var bundle = items.length > 1 ? items.map(function (item) { return item.sourceId + " x" + item.qty; }).join(", ") : "";
+  return { productName: labels.join("; ").slice(0, 2000), sourceId: items.length > 1 ? "catalogue:multi-item" : items[0].sourceId, bundleSourceIds: bundle };
+}
+
+// The customer checks of validatePayload_ for a paid cart order. There are no dimensions or design brief to check: the items and
+// their sizes come from the price table.
+function validatePaidPayload_(payload) {
+  var errors = {};
+  if (!ORDER_REQUEST_ID_PATTERN.test(payload.requestId)) errors.requestId = "Please reload the form and try again.";
+  bounded_(errors, "designDetails", payload.designDetails, 2000, false);
+  bounded_(errors, "customerName", payload.customerName, 120, true);
+  if (errors.customerName !== "This field is too long." && !validCustomerName_(payload.customerName)) errors.customerName = "Enter your name (at least 2 letters).";
+  if (!validIndianMobile_(payload.phone)) errors.phone = "Enter a 10-digit mobile number, e.g. 98765 43210.";
+  if (payload.email && (payload.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))) errors.email = "Enter a valid email address or leave it blank.";
+  var fulfillment = payload.fulfillment.toLowerCase();
+  if (["shipping", "pickup"].indexOf(fulfillment) === -1) errors.fulfillment = "Choose shipping or pickup.";
+  if (fulfillment === "shipping") {
+    bounded_(errors, "shippingAddress", payload.shippingAddress, 300, true);
+    if (errors.shippingAddress !== "This field is too long." && payload.shippingAddress.trim().length < 10) errors.shippingAddress = "Enter the full shipping address.";
+    bounded_(errors, "city", payload.city, 100, true);
+    bounded_(errors, "state", payload.state, 100, true);
+    if (!validPin_(payload.pin)) errors.pin = "Enter a valid 6-digit PIN code.";
+  }
+  if (payload.requestedDate && !isIsoDate_(payload.requestedDate)) errors.requestedDate = "Use a valid requested date.";
+  else if (payload.requestedDate && payload.requestedDate < todayIst_()) errors.requestedDate = "Choose today or a later date.";
+  if (payload.referralCode && !PARTNER_CODE_PATTERN.test(payload.referralCode)) errors.referralCode = "Enter a valid referral code or clear this field.";
+  return errors;
+}
+
+function findPaymentRow_(sheet, requestId) {
+  var values = sheet.getDataRange().getValues();
+  for (var index = 1; index < values.length; index += 1) {
+    if (String(values[index][0]) === requestId) return { number: index + 1, values: values[index] };
+  }
+  return null;
+}
+
+function orderCell_(values, name) {
+  var value = values[PAYMENT_HEADER_INDEX[name]];
+  return value == null ? "" : value;
+}
+
+// Items plus shipping for a stored row, in whole rupees.
+function storedTotal_(values) {
+  var subtotal = Number(orderCell_(values, "Final product subtotal"));
+  return (isFinite(subtotal) ? subtotal : 0) + shippingFee_(String(orderCell_(values, "Fulfilment")), String(orderCell_(values, "PIN")));
+}
+
+// Details of a row that was paid online (Payment status Paid with a Razorpay payment id), or null. "index" maps header names to
+// columns; a sheet without the payment columns has none of them.
+function paidOrderDetails_(row, index) {
+  var statusAt = index["Payment status"];
+  var idAt = index["Razorpay payment ID"];
+  var amountAt = index["Amount paid (₹)"];
+  var paidAtAt = index["Paid at"];
+  if (statusAt === undefined || idAt === undefined || amountAt === undefined || paidAtAt === undefined) return null;
+  var id = String(row[idAt] == null ? "" : row[idAt]).trim();
+  if (String(row[statusAt] == null ? "" : row[statusAt]).trim() !== "Paid" || !id) return null;
+  return { amount: Number(row[amountAt]) || 0, paymentId: id, paidAt: retentionDate_(row[paidAtAt]) };
+}
+
+// Answer for an order that has a Razorpay order on its row (a fresh one or one saved earlier). A row that is already paid gets no
+// payment object: there is nothing left to open.
+function paymentReply_(requestId, values, properties, body) {
+  var paid = paidOrderDetails_(values, PAYMENT_HEADER_INDEX);
+  if (paid) return { ok: true, requestId: requestId, paid: true, total: paid.amount || storedTotal_(values) };
+  var subtotal = Number(orderCell_(values, "Final product subtotal"));
+  var shipping = shippingFee_(String(orderCell_(values, "Fulfilment")), String(orderCell_(values, "PIN")));
+  var total = subtotal + shipping;
+  return {
+    ok: true, requestId: requestId,
+    payment: {
+      keyId: String(properties.getProperty("RAZORPAY_KEY_ID") || "").trim(), orderId: String(orderCell_(values, "Razorpay order ID")), currency: "INR",
+      subtotal: subtotal, shipping: shipping, total: total, priceChanged: total !== body.expectedTotal
+    }
+  };
+}
+
+// action=order, paid branch. Order of work: validate, captcha, price from the table, saved row for this request ID (a retry gets the
+// same Razorpay order), daily cap, Razorpay order created OUTSIDE the lock (a slow call must never block other orders), then under
+// the lock a last look for this request ID and the append. A failed Razorpay call adds no row.
+function startPayment_(body, form, properties, payments) {
+  try {
+    return startPaymentChecked_(body, form, properties, payments);
+  } catch (error) {
+    console.error("Could not start the payment.");
+    return paymentFailure_("payments_unavailable");
+  }
+}
+
+function startPaymentChecked_(body, form, properties, payments) {
+  if (isTrue_(properties.getProperty("ORDER_FORM_DISABLED"))) return paymentFailure_("payments_unavailable");
+  var keys = paymentKeys_(properties, payments.mode);
+  if (!keys) return paymentFailure_("payments_unavailable");
+  var sheet = openOrderSheet_(properties);
+  if (orderSchemaLength_(sheet) < ORDER_HEADERS_WITH_PAYMENT.length) return paymentFailure_("payments_unavailable");
+
+  var draft = {};
+  ["requestId", "designDetails", "customerName", "phone", "email", "fulfillment", "shippingAddress", "city", "state", "pin", "requestedDate", "referralCode", "visitSource"]
+    .forEach(function (field) { if (form[field] !== undefined) draft[field] = form[field]; });
+  var errors = validatePaidPayload_(collectPayload_(draft));
+  var lines = normalizeLines_(body.lines);
+  if (!lines) errors.lines = "Your cart could not be read. Please reload the page and try again.";
+  if (Object.keys(errors).length) return paymentFailure_("invalid", errors);
+
+  var captcha = verifyCaptcha_(typeof body.captchaToken === "string" ? body.captchaToken : "", properties, ORDER_CAPTCHA_ACTION, payments.test);
+  if (!captcha.ok) return paymentFailure_("captcha_failed");
+
+  var prices = paymentPrices_();
+  if (!prices) return paymentFailure_("payments_unavailable");
+  var priced = priceLines_(lines, prices);
+  if (!priced.ok) return paymentFailure_(priced.error);
+
+  var payload = collectPayload_(draft);
+  var text = paidProductText_(priced.items);
+  payload.sourceKind = "catalogue";
+  payload.sourceId = text.sourceId;
+  payload.productName = text.productName;
+  payload.bundleSourceIds = text.bundleSourceIds;
+  payload.quantity = String(priced.quantity);
+  payload.requestStage = "quote"; // no dimensions on a priced catalogue order; the row keeps those cells blank
+  payload.lines = JSON.stringify(lines);
+  var shipping = shippingFee_(payload.fulfillment, payload.pin);
+  var total = priced.subtotal + shipping;
+  if (total > PAYMENT_MAX_TOTAL) return paymentFailure_("too_large");
+  var fingerprint = payloadFingerprint_(payload);
+
+  var conflict = paymentFailure_("invalid", { requestId: "Request ID conflict: these details differ from the saved request. Start another request." });
+  var existing = findPaymentRow_(sheet, payload.requestId);
+  if (existing) {
+    if (String(existing.values[1]) !== fingerprint || !String(orderCell_(existing.values, "Razorpay order ID"))) return conflict;
+    return paymentReply_(payload.requestId, existing.values, properties, body);
+  }
+  if (dailyCapReached_(sheet, properties)) return paymentFailure_("rate_limited");
+
+  var attribution = payload.referralCode ? resolveReferralForOrder_(payload.referralCode, properties) : null;
+  var order = razorpay_("post", "/v1/orders", {
+    amount: total * 100, currency: "INR", receipt: receiptFor_(payload.requestId), notes: { requestId: payload.requestId }
+  }, keys);
+  if (!order || typeof order.id !== "string" || !/^order_[A-Za-z0-9]+$/.test(order.id) || order.amount !== total * 100) throw new Error("Razorpay order was not as requested.");
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to save the order.");
+  try {
+    var raced = findPaymentRow_(sheet, payload.requestId);
+    if (raced) {
+      if (String(raced.values[1]) !== fingerprint || !String(orderCell_(raced.values, "Razorpay order ID"))) return conflict;
+      return paymentReply_(payload.requestId, raced.values, properties, body);
+    }
+    var row = rowForPayload_(payload, fingerprint, new Date(), null, attribution || { active: false }, Number(sheet.getLastRow()) + 1);
+    while (row.length < ORDER_HEADERS_WITH_PAYMENT.length) row.push("");
+    row[PAYMENT_HEADER_INDEX["Status"]] = AWAITING_PAYMENT_STATUS;
+    row[PAYMENT_HEADER_INDEX["Final product subtotal"]] = priced.subtotal;
+    row[PAYMENT_HEADER_INDEX["Payment status"]] = "Pending";
+    row[PAYMENT_HEADER_INDEX["Visit source"]] = neutralizeForSheet_(payload.visitSource);
+    row[PAYMENT_HEADER_INDEX["Razorpay order ID"]] = order.id;
+    if (payments.test) {
+      row[PAYMENT_HEADER_INDEX["Delivery status"]] = "Test";
+      row[PAYMENT_HEADER_INDEX["Staff notes"]] = "Razorpay TEST";
+    }
+    try {
+      sheet.appendRow(row);
+    } catch (appendError) {
+      // appendRow can persist a row and still throw: a saved row for this request means the order is safe.
+      var afterAppend = findPaymentRow_(sheet, payload.requestId);
+      if (!afterAppend || String(afterAppend.values[1]) !== fingerprint) throw appendError;
+    }
+    return paymentReply_(payload.requestId, row, properties, body);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// --- action=verify ---
+// The page sends the three Razorpay values after a payment (or just the request ID, to ask "did my payment go through"). The
+// order ID in the Razorpay reply is never trusted: the signature is checked against the order ID stored on the row, and the
+// payment itself is read from Razorpay before the row is marked paid.
+function verifyFromPost_(event) {
+  var body;
+  try { body = postedJson_(event); } catch (parseError) { return { ok: false, error: "invalid" }; }
+  try {
+    return verifyPayment_(body.requestId, body.razorpay_payment_id, body.razorpay_order_id, body.razorpay_signature);
+  } catch (error) {
+    console.error("Could not verify the payment.");
+    return { ok: false, error: "unconfirmed" };
+  }
+}
+
+function optionalText_(value, pattern) {
+  if (value === undefined || value === null || value === "") return "";
+  return typeof value === "string" && pattern.test(value) ? value : null;
+}
+
+function verifyPayment_(requestId, rawPaymentId, rawOrderId, rawSignature) {
+  if (typeof requestId !== "string" || !ORDER_REQUEST_ID_PATTERN.test(requestId)) return { ok: false, error: "invalid" };
+  var paymentId = optionalText_(rawPaymentId, /^pay_[A-Za-z0-9]{1,40}$/);
+  var clientOrderId = optionalText_(rawOrderId, /^order_[A-Za-z0-9]{1,40}$/);
+  var signature = optionalText_(rawSignature, /^[0-9A-Fa-f]{64}$/);
+  if (paymentId === null || clientOrderId === null || signature === null || (signature && !paymentId)) return { ok: false, error: "invalid" };
+  var properties = PropertiesService.getScriptProperties();
+  var keys = paymentKeys_(properties, null); // any mode: a payment started before PAYMENTS_MODE was switched off still settles
+  if (!keys) return { ok: false, error: "payments_unavailable" };
+  var sheet = openOrderSheet_(properties);
+  if (orderSchemaLength_(sheet) < ORDER_HEADERS_WITH_PAYMENT.length) return { ok: false, error: "not_found" };
+  var found = findPaymentRow_(sheet, requestId);
+  var orderId = found ? String(orderCell_(found.values, "Razorpay order ID")) : "";
+  if (!orderId) return { ok: false, error: "not_found" };
+  // The total shown while a payment is not settled comes from the row, for display only. What is recorded as paid comes from Razorpay.
+  var total = storedTotal_(found.values);
+  var settled = paidOrderDetails_(found.values, PAYMENT_HEADER_INDEX);
+  if (settled) return { ok: true, status: "paid", requestId: requestId, total: settled.amount || total };
+
+  if (signature) {
+    if ((clientOrderId && clientOrderId !== orderId) || !safeEqual_(hmacHex_(orderId + "|" + paymentId, keys.secret), signature.toLowerCase())) {
+      return { ok: false, error: "signature_mismatch" };
+    }
+  } else {
+    // "Check my payment": at most one Razorpay check per order per minute.
+    var cache = CacheService.getScriptCache();
+    var limitKey = "pay-check-" + requestId;
+    var recent = false;
+    try { recent = Boolean(cache.get(limitKey)); if (!recent) cache.put(limitKey, "1", PAYMENT_CHECK_SECONDS); } catch (cacheError) { recent = false; }
+    if (recent) return { ok: true, status: unpaidLooking_(found.values) ? "unpaid" : "pending", requestId: requestId, total: total };
+  }
+  var check = checkRazorpayOrder_(orderId, requestId, paymentId, keys);
+  if (check.state === "paid") {
+    markPaid_(requestId, check.paymentId, check.amount, properties);
+    return { ok: true, status: "paid", requestId: requestId, total: check.amount };
+  }
+  return { ok: true, status: unpaidLooking_(found.values) ? "unpaid" : "pending", requestId: requestId, total: total };
+}
+
+// A row Saloni's sheet already calls "Payment not completed", or that has been waiting 2 hours.
+function unpaidLooking_(values) {
+  if (String(orderCell_(values, "Status")).trim() === PAYMENT_NOT_COMPLETED_STATUS) return true;
+  var receivedAt = retentionDate_(orderCell_(values, "Received at"));
+  return Boolean(receivedAt) && new Date().getTime() - receivedAt.getTime() >= PAYMENT_UNPAID_AFTER_MS;
+}
+
+// Reads the Razorpay order stored on the row (never an order ID from the page) and its payments. The amount is Razorpay's own: the
+// sheet's cells can be edited, the order cannot. "paid" only when the order is paid, its receipt and currency are ours, and a captured
+// payment on it (the one the page named, when it named one) is for exactly the order's amount, in whole rupees.
+function checkRazorpayOrder_(orderId, requestId, wantedPaymentId, keys) {
+  var order = razorpay_("get", "/v1/orders/" + orderId, null, keys);
+  var cents = order ? order.amount : 0;
+  if (!order || order.id !== orderId || order.receipt !== receiptFor_(requestId) || order.currency !== "INR" ||
+      typeof cents !== "number" || cents % 100 !== 0 || cents < 100 || cents > PAYMENT_MAX_TOTAL * 100) {
+    console.error("A Razorpay order did not match its row.");
+    return { state: "mismatch" };
+  }
+  if (order.status !== "paid") return { state: "pending" };
+  var list = razorpay_("get", "/v1/orders/" + orderId + "/payments", null, keys);
+  var items = list && Array.isArray(list.items) ? list.items : [];
+  for (var index = 0; index < items.length; index += 1) {
+    var item = items[index];
+    if (item && item.status === "captured" && item.order_id === orderId && item.amount === cents && item.currency === "INR" &&
+        typeof item.id === "string" && /^pay_[A-Za-z0-9]{1,40}$/.test(item.id) && (!wantedPaymentId || item.id === wantedPaymentId)) {
+      return { state: "paid", paymentId: item.id, amount: cents / 100 };
+    }
+  }
+  return { state: "pending" };
+}
+
+// Moves a row from Pending to Paid, once. Under the script lock, and only while Payment status is still "Pending", so a second
+// verify, the poll and a staff edit can never double-count or overwrite each other. The alerts go out after the lock is released.
+function markPaid_(requestId, paymentId, amount, properties) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to record the payment.");
+  var done = null;
+  try {
+    var sheet = openOrderSheet_(properties);
+    if (orderSchemaLength_(sheet) < ORDER_HEADERS_WITH_PAYMENT.length) return { changed: false };
+    var found = findPaymentRow_(sheet, requestId);
+    if (!found || String(orderCell_(found.values, "Payment status")).trim() !== "Pending" || !String(orderCell_(found.values, "Razorpay order ID")).trim()) return { changed: false };
+    var paidAt = new Date();
+    var write = function (name, value) { sheet.getRange(found.number, PAYMENT_HEADER_INDEX[name] + 1).setValue(value); };
+    write("Status", "Confirmed");
+    write("Payment status", "Paid");
+    write("Razorpay payment ID", neutralizeForSheet_(paymentId));
+    write("Amount paid (₹)", amount);
+    write("Paid at", paidAt);
+    var payload = payloadFromOrderRow_(found.values);
+    payload.payment = { amount: amount, paymentId: paymentId, test: String(orderCell_(found.values, "Delivery status")).trim() === "Test" };
+    done = { payload: payload, paidAt: paidAt };
+    return { changed: true, paidAt: paidAt };
+  } finally {
+    lock.releaseLock();
+    if (done) {
+      try { dispatchOrderAlert_(done.payload, done.paidAt, null, properties); } catch (alertError) { console.error("Paid order alert failed."); }
+      try { sendCustomerConfirmation_(done.payload, properties); } catch (mailError) { console.error("Customer confirmation email failed."); }
+    }
+  }
+}
+
+// The order alert payload for a saved row (same fields collectPayload_ gives a posted order).
+function payloadFromOrderRow_(values) {
+  var text = function (name) { return String(orderCell_(values, name)); };
+  var requested = orderCell_(values, "Requested date");
+  return collectPayload_({
+    requestId: text("Request ID"), requestStage: "quote", sourceKind: text("Source kind"), sourceId: text("Source ID").split(" | ")[0],
+    productName: text("Product name"), quantity: text("Quantity"), designDetails: text("Design details"),
+    customerName: text("Customer name"), phone: text("Phone"), email: text("Email"), fulfillment: text("Fulfilment"),
+    shippingAddress: text("Shipping address"), city: text("City"), state: text("State"), pin: text("PIN"),
+    requestedDate: requested instanceof Date ? Utilities.formatDate(requested, "Asia/Kolkata", "yyyy-MM-dd") : String(requested),
+    referralCode: text("Referral code")
+  });
+}
+
+// One email to the shopper when the payment is confirmed, if they gave an address.
+function sendCustomerConfirmation_(payload, properties) {
+  var email = String(payload.email || "").trim();
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+  var test = Boolean(payload.payment && payload.payment.test);
+  MailApp.sendEmail({
+    to: email,
+    subject: (test ? "[TEST] " : "") + "Your Saloni Resin Art order is confirmed",
+    body: [
+      "Hi " + (alertFirstName_(payload) || "there") + ",",
+      "",
+      "Thank you! We have received your payment of ₹" + payload.payment.amount + " and your order is confirmed.",
+      "Order: " + payload.productName.slice(0, 300),
+      "Order ID: " + payload.requestId.slice(0, 8),
+      "Payment ID: " + payload.payment.paymentId,
+      "",
+      "Cancelling: you can cancel from My orders on saloniresinart.com within 24 hours of payment, before work starts, for a full refund. After that the order is not refundable, except for damage in transit.",
+      "Questions? WhatsApp us on +" + ORDER_ALERT_WHATSAPP_PHONE + "."
+    ].join("\n")
+  });
+}
+
+// --- Polling (inside the 1-minute alert trigger) ---
+// About every 5 minutes: pending rows from the last 48 hours (at most 10, newest first) are checked with Razorpay. A paid order is
+// settled; an order still unpaid after 2 hours is marked "Payment not completed" but keeps being checked until 48 hours, so a late
+// payment still confirms it. No Razorpay keys, no work.
+function reconcilePaymentsIfDue_() {
+  var properties = PropertiesService.getScriptProperties();
+  if (!String(properties.getProperty("RAZORPAY_KEY_ID") || "").trim()) return null;
+  var now = new Date().getTime();
+  var last = Number(properties.getProperty("PAYMENTS_LAST_PASS"));
+  if (last > 0 && now >= last && now - last < PAYMENT_PASS_INTERVAL_MS) return null;
+  properties.setProperty("PAYMENTS_LAST_PASS", String(now));
+  return reconcilePayments_();
+}
+
+function reconcilePayments_() {
+  var properties = PropertiesService.getScriptProperties();
+  var keys = paymentKeys_(properties, null);
+  if (!keys) return null;
+  var started = new Date().getTime();
+  var sheet = openOrderSheet_(properties);
+  if (orderSchemaLength_(sheet) < ORDER_HEADERS_WITH_PAYMENT.length) return null;
+  var cache = CacheService.getScriptCache();
+  var values = sheet.getDataRange().getValues();
+  var pending = [];
+  for (var index = 1; index < values.length; index += 1) {
+    var row = values[index];
+    var receivedAt = retentionDate_(row[2]);
+    if (!receivedAt || started - receivedAt.getTime() > PAYMENT_POLL_WINDOW_MS) continue;
+    if (String(orderCell_(row, "Payment status")).trim() !== "Pending" || !String(orderCell_(row, "Razorpay order ID")).trim()) continue;
+    var checkedAt = 0;
+    try { checkedAt = Number(cache.get(PAYMENT_POLLED_PREFIX + String(row[0]))) || 0; } catch (cacheError) { checkedAt = 0; }
+    pending.push({ requestId: String(row[0]), values: row, receivedAt: receivedAt, checkedAt: checkedAt });
+  }
+  // Rotation: never-checked rows first, then the longest-waiting; newest first among equals. A busy day cannot starve older rows.
+  pending.sort(function (left, right) {
+    return left.checkedAt !== right.checkedAt ? left.checkedAt - right.checkedAt : right.receivedAt.getTime() - left.receivedAt.getTime();
+  });
+  var result = { checked: 0, paid: 0, notCompleted: 0 };
+  var batch = pending.slice(0, PAYMENT_POLL_BATCH);
+  for (var position = 0; position < batch.length; position += 1) {
+    // The trigger runs every minute and a script run may last 6: stop early and let the next pass carry on.
+    if (new Date().getTime() - started > PAYMENT_PASS_BUDGET_MS) break;
+    var entry = batch[position];
+    result.checked += 1;
+    try {
+      var check = checkRazorpayOrder_(String(orderCell_(entry.values, "Razorpay order ID")), entry.requestId, "", keys);
+      if (check.state === "paid") {
+        if (markPaid_(entry.requestId, check.paymentId, check.amount, properties).changed) result.paid += 1;
+      } else if (started - entry.receivedAt.getTime() >= PAYMENT_UNPAID_AFTER_MS && String(orderCell_(entry.values, "Status")).trim() === AWAITING_PAYMENT_STATUS) {
+        if (markPaymentNotCompleted_(entry.requestId, properties)) result.notCompleted += 1;
+      }
+    } catch (error) {
+      console.error("A pending payment could not be checked.");
+    }
+    try { cache.put(PAYMENT_POLLED_PREFIX + entry.requestId, String(new Date().getTime()), 21600); } catch (putError) { /* the next pass just checks it again */ }
+  }
+  return result;
+}
+
+function markPaymentNotCompleted_(requestId, properties) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return false;
+  try {
+    var sheet = openOrderSheet_(properties);
+    var found = findPaymentRow_(sheet, requestId);
+    if (!found || String(orderCell_(found.values, "Payment status")).trim() !== "Pending" || String(orderCell_(found.values, "Status")).trim() !== AWAITING_PAYMENT_STATUS) return false;
+    sheet.getRange(found.number, PAYMENT_HEADER_INDEX["Status"] + 1).setValue(PAYMENT_NOT_COMPLETED_STATUS);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Public so it shows in the editor Run menu; run once as the owner after deploying. Adds the four payment columns (AO to AR),
+// running the earlier migrations first when the sheet is older, makes sure the 1-minute trigger exists (the poll runs inside it),
+// and checks the Razorpay keys with one harmless read. Never touches order rows, and no web request can reach it: a visitor has an
+// empty active user. Safe to run twice. It does not switch payments on: set PAYMENTS_MODE yourself.
+function setupPayments() {
+  var active = String(Session.getActiveUser().getEmail() || "");
+  if (!active || active !== String(Session.getEffectiveUser().getEmail() || "")) {
+    throw new Error("Run this from the Apps Script editor as the owner.");
+  }
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, [
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.send_mail",
+    "https://www.googleapis.com/auth/script.external_request"
+  ]);
+  var properties = PropertiesService.getScriptProperties();
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) throw new Error("Unable to start payment setup.");
+  var sheet;
+  var changed;
+  try {
+    sheet = openOrderSheet_(properties);
+    changed = migratePaymentSchema_(sheet);
+  } finally {
+    lock.releaseLock();
+  }
+  var mode = paymentsMode_(properties);
+  var keys = paymentKeys_(properties, mode === "off" ? null : mode);
+  var keysOk = false;
+  if (keys) {
+    try { razorpay_("get", "/v1/orders?count=1", null, keys); keysOk = true; } catch (keyError) { keysOk = false; }
+  }
+  var result = { orderColumns: orderSchemaLength_(sheet), changed: changed, triggerInstalled: installOrderAlertTrigger_(), mode: mode, keysOk: keysOk };
+  console.log(JSON.stringify(result));
+  return result;
 }
 
 // --- WhatsApp advance message ---------------------------------------------
@@ -1345,7 +2032,9 @@ function sendWhatsAppAlert_(payload, properties) {
     alertFirstName_(payload) + " - " + place,
     "Request " + payload.requestId.slice(0, 8),
     orderSheetUrl_(properties)
-  ].join("\n");
+  ];
+  if (payload.payment) text.splice(3, 0, (payload.payment.test ? "TEST " : "") + "PAID online \u20B9" + payload.payment.amount);
+  text = text.join("\n");
   UrlFetchApp.fetch(
     "https://api.callmebot.com/whatsapp.php?phone=" + encodeURIComponent(phone) +
     "&text=" + encodeURIComponent(text) + "&apikey=" + encodeURIComponent(key),
@@ -1374,12 +2063,13 @@ function sendEmailAlert_(payload, receivedAt, referenceFile, properties) {
   lines.push("Requested date: " + (payload.requestedDate || "-"));
   if (payload.referralCode) lines.push("Referral code: " + payload.referralCode);
   if (referenceFile) lines.push("Reference image: " + referenceFile.getUrl());
+  if (payload.payment) lines.unshift((payload.payment.test ? "TEST PAYMENT. " : "") + "PAID online: \u20B9" + payload.payment.amount + " (Razorpay payment " + payload.payment.paymentId + ")");
   lines.push("Request ID: " + payload.requestId);
   lines.push("Received: " + Utilities.formatDate(receivedAt, "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " (IST)");
   lines.push("Orders sheet: " + orderSheetUrl_(properties));
   MailApp.sendEmail({
     to: to,
-    subject: "New order: " + alertProduct_(payload) + " \u2013 " + alertFirstName_(payload),
+    subject: (payload.payment ? (payload.payment.test ? "TEST " : "") + "PAID order: " : "New order: ") + alertProduct_(payload) + " \u2013 " + alertFirstName_(payload),
     body: lines.join("\n")
   });
 }
@@ -2824,7 +3514,7 @@ function hasImageSignature_(bytes, mime) {
   return bytes.length >= png.length && png.every(function (value, index) { return (bytes[index] + 256) % 256 === value; });
 }
 
-function verifyCaptcha_(token, properties, expectedAction) {
+function verifyCaptcha_(token, properties, expectedAction, allowLocalhost) {
   var secret = String(properties.getProperty("CAPTCHA_SECRET") || "");
   var rawThreshold = properties.getProperty("CAPTCHA_MIN_SCORE");
   var thresholdText = String(rawThreshold == null ? "" : rawThreshold).trim();
@@ -2835,7 +3525,8 @@ function verifyCaptcha_(token, properties, expectedAction) {
       method: "post", payload: { secret: secret, response: token }, muteHttpExceptions: true
     });
     var result = JSON.parse(response.getContentText() || "{}");
-    var hostnameMatches = String(result.hostname || "").toLowerCase() === "saloniresinart.com";
+    var hostname = String(result.hostname || "").toLowerCase();
+    var hostnameMatches = hostname === "saloniresinart.com" || (allowLocalhost === true && hostname === "localhost");
     var actionMatches = result.action === (expectedAction || ORDER_CAPTCHA_ACTION);
     var scoreOk = typeof result.score === "number" && isFinite(result.score) && result.score >= 0 && result.score <= 1 && result.score >= threshold;
     return result.success === true && hostnameMatches && actionMatches && scoreOk
@@ -2971,7 +3662,8 @@ function ensureSchema_(sheet) {
   var expected = columns === LEGACY_ORDER_HEADERS.length ? LEGACY_ORDER_HEADERS
     : columns === ORDER_HEADERS.length ? ORDER_HEADERS
     : columns === ORDER_HEADERS_WITH_ADVANCE.length ? ORDER_HEADERS_WITH_ADVANCE
-    : columns === ORDER_HEADERS_WITH_SOURCE.length ? ORDER_HEADERS_WITH_SOURCE : null;
+    : columns === ORDER_HEADERS_WITH_SOURCE.length ? ORDER_HEADERS_WITH_SOURCE
+    : columns === ORDER_HEADERS_WITH_PAYMENT.length ? ORDER_HEADERS_WITH_PAYMENT : null;
   if (!expected) throw new Error("Order sheet schema does not match the allowlist.");
   var existing = sheet.getRange(1, 1, 1, expected.length).getValues()[0].map(String);
   if (existing.join("\u001f") !== expected.join("\u001f")) throw new Error("Order sheet schema does not match the allowlist.");
@@ -3017,7 +3709,7 @@ function migrateAdvanceSchema_(sheet) {
 // Headers only: no data row is read or written. Returns true when it added the header, false when it was already there.
 function migrateVisitSourceSchema_(sheet) {
   var columns = ensureSchema_(sheet);
-  if (columns === ORDER_HEADERS_WITH_SOURCE.length) return false;
+  if (columns >= ORDER_HEADERS_WITH_SOURCE.length) return false;
   if (columns < ORDER_HEADERS_WITH_ADVANCE.length) {
     migrateAdvanceSchema_(sheet);
     columns = ensureSchema_(sheet);
@@ -3028,6 +3720,28 @@ function migrateVisitSourceSchema_(sheet) {
   if (sheet.getRange(1, 1, 1, ORDER_HEADERS_WITH_SOURCE.length).getValues()[0].map(String).join("\u001f") !== ORDER_HEADERS_WITH_SOURCE.join("\u001f")) {
     throw new Error("Order sheet migration could not verify the visit source header.");
   }
+  return true;
+}
+
+// Adds the four payment headers (AO to AR) after "Visit source", running the earlier migrations first when the sheet is older.
+// Headers only: no data row is read or written. Returns true when it added them, false when they were already there.
+function migratePaymentSchema_(sheet) {
+  var columns = ensureSchema_(sheet);
+  if (columns >= ORDER_HEADERS_WITH_PAYMENT.length) return false;
+  if (columns < ORDER_HEADERS_WITH_SOURCE.length) {
+    migrateVisitSourceSchema_(sheet);
+    columns = ensureSchema_(sheet);
+  }
+  var maxColumns = Number(sheet.getMaxColumns && sheet.getMaxColumns()) || columns;
+  if (maxColumns < ORDER_HEADERS_WITH_PAYMENT.length) sheet.insertColumnsAfter(maxColumns, ORDER_HEADERS_WITH_PAYMENT.length - maxColumns);
+  sheet.getRange(1, columns + 1, 1, PAYMENT_ORDER_HEADERS.length).setValues([PAYMENT_ORDER_HEADERS]);
+  if (sheet.getRange(1, 1, 1, ORDER_HEADERS_WITH_PAYMENT.length).getValues()[0].map(String).join("\u001f") !== ORDER_HEADERS_WITH_PAYMENT.join("\u001f")) {
+    throw new Error("Order sheet migration could not verify the payment headers.");
+  }
+  // Amount paid is a plain whole number and Paid at a real date and time (the cells are written as a number and a Date).
+  var bodyRows = Math.max(1, (Number(sheet.getMaxRows && sheet.getMaxRows()) || 2) - 1);
+  sheet.getRange(2, ORDER_HEADERS_WITH_PAYMENT.indexOf("Amount paid (\u20B9)") + 1, bodyRows, 1).setNumberFormat("0");
+  sheet.getRange(2, ORDER_HEADERS_WITH_PAYMENT.indexOf("Paid at") + 1, bodyRows, 1).setNumberFormat("dd mmm yyyy, hh:mm");
   return true;
 }
 
@@ -3143,6 +3857,7 @@ function payloadFingerprint_(payload) {
   }
   if (payload.referralCode) canonical.referralCode = payload.referralCode;
   if (payload.bundleSourceIds) canonical.bundleSourceIds = payload.bundleSourceIds;
+  if (payload.lines) canonical.lines = payload.lines;
   if (payload.requestStage === "quote") canonical.requestStage = payload.requestStage;
   return digestHex_(JSON.stringify(canonical));
 }
