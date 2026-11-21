@@ -714,12 +714,6 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .lightbox-request { width: 100%; align-self: stretch; justify-content: center; flex: 0 0 auto; margin-top: 1rem; }
 .lightbox-delivery-note { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.35; text-align: center; }
 .lightbox-request[hidden] + .lightbox-delivery-note { display: none; }
-.lightbox-order-summary .lightbox-ask { display: flex; justify-content: center; width: 100%; min-height: 2.75rem; margin: .6rem 0 .3rem; }
-.lightbox-damage-note { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.35; text-align: center; }
-.lightbox-damage-note a { display: flex; justify-content: center; align-items: center; min-height: 2.75rem; color: #8f0d49; font-weight: 700; }
-.lightbox-maker { display: flex; gap: .6rem; align-items: center; margin: .5rem 0 0; color: var(--muted); font-size: .85rem; line-height: 1.35; text-align: left; }
-.lightbox-maker img { flex: none; width: 2.75rem; height: 2.75rem; border-radius: 50%; object-fit: cover; }
-.lightbox-order-summary .lightbox-maker strong { display: inline; margin: 0; padding: 0; color: var(--ink); font: inherit; font-weight: 700; }
 .lightbox-share { display: grid; width: 100%; gap: .5rem; }
 .lightbox-share[hidden], .lightbox-share-options[hidden] { display: none; }
 .lightbox-share .button-line:not(:hover):not(:focus-visible) { background: transparent; }

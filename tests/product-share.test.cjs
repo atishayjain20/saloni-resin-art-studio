@@ -55,7 +55,7 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
       closest: (selector) => (selector === "article" ? card : null),
     });
   });
-  const names = ["lightbox-share", "lightbox-share-button", "lightbox-share-options", "lightbox-share-whatsapp", "lightbox-share-copy", "lightbox-share-status", "lightbox-ask"];
+  const names = ["lightbox-share", "lightbox-share-button", "lightbox-share-options", "lightbox-share-whatsapp", "lightbox-share-copy", "lightbox-share-status"];
   const elements = {};
   names.forEach((id) => { elements[id] = make(); });
   elements["lightbox-share"].hidden = true;
@@ -228,26 +228,6 @@ test("a card without a share page offers no Share button", () => {
   page.triggers[0].listeners.click({ defaultPrevented: false, button: 0, preventDefault() {} });
   assert.equal(page.lightbox.open, true);
   assert.equal(page.elements["lightbox-share"].hidden, true);
-});
-
-test("Ask Saloni on WhatsApp in the popup names the open product and links its page", () => {
-  const page = harness({});
-  page.triggers[1].listeners.click({ defaultPrevented: false, button: 0, preventDefault() {} });
-  assert.equal(page.elements["lightbox-ask"].href, "https://wa.me/918209238541?text=" + encodeURIComponent(`Hi Saloni, I have a question about Mr & Mrs Name Plate: ${SITE}/p/mr-and-mrs-name-plate/`));
-  const plain = harness({ noSlugAttribute: true });
-  plain.triggers[0].listeners.click({ defaultPrevented: false, button: 0, preventDefault() {} });
-  assert.equal(plain.elements["lightbox-ask"].href, "https://wa.me/918209238541?text=" + encodeURIComponent("Hi Saloni, I have a question about " + plain.elements["lightbox-product-name"].textContent));
-});
-
-test("the popup has Ask Saloni on WhatsApp, the transit-damage line and Meet Saloni under the delivery line", () => {
-  const dialog = html.match(/<dialog class="lightbox-dialog"[\s\S]*?<\/dialog>/)[0];
-  assert.match(dialog, /<a class="button button-whatsapp lightbox-ask" id="lightbox-ask" href="https:\/\/wa\.me\/918209238541" target="_blank" rel="noopener"><svg class="whatsapp-icon" aria-hidden="true" focusable="false"[^>]*>[\s\S]*?<\/svg>Ask Saloni on WhatsApp<\/a>/);
-  assert.match(dialog, /<p class="lightbox-damage-note">Damaged in transit\? Send Saloni photos and an unboxing video for replacement support\. Made to order, so no returns\. <a href="shipping-and-returns\/">Shipping &amp; returns<\/a><\/p>/);
-  assert.match(dialog, /<p class="lightbox-maker"><img src="assets\/saloni-portrait\.jpg" alt="Saloni, the artist behind Saloni Resin Art Studio" width="320" height="320" loading="lazy" decoding="async"><span><strong>Meet Saloni<\/strong> · every piece is handmade by Saloni in her studio in Ajmer, Rajasthan\.<\/span><\/p>/);
-  const at = (needle) => dialog.indexOf(needle);
-  assert.ok(at('id="lightbox-delivery-note"') < at('id="lightbox-ask"') && at('id="lightbox-ask"') < at('class="lightbox-damage-note"'));
-  assert.ok(at('id="lightbox-share"') < at('class="lightbox-maker"'), "Meet Saloni closes the popup's order box");
-  assert.match(css, /\.lightbox-damage-note a\s*\{[^}]*min-height:\s*2\.75rem/);
 });
 
 test("the popup markup has an accessible Share button, the two options and a polite status", () => {
@@ -492,7 +472,7 @@ test("every card photo link carries its own data-product-slug and the version is
   assert.ok(slugs.length > 90);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.doesNotMatch(html, /\?v=20261165/);
-  assert.match(html, /script\.js\?v=20261212/);
+  assert.match(html, /script\.js\?v=20261211/);
 });
 
 // --- Visitor counts: the product popup, the share button and a shared link, with no personal data ---
