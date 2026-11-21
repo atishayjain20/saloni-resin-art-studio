@@ -827,6 +827,18 @@ test("the expired Diwali offer is gone from the cart: even with the strip in the
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8"), /buy 2, get 1 free|free shipping \(Diwali/);
 });
 
+test("a cart order that is only sent as a request also empties the cart, and the saved name and city are still kept", () => {
+  const flow = runFlow();
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
+  assert.equal(flow.catalogueSelectionItems.children.length, 1);
+  assert.equal(typeof flow.orderOpens[0].options.onSent, "function");
+  flow.orderOpens[0].options.onSent({ firstName: "Asha", city: "Ajmer" });
+  assert.equal(flow.catalogueSelectionItems.children.length, 0);
+  assert.equal(flow.catalogueSelectionTotal.textContent, "");
+  assert.equal(flow.catalogueButton.getAttribute("aria-pressed"), "false");
+});
+
 test("the cart hands the order form each line's size code and colour, and a callback that empties the cart after a paid order", () => {
   const flow = sizedFlow({ aiImages: "emerald styled" });
   flow.catalogueButton.__saloniChosenSize = "6-in";
@@ -1034,7 +1046,9 @@ test("saves the repeat profile when the form reports a sent order, keeping only 
   const saved = JSON.parse(storage.getItem("saloniRepeatProfile"));
   assert.deepEqual(saved.profile, { customerName: profile.customerName, phone: profile.phone, fulfillment: profile.fulfillment, shippingAddress: profile.shippingAddress, city: profile.city, state: profile.state, pin: profile.pin });
   assert.ok(saved.expiresAt > Date.now());
-  assert.equal(storage.getItem("saloniCatalogueCart"), cartBefore, "the cart is untouched");
+  assert.ok(cartBefore, "the cart was saved before sending");
+  const cartAfter = storage.getItem("saloniCatalogueCart");
+  assert.ok(cartAfter === null || JSON.parse(cartAfter).items.length === 0, "a sent cart order empties the saved cart");
   assert.equal(flow.windowObject.messageListener, undefined, "script.js listens for no window messages, so a message cannot write the profile");
   assert.doesNotMatch(source, /saloni-order-save-repeat-profile/);
 });
