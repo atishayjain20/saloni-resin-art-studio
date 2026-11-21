@@ -842,6 +842,8 @@
     }, true);
   }
   function setDialogModal(modal) {
+    // Cleared even when the shopper closed the checkout while paying, so a later open is not dimmed twice.
+    if (modal && orderDialog && orderDialog.classList) orderDialog.classList.toggle("order-dialog-paying", false);
     if (!orderDialog || !orderDialog.open || typeof orderDialog.show !== "function") return;
     var isModal = true;
     try { isModal = orderDialog.matches(":modal"); } catch (error) {}
