@@ -842,12 +842,16 @@
     }, true);
   }
   function setDialogModal(modal) {
+    // Cleared even when the shopper closed the checkout while paying, so a later open is not dimmed twice.
+    if (modal && orderDialog && orderDialog.classList) orderDialog.classList.toggle("order-dialog-paying", false);
     if (!orderDialog || !orderDialog.open || typeof orderDialog.show !== "function") return;
     var isModal = true;
     try { isModal = orderDialog.matches(":modal"); } catch (error) {}
     if (isModal === modal) return;
     swapCloses += 1;
     orderDialog.close();
+    // The class keeps the non-modal checkout fixed in place over a dimmed page, as it looked while modal.
+    if (orderDialog.classList) orderDialog.classList.toggle("order-dialog-paying", !modal);
     if (modal) orderDialog.showModal(); else orderDialog.show();
   }
   function phoneDigits() { var digits = value("phone").replace(/\D/g, ""); return digits.length > 10 ? digits.slice(-10) : digits; }
