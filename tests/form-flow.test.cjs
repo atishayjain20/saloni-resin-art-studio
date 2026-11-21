@@ -320,7 +320,7 @@ test("after a successful send More details is hidden and Start another brings it
 });
 
 test("keeps only the required fields visible and groups optional fields in a closed More details disclosure", () => {
-  const more = html.match(/<details class="more-details" id="more-details">[\s\S]*?<\/details>\s*(?=<fieldset>\s*<legend>Optional reference image)/)?.[0] || "";
+  const more = html.match(/<details class="more-details" id="more-details">[\s\S]*?<\/details>\s*(?=<fieldset id="reference-image-fieldset">\s*<legend>Optional reference image)/)?.[0] || "";
   assert.match(more, /<summary>More details \(optional\)<\/summary>/);
   assert.doesNotMatch(more.split("\n")[0], /\bopen\b/);
   ["email", "requested-date", "referral-code"].forEach((id) => assert.match(more, new RegExp(`id="${id}"`)));
@@ -868,10 +868,17 @@ class FakeFileReader {
   }
 }
 
-function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], previewExpected = false, omitPreviewExpected = false, previewBlob = null, seedOverrides = {}, slugLinks = {} } = {}) {
-  const ids = ["order-form-embed", "order-form-intro", "success-celebration", "request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "order-reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "more-details", "bundle-source-ids"];
+function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], previewExpected = false, omitPreviewExpected = false, previewBlob = null, seedOverrides = {}, slugLinks = {}, payments = "", search = "", captchaKey = "", razorpay = false } = {}) {
+  const ids = ["order-form-embed", "order-form-intro", "success-celebration", "request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "order-reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "more-details", "bundle-source-ids", "checkout-summary", "checkout-lines", "checkout-subtotal", "checkout-shipping", "checkout-total", "checkout-test-note", "order-final-quote-note", "success-title", "order-dialog-title", "reference-image-fieldset"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   elements.get("order-form-embed").setAttribute("data-order-form-url", "https://script.google.com/macros/s/test/exec");
+  if (payments) elements.get("order-form-embed").setAttribute("data-payments", payments);
+  if (captchaKey) elements.get("order-form-embed").setAttribute("data-captcha-site-key", captchaKey);
+  elements.get("checkout-summary").hidden = true;
+  elements.get("checkout-test-note").hidden = true;
+  elements.get("success-title").textContent = "Order sent!";
+  elements.get("submit-button").textContent = "Send request";
+  elements.get("order-dialog-title").textContent = "Send an order request";
   const form = new FakeElement("order-form");
   form.hidden = true;
   elements.get("order-form-intro").hidden = true;
@@ -916,6 +923,9 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
   const clearedTimers = [];
   const fetches = [];
   const submissions = [];
+  const verifications = [];
+  const verifyCallbacks = [];
+  const razorpays = [];
   const callbacks = [];
   const lookupCallbacks = [];
   const savedProfiles = [];
@@ -940,8 +950,15 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
   }
   let objectUrlCounter = 0;
   const objectUrls = { created: [], revoked: [] };
+  class FakeRazorpay {
+    constructor(options) { this.options = options; this.handlers = {}; this.opened = 0; razorpays.push(this); }
+    on(name, handler) { this.handlers[name] = handler; }
+    open() { this.opened += 1; }
+  }
   const windowObject = {
     crypto: { randomUUID: () => "request-new" },
+    location: { search },
+    Razorpay: razorpay ? FakeRazorpay : undefined,
     setTimeout(callback, delay) { timers.push(callback); timerDelays.push(delay); return timers.length; },
     clearTimeout(id) { clearedTimers.push(id); },
     File: FakeFile,
@@ -962,11 +979,14 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
           failure(error) { reject(error); return settle(); },
         };
         if (/[?]action=order$/.test(url)) { submissions.push(entry.body); callbacks.push(answer); }
+        else if (/[?]action=verify$/.test(url)) { verifications.push(entry.body); verifyCallbacks.push(answer); }
         else if (/[?]action=referral$/.test(url)) lookupCallbacks.push(Object.assign({ value: entry.body.code }, answer));
       });
     },
   };
+  const head = new FakeElement("head");
   const documentObject = {
+    head,
     // The home page's photo links: only the ones named in slugLinks (href -> data-product-slug) exist.
     querySelector(selector) {
       const match = /^a\[data-product-slug\]\[href="([^"]+)"\]$/.exec(selector);
@@ -995,8 +1015,9 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
   };
   vm.createContext(context);
   vm.runInContext(formSource, context, { filename: "order-form.js" });
-  windowObject.saloniOrderForm.open(seed, { previewBlob, onSent: (profile) => savedProfiles.push(profile) });
-  return { form, imaging, elements, fields, errors, status, timers, timerDelays, clearedTimers, fetches, submissions, callbacks, lookupCallbacks, savedProfiles, windowObject, objectUrls, seed, open: windowObject.saloniOrderForm.open };
+  const paidCalls = [];
+  windowObject.saloniOrderForm.open(seed, { previewBlob, onSent: (profile) => savedProfiles.push(profile), onPaid: () => paidCalls.push(true) });
+  return { head, verifications, verifyCallbacks, razorpays, paidCalls, FakeRazorpay, form, imaging, elements, fields, errors, status, timers, timerDelays, clearedTimers, fetches, submissions, callbacks, lookupCallbacks, savedProfiles, windowObject, objectUrls, seed, open: windowObject.saloniOrderForm.open };
 }
 
 function fillValid(fields) {
@@ -1829,4 +1850,532 @@ test("no purchase is reported when the request fails, and a missing google.js ch
   fillValid(throwing.fields);
   await sendOk(throwing);
   assert.match(throwing.status.textContent, /Request received/, "a failing report never hides the success message");
+});
+
+// ---- Online payment (Razorpay): off by default, ?payments=test or data-payments="live" turns it on ----
+const PAID_ITEMS = [
+  { sourceId: "catalogue:one.webp", productName: "One (size: 8 × 12 in)", price: "₹1,799", size: "", sizeCode: "8-12-in", photo: "", quantity: 1 },
+  { sourceId: "catalogue:two.webp", productName: "Two", price: "₹399", size: "", photo: "rose-red", quantity: 2 },
+];
+const PAY_OK = { ok: true, requestId: "request-seed", payment: { keyId: "rzp_test_abc", orderId: "order_X1", currency: "INR", subtotal: 2597, shipping: 100, total: 2697, priceChanged: false } };
+const RAZORPAY_RESPONSE = { razorpay_payment_id: "pay_1", razorpay_order_id: "order_X1", razorpay_signature: "sig_1" };
+function payRuntime(options = {}) {
+  return makeFormRuntime(Object.assign({ sourceId: "catalogue:multi-item", bundleItems: PAID_ITEMS.map((item) => Object.assign({}, item)), search: "?payments=test", razorpay: true }, options));
+}
+function fillPay(runtime, { fulfillment = "shipping", pin = "305001" } = {}) {
+  fillValid(runtime.fields);
+  Object.assign(runtime.fields.fulfillment, { value: fulfillment });
+  Object.assign(runtime.fields.pin, { value: pin });
+  Object.assign(runtime.fields.shippingAddress, { value: "12 Test Street, Ajmer" });
+  Object.assign(runtime.fields.city, { value: "Ajmer" });
+  Object.assign(runtime.fields.state, { value: "Rajasthan" });
+  Object.assign(runtime.fields.email, { value: "a@example.com" });
+  runtime.form.dispatch("change");
+}
+function summaryText(runtime, id) { return runtime.elements.get(id).textContent; }
+function lineTexts(runtime) { return runtime.elements.get("checkout-lines").children.map((line) => line.children.map((part) => part.textContent).join("|")); }
+const button = (runtime) => runtime.elements.get("submit-button");
+async function payAndOpen(runtime, answer = PAY_OK) {
+  submitOrderForm(runtime);
+  await settle();
+  await runtime.callbacks[0].success(answer);
+  await settle();
+}
+function captchaSpy(runtime, token = "tok-1") {
+  const calls = [];
+  runtime.windowObject.grecaptcha = { ready: (callback) => callback(), execute: (key, options) => { calls.push({ key, options }); return Promise.resolve(token); } };
+  return calls;
+}
+
+test("payments are off by default: no checkout summary, the button stays Send request and the order body is the old request", async () => {
+  const runtime = makeFormRuntime({ sourceId: "catalogue:multi-item", bundleItems: PAID_ITEMS.map((item) => Object.assign({}, item)), razorpay: true });
+  fillPay(runtime);
+  assert.equal(runtime.elements.get("checkout-summary").hidden, true);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions.length, 1);
+  for (const key of ["lines", "expectedTotal", "paymentTest", "captchaToken"]) assert.equal(Object.hasOwn(runtime.submissions[0], key), false, key);
+  assert.equal(runtime.head.children.length, 0);
+});
+
+test("a payments=test address shows the summary: items, shipping by PIN or pickup, total, and a Pay button with the amount", () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  assert.equal(runtime.elements.get("checkout-summary").hidden, false);
+  assert.equal(runtime.elements.get("checkout-test-note").hidden, false);
+  assert.deepEqual(lineTexts(runtime), ["One (size: 8 × 12 in) × 1|₹1,799", "Two × 2|₹798"]);
+  assert.equal(summaryText(runtime, "checkout-subtotal"), "₹2,597");
+  assert.equal(summaryText(runtime, "checkout-shipping"), "₹100");
+  assert.equal(summaryText(runtime, "checkout-total"), "₹2,697");
+  assert.equal(button(runtime).textContent, "Pay ₹2,697");
+  Object.assign(runtime.fields.pin, { value: "110001" });
+  runtime.fields.pin.dispatch("input");
+  assert.equal(summaryText(runtime, "checkout-shipping"), "₹150");
+  assert.equal(button(runtime).textContent, "Pay ₹2,747");
+  Object.assign(runtime.fields.pin, { value: "345000" });
+  runtime.fields.pin.dispatch("input");
+  assert.equal(summaryText(runtime, "checkout-shipping"), "₹100", "PINs 30 to 34 are Rajasthan");
+  Object.assign(runtime.fields.pin, { value: "355000" });
+  runtime.fields.pin.dispatch("input");
+  assert.equal(summaryText(runtime, "checkout-shipping"), "₹150");
+  Object.assign(runtime.fields.fulfillment, { value: "pickup" });
+  runtime.form.dispatch("change");
+  assert.equal(summaryText(runtime, "checkout-shipping"), "₹0");
+  assert.equal(summaryText(runtime, "checkout-total"), "₹2,597");
+  assert.equal(button(runtime).textContent, "Pay ₹2,597");
+});
+
+test("until a valid PIN is entered the shipping line asks for it and the button has no amount", () => {
+  const runtime = payRuntime();
+  fillPay(runtime, { pin: "" });
+  assert.match(summaryText(runtime, "checkout-shipping"), /Enter your PIN/);
+  assert.equal(button(runtime).textContent, "Pay online");
+});
+
+test("test mode sends lines, the shown total, paymentTest and a reCAPTCHA token with the order, and loads Razorpay only then", async () => {
+  const runtime = payRuntime({ captchaKey: "SITEKEY" });
+  const captcha = captchaSpy(runtime);
+  fillPay(runtime);
+  assert.equal(runtime.head.children.length, 0, "Razorpay is not loaded before paying");
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions.length, 1);
+  const body = runtime.submissions[0];
+  assert.deepEqual(body.lines, [{ sourceId: "catalogue:one.webp", size: "8-12-in", photo: "", qty: 1 }, { sourceId: "catalogue:two.webp", size: "", photo: "rose-red", qty: 2 }]);
+  assert.equal(body.expectedTotal, 2697);
+  assert.equal(body.paymentTest, true);
+  assert.equal(body.captchaToken, "tok-1");
+  assert.deepEqual(JSON.parse(JSON.stringify(captcha)), [{ key: "SITEKEY", options: { action: "order_request" } }]);
+  assert.equal(body.requestId, "request-seed");
+});
+
+test("live mode (data-payments=live) pays without paymentTest and ignores the test address", async () => {
+  const runtime = payRuntime({ payments: "live", search: "" });
+  fillPay(runtime);
+  assert.equal(runtime.elements.get("checkout-summary").hidden, false);
+  assert.equal(runtime.elements.get("checkout-test-note").hidden, true);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(Object.hasOwn(runtime.submissions[0], "paymentTest"), false);
+  assert.equal(runtime.submissions[0].expectedTotal, 2697);
+});
+
+test("the server's payment answer opens Razorpay with its key, order, amount in paise, name, prefill and a 15 minute timeout", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  assert.equal(runtime.razorpays.length, 1);
+  const options = runtime.razorpays[0].options;
+  assert.equal(runtime.razorpays[0].opened, 1);
+  assert.equal(options.key, "rzp_test_abc");
+  assert.equal(options.order_id, "order_X1");
+  assert.equal(options.amount, 269700);
+  assert.equal(options.currency, "INR");
+  assert.equal(options.name, "Saloni Resin Art Studio");
+  assert.equal(options.timeout, 900);
+  assert.deepEqual(JSON.parse(JSON.stringify(options.prefill)), { name: "A Customer", contact: "8209238541", email: "a@example.com" });
+  assert.equal(typeof options.handler, "function");
+  assert.equal(typeof options.modal.ondismiss, "function");
+  assert.equal(button(runtime).disabled, true, "no second tap while the payment window is open");
+});
+
+test("Razorpay Checkout.js is added to the page only when paying, and a failed load keeps the cart and allows another try", async () => {
+  const runtime = payRuntime({ razorpay: false });
+  fillPay(runtime);
+  assert.equal(runtime.head.children.length, 0);
+  await payAndOpen(runtime);
+  const script = runtime.head.children[0];
+  assert.equal(script.src, "https://checkout.razorpay.com/v1/checkout.js");
+  script.dispatch("error");
+  await settle();
+  assert.match(runtime.status.textContent, /payment window could not load.*Your cart is kept/);
+  assert.equal(button(runtime).disabled, false);
+  assert.equal(runtime.paidCalls.length, 0);
+  submitOrderForm(runtime);
+  await settle();
+  await runtime.verifyCallbacks[0].success({ ok: true, status: "unpaid", requestId: "request-seed", total: 2697 });
+  await settle();
+  assert.equal(runtime.submissions.length, 1, "the same order is reused, nothing is posted again");
+  runtime.windowObject.Razorpay = runtime.FakeRazorpay;
+  runtime.head.children[runtime.head.children.length - 1].dispatch("load");
+  await settle();
+  assert.equal(runtime.razorpays.length, 1);
+  assert.equal(runtime.razorpays[0].options.order_id, "order_X1");
+});
+
+test("paying: verify is sent with the Razorpay answer, then Order confirmed, the cart is cleared, My orders and Google hear once with the server total", async () => {
+  const runtime = payRuntime();
+  const saved = watchMyOrders(runtime);
+  const purchases = googleSpy(runtime);
+  const events = [];
+  runtime.windowObject.saloniTrack = (...args) => events.push(args);
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  runtime.razorpays[0].options.handler(RAZORPAY_RESPONSE);
+  await settle();
+  assert.deepEqual(runtime.verifications, [{ requestId: "request-seed", razorpay_payment_id: "pay_1", razorpay_order_id: "order_X1", razorpay_signature: "sig_1" }]);
+  assert.match(runtime.status.textContent, /Confirming your payment/);
+  assert.equal(runtime.paidCalls.length, 0, "the cart stays until the server says paid");
+  await runtime.verifyCallbacks[0].success({ ok: true, status: "paid", requestId: "request-seed", total: 2697 });
+  await settle();
+  assert.match(runtime.status.textContent, /^Order confirmed\. ID request-seed/);
+  assert.equal(runtime.paidCalls.length, 1);
+  assert.equal(runtime.savedProfiles.length, 1);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].requestId, "request-seed");
+  assert.equal(saved[0].status, "paid");
+  assert.equal(runtime.elements.get("success-celebration").hidden, false);
+  assert.equal(runtime.elements.get("success-title").textContent, "Order confirmed!");
+  assert.equal(runtime.elements.get("checkout-summary").hidden, true);
+  assert.equal(runtime.elements.get("another-button").hidden, false);
+  assert.equal(purchases.length, 1);
+  assert.deepEqual(events, [["order-sent"]], "a confirmed paid order is counted once, like a sent request");
+  assert.equal(purchases[0].transaction_id, "request-seed");
+  assert.equal(purchases[0].value, 2697);
+  // A late repeat of the same answer changes nothing.
+  runtime.razorpays[0].options.handler(RAZORPAY_RESPONSE);
+  await settle();
+  assert.equal(runtime.verifications.length, 1);
+  assert.equal(purchases.length, 1);
+});
+
+test("a payment the server still calls pending is checked again after 3, 6 and 10 seconds, then left to My orders without a Google purchase", async () => {
+  const runtime = payRuntime();
+  const saved = watchMyOrders(runtime);
+  const purchases = googleSpy(runtime);
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  const delaysBefore = runtime.timerDelays.length;
+  runtime.razorpays[0].options.handler(RAZORPAY_RESPONSE);
+  await settle();
+  const pending = { ok: true, status: "pending", requestId: "request-seed", total: 2697 };
+  await runtime.verifyCallbacks[0].success(pending);
+  assert.deepEqual(runtime.timerDelays.slice(delaysBefore), [3000]);
+  runtime.timers[runtime.timers.length - 1]();
+  await settle();
+  await runtime.verifyCallbacks[1].success(pending);
+  assert.deepEqual(runtime.timerDelays.slice(delaysBefore), [3000, 6000]);
+  runtime.timers[runtime.timers.length - 1]();
+  await settle();
+  await runtime.verifyCallbacks[2].failure(new Error("offline"));
+  assert.deepEqual(runtime.timerDelays.slice(delaysBefore), [3000, 6000, 10000]);
+  runtime.timers[runtime.timers.length - 1]();
+  await settle();
+  assert.equal(runtime.verifications.length, 4);
+  await runtime.verifyCallbacks[3].success(pending);
+  await settle();
+  assert.match(runtime.status.textContent, /still confirming your payment.*request-seed/);
+  assert.equal(runtime.paidCalls.length, 1, "the money may have left: the cart is cleared so it cannot be paid twice");
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].status, "payment_pending");
+  assert.equal(purchases.length, 0);
+  assert.equal(runtime.timerDelays.slice(delaysBefore).length, 3, "no more checks after the third retry");
+});
+
+test("closing the payment window keeps the cart, says so, and Try again reuses the same Razorpay order", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  runtime.razorpays[0].options.modal.ondismiss();
+  assert.equal(runtime.status.textContent, "Payment not completed. Your cart is kept.");
+  assert.equal(button(runtime).disabled, false);
+  assert.equal(button(runtime).textContent, "Try again · Pay ₹2,697");
+  assert.equal(runtime.paidCalls.length, 0);
+  assert.equal(runtime.verifications.length, 0);
+  submitOrderForm(runtime);
+  await settle();
+  assert.deepEqual(runtime.verifications, [{ requestId: "request-seed" }], "Try again first asks whether the money already arrived");
+  await runtime.verifyCallbacks[0].success({ ok: true, status: "pending", requestId: "request-seed", total: 2697 });
+  await settle();
+  assert.equal(runtime.submissions.length, 1, "no new order is created");
+  assert.equal(runtime.razorpays.length, 2);
+  assert.equal(runtime.razorpays[1].options.order_id, "order_X1");
+  assert.equal(runtime.razorpays[1].opened, 1);
+});
+
+test("a failed payment shows the same message, keeps the window for Razorpay's own retry, and a later success still verifies", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  runtime.razorpays[0].handlers["payment.failed"]({ error: { description: "bank said no" } });
+  assert.equal(runtime.status.textContent, "Payment not completed. Your cart is kept.");
+  assert.equal(runtime.paidCalls.length, 0);
+  runtime.razorpays[0].options.handler(RAZORPAY_RESPONSE);
+  await settle();
+  assert.equal(runtime.verifications.length, 1);
+});
+
+test("a price the server changed shows the new total and needs a second tap, which reuses that order", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  const changed = { ok: true, requestId: "request-seed", payment: Object.assign({}, PAY_OK.payment, { subtotal: 2697, total: 2797, priceChanged: true }) };
+  await payAndOpen(runtime, changed);
+  assert.equal(runtime.razorpays.length, 0, "nothing opens until the shopper agrees");
+  assert.match(runtime.status.textContent, /price changed.*₹2,797/);
+  assert.equal(summaryText(runtime, "checkout-total"), "₹2,797");
+  assert.equal(summaryText(runtime, "checkout-subtotal"), "₹2,697");
+  assert.equal(button(runtime).textContent, "Pay ₹2,797");
+  assert.equal(button(runtime).disabled, false);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.razorpays.length, 1);
+  assert.equal(runtime.razorpays[0].options.amount, 279700);
+});
+
+test("changing the cart or details after an order was made starts a new order with a new request ID", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  runtime.razorpays[0].options.modal.ondismiss();
+  Object.assign(runtime.fields.phone, { value: "9876543210" });
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions.length, 2);
+  assert.equal(runtime.submissions[1].requestId, "request-new");
+  assert.equal(runtime.submissions[1].phone, "9876543210");
+});
+
+test("a refused order (captcha, too large, unavailable) shows the server's words, opens nothing and can be retried", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  await payAndOpen(runtime, { ok: false, error: "payments_unavailable", message: "Payments are briefly unavailable. Please try again in a few minutes." });
+  assert.equal(runtime.status.textContent, "Payments are briefly unavailable. Please try again in a few minutes.");
+  assert.equal(runtime.razorpays.length, 0);
+  assert.equal(button(runtime).disabled, false);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions.length, 2);
+  assert.equal(runtime.submissions[1].requestId, "request-seed");
+});
+
+test("a network failure while starting the payment keeps the entries and says it was not started", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  submitOrderForm(runtime);
+  await settle();
+  await runtime.callbacks[0].failure(new Error("offline"));
+  await settle();
+  assert.match(runtime.status.textContent, /unable to start the payment/);
+  assert.equal(button(runtime).disabled, false);
+  assert.equal(runtime.paidCalls.length, 0);
+});
+
+test("when the server answers a test-mode order as a plain request, the old Request received message shows", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  await payAndOpen(runtime, { ok: true, requestId: "request-seed", receivedAt: "now" });
+  assert.match(runtime.status.textContent, /Request received/);
+  assert.equal(runtime.razorpays.length, 0);
+});
+
+test("a cart that cannot be paid online stays a request: custom size, a price range, more than 20 of one item, over the online limit, one item that is not in the cart", async () => {
+  const range = payRuntime({ bundleItems: [Object.assign({}, PAID_ITEMS[0], { price: "₹500–₹900" })] });
+  fillPay(range);
+  assert.equal(range.elements.get("checkout-summary").hidden, true);
+  assert.equal(button(range).textContent, "Send request");
+  submitOrderForm(range);
+  await settle();
+  assert.equal(Object.hasOwn(range.submissions[0], "lines"), false);
+
+  const many = payRuntime({ bundleItems: [Object.assign({}, PAID_ITEMS[1], { quantity: 21 })] });
+  fillPay(many);
+  assert.equal(many.elements.get("checkout-summary").hidden, true);
+
+  const big = payRuntime({ bundleItems: [Object.assign({}, PAID_ITEMS[0], { price: "₹50,000", quantity: 2 })] });
+  fillPay(big, { fulfillment: "pickup" });
+  assert.equal(big.elements.get("checkout-summary").hidden, false, "exactly ₹1,00,000 is allowed");
+  const over = payRuntime({ bundleItems: [Object.assign({}, PAID_ITEMS[0], { price: "₹50,001", quantity: 2 })] });
+  fillPay(over, { fulfillment: "pickup" });
+  assert.equal(over.elements.get("checkout-summary").hidden, true);
+
+  const single = payRuntime({ sourceId: "catalogue:one.webp", bundleItems: [] });
+  fillPay(single);
+  assert.equal(single.elements.get("checkout-summary").hidden, true);
+  assert.equal(button(single).textContent, "Send request");
+
+  const customSize = payRuntime();
+  fillPay(customSize);
+  const first = customSize.elements.get("bundle-sizes").children[0].children[1].children[0].children[0];
+  Object.assign(first, { value: "2" });
+  first.dispatch("change");
+  assert.equal(customSize.elements.get("checkout-summary").hidden, true, "a custom size is a request, not a paid cart");
+});
+
+test("a custom request gets a reCAPTCHA token when payments are on and the site key is there, and stays the old request body", async () => {
+  const runtime = makeFormRuntime({ captchaKey: "SITEKEY", search: "?payments=test", sourceKind: "customizer", sourceId: "customizer:resin-frame" });
+  const captcha = captchaSpy(runtime, "tok-9");
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.submissions[0].captchaToken, "tok-9");
+  assert.deepEqual(JSON.parse(JSON.stringify(captcha)), [{ key: "SITEKEY", options: { action: "order_request" } }]);
+  for (const key of ["lines", "expectedTotal", "paymentTest"]) assert.equal(Object.hasOwn(runtime.submissions[0], key), false, key);
+});
+
+test("a reCAPTCHA that cannot run still lets a custom request go out, with no token", async () => {
+  const runtime = makeFormRuntime({ captchaKey: "SITEKEY", payments: "live" });
+  runtime.windowObject.grecaptcha = { ready: (callback) => callback(), execute: () => Promise.reject(new Error("blocked")) };
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions.length, 1);
+  assert.equal(runtime.submissions[0].captchaToken, "");
+});
+
+test("starting another request after paying gives a clean form with no old order", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  runtime.razorpays[0].options.handler(RAZORPAY_RESPONSE);
+  await settle();
+  await runtime.verifyCallbacks[0].success({ ok: true, status: "paid", requestId: "request-seed", total: 2697 });
+  await settle();
+  runtime.open({ requestId: "request-two", sourceKind: "catalogue", sourceId: "catalogue:multi-item", bundleItems: PAID_ITEMS.map((item) => Object.assign({}, item)), fulfillment: "pickup", pin: "305001", customerName: "A Customer", phone: "8209238541", designDetails: "d", quantity: "3", productName: "One + 1 more" });
+  assert.equal(runtime.elements.get("success-celebration").hidden, true);
+  assert.equal(runtime.elements.get("checkout-summary").hidden, false);
+  assert.equal(button(runtime).textContent, "Pay ₹2,597");
+  assert.equal(button(runtime).disabled, false);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.submissions[1].requestId, "request-two");
+});
+
+test("re-sending an order the server already has paid answers the normal reply plus paid:true, and that is shown as Order confirmed", async () => {
+  const runtime = payRuntime();
+  const saved = watchMyOrders(runtime);
+  const purchases = googleSpy(runtime);
+  fillPay(runtime);
+  await payAndOpen(runtime, { ok: true, requestId: "request-seed", receivedAt: "now", paid: true });
+  assert.match(runtime.status.textContent, /^Order confirmed\. ID request-seed/);
+  assert.equal(runtime.razorpays.length, 0, "nothing is paid twice");
+  assert.equal(runtime.paidCalls.length, 1);
+  assert.equal(saved[0].status, "paid");
+  assert.equal(purchases.length, 1);
+  assert.equal(purchases[0].value, 2697);
+});
+
+
+test("payments off: a request loads no reCAPTCHA, adds no token and goes out at once, even when the page has a site key", () => {
+  const runtime = makeFormRuntime({ captchaKey: "SITEKEY" });
+  const captcha = captchaSpy(runtime);
+  fillValid(runtime.fields);
+  submitOrderForm(runtime);
+  assert.equal(runtime.submissions.length, 1, "sent in the same tick: no waiting for reCAPTCHA");
+  assert.equal(Object.hasOwn(runtime.submissions[0], "captchaToken"), false);
+  assert.equal(captcha.length, 0);
+  assert.equal(runtime.head.children.length, 0);
+  assert.equal(runtime.timerDelays.includes(6000), false);
+  const bare = makeFormRuntime({ captchaKey: "SITEKEY" });
+  fillValid(bare.fields);
+  submitOrderForm(bare);
+  assert.equal(bare.submissions.length, 1);
+  assert.equal(bare.head.children.length, 0, "no reCAPTCHA script even when none is loaded yet");
+});
+
+test("an order the server says is paid is confirmed before any payment object is looked at: nothing opens, even if one is present", async () => {
+  const runtime = payRuntime();
+  const purchases = googleSpy(runtime);
+  fillPay(runtime);
+  await payAndOpen(runtime, Object.assign({}, PAY_OK, { paid: true, total: 2697 }));
+  assert.match(runtime.status.textContent, /^Order confirmed\. ID request-seed/);
+  assert.equal(runtime.razorpays.length, 0);
+  assert.equal(runtime.paidCalls.length, 1);
+  assert.equal(purchases.length, 1);
+  assert.equal(purchases[0].value, 2697);
+});
+
+test("Try again asks the server first: paid is confirmed and Razorpay stays closed; pending, unpaid or no answer reopens the same order", async () => {
+  const paid = payRuntime();
+  const purchases = googleSpy(paid);
+  const saved = watchMyOrders(paid);
+  fillPay(paid);
+  await payAndOpen(paid);
+  paid.razorpays[0].options.modal.ondismiss();
+  submitOrderForm(paid);
+  await settle();
+  assert.equal(paid.razorpays.length, 1);
+  await paid.verifyCallbacks[0].success({ ok: true, status: "paid", requestId: "request-seed", total: 2697 });
+  await settle();
+  assert.match(paid.status.textContent, /^Order confirmed\. ID request-seed/);
+  assert.equal(paid.razorpays.length, 1, "no second payment window");
+  assert.equal(paid.paidCalls.length, 1);
+  assert.equal(saved.length, 1);
+  assert.equal(purchases.length, 1);
+
+  const offline = payRuntime();
+  fillPay(offline);
+  await payAndOpen(offline);
+  offline.razorpays[0].options.modal.ondismiss();
+  submitOrderForm(offline);
+  await settle();
+  await offline.verifyCallbacks[0].failure(new Error("offline"));
+  await settle();
+  assert.equal(offline.razorpays.length, 2);
+  assert.equal(offline.razorpays[1].options.order_id, "order_X1");
+  assert.equal(offline.submissions.length, 1);
+});
+
+test("the paid order's second tap after a changed price opens Razorpay without a verify first", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  const changed = { ok: true, requestId: "request-seed", payment: Object.assign({}, PAY_OK.payment, { total: 2797, priceChanged: true }) };
+  await payAndOpen(runtime, changed);
+  submitOrderForm(runtime);
+  await settle();
+  assert.equal(runtime.verifications.length, 0);
+  assert.equal(runtime.razorpays.length, 1);
+});
+
+test("paid mode: the dialog title says Checkout and the reference image is hidden and not sent; a plain request keeps both", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  assert.equal(runtime.elements.get("order-dialog-title").textContent, "Checkout");
+  assert.equal(runtime.elements.get("reference-image-fieldset").hidden, true);
+  runtime.fields.referenceImage.files = [new File([pngBlob(6)], "manual.png", { type: "image/png" })];
+  runtime.fields.referenceImage.dispatch("change");
+  await settle();
+  await payAndOpen(runtime);
+  assert.equal(Object.hasOwn(runtime.submissions[0], "referenceImage"), false);
+  const plain = makeFormRuntime({ search: "?payments=test" });
+  assert.equal(plain.elements.get("order-dialog-title").textContent, "Send an order request");
+  assert.equal(plain.elements.get("reference-image-fieldset").hidden, false);
+  const off = makeFormRuntime({ sourceId: "catalogue:multi-item", bundleItems: PAID_ITEMS.map((item) => Object.assign({}, item)) });
+  assert.equal(off.elements.get("order-dialog-title").textContent, "Send an order request");
+  assert.equal(off.elements.get("reference-image-fieldset").hidden, false);
+});
+
+test("the test note is neutral until the server's key is a test key, and never shows for a live key", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  const note = runtime.elements.get("checkout-test-note");
+  assert.equal(note.hidden, false);
+  assert.doesNotMatch(note.textContent, /No real money/);
+  const changed = (keyId) => ({ ok: true, requestId: "request-seed", payment: Object.assign({}, PAY_OK.payment, { keyId, total: 2797, priceChanged: true }) });
+  await payAndOpen(runtime, changed("rzp_test_abc"));
+  assert.match(note.textContent, /Test payment mode.*No real money is charged/);
+  assert.equal(note.hidden, false);
+  const live = payRuntime();
+  fillPay(live);
+  await payAndOpen(live, changed("rzp_live_abc"));
+  assert.equal(live.elements.get("checkout-test-note").hidden, true);
+  const liveMode = payRuntime({ payments: "live", search: "" });
+  fillPay(liveMode);
+  assert.equal(liveMode.elements.get("checkout-test-note").hidden, true);
+});
+
+test("starting a payment has the same 30 second still-sending guard as a request, and it stops when the server answers", async () => {
+  const runtime = payRuntime();
+  fillPay(runtime);
+  submitOrderForm(runtime);
+  await settle();
+  const index = runtime.timerDelays.lastIndexOf(30000);
+  assert.ok(index >= 0, "a 30 second timer is set");
+  runtime.timers[index]();
+  assert.match(runtime.status.textContent, /Still starting your payment/);
+  await runtime.callbacks[0].success(PAY_OK);
+  await settle();
+  assert.ok(runtime.clearedTimers.includes(index + 1), "the timer is cleared once the order is answered");
+  assert.equal(runtime.razorpays.length, 1);
 });

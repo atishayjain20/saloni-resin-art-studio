@@ -1,0 +1,642 @@
+{
+ "catalogue:concept-floral-coasters.webp": {
+  "name": "Personalised Floral Coaster Set",
+  "price": 999,
+  "sizes": {
+   "set-of-2": 549,
+   "set-of-4": 999,
+   "set-of-6": 1449
+  }
+ },
+ "catalogue:concept-floral-memory-frame.webp": {
+  "name": "Pressed Flower Arch Frame",
+  "price": 3999,
+  "sizes": {
+   "12-14-in": 1949,
+   "16-18-in": 2899,
+   "20-22-in": 3999
+  }
+ },
+ "catalogue:concept-ocean-clock.webp": {
+  "name": "Shoreline Resin Wall Clock",
+  "price": 2199,
+  "sizes": {
+   "10-in": 1649,
+   "12-in": 2199,
+   "14-in": 2749
+  }
+ },
+ "catalogue:corporate-bag-tag-concept.webp": {
+  "name": "Personalised Bag Tag",
+  "price": 299
+ },
+ "catalogue:corporate-bookmark-keychain-duo-concept.webp": {
+  "name": "Welcome Keepsake Duo",
+  "price": 449
+ },
+ "catalogue:corporate-business-card-holder-concept.webp": {
+  "name": "Resin Business Card Holder",
+  "price": 449
+ },
+ "catalogue:corporate-desk-clock-concept.webp": {
+  "name": "Mini Resin Desk Clock",
+  "price": 999
+ },
+ "catalogue:corporate-desk-essentials-set-concept.webp": {
+  "name": "Desk Essentials Set",
+  "price": 1199
+ },
+ "catalogue:corporate-desk-logo-stand-concept.webp": {
+  "name": "Mini resin desk stand",
+  "price": 179
+ },
+ "catalogue:corporate-desk-nameplate-concept.webp": {
+  "name": "Resin desk nameplate",
+  "price": 799,
+  "sizes": {
+   "10-in": 1699,
+   "6-in": 799,
+   "8-in": 1249
+  }
+ },
+ "catalogue:corporate-desk-organizer-concept.webp": {
+  "name": "Resin desk organiser",
+  "price": 999
+ },
+ "catalogue:corporate-desk-trinket-tray-concept.webp": {
+  "name": "Desk Trinket Tray",
+  "price": 449,
+  "sizes": {
+   "4-in": 449,
+   "6-in": 849
+  }
+ },
+ "catalogue:corporate-floral-bookmark-concept.webp": {
+  "name": "Pressed-flower bookmark",
+  "price": 149
+ },
+ "catalogue:corporate-fridge-magnet-concept.webp": {
+  "name": "Resin fridge magnet",
+  "price": 179
+ },
+ "catalogue:corporate-lanyard-charm-concept.webp": {
+  "name": "Personalised Lanyard Charm",
+  "price": 199
+ },
+ "catalogue:corporate-logo-coaster-set-concept.webp": {
+  "name": "Branded coaster set",
+  "price": 749,
+  "sizes": {
+   "set-of-2": 399,
+   "set-of-4": 749,
+   "set-of-6": 1099
+  }
+ },
+ "catalogue:corporate-logo-keychain-concept.webp": {
+  "name": "Logo resin keychain",
+  "price": 199
+ },
+ "catalogue:corporate-logo-paperweight-concept.webp": {
+  "name": "Logo paperweight",
+  "price": 399
+ },
+ "catalogue:corporate-mini-photo-stand-concept.webp": {
+  "name": "Mini Photo Stand",
+  "price": 299
+ },
+ "catalogue:corporate-pen-cup-concept.webp": {
+  "name": "Resin Pen Cup",
+  "price": 699
+ },
+ "catalogue:corporate-phone-rest-concept.webp": {
+  "name": "Resin Phone Rest",
+  "price": 499
+ },
+ "catalogue:corporate-recognition-award-concept.webp": {
+  "name": "Recognition resin award",
+  "price": 899
+ },
+ "catalogue:diwali-emerald-led-holder-pair-concept.webp": {
+  "name": "Emerald Tealight Holder Pair",
+  "price": 799
+ },
+ "catalogue:diwali-festive-keepsake-box-concept.webp": {
+  "name": "Festive Keepsake Box",
+  "price": 649
+ },
+ "catalogue:diwali-floral-swastik-tealight-set.webp": {
+  "name": "Floral Swastik Tealight Set",
+  "price": 399
+ },
+ "catalogue:diwali-gold-fleck-lotus-light.jpeg": {
+  "name": "Gold Fleck Lotus Tealight Holder",
+  "price": 299
+ },
+ "catalogue:diwali-golden-ganesha-pooja-plate.jpg": {
+  "name": "Golden Ganesha Pooja Plate",
+  "price": 649,
+  "sizes": {
+   "5-in": 649,
+   "7-in": 1099
+  }
+ },
+ "catalogue:diwali-golden-toran-charms-concept.webp": {
+  "name": "Golden Toran Charms",
+  "price": 449
+ },
+ "catalogue:diwali-happy-diwali-glow.webp": {
+  "name": "Happy Diwali Resin Tealight Holder",
+  "price": 325
+ },
+ "catalogue:diwali-ivory-mandala-holder-concept.webp": {
+  "name": "Ivory Mandala Tealight Holder",
+  "price": 299
+ },
+ "catalogue:diwali-jewel-glow-tealight.jpg": {
+  "name": "Jewel Resin Tealight Holder",
+  "price": 249
+ },
+ "catalogue:diwali-labh-floral-hanging-pair.jpeg": {
+  "name": "Labh Floral Door Hanging Pair",
+  "price": 399
+ },
+ "catalogue:diwali-lotus-blue-festive-set.jpeg": {
+  "name": "Lotus Blue Festive Set",
+  "price": 899
+ },
+ "catalogue:diwali-lotus-diya-pair.webp": {
+  "name": "Lotus Diya Pair",
+  "price": 349
+ },
+ "catalogue:diwali-lotus-rangoli-duo-concept.webp": {
+  "name": "Lotus Rangoli Duo",
+  "price": 399
+ },
+ "catalogue:diwali-marigold-petal-holder-concept.webp": {
+  "name": "Marigold Tealight Holder",
+  "price": 249
+ },
+ "catalogue:diwali-ocean-bloom-pooja-platter.jpg": {
+  "name": "Ocean Bloom Pooja Platter",
+  "price": 1499,
+  "sizes": {
+   "10-in": 2099,
+   "6-in": 949,
+   "8-in": 1499
+  }
+ },
+ "catalogue:diwali-om-mini-tilak-plate.webp": {
+  "name": "Om Mini Tilak Plate",
+  "price": 599,
+  "sizes": {
+   "5-in": 599,
+   "7-in": 999
+  }
+ },
+ "catalogue:diwali-pastel-lotus-tealight.jpeg": {
+  "name": "Pastel Lotus Tealight Holder",
+  "price": 249
+ },
+ "catalogue:diwali-peacock-mini-pooja-thali.webp": {
+  "name": "Peacock Mini Pooja Thali",
+  "price": 449,
+  "sizes": {
+   "10-in": 949,
+   "6-in": 449,
+   "8-in": 699
+  }
+ },
+ "catalogue:diwali-pearl-rangoli-accent-concept.webp": {
+  "name": "Pearl Rangoli Accent",
+  "price": 399
+ },
+ "catalogue:diwali-rose-gold-festive-set.jpeg": {
+  "name": "Rose & Gold Festive Set",
+  "price": 849
+ },
+ "catalogue:diwali-rose-petal-offering-plate-concept.webp": {
+  "name": "Rose Petal Offering Plate",
+  "price": 449,
+  "sizes": {
+   "5-in": 449,
+   "7-in": 749
+  }
+ },
+ "catalogue:diwali-ruby-leaf-dish-concept.webp": {
+  "name": "Ruby Leaf Dish",
+  "price": 799,
+  "sizes": {
+   "6-in": 799,
+   "8-in": 1249
+  }
+ },
+ "catalogue:diwali-saffron-tilak-duo-concept.webp": {
+  "name": "Saffron Tilak Duo",
+  "price": 349
+ },
+ "catalogue:diwali-shubh-labh-welcome-pair.jpg": {
+  "name": "Shubh Labh Door Hanging Pair",
+  "price": 399
+ },
+ "catalogue:marriage-bouquet-block.webp": {
+  "name": "Proposal Bouquet Keepsake",
+  "price": 2999,
+  "sizes": {
+   "10-in": 6449,
+   "6-in": 2999,
+   "8-in": 4599
+  }
+ },
+ "catalogue:marriage-couple-nameplate.webp": {
+  "name": "Mr & Mrs Name Plate",
+  "price": 1799,
+  "sizes": {
+   "10-15-in": 2499,
+   "6-10-in": 1249,
+   "8-12-in": 1799
+  }
+ },
+ "catalogue:marriage-initial-pendant.webp": {
+  "name": "Fiancé Initial Pendant",
+  "price": 499
+ },
+ "catalogue:marriage-invite-frame.webp": {
+  "name": "Wedding Card Keepsake",
+  "price": 1499,
+  "sizes": {
+   "10-12-in": 2049,
+   "6-8-in": 999,
+   "8-10-in": 1499
+  }
+ },
+ "catalogue:marriage-jewellery-tray.webp": {
+  "name": "Bride's Jewellery Tray",
+  "price": 999,
+  "sizes": {
+   "5-in": 599,
+   "7-in": 999,
+   "9-in": 1449
+  }
+ },
+ "catalogue:marriage-mehendi-platter.webp": {
+  "name": "Haldi & Mehendi Platter",
+  "price": 1299,
+  "sizes": {
+   "10-in": 1299,
+   "12-in": 1699,
+   "8-in": 949
+  }
+ },
+ "catalogue:marriage-photo-clock.webp": {
+  "name": "Engagement Photo Clock",
+  "price": 2499,
+  "sizes": {
+   "10-in": 1899,
+   "12-in": 2499,
+   "14-in": 3149
+  }
+ },
+ "catalogue:marriage-ring-dish.webp": {
+  "name": "Save the Date Ring Dish",
+  "price": 599,
+  "sizes": {
+   "4-in": 599,
+   "6-in": 1099
+  }
+ },
+ "catalogue:marriage-ring-platter.webp": {
+  "name": "Engagement Ring Platter",
+  "price": 1499,
+  "sizes": {
+   "10-in": 2099,
+   "6-in": 949,
+   "8-in": 1499
+  }
+ },
+ "catalogue:marriage-varmala-frame.webp": {
+  "name": "Varmala Keepsake Frame",
+  "price": 3499,
+  "sizes": {
+   "10-12-in": 3499,
+   "12-15-in": 4749,
+   "8-10-in": 2599
+  }
+ },
+ "catalogue:navkar-resin-frame.jpg": {
+  "name": "Pearl white Namokar (Navkar) mantra frame",
+  "price": 3499,
+  "sizes": {
+   "12-14-in": 1699,
+   "16-18-in": 2549,
+   "20-22-in": 3499
+  }
+ },
+ "catalogue:personalized-floral-hoop.jpg": {
+  "name": "Personalised Floral Hoop Frame",
+  "price": 599,
+  "sizes": {
+   "4-in": 349,
+   "6-in": 599,
+   "8-in": 899
+  }
+ },
+ "catalogue:premium-black-gold-glassware-set.jpeg": {
+  "name": "Black Gold Resin Glassware Set",
+  "price": 11000
+ },
+ "catalogue:premium-champagne-two-tier-set.jpeg": {
+  "name": "Champagne 2-Tier Resin Cake Stand Set",
+  "price": 15000
+ },
+ "catalogue:premium-champagne-white-tray.jpeg": {
+  "name": "Champagne White Resin Serving Tray",
+  "price": 5000
+ },
+ "catalogue:premium-gemstone-mug-collection.jpeg": {
+  "name": "Geode Mug and Coaster Set of 6",
+  "price": 7500
+ },
+ "catalogue:premium-ivory-gold-tiered-set.jpeg": {
+  "name": "Ivory Gold 3-Tier Resin Serving Set",
+  "price": 22500
+ },
+ "catalogue:premium-midnight-blue-tiered-set.jpeg": {
+  "name": "Midnight Blue 3-Tier Resin Serving Set",
+  "price": 22500
+ },
+ "catalogue:premium-ocean-seashell-tray.jpeg": {
+  "name": "Ocean Seashell Resin Serving Tray",
+  "price": 5000
+ },
+ "catalogue:premium-pastel-butterfly-trays.jpeg": {
+  "name": "Pastel Butterfly Resin Trays, Set of 3",
+  "price": 12000
+ },
+ "catalogue:premium-silver-icy-blue-tray.jpeg": {
+  "name": "Silver Icy Blue Resin Serving Tray",
+  "price": 5000
+ },
+ "catalogue:premium-smoky-bronze-tray.jpeg": {
+  "name": "Smoky Bronze Resin Serving Tray",
+  "price": 5000
+ },
+ "catalogue:premium-turquoise-geode-glass-closeup.jpeg": {
+  "name": "Turquoise Geode Wine Glass",
+  "price": 1800
+ },
+ "catalogue:premium-turquoise-geode-glass-pair.jpeg": {
+  "name": "Turquoise Geode Wine Glasses, Pair",
+  "price": 3500
+ },
+ "catalogue:premium-turquoise-gold-wine-glasses.jpeg": {
+  "name": "Turquoise Gold Wine Glasses, Pair",
+  "price": 2500
+ },
+ "catalogue:premium-turquoise-tray-coasters.jpeg": {
+  "name": "Turquoise Resin Tray with 4 Coasters",
+  "price": 11000
+ },
+ "catalogue:resin-clock.jpg": {
+  "name": "Blue Ocean Resin Wall Clock",
+  "price": 2199,
+  "sizes": {
+   "10-in": 1649,
+   "12-in": 2199,
+   "14-in": 2749
+  }
+ },
+ "catalogue:resin-message-coasters.jpg": {
+  "name": "Personalised Message Coaster Set",
+  "price": 1299,
+  "sizes": {
+   "set-of-2": 699,
+   "set-of-4": 1299,
+   "set-of-6": 1849
+  }
+ },
+ "catalogue:romantic-botanical-pendant.webp": {
+  "name": "Pressed Flower Name Pendant",
+  "price": 399
+ },
+ "catalogue:romantic-calendar-coaster.webp": {
+  "name": "Couple Date Calendar Coaster",
+  "price": 899
+ },
+ "catalogue:romantic-first-rose-bracelet.webp": {
+  "name": "Rose Petal Resin Bracelet",
+  "price": 599,
+  "sizes": {
+   "large-wrist": 599,
+   "medium-wrist": 599,
+   "small-wrist": 599
+  }
+ },
+ "catalogue:romantic-floral-bookmark-set.webp": {
+  "name": "Pressed Flower Bookmark Set",
+  "price": 699
+ },
+ "catalogue:romantic-heart-trinket-tray.webp": {
+  "name": "Heart Resin Trinket Tray",
+  "price": 349,
+  "sizes": {
+   "4-in": 349,
+   "6-in": 649
+  }
+ },
+ "catalogue:romantic-initial-desk-stand.webp": {
+  "name": "Couple Initials Desk Stand",
+  "price": 699
+ },
+ "catalogue:romantic-ocean-memory-tray.webp": {
+  "name": "Ocean Memory Resin Tray",
+  "price": 1299,
+  "sizes": {
+   "10-in": 1299,
+   "12-in": 1699,
+   "8-in": 949
+  }
+ },
+ "catalogue:romantic-us-keychain-pair.webp": {
+  "name": "Couple Name Keychain Pair",
+  "price": 399
+ },
+ "catalogue:studio-blue-mantra-frame.jpeg": {
+  "name": "Blue and white Namokar (Navkar) mantra frame",
+  "price": 4099,
+  "sizes": {
+   "12-14-in": 1999,
+   "16-18-in": 2999,
+   "20-22-in": 4099
+  }
+ },
+ "catalogue:studio-floral-handled-tray.jpeg": {
+  "name": "Pressed Flower Handled Tray",
+  "price": 2299,
+  "sizes": {
+   "10-in": 1749,
+   "12-in": 2299,
+   "14-in": 2899
+  }
+ },
+ "catalogue:studio-floral-hexagon-keepsake.jpeg": {
+  "name": "Pressed Flower Hexagon Frame",
+  "price": 1999,
+  "sizes": {
+   "10-in": 1999,
+   "12-in": 2649,
+   "8-in": 1449
+  }
+ },
+ "catalogue:studio-floral-square-keepsake.jpeg": {
+  "name": "Pressed Bouquet Square Resin Frame",
+  "price": 1999,
+  "sizes": {
+   "10-10-in": 1999,
+   "12-12-in": 2649,
+   "8-8-in": 1449
+  }
+ },
+ "catalogue:studio-ivory-diamond-resin-clock.jpeg": {
+  "name": "Ivory Diamond Resin Wall Clock",
+  "price": 2199,
+  "sizes": {
+   "10-in": 1649,
+   "12-in": 2199,
+   "14-in": 2749
+  }
+ },
+ "catalogue:studio-lilac-scalloped-tray.jpeg": {
+  "name": "Lilac Resin Trinket Tray",
+  "price": 399,
+  "sizes": {
+   "4-in": 399,
+   "6-in": 749
+  }
+ },
+ "catalogue:studio-lilac-silver-resin-clock.jpeg": {
+  "name": "Lilac and Silver Resin Wall Clock",
+  "price": 2199,
+  "sizes": {
+   "10-in": 1649,
+   "12-in": 2199,
+   "14-in": 2749
+  }
+ },
+ "catalogue:studio-lilac-symbol-rakhi.jpeg": {
+  "name": "Lilac Pearl Rakhi",
+  "price": 349
+ },
+ "catalogue:studio-little-brother-rakhi.jpeg": {
+  "name": "Little Brother Name Rakhi",
+  "price": 399
+ },
+ "catalogue:studio-om-asiausa-mantra-plaque.jpeg": {
+  "name": "Om Asiausa Mantra Resin Plaque",
+  "price": 1799,
+  "sizes": {
+   "10-15-in": 2499,
+   "6-10-in": 1249,
+   "8-12-in": 1799
+  }
+ },
+ "catalogue:studio-pearl-geode-resin-clock.jpeg": {
+  "name": "Pearl Geode Resin Wall Clock",
+  "price": 2199,
+  "sizes": {
+   "10-in": 1649,
+   "12-in": 2199,
+   "14-in": 2749
+  }
+ },
+ "catalogue:studio-personalized-photo-clock.jpeg": {
+  "name": "Couple Photo Resin Clock",
+  "price": 3000,
+  "sizes": {
+   "12-in": 1949,
+   "14-in": 2449,
+   "16-in": 3000
+  }
+ },
+ "catalogue:studio-red-rose-resin-display.jpeg": {
+  "name": "Preserved Red Rose Resin Display",
+  "price": 599
+ },
+ "catalogue:studio-rose-hexagon-keepsake.jpeg": {
+  "name": "Preserved Rose Hexagon Frame",
+  "price": 2499,
+  "sizes": {
+   "10-in": 2499,
+   "12-in": 3299,
+   "8-in": 1799
+  }
+ },
+ "catalogue:studio-rose-mantra-door-strips.jpeg": {
+  "name": "Jain Mantra Door Strips, Rose Red",
+  "price": 1799,
+  "sizes": {
+   "10-15-in": 2499,
+   "6-10-in": 1249,
+   "8-12-in": 1799
+  }
+ },
+ "catalogue:studio-sage-gold-resin-clock.jpeg": {
+  "name": "Sage and Gold Resin Wall Clock",
+  "price": 2199,
+  "sizes": {
+   "10-in": 1649,
+   "12-in": 2199,
+   "14-in": 2749
+  }
+ },
+ "catalogue:studio-sky-blue-roman-resin-clock.jpeg": {
+  "name": "Sky Blue Roman Resin Wall Clock",
+  "price": 2199,
+  "sizes": {
+   "10-in": 1649,
+   "12-in": 2199,
+   "14-in": 2749
+  }
+ },
+ "catalogue:studio-teal-gold-roman-resin-clock.jpeg": {
+  "name": "Teal and Gold Roman Resin Wall Clock",
+  "price": 2199,
+  "sizes": {
+   "10-in": 1649,
+   "12-in": 2199,
+   "14-in": 2749
+  }
+ },
+ "catalogue:studio-white-mantra-frame.jpeg": {
+  "name": "White and gold Namokar (Navkar) mantra frame",
+  "price": 4599,
+  "sizes": {
+   "12-14-in": 2249,
+   "16-18-in": 3349,
+   "20-22-in": 4599
+  }
+ },
+ "catalogue:sunflower-floral-keepsakes.jpeg": {
+  "name": "Sunflower Resin Platter Set",
+  "price": 599
+ },
+ "catalogue:sunflower-keepsake-set.jpeg": {
+  "name": "Sunflower Tray, Keychain and Heart Set",
+  "price": 599
+ },
+ "catalogue:sunflower-plaque-easel.jpeg": {
+  "name": "Personalised Sunflower Name Plaque",
+  "price": 599,
+  "sizes": {
+   "6-in": 599,
+   "8-in": 899
+  }
+ },
+ "catalogue:sunflower-plaque-hand.jpeg": {
+  "name": "Sunflower Name Plaque, Close-up",
+  "price": 599
+ },
+ "catalogue:sunflower-resin-lamp.jpeg": {
+  "name": "Sunflower Resin Night Lamp",
+  "price": 599
+ }
+}

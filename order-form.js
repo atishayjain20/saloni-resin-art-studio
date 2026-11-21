@@ -1,6 +1,11 @@
 /*
  * The order request form, built into the page. Opening it is instant: nothing is fetched until the shopper presses Send.
- * script.js calls window.saloniOrderForm.open(seed, { previewBlob, onSent }) and owns the dialog around it.
+ * script.js calls window.saloniOrderForm.open(seed, { previewBlob, onSent, onPaid }) and owns the dialog around it.
+ *
+ * Online payment (Razorpay) is off unless the page says otherwise: data-payments="live" on #order-form-embed turns it on for
+ * everyone, ?payments=test turns on test mode in this browser (the request carries paymentTest: true). A cart of catalogue items
+ * with a fixed price is then paid at checkout; every other request (custom design, custom size, price on request, an item over 20
+ * pieces, a total over the online limit) stays the request it always was. Checkout.js loads only when the shopper pays.
  */
 (function () {
   "use strict";
@@ -35,12 +40,28 @@
   var referralStatus = document.getElementById("referral-status");
   var checkReferral = document.getElementById("check-referral");
   var moreDetails = document.getElementById("more-details");
+  var checkoutSummary = document.getElementById("checkout-summary");
+  var checkoutLines = document.getElementById("checkout-lines");
+  var checkoutSubtotal = document.getElementById("checkout-subtotal");
+  var checkoutShipping = document.getElementById("checkout-shipping");
+  var checkoutTotal = document.getElementById("checkout-total");
+  var checkoutTestNote = document.getElementById("checkout-test-note");
+  var finalQuoteNote = document.getElementById("order-final-quote-note");
+  var successTitle = document.getElementById("success-title");
+  var dialogTitle = document.getElementById("order-dialog-title");
+  var referenceFieldset = document.getElementById("reference-image-fieldset");
+  var REQUEST_BUTTON_TEXT = submitButton.textContent;
+  var REQUEST_TITLE_TEXT = successTitle ? successTitle.textContent : "";
+  var REQUEST_DIALOG_TITLE = dialogTitle ? dialogTitle.textContent : "";
+  var TEST_NOTE_NEUTRAL = checkoutTestNote ? checkoutTestNote.textContent : "";
+  var TEST_NOTE_CONFIRMED = "Test payment mode: use Razorpay test details only. No real money is charged.";
   var active = false;
   var currentAttempt = null;
   var timeoutId = null;
   var referralCheckVersion = 0;
   var referralAcceptedCode = "";
   var onSent = null;
+  var onPaid = null;
   var PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
   var PREVIEW_FILENAMES = { "image/jpeg": "saloni-customizer-preview.jpg", "image/png": "saloni-customizer-preview.png" };
   function previewFilename(type) { return PREVIEW_FILENAMES[String(type || "").toLowerCase()] || ""; }
@@ -108,10 +129,14 @@
       var productName = String(item.productName || "").trim().slice(0, 160);
       var price = String(item.price || "").trim().slice(0, 120);
       var size = String(item.size || "").trim().slice(0, 120);
+      var sizeCode = String(item.sizeCode || "");
+      var photo = String(item.photo || "");
+      if (sizeCode.length > 40 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(sizeCode)) sizeCode = "";
+      if (photo.length > 40 || !/^[a-z]+(?:-[a-z]+)*$/.test(photo)) photo = "";
       var quantity = Number(item.quantity);
       if (!sourceId || !/^[A-Za-z0-9_.:/-]+$/.test(sourceId) || !productName || !Number.isInteger(quantity) || quantity < 1 || quantity > 100 || seen[sourceId]) return [];
       seen[sourceId] = true;
-      normalized.push({ sourceId: sourceId, productName: productName, price: price, size: size, quantity: quantity, customSize: emptyCustomSize() });
+      normalized.push({ sourceId: sourceId, productName: productName, price: price, size: size, sizeCode: sizeCode, photo: photo, quantity: quantity, customSize: emptyCustomSize() });
     }
     return bundleTotal(normalized) <= 100 && bundleDetails(normalized).length <= 2000 ? normalized : [];
   }
@@ -130,6 +155,7 @@
     form.elements.productName.value = bundleProductName(bundleItems);
     form.elements.quantity.value = String(bundleTotal(bundleItems));
     form.elements.bundleSourceIds.value = bundleSourceIds(bundleItems);
+    renderCheckout();
     if (includeDetails) {
       var notes = String(typeof explicitNotes === "string" ? explicitNotes : bundleNotes || bundleNotesFromField(value("designDetails")) || "").trim();
       syncingBundleFields = true;
@@ -321,8 +347,9 @@
     Array.prototype.forEach.call(form.querySelectorAll(".field-error"), function (error) { if (error.remove) error.remove(); });
   }
   function setStatus(message, kind) { status.textContent = message || ""; status.className = "status" + (kind ? " " + kind : ""); }
+  // A request to be quoted: only the PIN is asked. A cart that is paid online is an order, so it asks for the full address.
   function isQuoteRequest() {
-    return seed.requestStage === "quote" && ["catalogue", "general", "customizer"].indexOf(seed.sourceKind) >= 0;
+    return seed.requestStage === "quote" && ["catalogue", "general", "customizer"].indexOf(seed.sourceKind) >= 0 && !checkoutQuote();
   }
   function toggleShipping() {
     var shipping = value("fulfillment") === "shipping";
@@ -409,6 +436,7 @@
     updateDimensionMaxes();
     applyProductContext();
     applyDimensionMode();
+    renderCheckout();
   }
   function normalizeReferralCode(value) { var code = String(value || "").trim().toUpperCase(); return /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code) ? code : ""; }
   function showReferralStatus(message, kind) { if (!referralStatus) return; referralStatus.textContent = message; referralStatus.className = "hint" + (kind ? " " + kind : ""); }
@@ -617,6 +645,353 @@
     setReferencePreparing(false);
     setReferenceImageStatus(wasPreview ? "Customizer preview removed." : "No reference image attached.");
   }
+  // ---- Online payment (Razorpay) ----
+  var CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+  var PAY_LIMIT = 100000;
+  var PAY_MAX_QUANTITY = 20;
+  var VERIFY_DELAYS = [3000, 6000, 10000];
+  var CAPTCHA_WAIT_MS = 6000;
+  var NOT_COMPLETED = "Payment not completed. Your cart is kept.";
+  var pendingPayment = null;
+  var paymentRetry = false;
+  var checkoutCopyHidden = false;
+  var referenceHiddenByCheckout = false;
+  var checkoutLoading = false;
+  var checkoutWaiters = [];
+  var captchaLoading = false;
+  var captchaWaiters = [];
+  // "off" (a plain request), "test" (?payments=test in this browser) or "live" (data-payments="live" on the page).
+  function paymentsMode() {
+    var configured = embed ? String(embed.getAttribute("data-payments") || "") : "";
+    if (configured === "live") return "live";
+    var search = "";
+    try { search = String(window.location && window.location.search || ""); } catch (error) { search = ""; }
+    return /(?:^|[?&])payments=test(?:&|$)/.test(search) ? "test" : "off";
+  }
+  function rupees(amount) { return "₹" + String(amount).replace(/\B(?=(\d\d)+\d$)/g, ","); }
+  function shippingFee(fulfillment, pin) {
+    if (fulfillment === "pickup") return 0;
+    if (!/^[1-9]\d{5}$/.test(pin)) return null;
+    return /^3[0-4]/.test(pin) ? 100 : 150;
+  }
+  function hasCustomSize(item) {
+    return SIZE_PARTS.some(function (part) { return String(item.customSize && item.customSize[part] || "").trim() !== ""; });
+  }
+  // The cart as it would be paid: { lines, subtotal, shipping, total } with shipping and total null until the PIN is valid.
+  // null when the request must stay a request.
+  function checkoutQuote() {
+    if (paymentsMode() === "off" || !isBundle() || !bundleItems.length) return null;
+    var fulfillment = value("fulfillment");
+    if (["shipping", "pickup"].indexOf(fulfillment) === -1) return null;
+    var subtotal = 0;
+    var lines = [];
+    for (var index = 0; index < bundleItems.length; index += 1) {
+      var item = bundleItems[index];
+      var price = priceNumber(item.price);
+      var quantity = bundleQuantity(item);
+      if (price === null || price < 1 || quantity > PAY_MAX_QUANTITY || hasCustomSize(item)) return null;
+      subtotal += price * quantity;
+      lines.push({ name: item.productName, quantity: quantity, amount: price * quantity });
+    }
+    var shipping = shippingFee(fulfillment, value("pin").trim());
+    if (subtotal + (shipping || 0) > PAY_LIMIT) return null;
+    return { lines: lines, subtotal: subtotal, shipping: shipping, total: shipping === null ? null : subtotal + shipping };
+  }
+  function paidLines() {
+    return sortedBundleItems(bundleItems).map(function (item) {
+      return { sourceId: item.sourceId, size: item.sizeCode || "", photo: item.photo || "", qty: bundleQuantity(item) };
+    });
+  }
+  // Everything the order row would hold: when it changes, an order made earlier is not this order any more.
+  function checkoutKey() {
+    return JSON.stringify([ORDER_FIELDS.filter(function (field) { return field !== "requestId"; }).map(value), paidLines()]);
+  }
+  function setCheckoutCopyHidden(hidden) {
+    if (hidden !== checkoutCopyHidden) {
+      checkoutCopyHidden = hidden;
+      if (intro) intro.hidden = hidden;
+      if (finalQuoteNote) finalQuoteNote.hidden = hidden;
+    }
+    // A paid order does not store a reference image, so the upload is not offered; the dialog is a checkout, not a request.
+    if (hidden !== referenceHiddenByCheckout) {
+      referenceHiddenByCheckout = hidden;
+      if (referenceFieldset) referenceFieldset.hidden = hidden;
+    }
+    if (dialogTitle) dialogTitle.textContent = hidden ? "Checkout" : REQUEST_DIALOG_TITLE;
+  }
+  function payLabel(total) {
+    if (total === null) return "Pay online";
+    return (paymentRetry ? "Try again · Pay " : "Pay ") + rupees(total);
+  }
+  // The summary (items, shipping, total, refund rule) and the button's words. A plain request keeps its own words.
+  function renderCheckout() {
+    var quote = checkoutQuote();
+    toggleShipping();
+    setCheckoutCopyHidden(Boolean(quote));
+    if (!quote) {
+      if (checkoutSummary) checkoutSummary.hidden = true;
+      if (checkoutTestNote) checkoutTestNote.hidden = true;
+      submitButton.textContent = REQUEST_BUTTON_TEXT;
+      return;
+    }
+    // After the server answered, its figures are the ones to show (and a changed price is shown as changed).
+    var served = pendingPayment && pendingPayment.key === checkoutKey() ? pendingPayment.payment : null;
+    var figures = served || quote;
+    // The note says "no real money" only once the server's own key is a Razorpay test key; a live key never shows it.
+    var keyId = served && typeof served.keyId === "string" ? served.keyId : "";
+    if (checkoutTestNote) {
+      checkoutTestNote.hidden = paymentsMode() !== "test" || keyId.indexOf("rzp_live_") === 0;
+      checkoutTestNote.textContent = keyId.indexOf("rzp_test_") === 0 ? TEST_NOTE_CONFIRMED : TEST_NOTE_NEUTRAL;
+    }
+    if (checkoutSummary) checkoutSummary.hidden = false;
+    if (checkoutLines) {
+      while (checkoutLines.firstChild) checkoutLines.removeChild(checkoutLines.firstChild);
+      quote.lines.forEach(function (line) {
+        var row = document.createElement("li");
+        var name = document.createElement("span");
+        name.textContent = line.name + " × " + line.quantity;
+        var amount = document.createElement("span");
+        amount.textContent = served && served.priceChanged ? "" : rupees(line.amount);
+        row.appendChild(name);
+        row.appendChild(amount);
+        checkoutLines.appendChild(row);
+      });
+    }
+    if (checkoutSubtotal) checkoutSubtotal.textContent = rupees(figures.subtotal);
+    if (checkoutShipping) checkoutShipping.textContent = figures.shipping === null ? "Enter your PIN to see shipping" : rupees(figures.shipping);
+    if (checkoutTotal) checkoutTotal.textContent = figures.total === null ? "" : rupees(figures.total);
+    submitButton.textContent = payLabel(figures.total);
+  }
+  // The reCAPTCHA site key, or "" when payments are off: then nothing loads, no token is sent and nothing waits.
+  function captchaKey() { return embed && paymentsMode() !== "off" ? String(embed.getAttribute("data-captcha-site-key") || "") : ""; }
+  // Loads the reCAPTCHA script without running it. done(true) once grecaptcha.ready can be used, done(false) if it cannot load.
+  function loadCaptcha(key, done) {
+    if (window.grecaptcha && window.grecaptcha.ready) { done(true); return; }
+    captchaWaiters.push(done);
+    if (captchaLoading) return;
+    captchaLoading = true;
+    var existing = document.querySelector ? document.querySelector('script[src*="recaptcha/api.js"]') : null;
+    var script = existing || document.createElement("script");
+    function settle(ok) {
+      if (!captchaLoading) return;
+      captchaLoading = false;
+      if (!ok && !existing && script.parentNode && script.parentNode.removeChild) script.parentNode.removeChild(script);
+      var waiters = captchaWaiters;
+      captchaWaiters = [];
+      waiters.forEach(function (waiter) { waiter(ok); });
+    }
+    script.addEventListener("load", function () { settle(Boolean(window.grecaptcha && window.grecaptcha.ready)); });
+    script.addEventListener("error", function () { settle(false); });
+    if (!existing) {
+      script.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(key);
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }
+  // done(token): "" when there is no site key (nothing runs) or reCAPTCHA cannot give a token (the server decides what that means).
+  function withCaptcha(done) {
+    var key = captchaKey();
+    if (!key) { done(""); return; }
+    var finished = false;
+    var timer = null;
+    function finish(token) {
+      if (finished) return;
+      finished = true;
+      if (timer !== null) window.clearTimeout(timer);
+      done(typeof token === "string" ? token : "");
+    }
+    timer = window.setTimeout(function () { finish(""); }, CAPTCHA_WAIT_MS);
+    loadCaptcha(key, function (ready) {
+      if (!ready) { finish(""); return; }
+      try {
+        window.grecaptcha.ready(function () {
+          try { window.grecaptcha.execute(key, { action: "order_request" }).then(finish, function () { finish(""); }); } catch (error) { finish(""); }
+        });
+      } catch (error) { finish(""); }
+    });
+  }
+  function loadCheckout(done) {
+    if (typeof window.Razorpay === "function") { done(true); return; }
+    checkoutWaiters.push(done);
+    if (checkoutLoading) return;
+    checkoutLoading = true;
+    var script = document.createElement("script");
+    function settle(ok) {
+      if (!checkoutLoading) return;
+      checkoutLoading = false;
+      if (!ok && script.parentNode && script.parentNode.removeChild) script.parentNode.removeChild(script);
+      var waiters = checkoutWaiters;
+      checkoutWaiters = [];
+      waiters.forEach(function (waiter) { waiter(ok); });
+    }
+    script.addEventListener("load", function () { settle(typeof window.Razorpay === "function"); });
+    script.addEventListener("error", function () { settle(false); });
+    script.src = CHECKOUT_SRC;
+    script.async = true;
+    document.head.appendChild(script);
+  }
+  function phoneDigits() { var digits = value("phone").replace(/\D/g, ""); return digits.length > 10 ? digits.slice(-10) : digits; }
+  function stopPaying(attempt, message) {
+    paymentRetry = true;
+    restoreSubmitState(attempt);
+    setStatus(message, "error");
+    renderCheckout();
+    // The Razorpay window took focus away; put it back on the button that tries again.
+    if (submitButton.focus) submitButton.focus();
+  }
+  function openPayment(attempt, pending) {
+    setStatus("Opening the payment window…", "");
+    loadCheckout(function (loaded) {
+      if (!isCurrent(attempt)) return;
+      if (!loaded) { clearErrors(); stopPaying(attempt, "The payment window could not load. Check your connection and try again. Your cart is kept."); return; }
+      var payment = pending.payment;
+      var checkout;
+      try {
+        checkout = new window.Razorpay({
+          key: payment.keyId,
+          order_id: payment.orderId,
+          amount: payment.total * 100,
+          currency: "INR",
+          name: "Saloni Resin Art Studio",
+          description: "Order " + pending.requestId.slice(0, 8),
+          prefill: { name: value("customerName").trim(), contact: phoneDigits(), email: value("email").trim() },
+          theme: { color: "#b0125b" },
+          timeout: 900,
+          handler: function (response) {
+            if (pending.done) return;
+            pending.done = true;
+            verifyPayment(attempt, pending, response || {}, 0);
+          },
+          modal: { ondismiss: function () { if (!pending.done && isCurrent(attempt)) stopPaying(attempt, NOT_COMPLETED); } }
+        });
+        checkout.on("payment.failed", function () { if (!pending.done && isCurrent(attempt)) setStatus(NOT_COMPLETED, "error"); });
+        setStatus("Finish your payment in the payment window.", "");
+        checkout.open();
+      } catch (error) {
+        stopPaying(attempt, "The payment window could not open. Your cart is kept. Please try again.");
+      }
+    });
+  }
+  // Asks the server whether the payment landed: now, then again after 3, 6 and 10 seconds while it says "pending" or cannot answer.
+  function verifyPayment(attempt, pending, response, step) {
+    if (isCurrent(attempt)) setStatus("Confirming your payment…", "");
+    function again() {
+      if (step < VERIFY_DELAYS.length) window.setTimeout(function () { verifyPayment(attempt, pending, response, step + 1); }, VERIFY_DELAYS[step]);
+      else finishPayment(attempt, pending, "payment_pending", null);
+    }
+    postJson("verify", { requestId: pending.requestId, razorpay_payment_id: response.razorpay_payment_id, razorpay_order_id: response.razorpay_order_id, razorpay_signature: response.razorpay_signature }).then(function (result) {
+      if (result && result.ok === true && result.status === "paid") finishPayment(attempt, pending, "paid", result);
+      else if (result && result.ok === true && result.status === "unpaid") { pending.done = false; if (isCurrent(attempt)) stopPaying(attempt, NOT_COMPLETED); }
+      else again();
+    }, again);
+  }
+  // The shopper paid. Whatever the page is showing now, the cart is cleared and My orders hears about it once.
+  function finishPayment(attempt, pending, outcome, result) {
+    if (pending.finished) return;
+    pending.finished = true;
+    var paid = outcome === "paid";
+    var total = result && Number.isInteger(result.total) ? result.total : pending.payment.total;
+    if (pendingPayment === pending) pendingPayment = null;
+    if (pending.onSent) { try { pending.onSent(pending.profile); } catch (error) {} }
+    if (pending.onPaid) { try { pending.onPaid(); } catch (error) {} }
+    var summary = pending.summary;
+    summary.status = outcome;
+    if (paid) summary.paidAt = Date.now();
+    saveMyOrder(null, summary);
+    if (paid) {
+      track("order-sent");
+      reportPurchase({ requestId: pending.requestId }, { items: pending.items, total: total });
+    }
+    if (!isCurrent(attempt)) return;
+    restoreSubmitState(attempt);
+    form.querySelectorAll("fieldset, #submit-button").forEach(function (element) { element.hidden = true; });
+    if (moreDetails) moreDetails.hidden = true;
+    if (checkoutSummary) checkoutSummary.hidden = true;
+    anotherButton.hidden = false;
+    if (paid) {
+      if (celebration) celebration.hidden = false;
+      if (successTitle) successTitle.textContent = "Order confirmed!";
+      setStatus("Order confirmed. ID " + pending.requestId + ". We received your payment of " + rupees(total) + ". Saloni will start making your order and will contact you if she needs anything.", "success");
+    } else {
+      setStatus("We are still confirming your payment. If money left your account, your order is safe: check My orders in a few minutes, or call or message Saloni with this ID: " + pending.requestId, "");
+    }
+    if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+  }
+  function stopStillSending() {
+    if (timeoutId) window.clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  // The server already has this order paid (an earlier answer was lost): confirm it, never pay it again.
+  function confirmAlreadyPaid(attempt, key, quote, result, payload) {
+    var pending = { key: key, requestId: String(result.requestId || payload.requestId), payment: { total: quote.total }, finished: false, onSent: onSent, onPaid: onPaid };
+    pending.profile = repeatProfileFromForm();
+    pending.items = purchaseItems();
+    pending.summary = myOrderSummary({ requestId: pending.requestId });
+    finishPayment(attempt, pending, "paid", result);
+  }
+  // Try again after a closed or failed payment: ask the server first whether the money already arrived.
+  function retryPayment(attempt, pending) {
+    setStatus("Checking your payment…", "");
+    postJson("verify", { requestId: pending.requestId }).then(function (result) {
+      if (!isCurrent(attempt)) return;
+      if (result && result.ok === true && result.status === "paid") { pending.done = true; finishPayment(attempt, pending, "paid", result); }
+      else openPayment(attempt, pending);
+    }, function () {
+      if (isCurrent(attempt)) openPayment(attempt, pending);
+    });
+  }
+  // The order is made on the server (once per set of entries); the shopper pays it in the Razorpay window.
+  function startPayment(attempt, quote) {
+    var key = checkoutKey();
+    var reuse = pendingPayment && pendingPayment.key === key ? pendingPayment : null;
+    if (pendingPayment && !reuse) { pendingPayment = null; form.elements.requestId.value = newRequestId(); }
+    if (reuse) {
+      if (paymentRetry) retryPayment(attempt, reuse); else openPayment(attempt, reuse);
+      return;
+    }
+    setStatus("Starting your payment…", "");
+    timeoutId = window.setTimeout(function () {
+      if (!isCurrent(attempt)) return;
+      setStatus("Still starting your payment – please keep this window open. This usually finishes within a minute.", "");
+      if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+    }, 30000);
+    var payload = orderPayload();
+    payload.lines = paidLines();
+    payload.expectedTotal = quote.total;
+    if (paymentsMode() === "test") payload.paymentTest = true;
+    // A paid order does not store a reference image, so none is sent.
+    prepareAndSend(attempt, payload, null, function () {
+      postJson("order", payload).then(function (result) {
+        stopStillSending();
+        if (!isCurrent(attempt)) return;
+        if (result && result.ok === true && result.paid === true) confirmAlreadyPaid(attempt, key, quote, result, payload);
+        else if (result && result.ok === true && result.payment && typeof result.payment === "object") {
+          var payment = result.payment;
+          var pending = { key: key, requestId: String(result.requestId || payload.requestId), payment: payment, done: false, finished: false, onSent: onSent, onPaid: onPaid };
+          pending.profile = repeatProfileFromForm();
+          pending.items = purchaseItems();
+          pending.summary = myOrderSummary({ requestId: pending.requestId });
+          pendingPayment = pending;
+          paymentRetry = false;
+          if (payment.priceChanged === true) {
+            restoreSubmitState(attempt);
+            clearErrors();
+            renderCheckout();
+            setStatus("The price changed since you added these items. The new total is " + rupees(payment.total) + ". Check it, then tap Pay again.", "error");
+            if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
+            return;
+          }
+          renderCheckout();
+          openPayment(attempt, pending);
+        } else if (result && result.ok === true) showSuccess(result, attempt);
+        else if (result && result.errors && typeof result.errors === "object") showFailure("Please correct the highlighted fields and try again.", result.errors, attempt);
+        else showFailure(result && typeof result.message === "string" && result.message ? result.message : UNCONFIRMED, null, attempt);
+      }, function () {
+        stopStillSending();
+        if (isCurrent(attempt)) showFailure("We were unable to start the payment. Your entries are still here; please try again.", null, attempt);
+      });
+    });
+  }
   function isCurrent(attempt) { return currentAttempt === attempt && active; }
   function restoreSubmitState(attempt) {
     if (attempt && currentAttempt !== attempt) return;
@@ -691,18 +1066,19 @@
     });
     return items;
   }
-  function reportPurchase(result) {
+  // known: { items, total } already worked out (a paid order reports the server's total); otherwise the form's own items.
+  function reportPurchase(result, known) {
     try {
       if (!window.saloniGoogle || typeof window.saloniGoogle.purchase !== "function") return;
-      var items = purchaseItems();
-      var total = items.reduce(function (sum, item) { return sum + (item.price || 0) * item.quantity; }, 0);
+      var items = known ? known.items : purchaseItems();
+      var total = known ? known.total : items.reduce(function (sum, item) { return sum + (item.price || 0) * item.quantity; }, 0);
       window.saloniGoogle.purchase({ transaction_id: String(result && result.requestId || value("requestId")), value: total, items: items });
     } catch (error) {}
   }
-  function saveMyOrder(result) {
+  function saveMyOrder(result, summary) {
     var store = window.saloniMyOrders;
     if (!store || typeof store.save !== "function") return;
-    try { store.save(myOrderSummary(result)); } catch (error) {}
+    try { store.save(summary || myOrderSummary(result)); } catch (error) {}
   }
   function showSuccess(result, attempt) {
     if (attempt && !isCurrent(attempt)) return;
@@ -835,6 +1211,21 @@
       reader.readAsDataURL(blob);
     });
   }
+  // Adds the reCAPTCHA token (when the page has a site key) and the attached image, then calls send().
+  function prepareAndSend(attempt, payload, image, send) {
+    withCaptcha(function (token) {
+      if (!isCurrent(attempt)) return;
+      if (captchaKey()) payload.captchaToken = token;
+      if (!image) { send(); return; }
+      blobToBase64(image.blob).then(function (data) {
+        if (!isCurrent(attempt)) return;
+        payload.referenceImage = { type: imageMimeType(image), data: data };
+        send();
+      }, function () {
+        if (isCurrent(attempt)) showFailure("The reference image could not be read. Remove it or choose it again.", { referenceImage: "The reference image could not be read." }, attempt);
+      });
+    });
+  }
   function sendOrder(attempt, payload) {
     postJson("order", payload).then(function (result) {
       if (!isCurrent(attempt)) return;
@@ -851,7 +1242,11 @@
     setReferencePreparing(false);
     restoreSubmitState();
     currentAttempt = null;
+    pendingPayment = null;
+    paymentRetry = false;
+    referenceHiddenByCheckout = false;
     if (celebration) celebration.hidden = true;
+    if (successTitle) successTitle.textContent = REQUEST_TITLE_TEXT;
     form.reset();
     form.querySelectorAll("fieldset, #submit-button").forEach(function (element) { element.hidden = false; });
     anotherButton.hidden = true; clearErrors(); setStatus("", "");
@@ -862,14 +1257,17 @@
   }
 
   form.addEventListener("change", function () {
-    toggleShipping(); updateDimensionMaxes();
+    toggleShipping(); updateDimensionMaxes(); renderCheckout();
     inlineFields.forEach(function (name) { if (form.elements[name] && form.elements[name].getAttribute("aria-invalid") === "true") validateField(name); });
   });
   inlineFields.forEach(function (name) {
     var input = form.elements[name];
     if (!input) return;
     input.addEventListener("blur", function () { validateField(name); });
-    input.addEventListener("input", function () { if (input.getAttribute("aria-invalid") === "true") validateField(name); });
+    input.addEventListener("input", function () {
+      if (input.getAttribute("aria-invalid") === "true") validateField(name);
+      if (name === "pin") renderCheckout();
+    });
   });
   if (form.elements.requestedDate) form.elements.requestedDate.setAttribute("min", istToday());
   if (form.elements.designDetails) form.elements.designDetails.addEventListener("input", function () {
@@ -898,6 +1296,8 @@
     active = true;
     submitButton.disabled = true;
     var image = attachedImage;
+    var quote = checkoutQuote();
+    if (quote) { startPayment(attempt, quote); return; }
     setStatus(image && image.preview ? "Sending your request and design preview…" : "Sending your request…", "");
     timeoutId = window.setTimeout(function () {
       if (!isCurrent(attempt)) return;
@@ -906,14 +1306,7 @@
       if (status.focus) { status.setAttribute("tabindex", "-1"); status.focus(); }
     }, 30000);
     var payload = orderPayload();
-    if (!image) { sendOrder(attempt, payload); return; }
-    blobToBase64(image.blob).then(function (data) {
-      if (!isCurrent(attempt)) return;
-      payload.referenceImage = { type: imageMimeType(image), data: data };
-      sendOrder(attempt, payload);
-    }, function () {
-      if (isCurrent(attempt)) showFailure("The reference image could not be read. Remove it or choose it again.", { referenceImage: "The reference image could not be read." }, attempt);
-    });
+    prepareAndSend(attempt, payload, image, function () { sendOrder(attempt, payload); });
   });
   anotherButton.addEventListener("click", function () {
     var hadCustomizerPreview = isCustomizerOrderRequest();
@@ -926,13 +1319,17 @@
     options = options || {};
     seed = nextSeed && typeof nextSeed === "object" ? nextSeed : {};
     onSent = typeof options.onSent === "function" ? options.onSent : null;
+    onPaid = typeof options.onPaid === "function" ? options.onPaid : null;
     resetFormState(seed.requestId ? String(seed.requestId) : newRequestId());
     if (isCustomizerOrderRequest()) {
       if (validPreviewBlob(options.previewBlob)) attachCustomizerPreview(options.previewBlob);
       else setReferenceImageStatus("The customizer preview could not be attached. You can still send your request.", "error");
     }
     form.hidden = false;
+    checkoutCopyHidden = false;
     if (intro) intro.hidden = false;
+    if (finalQuoteNote) finalQuoteNote.hidden = false;
+    renderCheckout();
   }
   window.saloniOrderForm = { open: open };
 }());

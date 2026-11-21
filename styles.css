@@ -569,6 +569,9 @@ dialog.advance-popup::backdrop { background: rgba(42, 14, 31, .72); }
 .my-order-status.is-cancel-declined { background: #def3e4; color: #17612f; }
 .my-order-status.is-cancelled { background: #ececec; color: #4a4a4a; }
 .my-order-status.is-advance-paid { background: #d3efdc; color: #0f5226; }
+.my-order-status.is-paid { background: #d3efdc; color: #0f5226; }
+.my-order-status.is-payment-pending { background: #fff0d1; color: #6b4300; }
+.my-order-status.is-unpaid { background: #ececec; color: #4a4a4a; }
 .my-order-note { margin: .5rem 0 0; font-size: .8rem; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; }
 .my-order-note[hidden] { display: none; }
 .my-order-note.is-error { color: #a41f33; font-weight: 800; }
@@ -1292,6 +1295,20 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 :is(#order-form, #partner-form, #corporate-form, #review-form) .status { min-height: 1.4rem; margin: 0; }
 :is(#order-form, #partner-form, #corporate-form, #review-form) .status.error { color: #a41f33; }
 :is(#order-form, #partner-form, #corporate-form, #review-form) .status.success { padding: 1rem; border-radius: .7rem; background: #edf5eb; color: #24532f; }
+/* Checkout summary: shown only when the cart can be paid online (items, shipping, total, refund rule). */
+#order-form .checkout-summary { display: grid; gap: .6rem; padding: 1rem; border: 1px solid var(--line); border-radius: .9rem; background: var(--ivory); }
+#order-form .checkout-summary[hidden] { display: none; }
+#order-form .checkout-summary h3 { margin: 0; color: var(--ink); font: 500 1.2rem/1.2 var(--display); }
+#order-form .checkout-lines { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
+#order-form .checkout-lines li { display: flex; justify-content: space-between; gap: .75rem; font-size: .9rem; line-height: 1.35; overflow-wrap: anywhere; }
+#order-form .checkout-lines li span:last-child { flex: none; font-weight: 750; }
+#order-form .checkout-totals { display: grid; gap: .3rem; margin: 0; padding-top: .55rem; border-top: 1px solid var(--line); }
+#order-form .checkout-totals div { display: flex; justify-content: space-between; gap: .75rem; font-size: .92rem; }
+#order-form .checkout-totals dt, #order-form .checkout-totals dd { margin: 0; }
+#order-form .checkout-totals .checkout-total { font-size: 1.1rem; font-weight: 800; }
+#order-form .checkout-refund, #order-form .checkout-secure, #order-form .checkout-test-note { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.45; }
+#order-form .checkout-refund a { color: var(--rose-ink); font-weight: 750; }
+#order-form .checkout-test-note { padding: .4rem .6rem; border-radius: .5rem; background: #fff0d1; color: #6b4300; font-weight: 750; }
 #order-form .success-celebration { position: relative; display: grid; justify-items: center; gap: .4rem; padding: 1.2rem 0 .4rem; overflow: visible; }
 #order-form .success-check { animation: success-pop .45s cubic-bezier(.2,1.4,.5,1) both; }
 #order-form .success-check-circle { fill: #2f8f5b; stroke: #2f8f5b; stroke-width: 2; }

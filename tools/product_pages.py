@@ -35,6 +35,8 @@ today's price. A product with size_choice "yes" also lists 2 or 3 sizes with a f
   * for a sized product, stamps data-sizes on the card's photo link (the popup reads it), a "3 sizes" note and the default size
     on the card, a size form on /p/<slug>/ and ProductGroup structured data (one variant per size),
   * adds one merchant-feed.tsv row per size (the default size keeps the old id and link; the others are <slug>--<size>),
+  * writes prices.json, the table the order web app prices a paid cart from: "catalogue:<photo file>" (the cart's sourceId) ->
+    name, price and, for a sized product, each size code's price, all whole rupees,
   * shows "From <lowest size price>" on the corporate gifting page.
 The default size is the first one whose price equals today's price. A mistake in the TSV stops the script with a message.
 
@@ -60,6 +62,7 @@ SITE = "https://saloniresinart.com"
 STUDIO = "Saloni Resin Art Studio"
 PAGE_DIR = "p"
 FEED_FILE = "merchant-feed.tsv"
+PRICES_FILE = "prices.json"
 CORPORATE_SECTION = "corporate-resin-gifts"
 CORPORATE_PAGE = "corporate-gifting/index.html"
 CORPORATE_START, CORPORATE_END = "<!-- corporate-collection:start -->", "<!-- corporate-collection:end -->"
@@ -642,6 +645,25 @@ def merchant_feed(cards, slugs, sizes=None):
     return "".join("\t".join(row) + "\n" for row in rows)
 
 
+def prices_json(cards, slugs, sizes):
+    """prices.json text: {"catalogue:<photo file>": {"name", "price", "sizes": {size code: price}}} in whole rupees.
+    The key is the sourceId the cart sends. "sizes" is left out for a one-size product; the default size's price equals "price".
+    A card with no row in data/product-sizes.tsv has no price here, so the server cannot sell it online."""
+    prices = {}
+    for card, slug in zip(cards, slugs):
+        entry = sizes.get(slug)
+        if not entry:
+            continue
+        item = {"name": card["name"], "price": entry["price"]}
+        if entry["options"]:
+            item["sizes"] = {option["code"]: option["price"] for option in entry["options"]}
+        key = "catalogue:" + card["file"]
+        if key in prices and prices[key] != item:
+            raise SystemExit("Two cards use the photo %s with different prices: the cart cannot tell them apart" % card["file"])
+        prices[key] = item
+    return json.dumps(prices, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+
+
 def esc(value):
     return html.escape(value, quote=True)
 
@@ -996,6 +1018,7 @@ def main():
     cards = parse_cards(stamped)
     slugs = assign_slugs(cards)
     (ROOT / FEED_FILE).write_text(merchant_feed(cards, slugs, sizes), encoding="utf-8")
+    (ROOT / PRICES_FILE).write_text(prices_json(cards, slugs, sizes), encoding="utf-8")
     corporate_path = ROOT / CORPORATE_PAGE
     corporate_path.write_text(corporate_collection(corporate_path.read_text(encoding="utf-8"), cards, slugs, sizes=sizes), encoding="utf-8")
     topic_count = len(TOPICS)

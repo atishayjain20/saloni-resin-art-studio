@@ -51,13 +51,13 @@
     // The 20% sale ends after 30 Nov 2026 23:59 India time (UTC+5:30). From then on the sale price is the price; styles.css and script.js key off this class.
     if (Date.now() >= Date.UTC(2026, 10, 30, 18, 30)) document.documentElement.classList.add("sale-ended");
   </script>
-  <link rel="stylesheet" href="styles.css?v=20261203">
-  <script class="analytics-script" src="analytics.js?v=20261203" defer></script>
-  <script class="google-script" src="google.js?v=20261203" defer></script>
-  <script class="order-form-script" src="order-form.js?v=20261203" defer></script>
-  <script class="site-script" src="script.js?v=20261203" defer></script>
-  <script class="my-orders-script" src="my-orders.js?v=20261203" defer></script>
-  <script class="customizer-script" src="customizer.js?v=20261203" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261204">
+  <script class="analytics-script" src="analytics.js?v=20261204" defer></script>
+  <script class="google-script" src="google.js?v=20261204" defer></script>
+  <script class="order-form-script" src="order-form.js?v=20261204" defer></script>
+  <script class="site-script" src="script.js?v=20261204" defer></script>
+  <script class="my-orders-script" src="my-orders.js?v=20261204" defer></script>
+  <script class="customizer-script" src="customizer.js?v=20261204" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -1124,7 +1124,7 @@
         <button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button>
         <button class="button button-line order-continue-request" id="order-continue-request" type="button" aria-controls="order-dialog" hidden>Continue your request</button>
       </div>
-      <details class="privacy-details" id="privacy-details"><summary>Privacy details</summary><p>Order details and an optional image are stored in the studio’s private Google Sheet and restricted Drive folder for handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. A short summary of each confirmed request (items, notes and request ID) is kept only in this browser for 30 days for My orders; it has no phone number, email or address. Partner attribution and private commission records are retained for payout records. Customer reviews (first name, optional city, rating, comment and photos) are public on the home page and are kept until removed; ask for removal through @saloniresin_art_studio or 8209238541. Request correction or deletion through <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>. If you tap Accept on the cookie banner, Google sets cookies to measure which Google listings lead to order requests; only the request ID, product IDs, prices and quantities are sent, never your name, phone or address. Change it any time with Cookie settings.</p></details>
+      <details class="privacy-details" id="privacy-details"><summary>Privacy details</summary><p>Order details and an optional image are stored in the studio’s private Google Sheet and restricted Drive folder for handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. A short summary of each confirmed request (items, notes and request ID) is kept only in this browser for 30 days for My orders; it has no phone number, email or address. Partner attribution and private commission records are retained for payout records. When you pay online, Razorpay processes the payment: your card, UPI or bank details go to Razorpay and the studio never sees or stores them. For a paid order the studio keeps the Razorpay order and payment IDs and the amount paid for 12 months for accounts and refunds. Google reCAPTCHA checks order requests for spam. Customer reviews (first name, optional city, rating, comment and photos) are public on the home page and are kept until removed; ask for removal through @saloniresin_art_studio or 8209238541. Request correction or deletion through <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>. If you tap Accept on the cookie banner, Google sets cookies to measure which Google listings lead to order requests; only the request ID, product IDs, prices and quantities are sent, never your name, phone or address. Change it any time with Cookie settings.</p></details>
     </section>
 
     <section class="home-reviews shell" id="customer-reviews" aria-labelledby="home-reviews-title">
@@ -1143,7 +1143,7 @@
         <button class="order-dialog-close" id="order-dialog-close" type="submit" aria-label="Close order request"><span aria-hidden="true">×</span></button>
       </form>
       <h2 class="order-dialog-title" id="order-dialog-title">Send an order request</h2>
-      <div class="order-panel order-form-panel" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec"><div class="selected-product-summary" id="selected-product-summary" hidden aria-live="polite"><img id="selected-product-image" alt="Selected product photo" width="280" height="280" loading="lazy" decoding="async"><div class="selected-product-summary-copy"><p class="panel-label">Selected item</p><h3 id="selected-product-name"></h3><p id="selected-product-price" hidden></p><p id="selected-product-size" hidden></p></div></div><p class="order-final-quote-note">Final quote after size, materials and delivery.</p>
+      <div class="order-panel order-form-panel" id="order-form-embed" data-order-form-url="https://script.google.com/macros/s/AKfycbydFuwmR32zO3Sj28a1YWZNTgThHctu-LnpkWVJAkUOQZfRgnzS1qTfbb2JeHvYa-Qg/exec" data-payments="off" data-captcha-site-key="6Lcyc_YtAAAAAH9NRP14nKWeaeVcIBXs5PwrhmT3"><div class="selected-product-summary" id="selected-product-summary" hidden aria-live="polite"><img id="selected-product-image" alt="Selected product photo" width="280" height="280" loading="lazy" decoding="async"><div class="selected-product-summary-copy"><p class="panel-label">Selected item</p><h3 id="selected-product-name"></h3><p id="selected-product-price" hidden></p><p id="selected-product-size" hidden></p></div></div><p class="order-final-quote-note" id="order-final-quote-note">Final quote after size, materials and delivery.</p>
         <p class="panel-label">Order request</p>
         <div class="order-form-status" id="order-form-status" role="status" aria-live="polite">Choose a product, a customizer design, or a general custom gift request to begin. You can still call Saloni at <a href="tel:+918209238541">8209238541</a> or message <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a>.<button class="button button-line order-general-request" type="button" data-order-prefill="general">Request a custom gift</button></div>
         <p class="order-form-intro" id="order-form-intro" hidden>This is a request only. Saloni will contact you to confirm the design, price, and delivery before any production begins.</p>
@@ -1225,7 +1225,7 @@
             </fieldset>
           </details>
 
-          <fieldset>
+          <fieldset id="reference-image-fieldset">
             <legend>Optional reference image</legend>
             <label for="order-reference-image">JPG or PNG, one photo (large photos are shrunk automatically) <input id="order-reference-image" name="referenceImage" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
             <div id="reference-image-preview-wrap" hidden>
@@ -1239,7 +1239,19 @@
 
           <input id="dimension-format" name="dimensionFormat" type="hidden" value="feet-inches">
           <input id="bundle-source-ids" name="bundleSourceIds" type="hidden">
-          <div id="success-celebration" class="success-celebration" aria-hidden="true" hidden><svg class="success-check" viewBox="0 0 52 52" width="88" height="88"><circle class="success-check-circle" cx="26" cy="26" r="23"></circle><path class="success-check-mark" d="M15 27 l7 7 l15 -16"></path></svg><p class="success-title">Order sent! 🎉</p><span class="confetti" style="--x:-110px;--y:-80px;--c:#b0125b;--r:30deg;--d:0ms"></span><span class="confetti" style="--x:-70px;--y:-120px;--c:#d9a227;--r:-20deg;--d:25ms"></span><span class="confetti" style="--x:-20px;--y:-135px;--c:#2f8f5b;--r:60deg;--d:50ms"></span><span class="confetti" style="--x:35px;--y:-125px;--c:#f08db3;--r:-45deg;--d:75ms"></span><span class="confetti" style="--x:85px;--y:-95px;--c:#b0125b;--r:15deg;--d:100ms"></span><span class="confetti" style="--x:120px;--y:-50px;--c:#d9a227;--r:80deg;--d:125ms"></span><span class="confetti" style="--x:-125px;--y:-25px;--c:#f08db3;--r:-70deg;--d:150ms"></span><span class="confetti" style="--x:-95px;--y:30px;--c:#2f8f5b;--r:40deg;--d:175ms"></span><span class="confetti" style="--x:100px;--y:25px;--c:#f08db3;--r:-30deg;--d:200ms"></span><span class="confetti" style="--x:60px;--y:-150px;--c:#d9a227;--r:110deg;--d:225ms"></span><span class="confetti" style="--x:-50px;--y:-160px;--c:#b0125b;--r:-95deg;--d:250ms"></span><span class="confetti" style="--x:130px;--y:-110px;--c:#2f8f5b;--r:55deg;--d:275ms"></span></div>
+          <section class="checkout-summary" id="checkout-summary" aria-labelledby="checkout-summary-title" hidden>
+            <h3 id="checkout-summary-title">Your order</h3>
+            <p class="checkout-test-note" id="checkout-test-note" hidden>Trial checkout on this page. The payment window shows whether it is a test.</p>
+            <ul class="checkout-lines" id="checkout-lines"></ul>
+            <dl class="checkout-totals">
+              <div><dt>Items</dt><dd id="checkout-subtotal"></dd></div>
+              <div><dt>Shipping</dt><dd id="checkout-shipping"></dd></div>
+              <div class="checkout-total"><dt>Total</dt><dd id="checkout-total" aria-live="polite"></dd></div>
+            </dl>
+            <p class="checkout-refund">Full refund if you cancel within 24 hours of paying, before work starts. After that, the payment is not refundable except for damage in transit. <a href="shipping-and-returns/#refunds" target="_blank" rel="noopener">Refund details</a></p>
+            <p class="checkout-secure">You pay securely on Razorpay with UPI, a card or net banking.</p>
+          </section>
+          <div id="success-celebration" class="success-celebration" aria-hidden="true" hidden><svg class="success-check" viewBox="0 0 52 52" width="88" height="88"><circle class="success-check-circle" cx="26" cy="26" r="23"></circle><path class="success-check-mark" d="M15 27 l7 7 l15 -16"></path></svg><p class="success-title" id="success-title">Order sent! 🎉</p><span class="confetti" style="--x:-110px;--y:-80px;--c:#b0125b;--r:30deg;--d:0ms"></span><span class="confetti" style="--x:-70px;--y:-120px;--c:#d9a227;--r:-20deg;--d:25ms"></span><span class="confetti" style="--x:-20px;--y:-135px;--c:#2f8f5b;--r:60deg;--d:50ms"></span><span class="confetti" style="--x:35px;--y:-125px;--c:#f08db3;--r:-45deg;--d:75ms"></span><span class="confetti" style="--x:85px;--y:-95px;--c:#b0125b;--r:15deg;--d:100ms"></span><span class="confetti" style="--x:120px;--y:-50px;--c:#d9a227;--r:80deg;--d:125ms"></span><span class="confetti" style="--x:-125px;--y:-25px;--c:#f08db3;--r:-70deg;--d:150ms"></span><span class="confetti" style="--x:-95px;--y:30px;--c:#2f8f5b;--r:40deg;--d:175ms"></span><span class="confetti" style="--x:100px;--y:25px;--c:#f08db3;--r:-30deg;--d:200ms"></span><span class="confetti" style="--x:60px;--y:-150px;--c:#d9a227;--r:110deg;--d:225ms"></span><span class="confetti" style="--x:-50px;--y:-160px;--c:#b0125b;--r:-95deg;--d:250ms"></span><span class="confetti" style="--x:130px;--y:-110px;--c:#2f8f5b;--r:55deg;--d:275ms"></span></div>
           <p id="form-status" class="status" role="status" aria-live="polite"></p>
           <div class="actions">
             <button id="submit-button" type="submit">Send request</button>
@@ -1247,7 +1259,7 @@
           </div>
           <details class="privacy-details" id="order-privacy-details">
             <summary>Privacy details</summary>
-            <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. A short summary of each confirmed request (items, notes and request ID) is kept only in this browser for 30 days for My orders; it has no phone number, email or address. Partner attribution and private commission records are retained for studio payout records. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>. If you tap Accept on the cookie banner, Google sets cookies to measure which Google listings lead to order requests; only the request ID, product IDs, prices and quantities are sent, never your name, phone or address. Change it any time with Cookie settings.</p>
+            <p class="privacy">Order details and an optional reference image are stored in the studio's private Google Sheet and restricted Drive folder for order handling. Customer requests and uploaded images are scheduled for deletion after 90 days. After you send a request, your name, phone, and delivery details are kept only in this browser for up to 30 days to fill your next request, and are not stored separately by the studio. A short summary of each confirmed request (items, notes and request ID) is kept only in this browser for 30 days for My orders; it has no phone number, email or address. Partner attribution and private commission records are retained for studio payout records. When you pay online, Razorpay processes the payment: your card, UPI or bank details go to Razorpay and the studio never sees or stores them. For a paid order the studio keeps the Razorpay order and payment IDs and the amount paid for 12 months for accounts and refunds. Google reCAPTCHA checks order requests for spam. For correction or deletion, contact <a href="https://www.instagram.com/saloniresin_art_studio/" target="_blank" rel="noreferrer">@saloniresin_art_studio</a> or <a href="tel:+918209238541">8209238541</a>. If you tap Accept on the cookie banner, Google sets cookies to measure which Google listings lead to order requests; only the request ID, product IDs, prices and quantities are sent, never your name, phone or address. Change it any time with Cookie settings.</p>
           </details>
         </form>
       </div>

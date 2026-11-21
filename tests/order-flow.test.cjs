@@ -559,7 +559,7 @@ test("reopens the selected-items order when the prior dialog history entry is st
 });
 
 test("keeps order-area copy short and removes the catalogue/customizer instruction", () => {
-  assert.equal((page.match(/class="order-final-quote-note">Final quote after size, materials and delivery\.<\/p>/g) || []).length, 1);
+  assert.equal((page.match(/class="order-final-quote-note"[^>]*>Final quote after size, materials and delivery\.<\/p>/g) || []).length, 1);
   assert.doesNotMatch(page, /class="panel-note"/);
   assert.doesNotMatch(page, /Add catalogue items to one request/);
   assert.doesNotMatch(page, /choose “Request this design” in the customizer/);
@@ -813,28 +813,40 @@ test("cart shows each line price and a live estimated total that follows quantit
   assert.equal(flow.catalogueSelectionTotal.textContent, "");
 });
 
-test("while the Diwali offer strip shows, one gift in every three is free, always the lowest-priced, and shipping is free", () => {
+test("the expired Diwali offer is gone from the cart: even with the strip in the page there is no free gift, no free shipping and no offer text", () => {
   const flow = runFlow({ diwaliOffer: true });
   flow.catalogueButton.dispatch("click");
-  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹249 + free shipping (Diwali offer: buy 2, get 1 free)");
+  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹249 + shipping");
   flow.generatedCatalogueButtons[2].dispatch("click");
   const quantity = flow.catalogueSelectionItems.children[0].querySelector("input");
   quantity.value = "2"; quantity.dispatch("change");
-  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹1,248 + free shipping (Diwali offer: ₹249 off, buy 2 get 1 free)");
-  assert.match(whatsappText(flow), /Estimated total: ₹1,248 \+ free shipping \(Diwali offer: ₹249 off, buy 2 get 1 free\)/);
+  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹1,497 + shipping");
+  assert.doesNotMatch(whatsappText(flow), /Diwali|free shipping|buy 2/i);
   quantity.value = "6"; quantity.dispatch("change");
-  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹1,995 + free shipping (Diwali offer: ₹498 off, buy 2 get 1 free)");
-  const mixed = runFlow({ diwaliOffer: true });
-  mixed.catalogueButton.dispatch("click");
-  mixed.generatedCatalogueButtons[2].dispatch("click");
-  const small = mixed.catalogueSelectionItems.children[0].querySelector("input");
-  small.value = "2"; small.dispatch("change");
-  const big = mixed.catalogueSelectionItems.children[1].querySelector("input");
-  big.value = "3"; big.dispatch("change");
-  assert.equal(mixed.catalogueSelectionTotal.textContent, "Estimated total: ₹3,246 + free shipping (Diwali offer: ₹249 off, buy 2 get 1 free)", "5 gifts: one free, and it is the lowest-priced one");
+  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹2,493 + shipping");
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8"), /buy 2, get 1 free|free shipping \(Diwali/);
+});
+
+test("the cart hands the order form each line's size code and colour, and a callback that empties the cart after a paid order", () => {
+  const flow = sizedFlow({ aiImages: "emerald styled" });
+  flow.catalogueButton.__saloniChosenSize = "6-in";
+  flow.catalogueButton.__saloniChosenPhoto = "emerald";
+  flow.catalogueButton.dispatch("click");
+  flow.catalogueRequestSelected.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.bundleItems[0].sizeCode, "6-in");
+  assert.equal(seed.bundleItems[0].photo, "emerald");
+  assert.equal(typeof flow.orderOpens[0].options.onPaid, "function");
+  assert.equal(flow.catalogueSelectionItems.children.length, 1);
+  flow.orderOpens[0].options.onPaid();
+  assert.equal(flow.catalogueSelectionItems.children.length, 0);
+  assert.equal(flow.catalogueSelectionTotal.textContent, "");
+  assert.equal(flow.catalogueButton.getAttribute("aria-pressed"), "false");
   const plain = runFlow();
   plain.catalogueButton.dispatch("click");
-  assert.equal(plain.catalogueSelectionTotal.textContent, "Estimated total: ₹249 + shipping", "no offer when the strip is not showing");
+  plain.catalogueRequestSelected.dispatch("click");
+  assert.equal(submittedSeed(plain.posted).bundleItems[0].sizeCode, "");
+  assert.equal(submittedSeed(plain.posted).bundleItems[0].photo, "");
 });
 
 test("cart marks price ranges as from-prices and keeps price-on-request items out of the sum", () => {
@@ -1777,11 +1789,11 @@ test("restores the default size when the saved size is missing, unknown or not a
   assert.deepEqual(cartLines(runFlow({ storage })), ["Test frame"]);
 });
 
-test("Diwali buy 2 get 1 free counts the size's own price", () => {
+test("the cart total counts a size's own price, with no offer even while the Diwali strip is in the page", () => {
   const flow = sizedFlow({ diwaliOffer: true });
   chooseSize(flow, "8-in");
   flow.generatedCatalogueButtons[0].dispatch("click");
   flow.generatedCatalogueButtons[1].dispatch("click");
-  assert.match(flow.catalogueSelectionTotal.textContent, /^Estimated total: .*free shipping \(Diwali offer: ₹\d[\d,]* off, buy 2 get 1 free\)/);
+  assert.match(flow.catalogueSelectionTotal.textContent, /^Estimated total: ₹[\d,]+ \+ shipping$/);
   assert.match(whatsappText(flow), /Test frame \(size: 8 in\) · ₹649 × 1/);
 });

@@ -841,7 +841,11 @@ test("the advance setup is never run by a web request or by ordinary sheet acces
   };
   assert.deepEqual(bodyOf("migrateVisitSourceSchema_").filter((line) => line.includes("migrateAdvanceSchema_(")), ["migrateAdvanceSchema_(sheet);"]);
   // migrateVisitSourceSchema_ is itself reached only from the owner-only setupVisitSource, and nothing else calls setupVisitSource.
-  assert.deepEqual(lines.filter((line) => line.includes("migrateVisitSourceSchema_(")), ["var changed = migrateVisitSourceSchema_(sheet);", "function migrateVisitSourceSchema_(sheet) {"]);
+  // The other caller is migratePaymentSchema_ (for an older sheet), which only the owner-only setupPayments reaches.
+  assert.deepEqual(lines.filter((line) => line.includes("migrateVisitSourceSchema_(")), ["var changed = migrateVisitSourceSchema_(sheet);", "function migrateVisitSourceSchema_(sheet) {", "migrateVisitSourceSchema_(sheet);"]);
+  assert.deepEqual(lines.filter((line) => line.includes("migratePaymentSchema_(")), ["changed = migratePaymentSchema_(sheet);", "function migratePaymentSchema_(sheet) {"]);
+  assert.ok(bodyOf("setupPayments").some((line) => line.includes("Session.getActiveUser()")), "setupPayments keeps its owner check");
+  assert.deepEqual(lines.filter((line) => line.includes("setupPayments(")), ["function setupPayments() {"]);
   assert.deepEqual(bodyOf("setupVisitSource").filter((line) => line.includes("migrateVisitSourceSchema_(")), ["var changed = migrateVisitSourceSchema_(sheet);"]);
   assert.ok(bodyOf("setupVisitSource").some((line) => line.includes("Session.getActiveUser()")), "setupVisitSource keeps its owner check");
   assert.deepEqual(lines.filter((line) => line.includes("setupVisitSource(")), ["function setupVisitSource() {"]);

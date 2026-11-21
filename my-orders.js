@@ -7,6 +7,9 @@
  * Opening the dialog asks the same URL for the live order status (action=status): the server answers with one fixed code
  * per request ID (read from the Status column Saloni updates by hand), which is stored as status/statusCheckedAt so the
  * last known status still shows when the check fails. The shopper never sees Saloni's own Status wording.
+ * A catalogue cart that was paid online (Razorpay) reads paid, payment_pending or unpaid. For a paid order the answer also carries
+ * paid {requestId: {amount, paidAt}} (paidAt an ISO date); "Cancel order" shows for it only within 24 hours of that time (the server decides in the end and may
+ * answer window_closed). In payments mode (test or live) there is no UPI advance: it is never shown and never asked for.
  * When Saloni has confirmed an order and typed an advance amount, the same answer carries advance {amount, payee, name}. It is
  * kept in memory only (never in localStorage), checked again here, and turned into "Pay with" UPI app links plus a copy option.
  * The home page also runs that status check once, about 2.5 s after it has loaded (never more than once per 10 minutes, and only
@@ -38,12 +41,17 @@
     cancel_requested: "Cancellation requested — Saloni will confirm",
     cancel_declined: "Confirmed — your cancellation request was declined. Contact Saloni if you have questions.",
     cancelled: "Cancelled",
-    advance_paid: "Advance received — thank you"
+    advance_paid: "Advance received — thank you",
+    paid: "Paid — your order is confirmed",
+    payment_pending: "Waiting for your payment to be confirmed — this updates by itself",
+    unpaid: "Payment not completed. If money was taken, contact Saloni."
   };
   var PICKUP_LABELS = { ready: "Ready for pickup in Ajmer", delivered: "Picked up" };
   var STATUS_CHECK_GAP_MS = 60 * 1000;
   var STATUS_TIMEOUT_MS = 15000;
   var CANCEL_FAILED_TEXT = "Could not send the request. Please try again or call/WhatsApp Saloni.";
+  var WINDOW_CLOSED_TEXT = "The 24 hours for cancelling online are over. Please call or message Saloni.";
+  var CANCEL_WINDOW_MS = 24 * 60 * 60 * 1000;
   var CANCEL_TIMEOUT_MS = 25000;
   // The server only accepts request IDs of this shape (Code.gs ORDER_REQUEST_ID_PATTERN); older or odd IDs get no button.
   var CANCELLABLE_ID = /^[A-Za-z0-9_-]{12,80}$/;
@@ -67,6 +75,19 @@
     return trimmed;
   }
   function isStatusCode(code) { return typeof code === "string" && Object.prototype.hasOwnProperty.call(STATUS_LABELS, code); }
+  // "off" (no online payment: the UPI advance works as before), "test" (?payments=test) or "live" (data-payments="live"), as in order-form.js.
+  function paymentsMode() {
+    var embed = document.getElementById("order-form-embed");
+    if (embed && String(embed.getAttribute("data-payments") || "") === "live") return "live";
+    var search = "";
+    try { search = String(window.location && window.location.search || ""); } catch (error) { search = ""; }
+    return /(?:^|[?&])payments=test(?:&|$)/.test(search) ? "test" : "off";
+  }
+  // The paid time as whole milliseconds, from a number or an ISO date; 0 when it is not a sensible time.
+  function paidAtValue(value, now) {
+    var ms = typeof value === "number" ? value : typeof value === "string" ? Date.parse(value) : NaN;
+    return ms % 1 === 0 && ms > 0 && ms <= now + CLOCK_SKEW_MS ? ms : 0;
+  }
   function wholeNumber(value, min, max) {
     return typeof value === "number" && value % 1 === 0 && value >= min && value <= max;
   }
@@ -102,6 +123,8 @@
       valid.status = entry.status;
       valid.statusCheckedAt = checked;
     }
+    var paidAt = paidAtValue(entry.paidAt, now);
+    if (paidAt) valid.paidAt = paidAt;
     return valid;
   }
 
@@ -152,6 +175,12 @@
     });
     var notes = typeof summary.notes === "string" ? summary.notes.trim().slice(0, MAX_NOTES).trim() : "";
     var candidate = { requestId: summary.requestId, at: Date.now(), items: items, fulfillment: summary.fulfillment, notes: notes };
+    // Only an order the shopper just paid for may say so; any other status comes from the server.
+    if (summary.status === "paid" || summary.status === "payment_pending") {
+      candidate.status = summary.status;
+      candidate.statusCheckedAt = candidate.at;
+      if (summary.status === "paid") candidate.paidAt = summary.paidAt;
+    }
     return validOrder(candidate, Date.now());
   }
 
@@ -209,7 +238,7 @@
   // Dispatched, Cancelled, ...) show as they are, because that is what really happened.
   function effectiveStatus(order) {
     var code = isStatusCode(order.status) ? order.status : "received";
-    if (order.cancelRequestedAt && (code === "received" || code === "confirmed")) return "cancel_requested";
+    if (order.cancelRequestedAt && (code === "received" || code === "confirmed" || code === "paid")) return "cancel_requested";
     return code;
   }
   function statusLabel(order) {
@@ -217,7 +246,13 @@
     return order.fulfillment === "pickup" && PICKUP_LABELS.hasOwnProperty(code) ? PICKUP_LABELS[code] : STATUS_LABELS[code];
   }
   // Remember the codes the server sent. Unknown ids and unknown codes are ignored.
-  function storeStatuses(statuses) {
+  // The paid time of one request from the answer's paid map ({requestId: {amount, paidAt}}), or 0.
+  function paidTimeFrom(paid, requestId, now) {
+    if (!paid || typeof paid !== "object" || Array.isArray(paid) || !Object.prototype.hasOwnProperty.call(paid, requestId)) return 0;
+    var entry = paid[requestId];
+    return entry && typeof entry === "object" ? paidAtValue(entry.paidAt, now) : 0;
+  }
+  function storeStatuses(statuses, paid) {
     if (!statuses || typeof statuses !== "object" || Array.isArray(statuses)) return;
     var now = Date.now();
     var orders = read();
@@ -226,6 +261,8 @@
       if (!Object.prototype.hasOwnProperty.call(statuses, order.requestId) || !isStatusCode(statuses[order.requestId])) return;
       order.status = statuses[order.requestId];
       order.statusCheckedAt = now;
+      var time = paidTimeFrom(paid, order.requestId, now);
+      if (time) order.paidAt = time;
       changed = true;
     });
     var store = storage();
@@ -241,6 +278,7 @@
     return { amount: advance.amount, payee: advance.payee, name: name };
   }
   function storeAdvances(map) {
+    if (paymentsMode() !== "off") { advanceByRequest = {}; return; }
     var fresh = {};
     if (map && typeof map === "object" && !Array.isArray(map)) {
       Object.keys(map).forEach(function (id) {
@@ -503,10 +541,12 @@
     if (!clipboard || typeof clipboard.writeText !== "function") return Promise.resolve(false);
     try { return Promise.resolve(clipboard.writeText(value)).then(function () { return true; }, function () { return false; }); } catch (error) { return Promise.resolve(false); }
   }
+  // Sent or confirmed requests, and a paid order within 24 hours of its paid time (the server checks the window again).
   function canCancel(view) {
     var order = view.order;
     var code = effectiveStatus(order);
-    return Boolean((code === "received" || code === "confirmed") && !order.cancelRequestedAt && CANCELLABLE_ID.test(order.requestId) && execUrl() && typeof window.fetch === "function");
+    var inWindow = code === "paid" && !order.windowClosed && Boolean(order.paidAt) && Date.now() - order.paidAt < CANCEL_WINDOW_MS;
+    return Boolean((code === "received" || code === "confirmed" || inWindow) && !order.cancelRequestedAt && CANCELLABLE_ID.test(order.requestId) && execUrl() && typeof window.fetch === "function");
   }
   function showNote(view, message, className) {
     view.note.className = className;
@@ -569,7 +609,7 @@
       var group = element("div", "my-order-confirm");
       group.setAttribute("role", "group");
       group.setAttribute("aria-label", "Confirm cancellation request");
-      group.appendChild(element("p", "my-order-confirm-text", "Ask Saloni to cancel this order?"));
+      group.appendChild(element("p", "my-order-confirm-text", effectiveStatus(order) === "paid" ? "Ask Saloni to cancel this order? You are within 24 hours of paying, so you get a full refund." : "Ask Saloni to cancel this order?"));
       var yes = plainButton("button button-dark", "Yes, ask to cancel");
       var keep = plainButton("button button-line", "Keep order");
       group.appendChild(yes);
@@ -584,7 +624,8 @@
         keep.disabled = true;
         group.setAttribute("aria-busy", "true");
         say("Sending your request…", false);
-        requestCancellation(order.requestId).then(function (reply) { return Boolean(reply) && reply.ok === true; }, function () { return false; }).then(function (sent) {
+        requestCancellation(order.requestId).then(function (reply) { return { sent: Boolean(reply) && reply.ok === true, closed: Boolean(reply) && reply.error === "window_closed", notPaid: Boolean(reply) && reply.error === "not_paid" }; }, function () { return { sent: false, closed: false, notPaid: false }; }).then(function (outcome) {
+          var sent = outcome.sent;
           sending = false;
           view.sending = false;
           var live = liveView(order.requestId) || view;
@@ -595,6 +636,19 @@
             live.status.setAttribute("tabindex", "-1");
             paint(live);
             if (live.cancel === wrap) removeControls(live);
+            focusHere(live.status);
+          } else if (outcome.notPaid) {
+            // The server has no payment for this order, so there is nothing to cancel here: the button goes, quietly.
+            live.order.windowClosed = true;
+            paint(live);
+            if (live.cancel === wrap) removeControls(live);
+            focusHere(live.status);
+          } else if (outcome.closed) {
+            // The 24 hours are over (the server counts them): the button goes and nothing is stored.
+            live.order.windowClosed = true;
+            paint(live);
+            if (live.cancel === wrap) removeControls(live);
+            showNote(live, WINDOW_CLOSED_TEXT, "my-order-note is-error");
             focusHere(live.status);
           } else if (live === view && canCancel(view)) {
             say(CANCEL_FAILED_TEXT, true);
@@ -634,13 +688,15 @@
     postAction("status", { requestIds: ids }, STATUS_TIMEOUT_MS).then(function (reply) {
       statusInFlight = false;
       if (!reply || reply.ok !== true || !reply.statuses || typeof reply.statuses !== "object") return;
-      storeStatuses(reply.statuses);
+      storeStatuses(reply.statuses, reply.paid);
       storeAdvances(reply.advance);
       views.forEach(function (view) {
         var code = Object.prototype.hasOwnProperty.call(reply.statuses, view.order.requestId) ? reply.statuses[view.order.requestId] : null;
         if (!isStatusCode(code)) return;
         view.order.status = code;
         view.order.statusCheckedAt = Date.now();
+        var paidTime = paidTimeFrom(reply.paid, view.order.requestId, Date.now());
+        if (paidTime) view.order.paidAt = paidTime;
         paint(view);
       });
       // An order the server did not answer for (or one whose advance went away) loses its Pay button too.
@@ -674,7 +730,7 @@
   var LOAD_CHECK_GAP_MS = 10 * 60 * 1000;
   var IDLE_DELAY_MS = 2500;
   // An order in one of these states cannot owe an advance any more, so it never triggers the load check.
-  var NO_ADVANCE_STATUSES = { delivered: true, dispatched: true, cancelled: true, advance_paid: true, cancel_requested: true };
+  var NO_ADVANCE_STATUSES = { delivered: true, dispatched: true, cancelled: true, advance_paid: true, cancel_requested: true, paid: true, payment_pending: true, unpaid: true };
   var popupOrders = [];
   var payingNow = false;
   var popupReturnFocus = null;
@@ -751,7 +807,7 @@
   // once per 10 minutes. The check itself is the same one My orders runs, with its own 60 s gap and one-at-a-time guard.
   function loadCheck() {
     var store = storage();
-    if (!store || popup.open || anotherDialogOpen() || backPending) return;
+    if (!store || popup.open || anotherDialogOpen() || backPending || paymentsMode() !== "off") return;
     var possible = read().some(function (order) { return CANCELLABLE_ID.test(order.requestId) && !NO_ADVANCE_STATUSES[effectiveStatus(order)]; });
     if (!possible) return;
     var now = Date.now();
