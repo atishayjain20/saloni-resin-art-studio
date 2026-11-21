@@ -506,12 +506,13 @@ class StaticSiteContractTests(unittest.TestCase):
             r'<a href="#customizer" data-customizer-open>Design a frame[\s\S]*?'
             r'<a href="corporate-gifting/">Corporate orders[\s\S]*?'
             r'<a href="partners/">Partner Circle[\s\S]*?'
-            r'<a href="#my-orders-dialog" data-my-orders-open>My orders',
+            r'<a href="#my-orders-dialog" data-my-orders-open>My orders[\s\S]*?'
+            r'<a href="#favourites-dialog" data-favourites-open>My favourites',
         )
         # The owner removed these shortcuts from the menu; the category tabs below the header still cover them.
         for label in ("Bestsellers", "Marriage gifts", "Couple keepsakes", "Resin frames"):
             self.assertNotIn(">" + label + " <", nav)
-        self.assertEqual(nav.count("<a "), 5)
+        self.assertEqual(nav.count("<a "), 6)
         self.assertNotIn('nav-cta', nav)
         self.assertNotIn('href="#process"', nav)
         self.assertNotIn(">The process<", nav)

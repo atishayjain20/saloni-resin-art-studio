@@ -358,20 +358,21 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261206">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261206" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261206" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261206" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261207">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261207" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261207" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261207" defer><\/script>/);
+  assert.match(html, /<script class="favourites-script" src="favourites\.js\?v=20261207" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
   for (const page of ["index.html", "partners/index.html", "corporate-gifting/index.html", "resin-photo-frames/index.html", "namokar-mantra-frames/index.html", "reviews/index.html", "varmala-preservation/index.html", "shipping-and-returns/index.html"]) {
     const source = fs.readFileSync(path.join(root, page), "utf8");
-    const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
+    const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|favourites\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261206"], page);
+    assert.deepEqual([...new Set(versions)], ["20261207"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261206/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261207/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -1012,12 +1013,12 @@ test("request CTA vocabulary is consistent and supports general enquiries", () =
 
 test("footer trust strip and primary navigation use the approved customer vocabulary", () => {
   const nav = html.match(/<nav class="site-nav"[\s\S]*?<\/nav>/)?.[0] || "";
-  ["Gifts", "Design a frame", "Corporate orders", "Partner Circle", "My orders"].forEach((label) => {
+  ["Gifts", "Design a frame", "Corporate orders", "Partner Circle", "My orders", "My favourites"].forEach((label) => {
     assert.match(nav, new RegExp(`>${label}(?:\\s|<)`));
   });
   ["Bestsellers", "Marriage gifts", "Couple keepsakes", "Resin frames"].forEach((label) => assert.doesNotMatch(nav, new RegExp(`>${label}(?:\\s|<)`)));
   assert.doesNotMatch(nav, />Order\s*<\/a>/);
-  assert.equal((nav.match(/<a\b/g) || []).length, 5);
+  assert.equal((nav.match(/<a\b/g) || []).length, 6);
   const hero = section("hero");
   const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
   const trustStrip = footer.match(/<ul class="hero-trust-strip"[\s\S]*?<\/ul>/)?.[0] || "";
