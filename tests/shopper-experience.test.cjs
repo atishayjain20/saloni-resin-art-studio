@@ -46,7 +46,9 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
   assert.match(sale, /<p class="hero-promo-big"><span>20%<\/span> off<\/p>/);
   const saleCount = (html.match(/<span>20% off<\/span>/g) || []).length;
   assert.match(sale, new RegExp(`on ${saleCount} handmade pieces`), "the piece count must match the cards that show 20% off");
-  assert.doesNotMatch(sale, /ends|hurry|only today|countdown|left/i);
+  // The sale is honest: it names its end date (the head script ends it after 30 Nov 2026, India time).
+  assert.match(sale, /<p class="hero-promo-sub hero-promo-ends"><strong>Sale ends 30 Nov<\/strong><\/p>/);
+  assert.doesNotMatch(sale, /hurry|only today|countdown|left/i);
   assert.equal((sale.match(/<a\b/g) || []).length, 1);
   assert.match(sale, /<a class="button hero-promo-cta" href="#catalogue-filters" data-browse-all>Shop the sale<\/a>/);
   [["Preserved Rose Hexagon Frame", "₹3,124", "₹2,499"], ["Sunflower Resin Night Lamp", "₹749", "₹599"], ["Little Brother Name Rakhi", "₹499", "₹399"]].forEach(([title, was, now]) => {
@@ -356,10 +358,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261201">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261201" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261201" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261201" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261202">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261202" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261202" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261202" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -367,9 +369,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261201"], page);
+    assert.deepEqual([...new Set(versions)], ["20261202"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261201/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261202/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -2826,4 +2828,64 @@ test("the product popup is warm ivory with the name, price and buttons in a blus
     assert.match(rule, /border-radius: 1rem/);
     assert.doesNotMatch(rule, /var\(--paper\)|border-top/);
   });
+});
+
+// The 20% sale ends after 30 Nov 2026 23:59 India time (2026-11-30T18:30:00Z); from 1 Dec the sale price is simply the price.
+test("an inline head script marks the page sale-ended exactly from 1 Dec 2026 00:00 India time", () => {
+  const head = html.slice(0, html.indexOf("</head>"));
+  const inline = Array.from(head.matchAll(/<script>([\s\S]*?)<\/script>/g), (match) => match[1]);
+  assert.equal(inline.length, 1, "one tiny inline script in the head");
+  assert.ok(head.indexOf("<script>") < head.indexOf('<link rel="stylesheet"'), "runs before the stylesheet so nothing flashes");
+  assert.equal(Date.UTC(2026, 10, 30, 18, 30), Date.parse("2026-11-30T18:30:00Z"));
+  assert.equal(Date.parse("2026-12-01T00:00:00+05:30"), Date.parse("2026-11-30T18:30:00Z"));
+  const run = (iso) => {
+    const added = [];
+    const context = { Date: { now: () => Date.parse(iso), UTC: Date.UTC }, document: { documentElement: { classList: { add: (name) => added.push(name) } } } };
+    vm.createContext(context);
+    vm.runInContext(inline[0], context);
+    return added;
+  };
+  assert.deepEqual(run("2026-11-21T00:00:00Z"), []);
+  assert.deepEqual(run("2026-11-30T18:29:59Z"), [], "30 Nov 23:59:59 India time is still sale");
+  assert.deepEqual(run("2026-12-01T00:00:00+05:30"), ["sale-ended"], "midnight India time ends the sale");
+  assert.deepEqual(run("2027-03-01T00:00:00Z"), ["sale-ended"]);
+});
+
+test("under sale-ended CSS hides every struck price, 20% off tag, sale slide and the was part of hero tags", () => {
+  const rule = css.match(/html\.sale-ended[^{]*\{[^}]*\}/g) || [];
+  const hidden = rule.filter((item) => /display:\s*none\s*!important/.test(item)).join("\n");
+  [".product-regular-price", ".hero-promo-sale", ".hero-promo-tag s", ".hero-promo-tag .sr-only"].forEach((selector) => {
+    assert.ok(hidden.includes("html.sale-ended " + selector), selector + " is hidden once the sale has ended");
+  });
+  // The "20% off" tag lives inside the regular-price row, so hiding the row hides it too.
+  assert.ok(/<dd class="product-regular-price">[^]*?<span>20% off<\/span><\/dd>/.test(html));
+  // The sale-ended note sits only in the sale slide, which is removed.
+  assert.equal((html.match(/Sale ends/g) || []).length, 1);
+});
+
+test("initSaleEnd drops the sale slide and its dot, and renumbers the rest, only once the sale has ended", () => {
+  assert.ok(script.indexOf("    initSaleEnd();") > 0 && script.indexOf("    initSaleEnd();") < script.indexOf("    initHeroBanner();"), "slides are final before the carousel reads them");
+  const start = script.indexOf("  function initSaleEnd(");
+  assert.ok(start > 0, "expected initSaleEnd");
+  const source = script.slice(start, script.indexOf("\n  }\n", start) + 5);
+  assert.doesNotMatch(source, /Date/, "the end time lives only in the head script");
+  const run = (ended) => {
+    const slide = (text, extra) => Object.assign({ text, removed: false, getAttribute() { return this.text; }, setAttribute(_name, value) { this.text = value; }, remove() { this.removed = true; } }, extra);
+    const slides = [slide("1 of 7: 20% off sale"), slide("2 of 7: Design"), slide("3 of 7: Premium"), slide("4 of 7: Couple"), slide("5 of 7: Marriage"), slide("6 of 7: Corporate"), slide("7 of 7: Diwali")];
+    const dots = [1, 2, 3, 4, 5, 6, 7].map(() => ({ removed: false, remove() { this.removed = true; } }));
+    const live = (list) => list.filter((item) => !item.removed);
+    const document = {
+      querySelector: (selector) => (selector === ".hero-promo-sale" ? slides[0] : selector === "html.sale-ended" && ended ? {} : null),
+      querySelectorAll: (selector) => (selector === ".hero-slide" ? live(slides) : selector === "[data-banner-dot]" ? live(dots) : []),
+    };
+    vm.runInContext(`${source}\ninitSaleEnd();`, vm.createContext({ document }));
+    return { labels: live(slides).map((item) => item.text), dots: live(dots).length };
+  };
+  const before = run(false);
+  assert.equal(before.labels.length, 7);
+  assert.equal(before.labels[0], "1 of 7: 20% off sale");
+  assert.equal(before.dots, 7);
+  const after = run(true);
+  assert.deepEqual(after.labels, ["1 of 6: Design", "2 of 6: Premium", "3 of 6: Couple", "4 of 6: Marriage", "5 of 6: Corporate", "6 of 6: Diwali"]);
+  assert.equal(after.dots, 6);
 });
