@@ -830,6 +830,26 @@
     script.async = true;
     document.head.appendChild(script);
   }
+  // Razorpay draws its window in <body>. The checkout sits in a modal <dialog>, which the browser keeps in its top layer above any
+  // z-index and which makes the rest of the page inert, so the payment window opened hidden and unclickable behind it. While the
+  // payment window is open the dialog stays open but non-modal; it becomes modal again when the window closes.
+  var orderDialog = document.getElementById("order-dialog");
+  var swapCloses = 0;
+  if (orderDialog && window.addEventListener) {
+    // The swap closes the dialog for a moment; the page's own close handler must not treat that as the shopper closing it.
+    window.addEventListener("close", function (event) {
+      if (swapCloses > 0 && event.target === orderDialog) { swapCloses -= 1; event.stopImmediatePropagation(); }
+    }, true);
+  }
+  function setDialogModal(modal) {
+    if (!orderDialog || !orderDialog.open || typeof orderDialog.show !== "function") return;
+    var isModal = true;
+    try { isModal = orderDialog.matches(":modal"); } catch (error) {}
+    if (isModal === modal) return;
+    swapCloses += 1;
+    orderDialog.close();
+    if (modal) orderDialog.showModal(); else orderDialog.show();
+  }
   function phoneDigits() { var digits = value("phone").replace(/\D/g, ""); return digits.length > 10 ? digits.slice(-10) : digits; }
   function stopPaying(attempt, message) {
     paymentRetry = true;
@@ -858,16 +878,19 @@
           theme: { color: "#b0125b" },
           timeout: 900,
           handler: function (response) {
+            setDialogModal(true);
             if (pending.done) return;
             pending.done = true;
             verifyPayment(attempt, pending, response || {}, 0);
           },
-          modal: { ondismiss: function () { if (!pending.done && isCurrent(attempt)) stopPaying(attempt, NOT_COMPLETED); } }
+          modal: { ondismiss: function () { setDialogModal(true); if (!pending.done && isCurrent(attempt)) stopPaying(attempt, NOT_COMPLETED); } }
         });
         checkout.on("payment.failed", function () { if (!pending.done && isCurrent(attempt)) setStatus(NOT_COMPLETED, "error"); });
         setStatus("Finish your payment in the payment window.", "");
+        setDialogModal(false);
         checkout.open();
       } catch (error) {
+        setDialogModal(true);
         stopPaying(attempt, "The payment window could not open. Your cart is kept. Please try again.");
       }
     });
