@@ -2416,7 +2416,7 @@
       }
       status.hidden = true;
       track("order-form-open");
-      window.saloniOrderForm.open(seed, { previewBlob: frameState.previewSnapshot ? frameState.previewSnapshot.blob : null, onSent: saveRepeatProfile, onPaid: clearCartAfterPayment });
+      window.saloniOrderForm.open(seed, { previewBlob: frameState.previewSnapshot ? frameState.previewSnapshot.blob : null, onSent: afterOrderSent, onPaid: clearCartAfterPayment });
       frameState.loaded = true;
       if (continueOrderButton) continueOrderButton.hidden = false;
       if (orderDialogEnabled) openOrderDialog(opener, true);
@@ -2806,6 +2806,12 @@
         button.setAttribute("aria-pressed", String(selected));
         button.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (button.__saloniCatalogueTitle || "item") + (selected ? " from cart" : " to cart"));
       });
+    }
+
+    // A sent cart order (paid, or saved as a request) empties the cart, so the shopper does not send it twice; a custom design request leaves the cart alone.
+    function afterOrderSent(profile) {
+      saveRepeatProfile(profile);
+      if (frameState.sourceKind === "catalogue" && frameState.catalogueSeedKey) clearCartAfterPayment();
     }
 
     // A paid order empties the cart. The order form stays on its own confirmation, and the next Order now opens a fresh request.
