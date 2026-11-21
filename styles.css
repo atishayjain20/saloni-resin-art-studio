@@ -669,6 +669,27 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .lightbox-order-summary { display: grid; flex: 0 0 auto; justify-items: center; gap: .3rem; margin-top: .9rem; padding: .8rem .75rem .75rem; border-radius: 1rem; background: #fde7f0; text-align: center; }
 .lightbox-order-summary strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
 .lightbox-order-summary #lightbox-product-price { color: var(--cocoa); font-weight: 800; }
+/* Size choice: native radio buttons shown as pills. The popup and each /p/ page use the same markup. */
+.size-choice { min-width: 0; margin: 0; padding: 0; border: 0; text-align: center; }
+.size-choice[hidden] { display: none; }
+.size-choice legend { margin: 0 auto .35rem; padding: 0; color: var(--muted); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.size-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.size-option { position: relative; display: block; min-width: 0; }
+.size-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.size-face { display: grid; align-content: center; justify-items: center; gap: .1rem; height: 100%; min-height: 44px; padding: .45rem .3rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--paper); color: var(--ink); line-height: 1.2; text-align: center; }
+.size-name { font-size: .85rem; font-weight: 700; overflow-wrap: anywhere; }
+.size-price { color: var(--muted); font-size: .78rem; font-variant-numeric: lining-nums tabular-nums; }
+.size-option input:checked + .size-face { border-color: var(--rose-ink); box-shadow: inset 0 0 0 1px var(--rose-ink); background: #fff; }
+.size-option input:checked + .size-face .size-name { font-weight: 800; }
+.size-option input:checked + .size-face .size-price { color: var(--rose-ink); font-weight: 700; }
+.size-option input:focus-visible + .size-face { outline: 3px solid var(--rose); outline-offset: 2px; }
+.lightbox-sizes { width: 100%; margin-top: .25rem; }
+.product-detail button.order { width: 100%; border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+.product-detail .size-form { margin: 0; }
+.product-detail .size-choice { margin: .5rem 0 0; }
+/* "3 sizes" on a card: the price shown is the default size's. */
+.product-size-count { flex-basis: 100%; }
+:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div > dd.product-size-count { padding: 0; background: none; color: var(--rose-ink); font: 700 .74rem/1.3 var(--sans); letter-spacing: normal; }
 .lightbox-request { width: 100%; align-self: stretch; justify-content: center; flex: 0 0 auto; margin-top: 1rem; }
 .lightbox-delivery-note { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.35; text-align: center; }
 .lightbox-request[hidden] + .lightbox-delivery-note { display: none; }

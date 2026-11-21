@@ -27,7 +27,7 @@ test("share helpers build the product page URL and an encoded WhatsApp message",
   assert.equal(decodeURIComponent(api.whatsappShareUrl("Rose Tray", "", `${SITE}/p/rose-tray/`).split("text=")[1]), `Rose Tray – ${SITE}/p/rose-tray/`, "no price, no dangling dash");
 });
 
-function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Resin Tealight Holder", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {}, thumbs = false, inCart = false } = {}) {
+function harness({ search = "", hash = "", share, clipboard, withShare = true, slugs = { "jewel-glow-tealight": "Jewel Resin Tealight Holder", "mr-and-mrs-name-plate": "Mr & Mrs Name Plate" }, noSlugAttribute = false, noLocation = false, more = {}, thumbs = false, inCart = false, sizes = {}, cartSize = "" } = {}) {
   const cartButtons = {};
   const make = (extra = {}) => Object.assign({
     hidden: false, textContent: "", attributes: {}, listeners: {},
@@ -41,16 +41,16 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
   const triggers = Object.entries(slugs).map(([slug, name], index) => {
     const rows = [["Price", index ? "₹1,799" : "₹249"], ["Size", "8 in"]].map(([label, value]) => make({ querySelector: (selector) => (selector === "dt" ? { textContent: label } : selector === "dd" ? { textContent: value } : null) }));
     // The card's own Add to cart button, as the catalogue makes it; a click toggles it like the real one.
-    const cartButton = make({ clicks: 0, attributes: { "data-order-prefill": "catalogue", "aria-pressed": inCart ? "true" : "false" } });
-    cartButton.click = function () { this.clicks += 1; this.attributes["aria-pressed"] = this.attributes["aria-pressed"] === "true" ? "false" : "true"; };
+    const cartButton = make({ clicks: 0, handoffs: [], attributes: Object.assign({ "data-order-prefill": "catalogue", "aria-pressed": inCart ? "true" : "false" }, inCart && cartSize ? { "data-cart-size": cartSize } : {}) });
+    cartButton.click = function () { this.clicks += 1; this.handoffs.push(this.__saloniChosenSize); this.attributes["aria-pressed"] = this.attributes["aria-pressed"] === "true" ? "false" : "true"; };
     cartButtons[slug] = cartButton;
     const card = make({
-      querySelector: (selector) => (selector === "figcaption strong" ? { textContent: name } : selector === '[data-order-prefill="catalogue"]' ? cartButton : null),
+      querySelector: (selector) => (selector === "figcaption strong" ? { textContent: name } : selector === '[data-order-prefill="catalogue"]' || selector === "[data-order-prefill]" ? cartButton : null),
       querySelectorAll: (selector) => (selector === ".product-pricing > div" ? rows : selector === "figcaption p" ? [{ textContent: "A short line." }] : []),
     });
     return make({
       href: `assets/${slug}.jpg`,
-      attributes: noSlugAttribute ? {} : Object.assign({ "data-product-slug": slug }, more[slug] ? { "data-more-like-this": more[slug] } : {}, thumbs ? { "data-thumb": `assets/thumb/${slug}.jpg` } : {}),
+      attributes: noSlugAttribute ? {} : Object.assign({ "data-product-slug": slug }, more[slug] ? { "data-more-like-this": more[slug] } : {}, thumbs ? { "data-thumb": `assets/thumb/${slug}.jpg` } : {}, sizes[slug] ? { "data-sizes": sizes[slug] } : {}),
       querySelector: (selector) => (selector === "img" ? { alt: name + " photo" } : null),
       closest: (selector) => (selector === "article" ? card : null),
     });
@@ -68,6 +68,10 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
   const figure = make({ scrollTop: 0 });
   elements["lightbox-more"] = make({ hidden: true });
   elements["lightbox-more-list"] = moreList;
+  // The popup's size choice (a fieldset and the list the script fills with radio buttons), only when the test asks for it.
+  const sizeList = make({ children: [], appendChild(child) { this.children.push(child); return child; } });
+  Object.defineProperty(sizeList, "textContent", { get() { return ""; }, set() { this.children = []; } });
+  if (Object.keys(sizes).length) { elements["lightbox-sizes"] = make({ hidden: true }); elements["lightbox-size-options"] = sizeList; }
   const lightbox = make({ querySelector: (selector) => (selector === ".lightbox-figure" ? figure : null), showModal() { this.open = true; }, close() { this.open = false; this.listeners.close(); } });
   Object.assign(elements, {
     "art-lightbox": lightbox, "lightbox-image": image, "lightbox-caption": make(),
@@ -92,7 +96,7 @@ function harness({ search = "", hash = "", share, clipboard, withShare = true, s
     querySelectorAll: (selector) => (selector === "[data-lightbox-trigger]" ? triggers : []),
   };
   const result = vm.runInNewContext(`(function () { ${helpers}${lightboxBlock}\n return { openSharedProduct: typeof openSharedProduct === "function" ? openSharedProduct : null }; })()`, { document: documentObject, window: windowObject, URLSearchParams, URL });
-  return { elements, triggers, lightbox, image, figure, moreList, pushes, replaces, order, calls, windowObject, cartButtons, openSharedProduct: result.openSharedProduct };
+  return { sizeList, elements, triggers, lightbox, image, figure, moreList, pushes, replaces, order, calls, windowObject, cartButtons, openSharedProduct: result.openSharedProduct };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -311,12 +315,164 @@ test("popup More like this: the markup sits last in the figure after the care ti
   assert.match(css, /\.lightbox-more-item img\s*\{[^}]*width:\s*6\.25rem[^}]*height:\s*6\.25rem/);
 });
 
+const SIZES_JSON = JSON.stringify({ default: "8-12-in", options: [{ code: "6-10-in", label: "6 × 10 in", price: "₹1,249" }, { code: "8-12-in", label: "8 × 12 in", price: "₹1,799" }, { code: "10-15-in", label: "10 × 15 in", price: "₹2,499" }] });
+const SIZED = { "mr-and-mrs-name-plate": SIZES_JSON };
+
+test("sizeOptions reads the card's data-sizes and refuses anything that is not a valid size list", () => {
+  const api = vm.runInNewContext(`(function () { ${helpers}\nreturn { sizeOptions }; })()`, {});
+  const trigger = (value) => ({ getAttribute: (name) => (name === "data-sizes" ? value : null) });
+  const good = JSON.parse(JSON.stringify(api.sizeOptions(trigger(SIZES_JSON))));
+  assert.equal(good.default, "8-12-in");
+  assert.deepEqual(good.options.map((option) => [option.code, option.label, option.price]), [["6-10-in", "6 × 10 in", "₹1,249"], ["8-12-in", "8 × 12 in", "₹1,799"], ["10-15-in", "10 × 15 in", "₹2,499"]]);
+  const option = (code, price = "₹100", label = "A") => ({ code, label, price });
+  const bad = [undefined, null, "", "not json", "[]", "{}", JSON.stringify({ default: "a", options: [option("a")] }),
+    JSON.stringify({ default: "z", options: [option("a"), option("b")] }), JSON.stringify({ options: [option("a"), option("b")] }),
+    JSON.stringify({ default: "a", options: [option("a"), option("a")] }), JSON.stringify({ default: "a", options: [option("a"), option("B C")] }),
+    JSON.stringify({ default: "a", options: [option("a"), option("b", "100")] }), JSON.stringify({ default: "a", options: [option("a"), option("b", "₹100", "")] }),
+    JSON.stringify({ default: "constructor", options: [option("a"), option("b")] }), JSON.stringify({ default: "a", options: [option("a"), null] })];
+  bad.forEach((value) => assert.equal(api.sizeOptions(trigger(value)), null, String(value)));
+  assert.equal(api.sizeOptions(null), null);
+  assert.equal(api.sizeOptions({}), null);
+});
+
+test("?product=<slug>&add=1&size=<code> adds that size; a missing or unknown size adds the default", () => {
+  const pick = (search, extra = {}) => {
+    const page = harness({ search, hash: "#marriage-gifts", sizes: SIZED, ...extra });
+    page.openSharedProduct();
+    return page.cartButtons["mr-and-mrs-name-plate"];
+  };
+  const chosen = pick("?product=mr-and-mrs-name-plate&add=1&size=10-15-in");
+  assert.equal(chosen.clicks, 1);
+  assert.deepEqual(chosen.handoffs, ["10-15-in"], "the size goes to the card's Add to cart in one go");
+  assert.deepEqual(pick("?product=mr-and-mrs-name-plate&add=1").handoffs, ["8-12-in"], "no size: the default");
+  assert.deepEqual(pick("?product=mr-and-mrs-name-plate&add=1&size=nope").handoffs, ["8-12-in"], "unknown size: the default");
+  assert.deepEqual(pick("?product=mr-and-mrs-name-plate&add=1&size=__proto__").handoffs, ["8-12-in"]);
+  const oneSize = harness({ search: "?product=jewel-glow-tealight&add=1&size=10-15-in", sizes: SIZED });
+  oneSize.openSharedProduct();
+  assert.equal(oneSize.cartButtons["jewel-glow-tealight"].clicks, 1, "a one-size card still just adds");
+});
+
+test("add=1 for an item in the cart with another size replaces that line; the same size or no size leaves the cart alone", () => {
+  const run = (search, cartSize = "8-12-in") => {
+    const page = harness({ search, sizes: SIZED, inCart: true, cartSize });
+    page.openSharedProduct();
+    return page.cartButtons["mr-and-mrs-name-plate"];
+  };
+  const changed = run("?product=mr-and-mrs-name-plate&add=1&size=10-15-in");
+  assert.equal(changed.clicks, 1);
+  assert.deepEqual(changed.handoffs, ["10-15-in"]);
+  assert.equal(run("?product=mr-and-mrs-name-plate&add=1&size=8-12-in").clicks, 0, "same size");
+  assert.equal(run("?product=mr-and-mrs-name-plate&add=1").clicks, 0, "no size in the link");
+  assert.equal(run("?product=mr-and-mrs-name-plate&add=1&size=nope").clicks, 0, "unknown size");
+});
+
+test("opening a shared product also takes ?size= out of the address", () => {
+  const page = harness({ search: "?ref=ABC&product=mr-and-mrs-name-plate&add=1&size=6-10-in&x=1", hash: "#marriage-gifts", sizes: SIZED });
+  page.openSharedProduct();
+  assert.deepEqual(page.replaces, ["/?ref=ABC&x=1#marriage-gifts"]);
+  const popup = harness({ search: "?product=mr-and-mrs-name-plate&size=6-10-in", sizes: SIZED });
+  popup.openSharedProduct();
+  assert.deepEqual(popup.replaces, ["/"]);
+});
+
+test("the catalogue's own address tidying also drops a leftover size=", () => {
+  assert.match(script, /\["type", "budget", "page", "q", "view", "product", "size"\]\.forEach\(function \(key\) \{ params\.delete\(key\); \}\);/);
+});
+
+const radios = (page) => page.sizeList.children.map((label) => label.children[0]);
+
+test("the popup shows a radio button per size only for a sized product, with the default checked and the size's own price", () => {
+  const page = harness({ sizes: SIZED });
+  page.triggers[1].listeners.click({ button: 0, preventDefault() {} });
+  assert.equal(page.elements["lightbox-sizes"].hidden, false);
+  assert.deepEqual(radios(page).map((input) => [input.type, input.name, input.value, input.checked]), [["radio", "lightbox-size", "6-10-in", false], ["radio", "lightbox-size", "8-12-in", true], ["radio", "lightbox-size", "10-15-in", false]]);
+  assert.deepEqual(page.sizeList.children.map((label) => label.children[1].textContent), ["6 × 10 in₹1,249", "8 × 12 in₹1,799", "10 × 15 in₹2,499"]);
+  assert.equal(page.elements["lightbox-product-price"].textContent, "Price: ₹1,799");
+  assert.equal(page.elements["lightbox-product-size"].hidden, true, "the size buttons replace the single size line");
+  // A one-size product has none.
+  page.lightbox.close();
+  page.triggers[0].listeners.click({ button: 0, preventDefault() {} });
+  assert.equal(page.elements["lightbox-sizes"].hidden, true);
+  assert.equal(page.sizeList.children.length, 0);
+  assert.equal(page.elements["lightbox-product-size"].hidden, false);
+  assert.equal(page.elements["lightbox-product-price"].textContent, "Price: ₹249");
+});
+
+test("choosing another size changes the popup price; Add to cart hands that size to the card's button", () => {
+  const page = harness({ sizes: SIZED });
+  page.triggers[1].listeners.click({ button: 0, preventDefault() {} });
+  radios(page)[2].checked = true;
+  radios(page)[2].listeners.change();
+  assert.equal(page.elements["lightbox-product-price"].textContent, "Price: ₹2,499");
+  assert.equal(page.elements["lightbox-request"].textContent, "Add to cart");
+  page.elements["lightbox-request"].listeners.click();
+  assert.equal(page.cartButtons["mr-and-mrs-name-plate"].__saloniChosenSize, "10-15-in");
+  assert.equal(page.cartButtons["mr-and-mrs-name-plate"].clicks, 1, "the card's own button still receives the click");
+});
+
+test("popup button wording follows the cart: Remove for the size in the cart, Update size in cart for another size", () => {
+  const page = harness({ sizes: SIZED, inCart: true, cartSize: "10-15-in" });
+  page.triggers[1].listeners.click({ button: 0, preventDefault() {} });
+  assert.deepEqual(radios(page).map((input) => input.checked), [false, false, true], "the size in the cart is selected");
+  assert.equal(page.elements["lightbox-request"].textContent, "Remove from cart");
+  assert.equal(page.elements["lightbox-product-price"].textContent, "Price: ₹2,499");
+  radios(page)[0].checked = true;
+  radios(page)[0].listeners.change();
+  assert.equal(page.elements["lightbox-request"].textContent, "Update size in cart");
+  assert.match(page.elements["lightbox-request"].attributes["aria-label"], /^Update size of Mr & Mrs Name Plate in cart$/);
+  assert.equal(page.elements["lightbox-product-price"].textContent, "Price: ₹1,249");
+  radios(page)[2].checked = true;
+  radios(page)[2].listeners.change();
+  assert.equal(page.elements["lightbox-request"].textContent, "Remove from cart", "back to the size in the cart");
+  radios(page)[0].checked = true;
+  radios(page)[0].listeners.change();
+  page.elements["lightbox-request"].listeners.click();
+  assert.equal(page.cartButtons["mr-and-mrs-name-plate"].__saloniChosenSize, "6-10-in");
+});
+
+test("a shared ?size= link opens the popup on that size; an unknown size opens on the default", () => {
+  const page = harness({ search: "?product=mr-and-mrs-name-plate&size=6-10-in", sizes: SIZED });
+  page.openSharedProduct();
+  assert.deepEqual(radios(page).map((input) => input.checked), [true, false, false]);
+  assert.equal(page.elements["lightbox-product-price"].textContent, "Price: ₹1,249");
+  const unknown = harness({ search: "?product=mr-and-mrs-name-plate&size=nope", sizes: SIZED });
+  unknown.openSharedProduct();
+  assert.deepEqual(radios(unknown).map((input) => input.checked), [false, true, false]);
+  // The shared size is used once: the next popup opens on its own default.
+  page.lightbox.close();
+  page.triggers[1].listeners.click({ button: 0, preventDefault() {} });
+  assert.deepEqual(radios(page).map((input) => input.checked), [false, true, false]);
+});
+
+test("closing the popup empties the size choice, and the arrow keys move between sizes instead of photos", () => {
+  const page = harness({ sizes: SIZED });
+  page.triggers[1].listeners.click({ button: 0, preventDefault() {} });
+  assert.equal(page.sizeList.children.length, 3);
+  const keys = [];
+  page.lightbox.listeners.keydown({ key: "ArrowRight", target: { name: "lightbox-size" }, preventDefault() { keys.push("prevented"); } });
+  assert.deepEqual(keys, [], "the radio group keeps its own arrow keys");
+  page.lightbox.close();
+  assert.equal(page.sizeList.children.length, 0);
+  assert.equal(page.elements["lightbox-sizes"].hidden, true);
+});
+
+test("the popup markup holds the size fieldset between the price and the request button, and the styles keep 44px size buttons", () => {
+  assert.match(html, /<span id="lightbox-product-price" hidden><\/span>\s*<fieldset class="size-choice lightbox-sizes" id="lightbox-sizes" hidden><legend>Size<\/legend><span class="size-options" id="lightbox-size-options"><\/span><\/fieldset>\s*<button class="button button-dark lightbox-request" id="lightbox-request"/);
+  assert.match(css, /\.size-face\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.size-option input\s*\{[^}]*opacity:\s*0/);
+  assert.doesNotMatch(css, /\.size-option input\s*\{[^}]*display:\s*none/, "the radio stays in the page for keyboards");
+  assert.match(css, /\.size-option input:checked \+ \.size-face\s*\{[^}]*var\(--rose-ink\)/);
+  assert.match(css, /\.size-option input:focus-visible \+ \.size-face/);
+  assert.match(css, /\.size-choice\[hidden\]\s*\{\s*display:\s*none/);
+  assert.match(css, /\.product-size-count\s*\{/);
+});
+
 test("every card photo link carries its own data-product-slug and the version is bumped", () => {
   const slugs = [...html.matchAll(/<a class="lightbox-trigger" data-lightbox-trigger[^>]*? data-product-slug="([a-z0-9-]+)"/g)].map((match) => match[1]);
   assert.ok(slugs.length > 90);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.doesNotMatch(html, /\?v=20261165/);
-  assert.match(html, /script\.js\?v=20261202/);
+  assert.match(html, /script\.js\?v=20261203/);
 });
 
 // --- Visitor counts: the product popup, the share button and a shared link, with no personal data ---

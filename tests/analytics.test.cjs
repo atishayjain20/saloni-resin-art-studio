@@ -8,7 +8,7 @@ const root = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const analyticsPath = path.join(root, "analytics.js");
 const source = fs.existsSync(analyticsPath) ? fs.readFileSync(analyticsPath, "utf8") : "";
-const VERSION = "20261202";
+const VERSION = "20261203";
 // The versioned file GoatCounter publishes for SRI, and the hash its help page lists for it (https://www.goatcounter.com/help/countjs-versions).
 const OFFICIAL_SRC = "https://gc.zgo.at/count.v5.js";
 const OFFICIAL_HASH = "sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ";
@@ -173,7 +173,7 @@ test("the shared cache version is bumped everywhere it is stamped", () => {
     assert.doesNotMatch(read(page), /\?v=20261173/, page);
   }
   assert.doesNotMatch(read("README.md"), /Cache version `20261173`/);
-  assert.match(read("README.md"), /Cache version `20261202`/);
+  assert.match(read("README.md"), /Cache version `20261203`/);
 });
 
 test("no page carries a Content-Security-Policy meta tag that would block GoatCounter", () => {
@@ -220,7 +220,7 @@ test("the order form is counted when it opens, and an add to cart only when the 
   const code = read("script.js");
   assert.match(code, /track\("order-form-open"\);\n\s*window\.saloniOrderForm\.open\(/);
   assert.match(code, /if \(toggleCatalogueSelection\([^\n]*\)\) \{?\s*var slug = slugOf\(card\);\s*if \(slug\) track\("cart-add-" \+ slug\);/);
-  assert.match(code, /function toggleCatalogueSelection\(seed\) \{[\s\S]*?selectedCatalogueItems = nextItems;[\s\S]*?return true;\n    \}/, "returns true only after an item was added");
+  assert.match(code, /function toggleCatalogueSelection\(seed(?:, resize)?\) \{[\s\S]*?selectedCatalogueItems = nextItems;[\s\S]*?return true;\n    \}/, "returns true only after an item was added");
 });
 
 test("the README names what is counted, where to read it, how to switch it off and how to exclude own visits", () => {

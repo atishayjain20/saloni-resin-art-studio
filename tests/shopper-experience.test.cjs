@@ -358,10 +358,10 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261202">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261202" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261202" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261202" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261203">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261203" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261203" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261203" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -369,9 +369,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261202"], page);
+    assert.deepEqual([...new Set(versions)], ["20261203"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261202/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261203/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -813,7 +813,7 @@ test("each priced gift shows a crossed-out regular price 25% above today's price
   cards.forEach((card) => {
     assert.match(card, /^<dl class="product-pricing"[^>]*><div><dt>(?:Price|From)<\/dt>/, "today's price stays the first row, so filters and the cart read it");
     const price = card.match(/<dt>(?:Price|From)<\/dt><dd>([^<]*)<\/dd>/)[1];
-    const regular = card.match(/<dt>(?:Price|From)<\/dt><dd>[^<]*<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>([^<]*)<\/s> <span>20% off<\/span><\/dd><\/div>/);
+    const regular = card.match(/<dt>(?:Price|From)<\/dt><dd>[^<]*<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>([^<]*)<\/s> <span>20% off<\/span><\/dd>(?:<dd class="product-size-count">[2-3] sizes<\/dd>)?<\/div>/);
     if (!/₹/.test(price)) {
       assert.equal(regular, null, price + " has no regular price");
       return;
@@ -2451,14 +2451,14 @@ test("all 106 catalogue cards keep price first and show only known size rows", (
     null,
     null,
     null,
-    ["Size", "8–10 in"],
-    ["Size", "16–18 in"],
+    ["Size", "10 in"],
+    ["Size", "16 in"],
     null,
     ["Size", "1.5–2 in"],
     ["Size", "5–6 in"],
     ["Size", "4 in"],
     ["Size", "6 in"],
-    ["Size", "3 in"],
+    ["Size", "Set of 4"],
     ["Size", "2 in"],
     null,
     null,
@@ -2473,28 +2473,28 @@ test("all 106 catalogue cards keep price first and show only known size rows", (
     null,
     null,
     null,
-    ["Size", "20×22 in"],
+    ["Size", "20 × 22 in"],
     null,
     null,
-    ["Size", "20×22 in"],
+    ["Size", "20 × 22 in"],
     ["Size", "8 × 12 in"],
     ["Size", "8 × 12 in"],
     null,
     null,
-    ["Size", "8–10 in"],
+    ["Size", "10 in"],
     null,
-    ["Size", "20×22 in"],
+    ["Size", "20 × 22 in"],
     null,
-    ["Size", "3 in"],
-    null,
-    null,
+    ["Size", "Set of 4"],
     null,
     null,
     null,
     null,
     null,
-    ["Size", "3 in"],
-    ["Size", "20×22 in"],
+    null,
+    null,
+    ["Size", "Set of 4"],
+    ["Size", "20 × 22 in"],
     null,
     null,
     null,
@@ -2523,9 +2523,9 @@ test("all 106 catalogue cards keep price first and show only known size rows", (
     ["Size", "6 in"],
     ["Size", "4 in"],
     ["Size", "4 in"],
-    ["Size", "6–8 in"],
-    ["Size", "4–5 in"],
-    ["Size", "4–5 in"],
+    ["Size", "8 in"],
+    ["Size", "5 in"],
+    ["Size", "5 in"],
     ["Size", "4 in"],
     ["Size", "6 in"],
     ["Size", "4 in — component size to confirm"],
@@ -2535,7 +2535,7 @@ test("all 106 catalogue cards keep price first and show only known size rows", (
     ["Size", "2–3 in"],
     ["Size", "3–4 in"],
     ["Size", "3–4 in"],
-    ["Size", "4–5 in"],
+    ["Size", "5 in"],
     ["Size", "2 in"],
     ["Size", "3–4 in"],
     ["Size", "3–4 in"],
@@ -2553,7 +2553,7 @@ test("all 106 catalogue cards keep price first and show only known size rows", (
     if (expectedRows[index]) {
       assert.equal(rows.length, 2, `card ${index + 1} has its known size row`);
       assert.deepEqual(rows[1], expectedRows[index], `card ${index + 1} size row`);
-      assert.match(rows[1][1], /\d.*in/);
+      assert.match(rows[1][1], /\d.*in|^Set of \d$/);
     } else {
       assert.equal(rows.length, 1, `card ${index + 1} omits an unknown size row`);
     }
@@ -2583,7 +2583,7 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
   assert.equal(cardFor("Festive Welcome Hamper"), "");
   assert.deepEqual(rowsFor("Ivory Mandala Tealight Holder").slice(1), [["Size", "3 in"]]);
   assert.deepEqual(rowsFor("Pearl Rangoli Accent").slice(1), [["Size", "3–4 in"]]);
-  assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "4–5 in"]]);
+  assert.deepEqual(rowsFor("Rose Petal Offering Plate").slice(1), [["Size", "5 in"]]);
 });
 
 test("studio edit section is removed before the order conversation", () => {

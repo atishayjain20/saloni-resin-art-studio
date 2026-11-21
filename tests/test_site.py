@@ -2672,7 +2672,7 @@ class ProductSharePageTests(unittest.TestCase):
             text, _ = self.page(slug)
             self.assertRegex(
                 text,
-                r'<a class="order" href="[^"]+">Add to cart</a>\s*<p class="delivery-note">' + re.escape(self.DELIVERY_LINE) + r"</p>",
+                r'(?:<a class="order" href="[^"]+">Add to cart</a>|<button class="order" type="submit">Add to cart</button>\s*</form>)\s*<p class="delivery-note">' + re.escape(self.DELIVERY_LINE) + r"</p>",
                 slug)
             self.assertEqual(text.count(self.DELIVERY_LINE), 1, slug)
 
@@ -2703,7 +2703,9 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertEqual(by_name.get(name), slug, name)
             self.assertIn("<h1>" + html.escape(name, quote=False) + "</h1>", self.page(slug)[0], name)
         self.assertEqual(len(self.slugs), 106)
-        self.assertEqual(len(feed_ids), 52)
+        # 52 products; each size of a sized product is its own row (the default size keeps the product's id).
+        self.assertEqual(len({line.split("\t")[10] or line.split("\t")[0] for line in (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8").splitlines()[1:]}), 52)
+        self.assertEqual(len(feed_ids), 95)
 
     def test_pages_and_card_slugs_are_in_step_with_index_html(self):
         tool = load_product_pages_tool()
@@ -2831,6 +2833,12 @@ class ProductSharePageTests(unittest.TestCase):
             blocks = [json.loads(block) for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)]
             products = [block for block in blocks if block.get("@type") == "Product"]
             self.assertEqual(len([block for block in blocks if block.get("@type") == "BreadcrumbList"]), 1, slug)
+            if '<form class="size-form"' in text:
+                # A product with sizes states a ProductGroup instead (ProductSizeTests checks its variants).
+                self.assertEqual(len([block for block in blocks if block.get("@type") == "ProductGroup"]), 1, slug)
+                self.assertEqual(len(blocks), 2, slug)
+                kinds["Offer"] += 1
+                continue
             self.assertEqual(len(blocks), len(products) + 1, slug)
             if card["price"] == "Price on request":
                 self.assertEqual(products, [], slug)
@@ -2864,6 +2872,7 @@ class ProductSharePageTests(unittest.TestCase):
         self.assertEqual(kinds, {"Offer": len(self.products), "AggregateOffer": 0, "none": 0})
 
     def test_pages_are_real_product_pages_with_one_order_button(self):
+        self.sizes = load_product_pages_tool().load_sizes(ROOT)
         section_ids = set(re.findall(r'<section[^>]*\bid="([^"]+)"', self.home))
         for slug, card in self.cards():
             text, tags = self.page(slug)
@@ -2872,18 +2881,22 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertNotIn("<noscript", text, slug)
             self.assertIn(card["section"], section_ids, slug)
             self.assertEqual(tags.body_links[:2], ["#main-content", "/"], slug + ": skip link, then the site header wordmark")
-            self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=" + slug + "&add=1#" + card["section"]], slug)
+            sized = bool(self.sizes[slug]["options"])
+            # A one-size page has an Add to cart link; a sized page has a form that goes to the same address plus the chosen size.
+            self.assertEqual([link for link in tags.body_links if "?product=" in link], [] if sized else ["/?product=" + slug + "&add=1#" + card["section"]], slug)
+            self.assertEqual(text.count('<form class="size-form" action="/#%s" method="get">' % card["section"]), 1 if sized else 0, slug)
             self.assertEqual(tags.noscript_links, [], slug)
             self.assertEqual(re.findall(r"<h1>([^<]*)</h1>", text), [html.escape(card["name"], quote=True)], slug)
             sizes = re.findall(r'<p class="size">Size: ([^<]*)</p>', text)
-            self.assertEqual([html.unescape(size) for size in sizes], [card["size"]] if card["size"] else [], slug)
+            self.assertEqual([html.unescape(size) for size in sizes], [card["size"]] if card["size"] and not sized else [], slug)
             image = re.search(r'<img src="/assets/[^"]+" alt="([^"]*)"( width="(\d+)" height="(\d+)")?', text)
             self.assertIsNotNone(image, slug)
             self.assertEqual(html.unescape(image.group(1)), card["alt"] or card["name"], slug)
             self.assertEqual((image.group(3) or "", image.group(4) or ""), (card["width"], card["height"]), slug)
             # The only script file is google.js (the cookie banner); the tag itself loads only after Accept.
             self.assertEqual(re.findall(r'<script\b[^>]*\bsrc="([^"]+)"', text), ["/google.js?v=" + self.version], slug)
-            self.assertEqual(re.findall(r"<script\b([^>]*)>", text), [' type="application/ld+json"'] * len(re.findall(r"application/ld\+json", text)) + [' src="/google.js?v=%s" defer' % self.version], slug)
+            # A sized page adds one small inline script (it preselects ?size= and keeps the price pill in step).
+            self.assertEqual(re.findall(r"<script\b([^>]*)>", text), [' type="application/ld+json"'] * len(re.findall(r"application/ld\+json", text)) + [' src="/google.js?v=%s" defer' % self.version] + ([""] if sized else []), slug)
         # The button lands in the section the card sits in.
         _, tags = self.page("jewel-glow-tealight")
         self.assertEqual([link for link in tags.body_links if "?product=" in link], ["/?product=jewel-glow-tealight&add=1#diwali"])
@@ -3104,20 +3117,25 @@ class ProductSharePageTests(unittest.TestCase):
         path = ROOT / "merchant-feed.tsv"
         self.assertTrue(path.is_file(), "merchant-feed.tsv is missing: run python3 tools/product_pages.py")
         text = path.read_text(encoding="utf-8")
-        self.assertEqual(text, tool.merchant_feed(cards, self.slugs), "merchant-feed.tsv is stale: run python3 tools/product_pages.py")
+        sizes = tool.load_sizes(ROOT)
+        self.assertEqual(text, tool.merchant_feed(cards, self.slugs, sizes), "merchant-feed.tsv is stale: run python3 tools/product_pages.py")
         lines = text.splitlines()
         header = lines[0].split("\t")
-        self.assertEqual(header, ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists"])
+        self.assertEqual(header, ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists",
+                                  "item_group_id", "item_group_title", "size"])
         wanted = [(slug, card) for slug, card in zip(self.slugs, cards)
                   if not card["alt"].startswith("Illustrative preview:") and re.fullmatch(r"₹[0-9,]+", card["price"])]
         self.assertGreater(len(wanted), 0)
-        self.assertEqual([line.split("\t")[0] for line in lines[1:]], [slug for slug, _ in wanted])
-        for line, (slug, card) in zip(lines[1:], wanted):
+        # One row per product, except that each size of a sized product has its own row (checked in ProductSizeTests): here the default rows.
+        rows = [line.split("\t") for line in lines[1:]]
+        defaults = [fields for fields in rows if not fields[10] or fields[0] == fields[10]]
+        self.assertEqual([fields[0] for fields in defaults], [slug for slug, _ in wanted])
+        for line, (slug, card) in zip([line for line in lines[1:] if not line.split("\t")[10] or line.split("\t")[0] == line.split("\t")[10]], wanted):
             fields = line.split("\t")
             self.assertEqual(len(fields), len(header), slug)
             row = dict(zip(header, fields))
             self.assertNotIn('"', line, slug)
-            self.assertTrue(all(value.strip() for value in fields), slug)
+            self.assertTrue(all(value.strip() for value in fields[:10]), slug)
             self.assertEqual(row["title"], card["name"])
             self.assertIn(card["line"], row["description"])
             self.assertEqual(row["link"], "%s/p/%s/?source=google-shopping" % (self.SITE, slug))
@@ -3136,6 +3154,9 @@ class ProductSharePageTests(unittest.TestCase):
         card = dict(tool.parse_cards(self.home)[0], alt="Photo", price="₹100", name="Bad\tname")
         with self.assertRaises(SystemExit):
             tool.merchant_feed([card], ["bad-name"])
+        sized = {"bad-name": {"price": 100, "choice": True, "default": "a", "options": [{"code": "a", "label": 'A "big" one', "price": 100}, {"code": "b", "label": "B", "price": 200}]}}
+        with self.assertRaises(SystemExit):
+            tool.merchant_feed([dict(card, name="Fine")], ["bad-name"], sized)
 
 
 class TopicPageTests(unittest.TestCase):
@@ -3215,7 +3236,7 @@ class TopicPageTests(unittest.TestCase):
                     mock.patch.object(self.tool, "share_size", return_value=(10, 10)), \
                     mock.patch.object(self.tool, "thumb", return_value="assets/thumb/x.jpg"), \
                     mock.patch.object(self.tool, "stamp", return_value=index):
-                return self.tool.build(index, sitemap)
+                return self.tool.build(index, sitemap, sizes={})
 
         base = {"slug": "topic", "link": "Topic", "title": "T", "description": "D", "heading": "H", "intro": "I"}
         # The helper accepts a valid topic, so each failure below comes from its own rule.
@@ -3505,6 +3526,7 @@ class CorporateCollectionTests(unittest.TestCase):
         cls.home = (ROOT / "index.html").read_text(encoding="utf-8")
         cls.cards = cls.tool.parse_cards(cls.home)
         cls.slugs = cls.tool.assign_slugs(cls.cards)
+        cls.sizes = cls.tool.load_sizes(ROOT)
         cls.page = cls.PAGE.read_text(encoding="utf-8")
 
     def corporate(self):
@@ -3529,7 +3551,8 @@ class CorporateCollectionTests(unittest.TestCase):
                 if card["alt"].startswith("Illustrative preview:"):
                     self.assertTrue(html.unescape(alt).startswith("Illustrative preview:"))
                 self.assertEqual(html.unescape(name), card["name"])
-                self.assertEqual(html.unescape(price), "From " + card["price"])
+                sized = self.sizes[slug]["options"]
+                self.assertEqual(html.unescape(price), "From " + (self.tool.rupees(min(o["price"] for o in sized)) if sized else card["price"]))
         for needed in ('id="enquire-title"', 'id="corporate-form"'):
             self.assertIn(needed, self.page)
         self.assertEqual(self.page.count('id="collection-title"'), 1)
@@ -3542,7 +3565,7 @@ class CorporateCollectionTests(unittest.TestCase):
         self.assertNotIn("corporate-note", styles)
 
     def test_corporate_page_collection_is_not_stale(self):
-        self.assertEqual(self.tool.corporate_collection(self.page, self.cards, self.slugs), self.page,
+        self.assertEqual(self.tool.corporate_collection(self.page, self.cards, self.slugs, sizes=self.sizes), self.page,
                          "corporate-gifting/index.html is stale: run python3 tools/product_pages.py")
 
     def test_corporate_collection_stops_on_bad_input(self):
@@ -3642,9 +3665,10 @@ class GoogleConsentTests(unittest.TestCase):
                 box = re.search(r'<div class="buy-box">(.*?)</div>', text, re.S)
                 self.assertIsNotNone(box)
                 inside = box.group(1)
-                for part in ("<h1>", '<p class="price">', '<a class="order"', '<p class="delivery-note">'):
+                order = '<a class="order"' if '<a class="order"' in inside else '<button class="order"'
+                for part in ("<h1>", '<p class="price">', order, '<p class="delivery-note">'):
                     self.assertIn(part, inside)
-                self.assertLess(inside.index('<a class="order"'), inside.index('<p class="delivery-note">'))
+                self.assertLess(inside.index(order), inside.index('<p class="delivery-note">'))
 
     def test_every_product_page_loads_google_js_and_has_the_button_in_the_site_footer(self):
         for path in self.product_pages:
@@ -3674,7 +3698,7 @@ class GoogleConsentTests(unittest.TestCase):
         self.assertGreater(len(rows), 0)
         for row in rows:
             fields = row.split("\t")
-            self.assertRegex(fields[3], r"^https://saloniresinart\.com/p/[a-z0-9-]+/\?source=google-shopping$")
+            self.assertRegex(fields[3], r"^https://saloniresinart\.com/p/[a-z0-9-]+/\?(?:size=[a-z0-9-]+&)?source=google-shopping$")
         self.assertNotIn("source=", (ROOT / "sitemap.xml").read_text(encoding="utf-8"))
         for path in self.product_pages:
             self.assertNotIn("google-shopping", path.read_text(encoding="utf-8"), path.parent.name)
@@ -3684,6 +3708,290 @@ class GoogleConsentTests(unittest.TestCase):
         for block in re.findall(r'<details class="privacy-details" id="(?:order-)?privacy-details">.*?</details>', self.home, re.S):
             self.assertIn(self.PRIVACY_LINE, block)
         self.assertIn(self.PRIVACY_LINE, (ROOT / "README.md").read_text(encoding="utf-8"))
+
+class ProductSizeTests(unittest.TestCase):
+    """data/product-sizes.tsv is the one place for prices and sizes: tools/product_pages.py copies it to the cards, pages and feed."""
+
+    SITE = "https://saloniresinart.com"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tool = load_product_pages_tool()
+        cls.home = (ROOT / "index.html").read_text(encoding="utf-8")
+        cls.sitemap = (ROOT / "sitemap.xml").read_text(encoding="utf-8")
+        cls.cards = cls.tool.parse_cards(cls.home)
+        cls.slugs = cls.tool.assign_slugs(cls.cards)
+        cls.sizes = cls.tool.load_sizes(ROOT)
+        cls.tsv = (ROOT / "data" / "product-sizes.tsv").read_text(encoding="utf-8")
+        cls.sized = [slug for slug in cls.slugs if cls.sizes[slug]["options"]]
+
+    def load_text(self, text):
+        import tempfile
+        with tempfile.TemporaryDirectory() as scratch:
+            (Path(scratch) / "data").mkdir()
+            (Path(scratch) / "data" / "product-sizes.tsv").write_text(text, encoding="utf-8")
+            return self.tool.load_sizes(Path(scratch))
+
+    def change_row(self, slug, **columns):
+        """The shipped TSV with some cells of one product's row replaced."""
+        header = self.tool.SIZE_COLUMNS
+        lines = self.tsv.splitlines()
+        for number, line in enumerate(lines):
+            cells = line.split("\t")
+            cells += [""] * (len(header) - len(cells))
+            if cells[0] == slug:
+                for name, value in columns.items():
+                    cells[header.index(name)] = value
+                lines[number] = "\t".join(cells)
+                return "\n".join(lines) + "\n"
+        raise AssertionError(slug)
+
+    def card_article(self, page, slug):
+        cards = self.tool.parse_cards(page)
+        slugs = self.tool.assign_slugs(cards)
+        card = cards[slugs.index(slug)]
+        return page[card["start"]:card["end"]]
+
+    def test_the_shipped_tsv_has_one_row_per_card_and_45_sized_products(self):
+        self.assertEqual(sorted(self.sizes), sorted(self.slugs))
+        self.assertEqual(len(self.sized), 45)
+        for slug, entry in self.sizes.items():
+            with self.subTest(slug=slug):
+                self.assertIsInstance(entry["price"], int)
+                if not entry["options"]:
+                    continue
+                self.assertGreaterEqual(len(entry["options"]), 2)
+                codes = [option["code"] for option in entry["options"]]
+                self.assertEqual(len(codes), len(set(codes)))
+                for option in entry["options"]:
+                    self.assertEqual(option["code"], self.tool.slugify(option["label"]))
+                default = [option for option in entry["options"] if option["code"] == entry["default"]][0]
+                self.assertEqual(default["price"], entry["price"])
+                first_match = [option["code"] for option in entry["options"] if option["price"] == entry["price"]][0]
+                self.assertEqual(entry["default"], first_match, "the default is the first size at today's price")
+        self.assertEqual(self.sizes["mr-and-mrs-name-plate"]["options"][0], {"code": "6-10-in", "label": "6 × 10 in", "price": 1249})
+        self.assertEqual(self.sizes["the-first-rose-still-with-me"]["default"], "small-wrist", "equal prices: the first size")
+
+    def test_a_mistake_in_the_tsv_stops_the_script_and_names_the_row(self):
+        header = "\t".join(self.tool.SIZE_COLUMNS)
+        good = "a-slug\t999\t6 in\tyes\t6 in\t999\t8 in\t1499\t\t\n"
+        self.assertEqual(self.load_text(header + "\n" + good)["a-slug"]["default"], "6-in")
+        bad = {
+            "price not a number": "a-slug\t9.5\t6 in\tyes\t6 in\t999\t8 in\t1499\t\t\n",
+            "price zero": "a-slug\t0\t6 in\tyes\t6 in\t0\t8 in\t1499\t\t\n",
+            "option price not a number": "a-slug\t999\t6 in\tyes\t6 in\t999\t8 in\tabc\t\t\n",
+            "option price negative": "a-slug\t999\t6 in\tyes\t6 in\t999\t8 in\t-5\t\t\n",
+            "size without a price": "a-slug\t999\t6 in\tyes\t6 in\t999\t8 in\t\t\t\n",
+            "price without a size": "a-slug\t999\t6 in\tyes\t6 in\t999\t\t1499\t\t\n",
+            "one option only": "a-slug\t999\t6 in\tyes\t6 in\t999\t\t\t\t\n",
+            "no option at today's price": "a-slug\t999\t6 in\tyes\t6 in\t949\t8 in\t1499\t\t\n",
+            "duplicate size": "a-slug\t999\t6 in\tyes\t6 in\t999\t6 in\t1499\t\t\n",
+            "duplicate code from different text": "a-slug\t999\t6 in\tyes\t6 in\t999\t6  in\t1499\t\t\n",
+            "slug missing": "\t999\t6 in\tyes\t6 in\t999\t8 in\t1499\t\t\n",
+            "choice is neither yes nor no": "a-slug\t999\t6 in\tmaybe\t6 in\t999\t8 in\t1499\t\t\n",
+            "slug twice": good + good,
+        }
+        for label, row in bad.items():
+            with self.subTest(label):
+                with self.assertRaises(SystemExit) as caught:
+                    self.load_text(header + "\n" + row)
+                self.assertIn("product-sizes.tsv", str(caught.exception))
+        with self.assertRaises(SystemExit):
+            self.load_text("product_id\ttodays_price\n" + good)
+        with self.assertRaises(SystemExit):
+            self.tool.load_sizes(Path("/nonexistent-root"))
+        # A one-size row needs only today's price.
+        self.assertEqual(self.load_text(header + "\nb\t399\t1 in\tno\t1 in\t399\t\t\t\t\n")["b"]["options"], [])
+
+    def test_a_row_for_a_product_that_is_not_on_the_home_page_stops_the_build(self):
+        sizes = dict(self.sizes, **{"no-such-product": {"price": 100, "choice": False, "default": "", "options": []}})
+        with self.assertRaises(SystemExit) as caught:
+            self.tool.build(self.home, self.sitemap, sizes=sizes)
+        self.assertIn("no-such-product", str(caught.exception))
+
+    def test_the_cards_and_pages_in_the_repository_are_in_step_with_the_tsv(self):
+        stamped, pages, _ = self.tool.build(self.home, self.sitemap)
+        self.assertEqual(stamped, self.home, "run python3 tools/product_pages.py")
+        for slug in self.slugs:
+            self.assertEqual((ROOT / "p" / slug / "index.html").read_text(encoding="utf-8"), pages["p/%s/index.html" % slug], slug)
+
+    def test_every_card_shows_todays_price_from_the_tsv_and_the_struck_price_is_25_percent_above(self):
+        for slug, card in zip(self.slugs, self.cards):
+            entry = self.sizes[slug]
+            article = self.home[card["start"]:card["end"]]
+            self.assertEqual(card["price"], self.tool.rupees(entry["price"]), slug)
+            self.assertIn("<s>%s</s>" % self.tool.rupees((entry["price"] * 5 + 2) // 4), article, slug)
+        self.assertEqual(self.tool.rupees(999), "₹999")
+        self.assertEqual(self.tool.rupees(1499), "₹1,499")
+        self.assertEqual(self.tool.rupees(123456), "₹1,23,456")
+
+    def test_45_cards_carry_data_sizes_that_match_the_tsv_and_61_do_not(self):
+        import urllib.parse
+        with_sizes = 0
+        for slug, card in zip(self.slugs, self.cards):
+            article = self.home[card["start"]:card["end"]]
+            attribute = re.search(r' data-sizes="([^"]*)"', article)
+            entry = self.sizes[slug]
+            if not entry["options"]:
+                self.assertIsNone(attribute, slug)
+                self.assertNotIn("product-size-count", article, slug)
+                continue
+            with_sizes += 1
+            data = json.loads(html.unescape(attribute.group(1)))
+            self.assertEqual(data["default"], entry["default"], slug)
+            self.assertEqual(data["options"], [{"code": o["code"], "label": o["label"], "price": self.tool.rupees(o["price"])} for o in entry["options"]], slug)
+            self.assertIn('<dd class="product-size-count">%d sizes</dd>' % len(entry["options"]), article, slug)
+            first_dd = re.search(r"<dt>Price</dt><dd>([^<]*)</dd>", article).group(1)
+            self.assertEqual(first_dd, self.tool.rupees(entry["price"]), "the first dd stays the price")
+            default_label = [o["label"] for o in entry["options"] if o["code"] == entry["default"]][0]
+            sizes_row = re.findall(r"<div><dt>Size</dt><dd>([^<]*)</dd></div>", article)
+            self.assertIn(sizes_row, ([], [default_label]), slug + ": the card's size text is the default size")
+        self.assertEqual(with_sizes, 45)
+        self.assertEqual(len(self.slugs) - with_sizes, 61)
+
+    def test_changing_a_price_in_the_tsv_changes_card_struck_price_page_json_ld_and_feed(self):
+        slug = "om-asiausa-mantra-plaque"
+        sizes = {key: dict(value, options=[dict(o) for o in value["options"]]) for key, value in self.sizes.items()}
+        sizes[slug]["price"] = 1899
+        for option in sizes[slug]["options"]:
+            if option["code"] == "8-12-in":
+                option["price"] = 1899
+            if option["code"] == "10-15-in":
+                option["price"] = 2599
+        stamped, pages, _ = self.tool.build(self.home, self.sitemap, sizes=sizes)
+        article = self.card_article(stamped, slug)
+        self.assertIn("<dt>Price</dt><dd>₹1,899</dd>", article)
+        self.assertIn("<s>₹2,374</s>", article)
+        self.assertEqual(re.search(r' data-sizes="([^"]*)"', article).group(1).count("₹1,899"), 1)
+        self.assertIn("₹2,599", html.unescape(re.search(r' data-sizes="([^"]*)"', article).group(1)))
+        page = pages["p/%s/index.html" % slug]
+        self.assertIn('<p class="price">₹1,899</p>', page)
+        self.assertIn('data-price="₹2,599"', page)
+        self.assertIn('"price": "1899"', page)
+        self.assertIn('"price": "2599"', page)
+        cards = self.tool.parse_cards(stamped)
+        feed = self.tool.merchant_feed(cards, self.tool.assign_slugs(cards), sizes)
+        rows = {line.split("\t")[0]: line.split("\t") for line in feed.splitlines()[1:]}
+        self.assertEqual(rows[slug][6], "1899 INR")
+        self.assertEqual(rows[slug + "--10-15-in"][6], "2599 INR")
+
+    def feed_rows(self):
+        text = (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8")
+        lines = text.splitlines()
+        header = lines[0].split("\t")
+        return header, [dict(zip(header, line.split("\t"))) for line in lines[1:]]
+
+    def test_the_merchant_feed_has_a_row_per_size_for_products_already_in_it(self):
+        header, rows = self.feed_rows()
+        self.assertEqual(header[-3:], ["item_group_id", "item_group_title", "size"])
+        ids = [row["id"] for row in rows]
+        self.assertEqual(len(ids), len(set(ids)), "ids are unique")
+        self.assertTrue(all(len(value) <= 50 for value in ids))
+        by_slug = dict(zip(self.slugs, self.cards))
+        in_feed = [slug for slug in self.slugs if not by_slug[slug]["alt"].startswith("Illustrative preview:")]
+        sized_in_feed = [slug for slug in in_feed if self.sizes[slug]["options"]]
+        self.assertEqual(len(sized_in_feed), 23)
+        self.assertEqual(len(in_feed), 52, "no product joined or left the feed")
+        expected = sum(len(self.sizes[slug]["options"]) if self.sizes[slug]["options"] else 1 for slug in in_feed)
+        self.assertEqual(len(rows), expected)
+        self.assertEqual(len(rows) - len(in_feed), sum(len(self.sizes[slug]["options"]) - 1 for slug in sized_in_feed))
+        for slug in in_feed:
+            entry = self.sizes[slug]
+            mine = [row for row in rows if row["item_group_id"] == slug] if entry["options"] else [row for row in rows if row["id"] == slug]
+            self.assertEqual(len(mine), len(entry["options"]) or 1, slug)
+            if not entry["options"]:
+                self.assertEqual((mine[0]["item_group_id"], mine[0]["item_group_title"], mine[0]["size"]), ("", "", ""), slug)
+                self.assertEqual(mine[0]["link"], "%s/p/%s/?source=google-shopping" % (self.SITE, slug))
+                continue
+            for option, row in zip(entry["options"], mine):
+                default = option["code"] == entry["default"]
+                self.assertEqual(row["id"], slug if default else "%s--%s" % (slug, option["code"]), slug)
+                self.assertEqual(row["link"], "%s/p/%s/?source=google-shopping" % (self.SITE, slug) if default
+                                 else "%s/p/%s/?size=%s&source=google-shopping" % (self.SITE, slug, option["code"]), slug)
+                self.assertEqual(row["price"], "%d INR" % option["price"], slug)
+                self.assertEqual((row["item_group_id"], row["item_group_title"], row["size"]), (slug, by_slug[slug]["name"], option["label"]), slug)
+                self.assertIn("Size: %s." % option["label"], row["description"], slug)
+                self.assertEqual(row["title"], by_slug[slug]["name"] if default else "%s – %s" % (by_slug[slug]["name"], option["label"]), slug)
+
+    def test_a_feed_id_longer_than_50_characters_stops_the_build(self):
+        sizes = {key: dict(value) for key, value in self.sizes.items()}
+        slug = "blue-and-white-namokar-mantra-frame"
+        sizes[slug] = dict(sizes[slug], options=[dict(o, code=o["code"] + "-" + "x" * 20) for o in sizes[slug]["options"]],
+                           default=sizes[slug]["default"] + "-" + "x" * 20)
+        with self.assertRaises(SystemExit) as caught:
+            self.tool.build(self.home, self.sitemap, sizes=sizes)
+        self.assertIn(slug, str(caught.exception))
+
+    def page_text(self, slug):
+        return (ROOT / "p" / slug / "index.html").read_text(encoding="utf-8")
+
+    def test_a_sized_product_page_has_a_size_form_that_keeps_the_section_hash(self):
+        for slug, card in zip(self.slugs, self.cards):
+            text = self.page_text(slug)
+            entry = self.sizes[slug]
+            if not entry["options"]:
+                self.assertIn('<a class="order" href="/?product=%s&amp;add=1#%s">Add to cart</a>' % (slug, card["section"]), text, slug)
+                self.assertNotIn("<form", text, slug)
+                self.assertNotIn('type="radio"', text, slug)
+                continue
+            form = re.search(r'<form class="size-form" action="([^"]+)" method="get">(.*?)</form>', text, re.S)
+            self.assertIsNotNone(form, slug)
+            self.assertEqual(form.group(1), "/#" + card["section"], slug)
+            body = form.group(2)
+            self.assertIn('<input type="hidden" name="product" value="%s">' % slug, body)
+            self.assertIn('<input type="hidden" name="add" value="1">', body)
+            self.assertIn("<fieldset", body)
+            self.assertIn("<legend>Size</legend>", body)
+            radios = re.findall(r'<input type="radio" name="size" value="([^"]+)" data-price="([^"]+)"( checked)?>', body)
+            self.assertEqual([(code, price) for code, price, _ in radios], [(o["code"], self.tool.rupees(o["price"])) for o in entry["options"]], slug)
+            self.assertEqual([code for code, _, checked in radios if checked], [entry["default"]], slug)
+            self.assertIn('<button class="order" type="submit">Add to cart</button>', body)
+            self.assertNotIn('<p class="size">', text, slug)
+            self.assertNotIn("<div", body, "no div inside the buy box: pages keep one flat box")
+            shown = re.search(r'<p class="price">([^<]*)</p>', text).group(1)
+            self.assertEqual(shown, card["price"], slug)
+            self.assertEqual(len(re.findall(r"<script>", text)), 1, slug)
+            self.assertNotRegex(text, r"location\.(?:replace|assign)|location\.href\s*=|innerHTML|eval\(", slug)
+
+    def test_a_sized_page_script_preselects_from_the_address_and_keeps_the_price_pill_in_step(self):
+        text = self.page_text("mr-and-mrs-name-plate")
+        script = re.search(r"<script>(.*?)</script>", text, re.S).group(1)
+        self.assertIn("size=", script)
+        self.assertIn("pageshow", script)
+        self.assertIn("change", script)
+        self.assertIn("data-price", script)
+        self.assertNotRegex(script, r"\b(?:let|const)\b|=>|`", "ES5 only")
+
+    def test_a_sized_product_page_states_a_product_group_with_one_variant_per_size(self):
+        for slug in self.sized:
+            text = self.page_text(slug)
+            blocks = [json.loads(block) for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)]
+            groups = [block for block in blocks if block.get("@type") == "ProductGroup"]
+            self.assertEqual(len(groups), 1, slug)
+            self.assertEqual([block for block in blocks if block.get("@type") == "Product"], [], slug)
+            group = groups[0]
+            entry = self.sizes[slug]
+            self.assertEqual(group["productGroupID"], slug)
+            self.assertEqual(group["variesBy"], ["https://schema.org/size"])
+            self.assertEqual(len(group["hasVariant"]), len(entry["options"]))
+            for option, variant in zip(entry["options"], group["hasVariant"]):
+                self.assertEqual(variant["@type"], "Product")
+                self.assertEqual(variant["size"], option["label"])
+                self.assertTrue(variant["name"].endswith(" – " + option["label"]), slug)
+                self.assertEqual(variant["sku"], slug if option["code"] == entry["default"] else "%s--%s" % (slug, option["code"]))
+                offer = variant["offers"]
+                self.assertEqual((offer["@type"], offer["price"], offer["priceCurrency"], offer["availability"]),
+                                 ("Offer", str(option["price"]), "INR", "https://schema.org/InStock"))
+                self.assertEqual(offer["url"], "%s/p/%s/?size=%s" % (self.SITE, slug, option["code"]))
+
+    def test_the_corporate_page_says_from_the_lowest_size_price_for_a_sized_product(self):
+        page = (ROOT / "corporate-gifting" / "index.html").read_text(encoding="utf-8")
+        tiles = dict(re.findall(r'href="\.\./\?product=([^#"]+)#corporate-resin-gifts">.*?<span>([^<]*)</span></a>', page))
+        sized_tiles = [slug for slug in tiles if self.sizes[slug]["options"]]
+        self.assertIn("branded-coaster-set", sized_tiles)
+        for slug in sized_tiles:
+            self.assertEqual(html.unescape(tiles[slug]), "From " + self.tool.rupees(min(o["price"] for o in self.sizes[slug]["options"])), slug)
+        self.assertEqual(html.unescape(tiles["branded-coaster-set"]), "From ₹399")
 
 
 if __name__ == "__main__":

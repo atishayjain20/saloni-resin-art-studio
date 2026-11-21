@@ -29,11 +29,21 @@ It also:
     marks the visit); the canonical tag and sitemap stay clean,
   * loads /google.js (cookie banner, Google tag after Accept) on every page and adds a Cookie settings button.
 
+Prices and sizes come from data/product-sizes.tsv (one row per product; edit it, then run this script). Each row gives
+today's price. A product with size_choice "yes" also lists 2 or 3 sizes with a fixed price each. The script then:
+  * stamps today's price (and the struck regular price, 25% above it) on the card, so the TSV is the one place to change a price,
+  * for a sized product, stamps data-sizes on the card's photo link (the popup reads it), a "3 sizes" note and the default size
+    on the card, a size form on /p/<slug>/ and ProductGroup structured data (one variant per size),
+  * adds one merchant-feed.tsv row per size (the default size keeps the old id and link; the others are <slug>--<size>),
+  * shows "From <lowest size price>" on the corporate gifting page.
+The default size is the first one whose price equals today's price. A mistake in the TSV stops the script with a message.
+
 The slug comes from the product name. If two names give the same slug, the first card in
 page order keeps it and later ones get a 4-letter suffix taken from their photo file name,
 so adding a product never renames an earlier one. Renaming a card does change its slug and
 breaks links already shared; the tests fail until this script has been run again.
 """
+import csv
 import hashlib
 import html
 import json
@@ -53,7 +63,18 @@ FEED_FILE = "merchant-feed.tsv"
 CORPORATE_SECTION = "corporate-resin-gifts"
 CORPORATE_PAGE = "corporate-gifting/index.html"
 CORPORATE_START, CORPORATE_END = "<!-- corporate-collection:start -->", "<!-- corporate-collection:end -->"
-FEED_COLUMNS = ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists"]
+FEED_COLUMNS = ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists",
+                "item_group_id", "item_group_title", "size"]
+SIZES_FILE = "data/product-sizes.tsv"
+SIZE_COLUMNS = ["product_id", "todays_price", "todays_size", "size_choice", "size1", "price1", "size2", "price2", "size3", "price3"]
+OPTION_SLOTS = 3
+FEED_ID_MAX = 50
+PRICE_DD_RE = re.compile(r"(<dt>Price</dt><dd>)[^<]*(</dd>)")
+PRICE_ROW_RE = re.compile(r"<div><dt>Price</dt>.*?</div>", re.S)
+STRUCK_RE = re.compile(r"(<s>)[^<]*(</s>)")
+SIZE_DD_RE = re.compile(r"(<div><dt>Size</dt><dd>)[^<]*(</dd></div>)")
+SIZE_COUNT_RE = re.compile(r'<dd class="product-size-count">[^<]*</dd>')
+SIZES_ATTR_RE = re.compile(r' data-sizes="[^"]*"')
 
 ARTICLE_RE = re.compile(r'<article\b[^>]*\bclass="[^"]*\b(?:work-card|romantic-keepsake-card)\b[^"]*"[^>]*>.*?</article>', re.S)
 TRIGGER_RE = re.compile(r'<a class="lightbox-trigger" data-lightbox-trigger\b[^>]*>')
@@ -373,6 +394,109 @@ def description(card):
     return (facts + ". " + card["line"] if card["line"] else facts).strip()
 
 
+def rupees(amount):
+    """₹1,499 style text (Indian grouping) for a whole number of rupees."""
+    head, tail = str(amount)[:-3], str(amount)[-3:]
+    return "₹" + (re.sub(r"(\d)(?=(?:\d\d)+$)", r"\1,", head) + "," + tail if head else tail)
+
+
+def load_sizes(root=ROOT):
+    """{slug: {"price": today's price, "choice": bool, "default": size code, "options": [{"code", "label", "price"}]}} from
+    data/product-sizes.tsv. Products with size_choice "no" have no options. Stops with a message naming the row on any mistake."""
+    path = Path(root) / SIZES_FILE
+    if not path.is_file():
+        raise SystemExit("Missing %s: it holds each product's price and sizes" % SIZES_FILE)
+    with open(path, encoding="utf-8", newline="") as handle:
+        rows = list(csv.reader(handle, delimiter="\t", quoting=csv.QUOTE_NONE))
+    if not rows or rows[0] != SIZE_COLUMNS:
+        raise SystemExit("%s must start with the columns: %s" % (SIZES_FILE, ", ".join(SIZE_COLUMNS)))
+    sizes = {}
+    for number, cells in enumerate(rows[1:], 2):
+        if not any(cell.strip() for cell in cells):
+            continue
+        cells = [cell.strip() for cell in cells] + [""] * (len(SIZE_COLUMNS) - len(cells))
+        slug = cells[0]
+
+        def fail(problem):
+            raise SystemExit("%s line %d (%s): %s" % (SIZES_FILE, number, slug or "no product_id", problem))
+
+        if len(cells) > len(SIZE_COLUMNS):
+            fail("too many columns")
+        if not slug:
+            fail("product_id is empty")
+        if slug in sizes:
+            fail("the product appears twice")
+        if not re.fullmatch(r"[1-9][0-9]*", cells[1]):
+            fail("todays_price %r must be a whole number of rupees above 0" % cells[1])
+        if cells[3] not in ("yes", "no"):
+            fail("size_choice %r must be yes or no" % cells[3])
+        entry = {"price": int(cells[1]), "choice": cells[3] == "yes", "default": "", "options": []}
+        if entry["choice"]:
+            for slot in range(OPTION_SLOTS):
+                label, price = " ".join(cells[4 + 2 * slot].split()), cells[5 + 2 * slot]
+                if not label and not price:
+                    continue
+                if not label or not re.fullmatch(r"[1-9][0-9]*", price):
+                    fail("size%d %r needs a size name and a price (a whole number above 0), got price %r" % (slot + 1, label, price))
+                entry["options"].append({"code": slugify(label), "label": label, "price": int(price)})
+            codes = [option["code"] for option in entry["options"]]
+            if len(entry["options"]) < 2:
+                fail("size_choice yes needs at least 2 sizes")
+            if len(set(codes)) != len(codes) or "" in codes:
+                fail("two sizes give the same code: %s" % ", ".join(option["label"] for option in entry["options"]))
+            matching = [option for option in entry["options"] if option["price"] == entry["price"]]
+            if not matching:
+                fail("no size costs today's price %d" % entry["price"])
+            entry["default"] = matching[0]["code"]
+        sizes[slug] = entry
+    return sizes
+
+
+def check_sizes(sizes, slugs):
+    """Stops when the TSV names a product the home page does not have, or a size would make a feed id longer than 50 characters."""
+    for slug, entry in sizes.items():
+        if slug not in slugs:
+            raise SystemExit("%s has a row for %s, but no card on the home page has that slug" % (SIZES_FILE, slug))
+        for option in entry["options"]:
+            if len(variant_id(slug, entry, option)) > FEED_ID_MAX:
+                raise SystemExit("%s: the Google feed id for %s size %s is longer than %d characters" % (SIZES_FILE, slug, option["label"], FEED_ID_MAX))
+
+
+def variant_id(slug, entry, option):
+    """The feed id of one size: the default size keeps the product's own id."""
+    return slug if option["code"] == entry["default"] else "%s--%s" % (slug, option["code"])
+
+
+def sizes_json(entry):
+    """The card's data-sizes value: the default size code and each size's code, label and price text."""
+    data = {"default": entry["default"], "options": [{"code": o["code"], "label": o["label"], "price": rupees(o["price"])} for o in entry["options"]]}
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+
+
+def stamp_prices(page, cards, slugs, sizes):
+    """index.html with each card's price (and struck regular price, 25% above) taken from sizes. A sized card also gets its default
+    size as the Size text (where it has one) and a "3 sizes" note at the end of its Price row; a one-size card loses any such note."""
+    pieces, last = [], 0
+    for card, slug in zip(cards, slugs):
+        entry = sizes.get(slug)
+        if not entry:
+            continue
+        article = page[card["start"]:card["end"]]
+        if not PRICE_DD_RE.search(article):
+            raise SystemExit("No Price row in the card " + card["name"])
+        article = PRICE_DD_RE.sub(lambda match: match.group(1) + rupees(entry["price"]) + match.group(2), article, count=1)
+        article = STRUCK_RE.sub(lambda match: match.group(1) + rupees((entry["price"] * 5 + 2) // 4) + match.group(2), article, count=1)
+        article = SIZE_COUNT_RE.sub("", article)
+        if entry["options"]:
+            default = [option["label"] for option in entry["options"] if option["code"] == entry["default"]][0]
+            article = SIZE_DD_RE.sub(lambda match: match.group(1) + esc(default) + match.group(2), article, count=1)
+            note = '<dd class="product-size-count">%d sizes</dd>' % len(entry["options"])
+            article = PRICE_ROW_RE.sub(lambda match: match.group(0)[:-len("</div>")] + note + "</div>", article, count=1)
+        pieces.append(page[last:card["start"]] + article)
+        last = card["end"]
+    return "".join(pieces) + page[last:]
+
+
 def price_offer(price):
     """The schema.org offer for a card price, or None for "Price on request". Stops on any other format."""
     if price == "Price on request":
@@ -388,8 +512,25 @@ def price_offer(price):
     return {"@type": "AggregateOffer", "lowPrice": low, "highPrice": high, "priceCurrency": "INR"}
 
 
-def product_json_ld(card):
-    """Product structured data as a JSON string, or "" when the card has no price to state."""
+def product_json_ld(card, slug="", entry=None):
+    """Product structured data as a JSON string, or "" when the card has no price to state. A product with sizes is a
+    ProductGroup with one variant per size, each with its own price."""
+    if entry and entry["options"]:
+        data = {"@context": "https://schema.org", "@type": "ProductGroup", "name": card["name"]}
+        if card["line"]:
+            data["description"] = card["line"]
+        image = SITE + "/assets/" + urllib.parse.quote(card["file"])
+        data["image"] = image
+        data["brand"] = {"@type": "Brand", "name": STUDIO}
+        data["productGroupID"] = slug
+        data["variesBy"] = ["https://schema.org/size"]
+        data["hasVariant"] = [{
+            "@type": "Product", "name": "%s – %s" % (card["name"], option["label"]), "sku": variant_id(slug, entry, option),
+            "size": option["label"], "image": image,
+            "offers": {"@type": "Offer", "price": str(option["price"]), "priceCurrency": "INR", "availability": "https://schema.org/InStock",
+                       "url": "%s/%s/%s/?size=%s" % (SITE, PAGE_DIR, slug, option["code"])},
+        } for option in entry["options"]]
+        return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     offer = price_offer(card["price"])
     if offer is None:
         return ""
@@ -473,17 +614,28 @@ def pick_more(cards, slugs, groups):
     raise SystemExit("More like this lists still leave pages with no link after %d passes: fix the cards" % (len(slugs) + 1))
 
 
-def merchant_feed(cards, slugs):
-    """The Google Merchant Center feed (tab-separated). AI preview photos and prices that are a range or on request stay out."""
+def merchant_feed(cards, slugs, sizes=None):
+    """The Google Merchant Center feed (tab-separated). AI preview photos and prices that are a range or on request stay out.
+    A product with sizes gets one row per size, grouped by item_group_id; the default size keeps the product's id and link."""
     rows = [FEED_COLUMNS]
     for card, slug in zip(cards, slugs):
         offer = price_offer(card["price"])
         if card["alt"].startswith("Illustrative preview:") or not offer or offer["@type"] != "Offer":
             continue
-        about = " ".join(part for part in (card["line"], "Size: %s." % card["size"] if card["size"] else "",
-                                           "Handmade to order by Saloni in Ajmer, Rajasthan.") if part)
-        rows.append([slug, card["name"], about, "%s/%s/%s/?source=google-shopping" % (SITE, PAGE_DIR, slug),
-                     SITE + "/assets/" + urllib.parse.quote(card["file"]), "in_stock", offer["price"] + " INR", STUDIO, "new", "no"])
+        entry = (sizes or {}).get(slug)
+        image = SITE + "/assets/" + urllib.parse.quote(card["file"])
+        link = "%s/%s/%s/" % (SITE, PAGE_DIR, slug)
+        if not entry or not entry["options"]:
+            about = " ".join(part for part in (card["line"], "Size: %s." % card["size"] if card["size"] else "",
+                                               "Handmade to order by Saloni in Ajmer, Rajasthan.") if part)
+            rows.append([slug, card["name"], about, link + "?source=google-shopping", image, "in_stock", offer["price"] + " INR", STUDIO, "new", "no", "", "", ""])
+            continue
+        for option in entry["options"]:
+            default = option["code"] == entry["default"]
+            about = " ".join(part for part in (card["line"], "Size: %s." % option["label"], "Handmade to order by Saloni in Ajmer, Rajasthan.") if part)
+            rows.append([variant_id(slug, entry, option), card["name"] if default else "%s – %s" % (card["name"], option["label"]), about,
+                         link + ("?source=google-shopping" if default else "?size=%s&source=google-shopping" % option["code"]), image, "in_stock",
+                         "%d INR" % option["price"], STUDIO, "new", "no", slug, card["name"], option["label"]])
     for row in rows:
         if any(re.search(r'[\t\n\r"]', value) for value in row):
             raise SystemExit("A tab, line break or double quote would break %s: fix the card %r in index.html" % (FEED_FILE, row[1]))
@@ -508,14 +660,35 @@ def jpeg_size(path):
     raise SystemExit("Not a JPEG: " + str(path))
 
 
-def render_page(card, slug, share_size, topic, more, version):
+# On a sized product page: a size picked in the address (?size=) is preselected, and the price pill follows the chosen size.
+SIZE_SCRIPT = ('<script>(function () { var price = document.querySelector(".price"), radios = document.querySelectorAll(\'input[name="size"]\'), found = /[?&]size=([a-z0-9-]+)/.exec(location.search), i;\n'
+               '  function show() { for (i = 0; i < radios.length; i++) if (radios[i].checked) price.textContent = radios[i].getAttribute("data-price"); }\n'
+               '  for (i = 0; i < radios.length; i++) { if (found && radios[i].value === found[1]) radios[i].checked = true; radios[i].addEventListener("change", show); }\n'
+               '  window.addEventListener("pageshow", show); show(); }());</script>\n')
+
+
+def size_form(slug, section, entry):
+    """The Add to cart form of a sized product page: native radio buttons (the first size at today's price is checked) that
+    GET /?product=<slug>&add=1&size=<code>#<section>, where script.js puts that size in the cart."""
+    radios = "".join(
+        '<label class="size-option"><input type="radio" name="size" value="%s" data-price="%s"%s><span class="size-face"><span class="size-name">%s</span>'
+        '<span class="size-price">%s</span></span></label>' % (esc(option["code"]), esc(rupees(option["price"])),
+                                                              " checked" if option["code"] == entry["default"] else "", esc(option["label"]), esc(rupees(option["price"])))
+        for option in entry["options"])
+    return ('    <form class="size-form" action="/#%s" method="get">\n'
+            '    <input type="hidden" name="product" value="%s"><input type="hidden" name="add" value="1">\n'
+            '    <fieldset class="size-choice"><legend>Size</legend><span class="size-options">%s</span></fieldset>\n'
+            '    <button class="order" type="submit">Add to cart</button>\n    </form>') % (esc(section), esc(slug), radios)
+
+
+def render_page(card, slug, share_size, topic, more, version, entry=None):
     url = "%s/%s/%s/" % (SITE, PAGE_DIR, slug)
     target = "/?product=%s&add=1#%s" % (slug, card["section"])
     title = "%s | %s" % (card["name"], STUDIO)
     desc = description(card)
     image = "%s/assets/share/%s.jpg" % (SITE, slug)
     alt = card["alt"] or card["name"]
-    data = product_json_ld(card)
+    data = product_json_ld(card, slug, entry)
     crumbs = breadcrumb_json_ld(card, slug, topic)
     path = '<li><a href="/">Home</a></li>'
     if topic:
@@ -527,6 +700,7 @@ def render_page(card, slug, share_size, topic, more, version):
             '<li><a href="/%s/%s/"><img src="/assets/thumb/%s.jpg" alt="" width="%d" height="%d" loading="lazy" decoding="async"><span>%s</span></a></li>'
             % (PAGE_DIR, other, other, THUMB_SIDE, THUMB_SIDE, esc(other_card["name"])) for other_card, other in more)
         more_html = '    <section class="more" aria-labelledby="more-title"><h2 id="more-title">More like this</h2><ul>%s</ul></section>\n' % links
+    sized = bool(entry and entry["options"])
     size = '  <meta property="og:image:width" content="%d">\n  <meta property="og:image:height" content="%d">\n' % share_size
     return """<!doctype html>
 <html lang="en">
@@ -563,19 +737,20 @@ def render_page(card, slug, share_size, topic, more, version):
     <div class="buy-box">
     <h1>{name}</h1>
     <p class="price">{price}</p>
-{size_line}{line_html}    <a class="order" href="{target}">Add to cart</a>
+{size_line}{line_html}{order}
     <p class="delivery-note">Handmade in 4–5 days · delivered in 2–5 days after dispatch</p>
     </div>
 {more_html}  </main>
-{footer}</body>
+{footer}{script}</body>
 </html>
 """.format(
         title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
         ld=("".join('  <script type="application/ld+json">%s</script>\n' % block for block in (data, crumbs) if block)), css=PAGE_CSS,
         path=path, more_html=more_html, version=version,
         header=TOPIC_HEADER.replace('href="../', 'href="/'), footer=TOPIC_FOOTER.replace('href="../', 'href="/').replace("{topic_links}", ""),
-        target=esc(target), name=esc(card["name"]), file=esc(card["file"]), price=esc(card["price"]),
-        size_line='    <p class="size">Size: %s</p>\n' % esc(card["size"]) if card["size"] else "",
+        script=SIZE_SCRIPT if sized else "", name=esc(card["name"]), file=esc(card["file"]), price=esc(card["price"]),
+        size_line='    <p class="size">Size: %s</p>\n' % esc(card["size"]) if card["size"] and not sized else "",
+        order=size_form(slug, card["section"], entry) if sized else '    <a class="order" href="%s">Add to cart</a>' % esc(target),
         line_html='    <p>%s</p>\n' % esc(card["line"]) if card["line"] else "",
         dims=' width="%s" height="%s"' % (card["width"], card["height"]) if card["width"].isdigit() and card["height"].isdigit() else "",
     )
@@ -682,18 +857,20 @@ def render_topic(topic, items, version, share_size):
     )
 
 
-def stamp(page, cards, slugs, more, thumbs):
+def stamp(page, cards, slugs, more, thumbs, sizes=None):
     """index.html with data-product-slug, data-more-like-this (the slugs of its "More like this" list, from more) and
-    data-thumb (its thumbnail, from thumbs) on each card's photo link, replacing any older ones. The popup reads them from there."""
+    data-thumb (its thumbnail, from thumbs) and, for a product with sizes, data-sizes (from sizes) on each card's photo link, replacing any
+    older ones. The popup reads them from there."""
     pieces, last = [], 0
     for card, slug in zip(cards, slugs):
         article = page[card["start"]:card["end"]]
         trigger = TRIGGER_RE.search(article)
         if not trigger:
             raise SystemExit("No photo link in the card " + card["name"])
-        tag = THUMB_ATTR_RE.sub("", MORE_ATTR_RE.sub("", SLUG_ATTR_RE.sub("", trigger.group(0))))
+        tag = SIZES_ATTR_RE.sub("", THUMB_ATTR_RE.sub("", MORE_ATTR_RE.sub("", SLUG_ATTR_RE.sub("", trigger.group(0)))))
+        entry = (sizes or {}).get(slug)
         related = " ".join(other for _, other in more.get(slug, []))
-        attributes = ' data-product-slug="%s"' % slug + (' data-more-like-this="%s"' % related if related else "") + ' data-thumb="%s"' % thumbs[slug]
+        attributes = ' data-product-slug="%s"' % slug + (' data-more-like-this="%s"' % related if related else "") + ' data-thumb="%s"' % thumbs[slug] + (' data-sizes="%s"' % esc(sizes_json(entry)) if entry and entry["options"] else "")
         tag = tag.replace(" data-lightbox-trigger", " data-lightbox-trigger" + attributes, 1)
         pieces.append(page[last:card["start"]] + article[:trigger.start()] + tag + article[trigger.end():])
         last = card["end"]
@@ -725,10 +902,15 @@ def thumb(root, slug):
     return relative
 
 
-def build(index_html, sitemap, root=ROOT):
-    """(index.html with slugs, {relative path: page}, sitemap.xml): a page per card in index_html and one per topic in TOPICS."""
+def build(index_html, sitemap, root=ROOT, sizes=None):
+    """(index.html with slugs, {relative path: page}, sitemap.xml): a page per card in index_html and one per topic in TOPICS.
+    sizes is {slug: row} from load_sizes(); the default reads data/product-sizes.tsv under root."""
+    sizes = load_sizes(root) if sizes is None else sizes
     cards = parse_cards(index_html)
     slugs = assign_slugs(cards)
+    check_sizes(sizes, slugs)
+    index_html = stamp_prices(index_html, cards, slugs, sizes)
+    cards = parse_cards(index_html)
     version = asset_version(index_html)
     seen = {PAGE_DIR}
     topic_pages = []
@@ -756,14 +938,15 @@ def build(index_html, sitemap, root=ROOT):
         topics[slug], groups[slug] = placed[slug] if slug in placed else (None, sections[card["section"]])
     more = pick_more(cards, slugs, groups)
     for card, slug in zip(cards, slugs):
-        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topics[slug], more[slug], version)
+        pages["%s/%s/index.html" % (PAGE_DIR, slug)] = render_page(card, slug, share_size(root, slug), topics[slug], more[slug], version, sizes.get(slug))
     for topic, items in topic_pages:
         pages[topic["slug"] + "/index.html"] = render_topic(topic, items, version, share_size(root, items[0][1]))
-    return stamp(index_html, cards, slugs, more, thumbs), pages, sitemap_with_products(sitemap, slugs)
+    return stamp(index_html, cards, slugs, more, thumbs, sizes), pages, sitemap_with_products(sitemap, slugs)
 
 
-def corporate_collection(page, cards, slugs, root=ROOT):
-    """page (corporate-gifting/index.html) with the text between its corporate-collection markers replaced by a tile for each corporate card."""
+def corporate_collection(page, cards, slugs, root=ROOT, sizes=None):
+    """page (corporate-gifting/index.html) with the text between its corporate-collection markers replaced by a tile for each corporate card.
+    A product with sizes says "From" its lowest size price."""
     if page.count(CORPORATE_START) != 1 or page.count(CORPORATE_END) != 1 or page.index(CORPORATE_START) > page.index(CORPORATE_END):
         raise SystemExit("%s needs one %s then one %s" % (CORPORATE_PAGE, CORPORATE_START, CORPORATE_END))
     chosen = [(card, slug) for card, slug in zip(cards, slugs) if card["section"] == CORPORATE_SECTION]
@@ -772,7 +955,10 @@ def corporate_collection(page, cards, slugs, root=ROOT):
     tiles = ""
     for card, slug in chosen:
         price = card["price"]
-        if price != "Price on request":
+        entry = (sizes or {}).get(slug)
+        if entry and entry["options"]:
+            price = "From " + rupees(min(option["price"] for option in entry["options"]))
+        elif price != "Price on request":
             match = PRICE_RE.fullmatch(price)
             if not match:
                 raise SystemExit("Unknown price format %r: extend corporate_collection() in tools/product_pages.py" % price)
@@ -798,7 +984,8 @@ def remove_stale_pages(root, keep):
 
 def main():
     index_path, sitemap_path = ROOT / "index.html", ROOT / "sitemap.xml"
-    stamped, pages, sitemap = build(index_path.read_text(encoding="utf-8"), sitemap_path.read_text(encoding="utf-8"))
+    sizes = load_sizes(ROOT)
+    stamped, pages, sitemap = build(index_path.read_text(encoding="utf-8"), sitemap_path.read_text(encoding="utf-8"), sizes=sizes)
     remove_stale_pages(ROOT, set(pages))
     for relative, content in pages.items():
         target = ROOT / relative
@@ -808,9 +995,9 @@ def main():
     sitemap_path.write_text(sitemap, encoding="utf-8")
     cards = parse_cards(stamped)
     slugs = assign_slugs(cards)
-    (ROOT / FEED_FILE).write_text(merchant_feed(cards, slugs), encoding="utf-8")
+    (ROOT / FEED_FILE).write_text(merchant_feed(cards, slugs, sizes), encoding="utf-8")
     corporate_path = ROOT / CORPORATE_PAGE
-    corporate_path.write_text(corporate_collection(corporate_path.read_text(encoding="utf-8"), cards, slugs), encoding="utf-8")
+    corporate_path.write_text(corporate_collection(corporate_path.read_text(encoding="utf-8"), cards, slugs, sizes=sizes), encoding="utf-8")
     topic_count = len(TOPICS)
     print("Wrote %d product pages in %s/, %d topic pages, stamped index.html and updated sitemap.xml." % (len(pages) - topic_count, PAGE_DIR, topic_count))
 

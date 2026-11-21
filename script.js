@@ -72,6 +72,31 @@
     return list.split(/\s+/).filter(function (name) { return /^[a-z]+(?:-[a-z]+)*$/.test(name); });
   }
 
+  // The sizes a card offers: data-sizes on its photo link, stamped by tools/product_pages.py from data/product-sizes.tsv.
+  // { default: code, options: [{ code, label, price }] }, or null for a one-size card or data that is not a valid size list.
+  function sizeOptions(trigger) {
+    var raw = trigger && typeof trigger.getAttribute === "function" ? trigger.getAttribute("data-sizes") : "";
+    var data = null;
+    try { data = raw ? JSON.parse(raw) : null; } catch (error) { return null; }
+    if (!data || !Array.isArray(data.options) || data.options.length < 2) return null;
+    var seen = Object.create(null);
+    var valid = data.options.every(function (option) {
+      var ok = option && typeof option.code === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(option.code) && !seen[option.code] &&
+        typeof option.label === "string" && option.label && typeof option.price === "string" && /^\u20b9[0-9][0-9,]*$/.test(option.price);
+      if (ok) seen[option.code] = true;
+      return ok;
+    });
+    if (!valid || typeof data["default"] !== "string" || !seen[data["default"]]) return null;
+    return { "default": data["default"], options: data.options.map(function (option) { return { code: option.code, label: option.label, price: option.price }; }) };
+  }
+
+  // The option with this code, or null.
+  function sizeFor(sizes, code) {
+    var found = null;
+    if (sizes) sizes.options.forEach(function (option) { if (!found && option.code === code) found = option; });
+    return found;
+  }
+
   // Visitor counts (analytics.js): a fixed event name, or "product-" / "cart-add-" plus the card's slug. A no-op when analytics is not there.
   function track(path) { try { if (window.saloniTrack) window.saloniTrack(path); } catch (error) {} }
   // The share slug of a card or its photo link ("" when it has none).
@@ -340,6 +365,8 @@
     var lightboxSize = document.getElementById("lightbox-product-size");
     var lightboxDescription = document.getElementById("lightbox-image-description");
     var lightboxRequest = document.getElementById("lightbox-request");
+    var lightboxSizes = document.getElementById("lightbox-sizes");
+    var lightboxSizeOptions = document.getElementById("lightbox-size-options");
     var lightboxStage = document.getElementById("lightbox-stage");
     var photoPrev = document.getElementById("lightbox-photo-prev");
     var photoNext = document.getElementById("lightbox-photo-next");
@@ -412,16 +439,21 @@
     // add=1 comes from the product page's Add to cart: put the item straight in the cart instead of opening its popup.
     // The page then shows that card (marked as in the cart) with the cart bar's Order now below it.
     var sharedAdd = false;
+    // size=<code> comes from a sized product page's form: the size the shopper picked there.
+    var sharedSize = "";
     try {
       var sharedParams = new URLSearchParams((window.location && window.location.search) || "");
       sharedSlug = sharedParams.get("product") || "";
       sharedAdd = sharedParams.get("add") === "1";
+      sharedSize = sharedParams.get("size") || "";
     } catch (error) {}
     var lastTrigger = null;
     var lightboxItems = [];
     var lightboxIndex = 0;
     var lightboxPhotos = [];
     var lightboxPhotoIndex = 0;
+    var lightboxSizeCode = "";
+    var lightboxPreferredSize = "";
     var swipeStart = null;
     var pendingLightboxRequest = null;
     var lightboxHistoryActive = false;
@@ -504,7 +536,9 @@
         var description = paragraphs.filter(function (paragraph, index) { return index !== includedAt; }).join(" ");
         var aiImages = aiImageNames(trigger);
         if (!description) description = imageAlt.replace(/^(?:illustrative preview|reference image|reference design|concept preview):\s*/i, "");
-        return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: size, description: description, included: included, aiImages: aiImages };
+        // A sized product shows its size buttons instead of the one size line.
+        var sizes = sizeOptions(trigger);
+        return { trigger: trigger, card: card, image: image, imageAlt: imageAlt, title: title ? title.textContent.trim() : "", price: price, size: sizes ? null : size, sizes: sizes, description: description, included: included, aiImages: aiImages };
       }
 
       function photosFor(item) {
@@ -530,7 +564,7 @@
           // The thumbnails show which photo is on screen, so only extra photos keep a label and the colour hint.
           var showLabel = several && lightboxPhotoIndex > 0;
           photoLabel.hidden = !showLabel;
-          photoLabel.textContent = showLabel ? photo.label + (photo.colour ? (lightboxRequest && !lightboxRequest.hidden ? (lightboxRequest.textContent === "Remove from cart" ? "\nRemove it from the cart first to choose \"" + photo.colour + "\" instead." : "\nUse the button below on this photo to choose \"" + photo.colour + "\".") : "\nMention \"" + photo.colour + "\" in your order notes.") : "") : "";
+          photoLabel.textContent = showLabel ? photo.label + (photo.colour ? (lightboxRequest && !lightboxRequest.hidden ? (lightboxRequest.classList && lightboxRequest.classList.contains("is-in-cart") ? "\nRemove it from the cart first to choose \"" + photo.colour + "\" instead." : "\nUse the button below on this photo to choose \"" + photo.colour + "\".") : "\nMention \"" + photo.colour + "\" in your order notes.") : "") : "";
         }
       }
 
@@ -807,6 +841,72 @@
         if (!hadFeed && productReviewsData) renderProductReviews(item);
       }
 
+      function cardRequestButton(item) {
+        return item.card && item.card.querySelector ? item.card.querySelector("[data-order-prefill]") : null;
+      }
+
+      // The button's words follow the cart: a size in the cart can be removed, or swapped for the size chosen now.
+      function renderRequestButton(item) {
+        if (!lightboxRequest) return;
+        var itemRequestButton = cardRequestButton(item);
+        lightboxRequest.hidden = !itemRequestButton;
+        lightboxRequest.disabled = lightboxRequest.hidden;
+        if (lightboxRequest.hidden) return;
+        var selected = typeof itemRequestButton.getAttribute === "function" && itemRequestButton.getAttribute("aria-pressed") === "true";
+        var inCartSize = selected ? itemRequestButton.getAttribute("data-cart-size") || "" : "";
+        var update = selected && Boolean(lightboxSizeCode) && Boolean(inCartSize) && lightboxSizeCode !== inCartSize;
+        lightboxRequest.textContent = update ? "Update size in cart" : selected ? "Remove from cart" : "Add to cart";
+        if (lightboxRequest.classList) lightboxRequest.classList.toggle("is-in-cart", selected);
+        lightboxRequest.setAttribute("aria-label", update ? "Update size of " + (item.title || "item") + " in cart" : (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from cart" : " to cart"));
+      }
+
+      // One radio button per size. The size in the cart is selected, else the size a shared link named (once), else the default.
+      function renderSizes(item) {
+        var preferred = lightboxPreferredSize;
+        lightboxPreferredSize = "";
+        lightboxSizeCode = "";
+        if (!lightboxSizes || !lightboxSizeOptions) return;
+        lightboxSizeOptions.textContent = "";
+        lightboxSizes.hidden = !item.sizes;
+        if (!item.sizes) return;
+        var requestButton = cardRequestButton(item);
+        var inCartSize = requestButton && typeof requestButton.getAttribute === "function" && requestButton.getAttribute("aria-pressed") === "true" ? requestButton.getAttribute("data-cart-size") || "" : "";
+        lightboxSizeCode = sizeFor(item.sizes, inCartSize) ? inCartSize : sizeFor(item.sizes, preferred) ? preferred : item.sizes["default"];
+        item.sizes.options.forEach(function (option) {
+          var label = document.createElement("label");
+          label.className = "size-option";
+          var input = document.createElement("input");
+          input.type = "radio";
+          input.name = "lightbox-size";
+          input.value = option.code;
+          input.checked = option.code === lightboxSizeCode;
+          var face = document.createElement("span");
+          face.className = "size-face";
+          var name = document.createElement("span");
+          name.className = "size-name";
+          name.textContent = option.label;
+          var price = document.createElement("span");
+          price.className = "size-price";
+          price.textContent = option.price;
+          face.appendChild(name);
+          face.appendChild(price);
+          label.appendChild(input);
+          label.appendChild(face);
+          input.addEventListener("change", function () {
+            lightboxSizeCode = option.code;
+            showSizePrice(item);
+            renderRequestButton(item);
+          });
+          lightboxSizeOptions.appendChild(label);
+        });
+        showSizePrice(item);
+      }
+
+      function showSizePrice(item) {
+        var option = sizeFor(item.sizes, lightboxSizeCode);
+        if (lightboxPrice && option) { lightboxPrice.textContent = "Price: " + option.price; lightboxPrice.hidden = false; }
+      }
+
       function renderLightboxItem(photoIndex) {
         var item = lightboxItems[lightboxIndex] || productDetails(lastTrigger);
         if (!item) return;
@@ -818,17 +918,8 @@
         if (lightboxPrice) { lightboxPrice.textContent = item.price || ""; lightboxPrice.hidden = !item.price; }
         if (lightboxSize) { lightboxSize.textContent = item.size || ""; lightboxSize.hidden = !item.size; }
         if (lightboxDescription) lightboxDescription.textContent = item.description || "";
-        if (lightboxRequest) {
-          var itemRequestButton = item.card && item.card.querySelector ? item.card.querySelector("[data-order-prefill]") : null;
-          lightboxRequest.hidden = !itemRequestButton;
-          lightboxRequest.disabled = lightboxRequest.hidden;
-          if (!lightboxRequest.hidden) {
-            var selected = typeof itemRequestButton.getAttribute === "function" && itemRequestButton.getAttribute("aria-pressed") === "true";
-            lightboxRequest.textContent = selected ? "Remove from cart" : "Add to cart";
-            if (lightboxRequest.classList) lightboxRequest.classList.toggle("is-in-cart", selected);
-            lightboxRequest.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (item.title || "item") + (selected ? " from cart" : " to cart"));
-          }
-        }
+        renderSizes(item);
+        renderRequestButton(item);
         // After the request button is set, so the photo hint knows whether it is there.
         renderPhoto();
         renderShare(item);
@@ -907,15 +998,25 @@
             var clean = new URL(window.location.href);
             clean.searchParams.delete("product");
             clean.searchParams.delete("add");
+            clean.searchParams.delete("size");
             window.history.replaceState(window.history.state, "", clean.pathname + clean.search + clean.hash);
           }
         } catch (error) {}
         var sharedCard = sharedAdd && typeof match.closest === "function" ? match.closest("article") : null;
         var sharedCartButton = sharedCard ? sharedCard.querySelector('[data-order-prefill="catalogue"]') : null;
         if (sharedCartButton) {
-          if (sharedCartButton.getAttribute("aria-pressed") !== "true") sharedCartButton.click();
+          var sharedSizes = sizeOptions(match);
+          var sharedOption = sizeFor(sharedSizes, sharedSize);
+          var sharedInCart = sharedCartButton.getAttribute("aria-pressed") === "true";
+          // A sized product goes in with the size the page named (else the default); one already in the cart changes only
+          // when the link names a different valid size.
+          if (!sharedInCart || (sharedOption && sharedOption.code !== sharedCartButton.getAttribute("data-cart-size"))) {
+            if (sharedSizes) sharedCartButton.__saloniChosenSize = sharedOption ? sharedOption.code : sharedSizes["default"];
+            sharedCartButton.click();
+          }
           return;
         }
+        lightboxPreferredSize = sharedSize;
         // Back from the popup must leave the page where the link scrolled it, not where the browser saved it before the jump.
         if (window.history) window.history.scrollRestoration = "manual";
         openLightbox(match, match);
@@ -932,7 +1033,7 @@
       if (photoPrev) photoPrev.addEventListener("click", function () { stepPhoto(-1); });
       if (photoNext) photoNext.addEventListener("click", function () { stepPhoto(1); });
       lightbox.addEventListener("keydown", function (event) {
-        if (lightboxPhotos.length < 2 || !event || event.altKey || event.metaKey || event.ctrlKey || event.shiftKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+        if (lightboxPhotos.length < 2 || !event || (event.target && event.target.name === "lightbox-size") || event.altKey || event.metaKey || event.ctrlKey || event.shiftKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
         event.preventDefault();
         stepPhoto(event.key === "ArrowRight" ? 1 : -1);
       });
@@ -964,6 +1065,9 @@
         if (lightboxName) lightboxName.textContent = "";
         if (lightboxPrice) { lightboxPrice.textContent = ""; lightboxPrice.hidden = true; }
         if (lightboxSize) { lightboxSize.textContent = ""; lightboxSize.hidden = true; }
+        if (lightboxSizes) lightboxSizes.hidden = true;
+        if (lightboxSizeOptions) lightboxSizeOptions.textContent = "";
+        lightboxSizeCode = "";
         if (lightboxDescription) lightboxDescription.textContent = "";
         if (lightboxRequest) { lightboxRequest.hidden = true; lightboxRequest.disabled = true; }
         if (lightboxMoreList) lightboxMoreList.textContent = "";
@@ -1053,6 +1157,8 @@
         pendingLightboxRequest = requestButton;
         // The order button reads this once, so the cart gets the photo on show.
         requestButton.__saloniChosenPhoto = (lightboxPhotos[lightboxPhotoIndex] || {}).name || "";
+        // Same for the size; "" for a one-size product.
+        requestButton.__saloniChosenSize = lightboxSizeCode;
         lightbox.close();
       });
       function cardPhotoIndex(trigger) {
@@ -1673,7 +1779,7 @@
     function urlWithState(state, hash) {
       var url = new URL(currentUrl(), "https://saloniresinart.com/");
       var params = url.searchParams;
-      ["type", "budget", "page", "q", "view", "product"].forEach(function (key) { params.delete(key); });
+      ["type", "budget", "page", "q", "view", "product", "size"].forEach(function (key) { params.delete(key); });
       if (state && state.preview) {
         params.set("view", "preview");
         params.set("type", state.type || "all");
@@ -2429,6 +2535,7 @@
           items: selectedCatalogueItems.map(function (item) {
             var saved = { sourceId: item.sourceId, quantity: bundleQuantity(item) };
             if (item.photo) saved.photo = item.photo;
+            if (item.sizeCode) saved.size = item.sizeCode;
             return saved;
           })
         }));
@@ -2695,7 +2802,10 @@
         }
       }
       catalogueButtons.forEach(function (button) {
-        var selected = selectedCatalogueItems.some(function (item) { return item.sourceId === button.__saloniCatalogueSourceId; });
+        var inCart = selectedCatalogueItems.filter(function (item) { return item.sourceId === button.__saloniCatalogueSourceId; })[0];
+        var selected = Boolean(inCart);
+        // The popup reads the size in the cart from here.
+        if (inCart && inCart.sizeCode) button.setAttribute("data-cart-size", inCart.sizeCode); else button.removeAttribute("data-cart-size");
         button.textContent = selected ? "Remove from cart" : "Add to cart";
         button.setAttribute("aria-pressed", String(selected));
         button.setAttribute("aria-label", (selected ? "Remove " : "Add ") + (button.__saloniCatalogueTitle || "item") + (selected ? " from cart" : " to cart"));
@@ -2725,7 +2835,7 @@
     }
 
     function catalogueSelectionKey(items) {
-      return sortedBundleItems(items).map(function (item) { return item.sourceId + ":" + bundleQuantity(item) + (item.photo ? ":" + item.photo : ""); }).join("|");
+      return sortedBundleItems(items).map(function (item) { return item.sourceId + ":" + bundleQuantity(item) + (item.photo ? ":" + item.photo : "") + (item.sizeCode ? "#" + item.sizeCode : ""); }).join("|");
     }
 
     function openCatalogueSelectionRequest(items, opener) {
@@ -2746,8 +2856,24 @@
       return opened;
     }
 
-    function toggleCatalogueSelection(seed) {
+    // resize: the popup chose another size for an item already in the cart, so its line is replaced in place (quantity kept)
+    // instead of the item being removed.
+    function toggleCatalogueSelection(seed, resize) {
       var existingIndex = selectedCatalogueItems.findIndex(function (item) { return item.sourceId === seed.sourceId; });
+      if (existingIndex !== -1 && resize) {
+        var resized = selectedCatalogueItems.slice();
+        resized[existingIndex] = Object.assign({}, seed, { quantity: bundleQuantity(selectedCatalogueItems[existingIndex]) });
+        if (bundleDetails(resized).length > 2000) {
+          setCatalogueSelectionStatus("That size cannot be changed because the selected list is full. Remove an item first.");
+          return false;
+        }
+        selectedCatalogueItems = resized;
+        setCatalogueSelectionStatus("");
+        markCatalogueSelectionChanged();
+        updateCatalogueSelection();
+        clearPreparedCatalogueRequest();
+        return false;
+      }
       if (existingIndex !== -1) {
         selectedCatalogueItems.splice(existingIndex, 1);
         setCatalogueSelectionStatus("");
@@ -2785,7 +2911,7 @@
       if (pricingDetails.length) details += (details ? " " : "") + pricingDetails.join(" ");
       var price = pricingDetails.map(function (detail) { return /^(?:price|from):\s*/i.test(detail) ? detail.replace(/^(?:price|from):\s*/i, "") : ""; }).filter(Boolean)[0] || "";
       var size = pricingDetails.map(function (detail) { return /^size:\s*/i.test(detail) ? detail.replace(/^size:\s*/i, "") : ""; }).filter(Boolean)[0] || "";
-      return Object.assign(sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details }), { price: price, size: size, imageSrc: image.getAttribute("src"), aiImages: aiImageNames(card.querySelector("[data-lightbox-trigger]")) });
+      return Object.assign(sourceSeed({ sourceKind: "catalogue", sourceId: sourceId, productName: title.textContent.trim(), designDetails: details }), { price: price, size: size, imageSrc: image.getAttribute("src"), aiImages: aiImageNames(card.querySelector("[data-lightbox-trigger]")), sizes: sizeOptions(card.querySelector("[data-lightbox-trigger]")), sizeCode: "" });
     }
 
     // A colour idea only counts when the card offers it; "styled" shows the same design, so it stays as shown.
@@ -2802,6 +2928,14 @@
         name = trigger ? trigger.__saloniPhotoName : "";
       }
       return offeredPhotoName(seed, name);
+    }
+
+    // A sized product's line carries one size: its code, the size in the name, and that size's price. A code the card does not offer
+    // gives the default size; a one-size product is left as it is.
+    function withSize(seed, code) {
+      var option = seed.sizes ? sizeFor(seed.sizes, code) || sizeFor(seed.sizes, seed.sizes["default"]) : null;
+      if (!option) return Object.assign({}, seed, { sizeCode: "" });
+      return Object.assign({}, seed, { sizeCode: option.code, productName: seed.productName + " (size: " + option.label + ")", price: option.price, size: "" });
     }
 
     // The seed for the chosen colour photo: its name, thumbnail and photo on the order line. Empty means as shown.
@@ -2825,7 +2959,14 @@
       button.setAttribute("aria-pressed", "false");
       button.setAttribute("aria-label", "Add " + seed.productName + " to cart");
       button.addEventListener("click", function () {
-        if (toggleCatalogueSelection(withPhoto(seed, chosenPhotoName(button, card, seed)))) {
+        // The popup hands over the size on show once; a plain click on the card adds the default size or removes the item.
+        var handoff = button.__saloniChosenSize;
+        button.__saloniChosenSize = null;
+        var sized = withSize(seed, handoff);
+        var inCart = selectedCatalogueItems.filter(function (item) { return item.sourceId === seed.sourceId; })[0];
+        var resize = Boolean(inCart && typeof handoff === "string" && sized.sizeCode && sized.sizeCode !== inCart.sizeCode);
+        var shownPhoto = chosenPhotoName(button, card, seed);
+        if (toggleCatalogueSelection(withPhoto(sized, resize ? inCart.photo : shownPhoto), resize)) {
           var slug = slugOf(card);
           if (slug) track("cart-add-" + slug);
         }
@@ -2842,7 +2983,7 @@
         if (!entry || typeof entry.sourceId !== "string" || seen[entry.sourceId] || !seedsBySourceId[entry.sourceId]) return;
         var quantity = Number(entry.quantity);
         if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) return;
-        var item = Object.assign(withPhoto(seedsBySourceId[entry.sourceId], offeredPhotoName(seedsBySourceId[entry.sourceId], entry.photo)), { quantity: quantity });
+        var item = Object.assign(withPhoto(withSize(seedsBySourceId[entry.sourceId], entry.size), offeredPhotoName(seedsBySourceId[entry.sourceId], entry.photo)), { quantity: quantity });
         var candidate = restored.concat([item]);
         if (bundleTotal(candidate) > 100 || bundleDetails(candidate).length > 2000) return;
         seen[entry.sourceId] = true;

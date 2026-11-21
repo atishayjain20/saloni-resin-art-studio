@@ -99,7 +99,7 @@ function createStorage(initial = {}) {
   };
 }
 
-function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "", diwaliOffer = false, observers = null } = {}) {
+function runFlow({ configured = true, frameType = "square", framePreset = "8", frameUnit = "in", confirms = [], longCatalogueTitle = false, storage = createStorage(), priceOverrides = {}, aiImages = "", sizes = "", diwaliOffer = false, observers = null } = {}) {
   const elements = new Map();
   const embed = new Element("order-form-embed");
   embed.attributes["data-order-form-url"] = configured ? "https://script.google.test/exec" : "https://script.google.test/REPLACE_WITH_ID/exec";
@@ -307,8 +307,9 @@ function runFlow({ configured = true, frameType = "square", framePreset = "8", f
     premiumCard.priceRows = [["Price", price]].map(([label, value]) => ({ querySelector(selector) { return selector === "dt" ? { textContent: label } : { textContent: value }; } }));
     return premiumCard;
   });
-  const photoTrigger = () => ({ getAttribute: (name) => (name === "data-ai-images" ? aiImages : null) });
-  if (aiImages) [card, premiumCards[0]].forEach((photoCard) => { photoCard.lightboxTrigger = photoTrigger(); });
+  const photoTrigger = (withSizes) => ({ getAttribute: (name) => (name === "data-ai-images" ? aiImages : name === "data-sizes" && withSizes && sizes ? sizes : null) });
+  if (aiImages) [card, premiumCards[0]].forEach((photoCard) => { photoCard.lightboxTrigger = photoTrigger(photoCard === card); });
+  else if (sizes) card.lightboxTrigger = photoTrigger(true);
   const posted = [];
   const scheduledTimers = [];
   // A stand-in for order-form.js: every open() is recorded in `posted` like the seed POST it replaced, with its options.
@@ -1656,4 +1657,131 @@ test("opens the request with the new colour after the item is removed and added 
   flow.catalogueCartOrder.dispatch("click");
   assert.ok(flow.posted.length > before, "the form is opened again for the new colour");
   assert.equal(submittedSeed(flow.posted).bundleItems[0].productName, EMERALD_NAME);
+});
+
+// --- Sized products: one cart line per product, with the chosen size and that size's price ---
+const SIZES = JSON.stringify({ default: "4-in", options: [{ code: "4-in", label: "4 in", price: "₹249" }, { code: "6-in", label: "6 in", price: "₹449" }, { code: "8-in", label: "8 in", price: "₹649" }] });
+const sizedFlow = (extra = {}) => runFlow({ sizes: SIZES, ...extra });
+const chooseSize = (flow, code) => { flow.catalogueButton.__saloniChosenSize = code; flow.catalogueButton.dispatch("click"); };
+const lineText = (flow, index = 0) => flow.catalogueSelectionItems.children[index].children.at(-1).textContent;
+
+test("a sized product goes in the cart at its default size and that size's price", () => {
+  const flow = sizedFlow();
+  flow.catalogueButton.dispatch("click");
+  assert.deepEqual(cartLines(flow), ["Test frame (size: 4 in)"]);
+  assert.equal(lineText(flow), "₹249 × 1 = ₹249");
+  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹249 + shipping");
+  assert.equal(flow.catalogueButton.getAttribute("data-cart-size"), "4-in", "the card's button knows the size in the cart");
+  assert.equal(flow.catalogueButton.getAttribute("aria-label"), "Remove Test frame from cart", "labels keep the plain title");
+  flow.catalogueRequestSelected.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.equal(seed.bundleItems[0].sourceId, "catalogue:test-frame.png", "one line per product: the source id does not change");
+  assert.deepEqual([seed.bundleItems[0].productName, seed.bundleItems[0].price, seed.bundleItems[0].size], ["Test frame (size: 4 in)", "₹249", ""]);
+  assert.match(seed.designDetails, /Test frame \(size: 4 in\) · ₹249 · Qty 1/);
+});
+
+test("the size the popup hands over sets the line's name, price, total and WhatsApp text", () => {
+  const flow = sizedFlow();
+  chooseSize(flow, "6-in");
+  assert.deepEqual(cartLines(flow), ["Test frame (size: 6 in)"]);
+  assert.equal(lineText(flow), "₹449 × 1 = ₹449");
+  assert.equal(flow.catalogueSelectionTotal.textContent, "Estimated total: ₹449 + shipping");
+  assert.match(whatsappText(flow), /- Test frame \(size: 6 in\) · ₹449 × 1\nEstimated total: ₹449 \+ shipping/);
+  assert.match(flow.catalogueSelectionSummary.textContent, /Test frame \(size: 6 in\)/);
+  assert.equal(flow.catalogueButton.getAttribute("data-cart-size"), "6-in");
+  flow.catalogueRequestSelected.dispatch("click");
+  const seed = submittedSeed(flow.posted);
+  assert.deepEqual([seed.bundleItems[0].productName, seed.bundleItems[0].price], ["Test frame (size: 6 in)", "₹449"]);
+  assert.match(seed.designDetails, /Test frame \(size: 6 in\) · ₹449 · Qty 1/);
+});
+
+test("the size choice is used once, and an unknown or empty size gives the default", () => {
+  const flow = sizedFlow();
+  chooseSize(flow, "8-in");
+  assert.equal(flow.catalogueButton.__saloniChosenSize, null, "the popup's choice is read once");
+  flow.catalogueButton.dispatch("click");
+  assert.deepEqual(cartLines(flow), [], "a plain click on the card removes it, whatever the size");
+  assert.equal(flow.catalogueButton.getAttribute("data-cart-size"), "", "no size once it is out of the cart");
+  for (const code of ["nope", "", "__proto__", 7]) {
+    const again = sizedFlow();
+    chooseSize(again, code);
+    assert.deepEqual(cartLines(again), ["Test frame (size: 4 in)"], String(code));
+  }
+});
+
+test("a one-size product ignores a size choice and keeps its plain line", () => {
+  const flow = runFlow();
+  chooseSize(flow, "6-in");
+  assert.deepEqual(cartLines(flow), ["Test frame"]);
+  assert.equal(flow.catalogueButton.getAttribute("data-cart-size"), "");
+  assert.deepEqual(JSON.parse(flow.windowObject.localStorage.getItem("saloniCatalogueCart")).items, [{ sourceId: "catalogue:test-frame.png", quantity: 1 }]);
+});
+
+test("choosing another size for an item in the cart replaces its line in place and keeps quantity and colour", () => {
+  const flow = sizedFlow({ aiImages: "emerald styled" });
+  flow.photoTriggers[0].__saloniPhotoName = "emerald";
+  chooseSize(flow, "4-in");
+  const quantity = flow.catalogueSelectionItems.children[0].children[1].children[0];
+  quantity.value = "3";
+  quantity.dispatch("change");
+  assert.equal(lineText(flow), "₹249 × 3 = ₹747");
+  flow.photoTriggers[0].__saloniPhotoName = "";
+  chooseSize(flow, "8-in");
+  assert.deepEqual(cartLines(flow), ["Test frame (size: 8 in) (colour: Emerald)"], "one line, new size, same colour");
+  assert.equal(lineText(flow), "₹649 × 3 = ₹1,947", "the quantity stays");
+  assert.equal(flow.catalogueButton.textContent, "Remove from cart");
+  assert.equal(flow.catalogueButton.getAttribute("data-cart-size"), "8-in");
+  assert.equal(flow.catalogueSelectionPreviews.children[0].attributes.src, EMERALD_IMAGE);
+  assert.equal(flow.catalogueCartCount.textContent, "1 selected");
+  // Choosing the size that is in the cart takes it out, like Remove from cart.
+  chooseSize(flow, "8-in");
+  assert.deepEqual(cartLines(flow), []);
+});
+
+test("a changed size reopens the order request instead of the old one", () => {
+  const flow = sizedFlow();
+  chooseSize(flow, "4-in");
+  flow.catalogueCartOrder.dispatch("click");
+  flow.orderDialog.close();
+  const before = flow.posted.length;
+  chooseSize(flow, "6-in");
+  flow.catalogueCartOrder.dispatch("click");
+  assert.ok(flow.posted.length > before, "the form opens again for the new size");
+  assert.equal(submittedSeed(flow.posted).bundleItems[0].productName, "Test frame (size: 6 in)");
+});
+
+test("saves the chosen size and restores it after a reload", () => {
+  const storage = createStorage();
+  const first = sizedFlow({ storage });
+  chooseSize(first, "6-in");
+  assert.deepEqual(JSON.parse(storage.getItem("saloniCatalogueCart")).items, [{ sourceId: "catalogue:test-frame.png", quantity: 1, size: "6-in" }]);
+  const reloaded = sizedFlow({ storage });
+  assert.deepEqual(cartLines(reloaded), ["Test frame (size: 6 in)"]);
+  assert.equal(lineText(reloaded), "₹449 × 1 = ₹449");
+  assert.equal(reloaded.catalogueButton.getAttribute("data-cart-size"), "6-in");
+});
+
+test("restores the default size when the saved size is missing, unknown or not a string", () => {
+  for (const entry of [{}, { size: "nope" }, { size: "" }, { size: 7 }, { size: null }, { size: "Six" }]) {
+    const storage = createStorage({
+      saloniCatalogueCart: JSON.stringify({ version: 1, expiresAt: Date.now() + 1000 * 60, items: [Object.assign({ sourceId: "catalogue:test-frame.png", quantity: 2 }, entry)] }),
+    });
+    const flow = sizedFlow({ storage });
+    assert.deepEqual(cartLines(flow), ["Test frame (size: 4 in)"], JSON.stringify(entry));
+    assert.equal(lineText(flow), "₹249 × 2 = ₹498");
+  }
+  // A saved size on a card that now has one size is ignored.
+  const storage = createStorage({
+    saloniCatalogueCart: JSON.stringify({ version: 1, expiresAt: Date.now() + 1000 * 60, items: [{ sourceId: "catalogue:test-frame.png", quantity: 1, size: "6-in" }] }),
+  });
+  assert.deepEqual(cartLines(runFlow({ storage })), ["Test frame"]);
+});
+
+test("Diwali buy 2 get 1 free counts the size's own price", () => {
+  const flow = sizedFlow({ diwaliOffer: true });
+  chooseSize(flow, "8-in");
+  flow.generatedCatalogueButtons[0].dispatch("click");
+  flow.generatedCatalogueButtons[1].dispatch("click");
+  assert.match(flow.catalogueSelectionTotal.textContent, /^Estimated total: .*free shipping \(Diwali offer: ₹\d[\d,]* off, buy 2 get 1 free\)/);
+  assert.match(whatsappText(flow), /Test frame \(size: 8 in\) · ₹649 × 1/);
 });
