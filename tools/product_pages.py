@@ -760,7 +760,7 @@ def render_page(card, slug, share_size, topic, more, version, entry=None):
     <h1>{name}</h1>
     <p class="price">{price}</p>
 {size_line}{line_html}{order}
-    <p class="delivery-note">Handmade in 4–5 days · delivered in 2–5 days after dispatch</p>
+    <p class="delivery-note">Free delivery on orders of ₹1,999+ · otherwise ₹100 in Rajasthan, ₹150 rest of India · handmade in 4–5 days, delivered 2–5 days after dispatch</p>
     </div>
 {more_html}  </main>
 {footer}{script}</body>

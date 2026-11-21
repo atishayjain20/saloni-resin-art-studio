@@ -851,7 +851,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIn(size, page)
         for sentence in (
             "Typical handmade production takes 4–5 days after design and advance confirmation.",
-            "Shipping is across India: ₹100 within Rajasthan and ₹150 to other states. Orders use protective packaging.",
+            "Shipping is across India: free on orders of ₹1,999 or more, otherwise ₹100 within Rajasthan and ₹150 to other states. Orders use protective packaging.",
             "Final quote after size, materials and delivery.",
             "she will check feasibility and try to meet it, but delivery is not promised until she confirms.",
             "Saloni normally replies within 5–6 working hours.",
@@ -902,7 +902,7 @@ class StaticSiteContractTests(unittest.TestCase):
         tags = PageTags()
         tags.feed(page)
         url = "https://saloniresinart.com/shipping-and-returns/"
-        description = "Shipping across India from Ajmer: ₹100 within Rajasthan, ₹150 to other states. No returns on customised pieces; transit damage support with photos and video."
+        description = "Shipping across India from Ajmer: free on orders of ₹1,999+, otherwise ₹100 within Rajasthan, ₹150 to other states. No returns on customised pieces; transit damage support with photos and video."
         title = "Shipping and Returns | Saloni Resin Art Studio"
         self.assertEqual(tags.title, title)
         self.assertEqual(tags.meta["og:title"], title)
@@ -913,7 +913,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(len(re.findall(r"<h1\b", page)), 1)
         self.assertIn('<h1 id="collection-title">Shipping and returns</h1>', page)
         for sentence in (
-            "Shipping is across India: ₹100 within Rajasthan and ₹150 to other states. Orders use protective packaging.",
+            "Shipping is across India: free on orders of ₹1,999 or more, otherwise ₹100 within Rajasthan and ₹150 to other states. Orders use protective packaging.",
             "Typical handmade production takes 4–5 days after design and advance confirmation.",
             "For an urgent date, tell Saloni the required date; she will check feasibility and try to meet it, but delivery is not promised until she confirms.",
             "Advance amount and payment terms are confirmed with the final design and quote before production starts.",
@@ -2663,7 +2663,7 @@ class ProductSharePageTests(unittest.TestCase):
         self.assertEqual(on_disk, sorted(self.slugs), "p/ holds exactly one page per card and nothing else")
         self.assertEqual([path.name for path in (ROOT / "p").iterdir() if path.name != "index.html" and not path.is_dir()], [])
 
-    DELIVERY_LINE = "Handmade in 4\u20135 days \u00b7 delivered in 2\u20135 days after dispatch"
+    DELIVERY_LINE = "Free delivery on orders of \u20b91,999+ \u00b7 otherwise \u20b9100 in Rajasthan, \u20b9150 rest of India \u00b7 handmade in 4\u20135 days, delivered 2\u20135 days after dispatch"
 
     def test_every_product_page_shows_the_delivery_line_right_under_add_to_cart(self):
         for slug in self.slugs:

@@ -155,6 +155,8 @@ function makeRuntime(options = {}) {
   };
   vm.createContext(runtimeContext);
   vm.runInContext(source, runtimeContext, { filename: "Code.gs" });
+  // Most carts here cost more than ₹1,999 and test other things, so free delivery is off unless a test asks for the real rule.
+  if (!options.realFreeDelivery) runtimeContext.FREE_DELIVERY_FROM = Infinity;
   const sign = (orderId, paymentId, secret = KEY_SECRET) => crypto.createHmac("sha256", secret).update(orderId + "|" + paymentId).digest("hex");
   const settle = (orderId, paymentId, overrides = {}) => {
     const order = rzp.orders[orderId];
@@ -204,6 +206,30 @@ test("shippingFee_: pickup free, PIN 30-34 (Rajasthan) 100, any other PIN 150", 
   assert.equal(fee("shipping", "299999"), 150);
   assert.equal(fee("shipping", "110001"), 150);
   assert.equal(fee("Shipping", "400001"), 150);
+});
+
+test("shippingFee_: free delivery when the products come to ₹1,999 or more", () => {
+  const rt = makeRuntime({ realFreeDelivery: true });
+  assert.equal(rt.context.FREE_DELIVERY_FROM, 1999);
+  const fee = rt.context.shippingFee_;
+  assert.equal(fee("shipping", "110001", 1998), 150);
+  assert.equal(fee("shipping", "302001", 1998), 100);
+  assert.equal(fee("shipping", "110001", 1999), 0);
+  assert.equal(fee("shipping", "302001", 4500), 0);
+  assert.equal(fee("pickup", "", 1998), 0);
+});
+
+test("a cart of ₹1,999 or more is charged no delivery: the Razorpay order is the products alone", () => {
+  const rt = makeRuntime({ realFreeDelivery: true });
+  const reply = placeOrder(rt, { pin: "110001", expectedTotal: 2498 });
+  assert.equal(reply.payment.shipping, 0);
+  assert.equal(reply.payment.total, 2498);
+  assert.equal(reply.payment.priceChanged, false);
+  assert.equal(rt.rzp.orders[reply.payment.orderId].amount, 249800);
+  const small = makeRuntime({ realFreeDelivery: true });
+  const one = placeOrder(small, { pin: "110001", lines: [{ sourceId: "catalogue:rose.jpg", size: "6-10-in", photo: "", qty: 1 }], expectedTotal: 1399 });
+  assert.equal(one.payment.shipping, 150);
+  assert.equal(one.payment.total, 1399);
 });
 
 test("paid order: server computes items and shipping once per order, and ignores client prices", () => {
