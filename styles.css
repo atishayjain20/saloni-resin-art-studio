@@ -527,6 +527,8 @@ dialog.lightbox-dialog:not([open]) { display: none; }
 dialog.order-dialog:not([open]) { display: none; }
 dialog.order-dialog { width: min(760px, calc(100vw - 2rem)); max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); padding: 0; border: 0; background: transparent; color: var(--ink); }
 dialog.order-dialog::backdrop { background: rgba(42, 14, 31, .72); }
+/* While the Razorpay window is open the checkout is non-modal (see order-form.js); keep it where it was, over the same dim. */
+dialog.order-dialog.order-dialog-paying[open] { position: fixed; inset: 0; z-index: 1000; box-shadow: 0 0 0 100vmax rgba(42, 14, 31, .72); }
 dialog.my-orders-dialog:not([open]) { display: none; }
 dialog.my-orders-dialog { width: min(680px, calc(100vw - 2rem)); max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); padding: 0; border: 0; background: transparent; color: var(--ink); }
 dialog.my-orders-dialog::backdrop { background: rgba(42, 14, 31, .72); }

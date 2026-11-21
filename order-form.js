@@ -848,6 +848,8 @@
     if (isModal === modal) return;
     swapCloses += 1;
     orderDialog.close();
+    // The class keeps the non-modal checkout fixed in place over a dimmed page, as it looked while modal.
+    if (orderDialog.classList) orderDialog.classList.toggle("order-dialog-paying", !modal);
     if (modal) orderDialog.showModal(); else orderDialog.show();
   }
   function phoneDigits() { var digits = value("phone").replace(/\D/g, ""); return digits.length > 10 ? digits.slice(-10) : digits; }

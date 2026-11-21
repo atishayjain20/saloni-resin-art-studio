@@ -1986,6 +1986,8 @@ test("the server's payment answer opens Razorpay with its key, order, amount in 
 function fakeOrderDialog() {
   const dialog = { open: true, modal: true, log: [] };
   dialog.matches = (selector) => selector === ":modal" && dialog.open && dialog.modal;
+  dialog.classes = new Set();
+  dialog.classList = { toggle: (name, on) => { if (on) dialog.classes.add(name); else dialog.classes.delete(name); } };
   dialog.close = () => { dialog.open = false; dialog.log.push("close"); };
   dialog.show = () => { dialog.open = true; dialog.modal = false; dialog.log.push("show"); };
   dialog.showModal = () => { dialog.open = true; dialog.modal = true; dialog.log.push("showModal"); };
@@ -2000,6 +2002,7 @@ test("the checkout popup stops being modal while the Razorpay window is open, so
   await payAndOpen(runtime);
   assert.equal(runtime.razorpays[0].opened, 1);
   assert.equal(modalAtOpen, false, "the popup is non-modal when Razorpay opens");
+  assert.equal(dialog.classes.has("order-dialog-paying"), true, "the paying class keeps the non-modal popup fixed in place");
   assert.equal(dialog.open, true, "the popup stays open behind the payment window");
   // The swap's close event must not reach the page's own close handler (which would undo the order dialog).
   const capture = runtime.windowObject.captureListeners.find((entry) => entry.type === "close" && entry.capture === true);
@@ -2011,6 +2014,7 @@ test("the checkout popup stops being modal while the Razorpay window is open, so
   assert.equal(stopped, 1, "a real close by the shopper still reaches the page");
   runtime.razorpays[0].options.modal.ondismiss();
   assert.equal(dialog.matches(":modal"), true, "closing the payment window makes the popup modal again");
+  assert.equal(dialog.classes.has("order-dialog-paying"), false);
   assert.deepEqual(dialog.log, ["close", "show", "close", "showModal"]);
 });
 test("a successful payment also makes the checkout popup modal again", async () => {
