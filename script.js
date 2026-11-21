@@ -932,7 +932,6 @@
       var shareCopy = document.getElementById("lightbox-share-copy");
       var shareStatus = document.getElementById("lightbox-share-status");
       var shareData = null;
-      var askLink = document.getElementById("lightbox-ask");
 
       function showShareOptions(show) {
         if (!shareOptions) return;
@@ -943,11 +942,9 @@
 
       // Share needs the card's data-product-slug; cards without a share page show no button.
       function renderShare(item) {
+        if (!shareBox || !shareButton) return;
         var slug = item.trigger && typeof item.trigger.getAttribute === "function" ? item.trigger.getAttribute("data-product-slug") : "";
         var url = slug ? productShareUrl(slug) : "";
-        // Ask Saloni on WhatsApp names this product, with its page link when it has one (same message as the product page).
-        if (askLink) askLink.href = "https://wa.me/918209238541?text=" + encodeURIComponent("Hi Saloni, I have a question about " + item.title + (url ? ": " + url : ""));
-        if (!shareBox || !shareButton) return;
         shareData = url ? { title: item.title, text: shareSummary(item.title, item.price), url: url } : null;
         shareBox.hidden = !shareData;
         if (shareOptions) { shareOptions.hidden = true; shareButton.setAttribute("aria-expanded", "false"); }
