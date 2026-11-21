@@ -924,11 +924,8 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(sentence, self.html)
                 self.assertIn(sentence, page)
         cancellation = re.search(r"<strong>Cancellation</strong><span>(.*?)</span>", page, re.S).group(1)
-        self.assertEqual(cancellation, "To cancel an order, call or message Saloni on WhatsApp. Before you pay the advance, you can also send a cancel request from My orders on the studio page, on the phone or computer you ordered from. If you cancel before making starts, your advance is refunded.")
+        self.assertEqual(cancellation, "To cancel an order, call or message Saloni on WhatsApp. You can also send a cancel request from My orders on the studio page, on the phone or computer you ordered from. For a paid order, Cancel order shows for 24 hours after you pay.")
         self.assertIn("My orders", cancellation)
-        refund = "If you cancel before making starts, your advance is refunded."
-        self.assertEqual(page.count(refund), 1)
-        self.assertTrue(cancellation.endswith(" " + refund))
         self.assertNotIn("confirms or declines", page)
         self.assertNotIn("Once paid, the advance is not refunded if you cancel.", page)
         self.assertIn("House No. 61, Hathi Bhata, Ajmer, Rajasthan, India. Open every day, 11:00 AM–4:00 PM.", page)
@@ -4036,9 +4033,9 @@ class OnlinePaymentSiteTests(unittest.TestCase):
                     self.assertIn("catalogue:" + card["file"], self.prices)
                     self.assertEqual(self.prices["catalogue:" + card["file"]]["price"], int(card["price"][1:].replace(",", "")))
 
-    def test_the_site_ships_with_payments_off_and_the_captcha_key_on_the_order_form(self):
+    def test_the_site_ships_with_payments_live_and_the_captcha_key_on_the_order_form(self):
         embed = re.search(r'<div class="order-panel order-form-panel" id="order-form-embed"[^>]*>', self.home).group(0)
-        self.assertIn('data-payments="off"', embed)
+        self.assertIn('data-payments="live"', embed)
         rating_key = re.search(r'id="lightbox-rate" data-captcha-site-key="([^"]+)"', self.home).group(1)
         self.assertIn('data-captcha-site-key="%s"' % rating_key, embed)
 
@@ -4054,10 +4051,17 @@ class OnlinePaymentSiteTests(unittest.TestCase):
         self.assertNotIn("No real money", summary, "the test note says so only after the server's key is a test key")
         self.assertIn('id="reference-image-fieldset"', self.home)
 
-    def test_the_shipping_page_does_not_promise_online_payment_while_payments_are_off(self):
+    def test_the_shipping_page_states_online_payment_and_the_24_hour_refund_rule(self):
         page = (ROOT / "shipping-and-returns" / "index.html").read_text(encoding="utf-8")
-        for absent in ("Razorpay", "Pay online", 'id="refunds"', "within 24 hours of paying"):
-            self.assertNotIn(absent, page)
+        refund = re.search(r'<li id="refunds"><strong>Refund for online payments</strong><span>(.*?)</span></li>', page, re.S).group(1)
+        for part in ("full refund", "within 24 hours of paying", "before Saloni starts making", "except for damage in transit"):
+            self.assertIn(part, refund)
+        paying = re.search(r"<strong>Pay online</strong><span>(.*?)</span>", page, re.S).group(1)
+        for part in ("Razorpay", "A paid order is confirmed at once", "\u20b90 for pickup", "\u20b9100", "\u20b9150", "30 to 34", "once per order"):
+            self.assertIn(part, paying)
+        self.assertLess(page.index("<strong>Pickup</strong>"), page.index("<strong>Pay online</strong>"))
+        self.assertLess(page.index('id="refunds"'), page.index("<strong>Transit damage</strong>"))
+        self.assertNotIn("Before you pay the advance", page)
 
     def test_the_go_live_checklist_holds_the_exact_payment_and_refund_copy_for_the_shipping_page(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -4071,7 +4075,6 @@ class OnlinePaymentSiteTests(unittest.TestCase):
         paying = re.search(r"<strong>Pay online</strong><span>(.*?)</span>", section, re.S).group(1)
         for part in ("Razorpay", "A paid order is confirmed at once", "\u20b90 for pickup", "\u20b9100", "\u20b9150", "30 to 34", "once per order"):
             self.assertIn(part, paying)
-        self.assertIn("Before you pay the advance", (ROOT / "shipping-and-returns" / "index.html").read_text(encoding="utf-8"))
         self.assertIn("For a paid order, Cancel order shows for 24 hours after you pay.", section)
 
     def test_both_privacy_texts_say_razorpay_processes_payments(self):
