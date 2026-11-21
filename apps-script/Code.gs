@@ -1311,9 +1311,12 @@ function paymentKeys_(properties, mode) {
   return { id: id, secret: secret };
 }
 
-// Shipping once per order: pickup 0; PIN starting 30 to 34 (Rajasthan) 100; any other PIN 150.
-function shippingFee_(fulfillment, pin) {
+// Shipping once per order: pickup 0; products worth FREE_DELIVERY_FROM or more 0; PIN starting 30 to 34 (Rajasthan) 100; any other PIN 150.
+// Keep in step with shippingFee in order-form.js and the delivery line in tools/product_pages.py and index.html.
+var FREE_DELIVERY_FROM = 1999;
+function shippingFee_(fulfillment, pin, subtotal) {
   if (String(fulfillment).toLowerCase() !== "shipping") return 0;
+  if (Number(subtotal) >= FREE_DELIVERY_FROM) return 0;
   var prefix = Number(String(pin).slice(0, 2));
   return prefix >= 30 && prefix <= 34 ? 100 : 150;
 }
@@ -1483,7 +1486,7 @@ function orderCell_(values, name) {
 // Items plus shipping for a stored row, in whole rupees.
 function storedTotal_(values) {
   var subtotal = Number(orderCell_(values, "Final product subtotal"));
-  return (isFinite(subtotal) ? subtotal : 0) + shippingFee_(String(orderCell_(values, "Fulfilment")), String(orderCell_(values, "PIN")));
+  return (isFinite(subtotal) ? subtotal : 0) + shippingFee_(String(orderCell_(values, "Fulfilment")), String(orderCell_(values, "PIN")), subtotal);
 }
 
 // Details of a row that was paid online (Payment status Paid with a Razorpay payment id), or null. "index" maps header names to
@@ -1505,7 +1508,7 @@ function paymentReply_(requestId, values, properties, body) {
   var paid = paidOrderDetails_(values, PAYMENT_HEADER_INDEX);
   if (paid) return { ok: true, requestId: requestId, paid: true, total: paid.amount || storedTotal_(values) };
   var subtotal = Number(orderCell_(values, "Final product subtotal"));
-  var shipping = shippingFee_(String(orderCell_(values, "Fulfilment")), String(orderCell_(values, "PIN")));
+  var shipping = shippingFee_(String(orderCell_(values, "Fulfilment")), String(orderCell_(values, "PIN")), subtotal);
   var total = subtotal + shipping;
   return {
     ok: true, requestId: requestId,
@@ -1560,7 +1563,7 @@ function startPaymentChecked_(body, form, properties, payments) {
   payload.quantity = String(priced.quantity);
   payload.requestStage = "quote"; // no dimensions on a priced catalogue order; the row keeps those cells blank
   payload.lines = JSON.stringify(lines);
-  var shipping = shippingFee_(payload.fulfillment, payload.pin);
+  var shipping = shippingFee_(payload.fulfillment, payload.pin, priced.subtotal);
   var total = priced.subtotal + shipping;
   if (total > PAYMENT_MAX_TOTAL) return paymentFailure_("too_large");
   var fingerprint = payloadFingerprint_(payload);

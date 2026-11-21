@@ -668,10 +668,13 @@
     try { search = String(window.location && window.location.search || ""); } catch (error) { search = ""; }
     return /(?:^|[?&])payments=test(?:&|$)/.test(search) ? "test" : "off";
   }
+  var FREE_DELIVERY_FROM = 1999;
   function rupees(amount) { return "₹" + String(amount).replace(/\B(?=(\d\d)+\d$)/g, ","); }
-  function shippingFee(fulfillment, pin) {
+  // Same rule as shippingFee_ in apps-script/Code.gs.
+  function shippingFee(fulfillment, pin, subtotal) {
     if (fulfillment === "pickup") return 0;
     if (!/^[1-9]\d{5}$/.test(pin)) return null;
+    if (subtotal >= FREE_DELIVERY_FROM) return 0;
     return /^3[0-4]/.test(pin) ? 100 : 150;
   }
   function hasCustomSize(item) {
@@ -693,7 +696,7 @@
       subtotal += price * quantity;
       lines.push({ name: item.productName, quantity: quantity, amount: price * quantity });
     }
-    var shipping = shippingFee(fulfillment, value("pin").trim());
+    var shipping = shippingFee(fulfillment, value("pin").trim(), subtotal);
     if (subtotal + (shipping || 0) > PAY_LIMIT) return null;
     return { lines: lines, subtotal: subtotal, shipping: shipping, total: shipping === null ? null : subtotal + shipping };
   }
@@ -758,7 +761,7 @@
       });
     }
     if (checkoutSubtotal) checkoutSubtotal.textContent = rupees(figures.subtotal);
-    if (checkoutShipping) checkoutShipping.textContent = figures.shipping === null ? "Enter your PIN to see shipping" : rupees(figures.shipping);
+    if (checkoutShipping) checkoutShipping.textContent = figures.shipping === null ? "Enter your PIN to see shipping" : figures.shipping === 0 && value("fulfillment") === "shipping" ? "Free" : rupees(figures.shipping);
     if (checkoutTotal) checkoutTotal.textContent = figures.total === null ? "" : rupees(figures.total);
     submitButton.textContent = payLabel(figures.total);
   }
