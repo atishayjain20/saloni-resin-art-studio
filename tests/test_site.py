@@ -2674,6 +2674,30 @@ class ProductSharePageTests(unittest.TestCase):
                 slug)
             self.assertEqual(text.count(self.DELIVERY_LINE), 1, slug)
 
+    def test_every_product_page_has_whatsapp_damage_help_and_meet_saloni(self):
+        """A stranger landing from Google sees how to ask Saloni, what happens if it arrives damaged, and who makes it."""
+        from urllib.parse import unquote
+        for slug in self.slugs:
+            text, _ = self.page(slug)
+            with self.subTest(slug=slug):
+                ask = re.search(r'<a class="button button-whatsapp ask" href="https://wa\.me/918209238541\?text=([^"]+)" target="_blank" rel="noopener">'
+                                r'<svg class="whatsapp-icon"[^>]*>.*?</svg>Ask Saloni on WhatsApp</a>', text, re.S)
+                self.assertIsNotNone(ask)
+                self.assertIn("https://saloniresinart.com/p/%s/" % slug, unquote(ask.group(1)))
+                care = re.search(r'<p class="care-note">(.*?)</p>', text, re.S)
+                self.assertIsNotNone(care)
+                self.assertIn("Damaged in transit? Send Saloni photos and an unboxing video for replacement support.", care.group(1))
+                self.assertIn("Made to order, so no returns.", care.group(1))
+                self.assertIn('<a href="/shipping-and-returns/">Shipping &amp; returns</a>', care.group(1))
+                self.assertLess(text.index('<p class="delivery-note">'), text.index('class="button button-whatsapp ask"'))
+                self.assertLess(text.index('class="button button-whatsapp ask"'), text.index('<p class="care-note">'))
+                maker = re.search(r'<section class="maker" aria-labelledby="maker-title">(.*?)</section>', text, re.S)
+                self.assertIsNotNone(maker)
+                self.assertIn('<img src="/assets/saloni-portrait.jpg" alt="Saloni, the artist behind Saloni Resin Art Studio"', maker.group(1))
+                self.assertIn('<h2 id="maker-title">Meet Saloni</h2>', maker.group(1))
+                self.assertIn("Every piece is handmade by Saloni in her studio in Ajmer, Rajasthan.", maker.group(1))
+                self.assertIn('<a href="/#customer-reviews">Read customer reviews</a>', maker.group(1))
+
     def test_popup_shows_the_delivery_line_right_under_its_add_to_cart_button_and_not_on_cards(self):
         self.assertRegex(
             self.home,
@@ -3004,8 +3028,8 @@ class ProductSharePageTests(unittest.TestCase):
 
                 # Every link on the page leads to a file in the site.
                 for href in tags.body_links:
-                    if href == "#main-content" or href == "https://www.instagram.com/saloniresin_art_studio/":
-                        continue  # skip link, and the studio Instagram in the site footer
+                    if href == "#main-content" or href == "https://www.instagram.com/saloniresin_art_studio/" or href.startswith("https://wa.me/918209238541?text="):
+                        continue  # skip link, the studio Instagram in the site footer, and Ask Saloni on WhatsApp
                     path = re.split(r"[?#]", href)[0]
                     self.assertTrue(path.startswith("/"), href)
                     self.assertTrue((ROOT / path.strip("/") / "index.html").is_file(), href)

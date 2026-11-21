@@ -152,7 +152,26 @@ PAGE_CSS = ('.product-detail{box-sizing:border-box;width:calc(100% - 1rem);max-w
             '.product-detail .more a{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.35rem;height:100%;padding:.4rem;text-align:center}'
             '.product-detail .more a:focus-visible{outline-offset:-3px}.product-detail .more img{width:6.25rem;height:6.25rem;border-radius:.75rem;object-fit:cover}'
             '.product-detail .more span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-size:.9rem;line-height:1.25}'
+            '.product-detail .ask{display:flex;justify-content:center;min-height:2.75rem;margin:.75rem 0 .4rem}'
+            '.product-detail .care-note{margin:0;color:#6a4a5b;font-size:.8rem;line-height:1.35;text-align:center}'
+            '.product-detail .care-note a{display:flex;justify-content:center;align-items:center;min-height:2.75rem}'
+            '.product-detail .care-note a,.product-detail .maker a{color:#8f0d49;font-weight:700}.product-detail .maker a{display:inline-flex;align-items:center;min-height:2.75rem}'
+            '.product-detail .maker{display:flex;gap:.9rem;align-items:center;margin:0 0 1.5rem;padding:.9rem;border-radius:1rem;background:#fde7f0}'
+            '.product-detail .maker img{flex:none;width:5rem;height:5rem;border-radius:50%;object-fit:cover}'
+            '.product-detail .maker h2{margin:0 0 .25rem;font-size:1.2rem;letter-spacing:-.02em}.product-detail .maker p{margin:0;font-size:.9rem;line-height:1.35}'
             '.product-detail a:focus-visible{outline:3px solid #b0125b;outline-offset:4px}')
+# Same icon as the WhatsApp buttons on the home page.
+WHATSAPP_ICON = '<svg class="whatsapp-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.21 3.07.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.76-.72 2-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.05 21.5h-.01a9.4 9.4 0 0 1-4.8-1.32l-.34-.2-3.57.94.95-3.48-.22-.36a9.4 9.4 0 0 1-1.44-5.01c0-5.2 4.23-9.43 9.44-9.43a9.37 9.37 0 0 1 6.67 2.77 9.37 9.37 0 0 1 2.76 6.67c0 5.2-4.24 9.43-9.44 9.43zm8.03-17.46A11.3 11.3 0 0 0 12.05.72C5.79.72.7 5.8.7 12.07c0 2 .52 3.95 1.52 5.67L.6 23.28l5.68-1.49a11.33 11.33 0 0 0 5.77 1.47h.01c6.26 0 11.35-5.09 11.35-11.35 0-3.03-1.18-5.88-3.33-8.03z"></path></svg>'
+# Under the delivery line: ask Saloni about this piece, and what happens if it arrives damaged (see shipping-and-returns).
+TRUST_HTML = ('    <a class="button button-whatsapp ask" href="https://wa.me/918209238541?text=%s" target="_blank" rel="noopener">%sAsk Saloni on WhatsApp</a>\n'
+              '    <p class="care-note">Damaged in transit? Send Saloni photos and an unboxing video for replacement support. '
+              'Made to order, so no returns. <a href="/shipping-and-returns/">Shipping &amp; returns</a></p>\n')
+MAKER_HTML = ('  <section class="maker" aria-labelledby="maker-title">\n'
+              '    <img src="/assets/saloni-portrait.jpg" alt="Saloni, the artist behind Saloni Resin Art Studio" width="320" height="320" loading="lazy" decoding="async">\n'
+              '    <div><h2 id="maker-title">Meet Saloni</h2>\n'
+              '    <p>Every piece is handmade by Saloni in her studio in Ajmer, Rajasthan. Studio visits every day, 11 AM–4 PM.</p>\n'
+              '    <p><a href="/#customer-reviews">Read customer reviews</a></p></div>\n'
+              '  </section>\n')
 # Sizes the popup also hides: they are not a real size yet.
 NOT_A_SIZE_RE = re.compile(r"suggested size|confirm with saloni|custom size in inches|component size to confirm", re.I)
 
@@ -761,14 +780,15 @@ def render_page(card, slug, share_size, topic, more, version, entry=None):
     <p class="price">{price}</p>
 {size_line}{line_html}{order}
     <p class="delivery-note">Free delivery on orders of ₹1,999+ · otherwise ₹100 in Rajasthan, ₹150 rest of India · handmade in 4–5 days, delivered 2–5 days after dispatch</p>
-    </div>
-{more_html}  </main>
+{trust}    </div>
+{maker}{more_html}  </main>
 {footer}{script}</body>
 </html>
 """.format(
         title=esc(title), desc=esc(desc), url=url, studio=esc(STUDIO), image=esc(image), size=size, alt=esc(alt),
         ld=("".join('  <script type="application/ld+json">%s</script>\n' % block for block in (data, crumbs) if block)), css=PAGE_CSS,
-        path=path, more_html=more_html, version=version,
+        path=path, more_html=more_html, version=version, maker=MAKER_HTML,
+        trust=TRUST_HTML % (urllib.parse.quote("Hi Saloni, I have a question about %s: %s" % (card["name"], url), safe=""), WHATSAPP_ICON),
         header=TOPIC_HEADER.replace('href="../', 'href="/'), footer=TOPIC_FOOTER.replace('href="../', 'href="/').replace("{topic_links}", ""),
         script=SIZE_SCRIPT if sized else "", name=esc(card["name"]), file=esc(card["file"]), price=esc(card["price"]),
         size_line='    <p class="size">Size: %s</p>\n' % esc(card["size"]) if card["size"] and not sized else "",
