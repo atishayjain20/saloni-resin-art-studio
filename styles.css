@@ -1307,6 +1307,12 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 #review-form .photo-previews img { display: block; width: 6.5rem; height: 6.5rem; object-fit: cover; border: 1px solid #dccbc1; border-radius: .6rem; background: #fffaf4; }
 #review-form .photo-previews button { min-height: 2.2rem; padding: .3rem .8rem; border-color: #bca8a0; background: #fff; color: #2b2020; font-size: .78rem; }
 
+/* After the sale ends (head script in index.html) the sale price is the price: no struck prices, "20% off" tags or sale slide. */
+html.sale-ended .product-regular-price,
+html.sale-ended .hero-promo-sale,
+html.sale-ended .hero-promo-tag s,
+html.sale-ended .hero-promo-tag .sr-only { display: none !important; }
+
 @media (min-width: 1024px) {
   body:has(#catalogue-selection) { --max: 1320px; }
   #catalogue-selection { width: min(calc(100% - (var(--gutter) * 2)), var(--max)); margin: 1rem auto 0; grid-template-columns: minmax(0, 1fr) minmax(15rem, auto); align-items: center; gap: 1.25rem 2.5rem; padding: 1.25rem 1.5rem; border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }

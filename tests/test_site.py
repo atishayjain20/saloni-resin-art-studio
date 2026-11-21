@@ -2643,6 +2643,19 @@ class ProductSharePageTests(unittest.TestCase):
         source = self.tool_path.read_text(encoding="utf-8")
         self.assertNotRegex(source, r"(?m)^\s*(?:from|import)\s+(?:PIL|requests|jinja2|bs4)\b")
 
+    def test_sale_price_is_the_only_price_off_the_home_page(self):
+        """The 20% sale (ends 30 Nov 2026) shows a struck price only on the home page, so share pages, topic pages
+        and the Merchant feed need no end date and never state a regular price or sale dates."""
+        pages = list((ROOT / "p").glob("*/index.html")) + list(ROOT.glob("*/index.html"))
+        self.assertGreater(len(pages), 100)
+        for path in pages:
+            if path.parent == ROOT / "p":
+                continue
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(page=str(path.relative_to(ROOT))):
+                self.assertNotRegex(text, r"product-regular-price|<s>|% off|Sale ends|priceValidUntil|sale-ended", )
+        self.assertNotRegex((ROOT / "merchant-feed.tsv").read_text(encoding="utf-8"), r"sale_price|% off")
+
     def test_every_card_has_exactly_one_page_and_the_slugs_are_unique(self):
         self.assertEqual(len(self.slugs), len(self.products), "every catalogue card photo link carries data-product-slug")
         self.assertEqual(len(self.slugs), len(set(self.slugs)))

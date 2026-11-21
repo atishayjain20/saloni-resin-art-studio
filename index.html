@@ -47,13 +47,17 @@
     }
   </script>
   <title>Custom Resin Art &amp; Gifts | Saloni Resin Art Studio</title>
-  <link rel="stylesheet" href="styles.css?v=20261201">
-  <script class="analytics-script" src="analytics.js?v=20261201" defer></script>
-  <script class="google-script" src="google.js?v=20261201" defer></script>
-  <script class="order-form-script" src="order-form.js?v=20261201" defer></script>
-  <script class="site-script" src="script.js?v=20261201" defer></script>
-  <script class="my-orders-script" src="my-orders.js?v=20261201" defer></script>
-  <script class="customizer-script" src="customizer.js?v=20261201" defer></script>
+  <script>
+    // The 20% sale ends after 30 Nov 2026 23:59 India time (UTC+5:30). From then on the sale price is the price; styles.css and script.js key off this class.
+    if (Date.now() >= Date.UTC(2026, 10, 30, 18, 30)) document.documentElement.classList.add("sale-ended");
+  </script>
+  <link rel="stylesheet" href="styles.css?v=20261202">
+  <script class="analytics-script" src="analytics.js?v=20261202" defer></script>
+  <script class="google-script" src="google.js?v=20261202" defer></script>
+  <script class="order-form-script" src="order-form.js?v=20261202" defer></script>
+  <script class="site-script" src="script.js?v=20261202" defer></script>
+  <script class="my-orders-script" src="my-orders.js?v=20261202" defer></script>
+  <script class="customizer-script" src="customizer.js?v=20261202" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -147,6 +151,7 @@
             <p class="hero-promo-kicker">The handmade sale</p>
             <p class="hero-promo-big"><span>20%</span> off</p>
             <p class="hero-promo-sub">on 106 handmade pieces · gifts from ₹149</p>
+            <p class="hero-promo-sub hero-promo-ends"><strong>Sale ends 30 Nov</strong></p>
             <a class="button hero-promo-cta" href="#catalogue-filters" data-browse-all>Shop the sale</a>
           </div>
           <ul class="hero-promo-picks" aria-label="Sale prices">
