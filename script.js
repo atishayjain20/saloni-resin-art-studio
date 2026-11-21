@@ -1260,6 +1260,7 @@
         var targetTrigger = targetCard && targetCard.querySelector ? targetCard.querySelector("[data-lightbox-trigger]") : null;
         lightboxItems = [productDetails(targetTrigger || trigger)];
         var slug = slugOf(targetTrigger || trigger);
+        lightbox.setAttribute("data-product-slug", slug);
         if (slug) track("product-" + slug);
         lightboxIndex = 0;
         renderLightboxItem(cardPhotoIndex(targetTrigger || trigger));

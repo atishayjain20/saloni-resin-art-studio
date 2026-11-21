@@ -601,6 +601,22 @@ dialog.advance-popup::backdrop { background: rgba(42, 14, 31, .72); }
 .my-order-pay:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; border-color: var(--ink); }
 .my-order-pay:active { transform: scale(.96); }
 .my-order-copy-feedback:empty { display: none; }
+/* Favourites: a heart on each card photo (and in the product popup), and the My favourites rows. */
+:is(.work-card, .romantic-keepsake-card) > figure { position: relative; }
+.favourite-toggle { position: absolute; top: .25rem; right: .25rem; z-index: 2; display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--rose-ink); cursor: pointer; }
+.favourite-toggle::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: rgba(255, 255, 255, .92); box-shadow: 0 1px 4px rgba(42, 14, 31, .3); transition: background-color 180ms ease; }
+.favourite-toggle:hover::before { background: #fff; }
+.favourite-toggle:focus-visible { outline: 3px solid var(--rose); outline-offset: 0; }
+.favourite-icon { position: relative; width: 1.3rem; height: 1.3rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.favourite-toggle[aria-pressed="true"] .favourite-icon { fill: currentColor; }
+.lightbox-order-summary strong { padding-inline: 2.75rem; }
+.lightbox-favourite { top: .35rem; right: .35rem; }
+.favourites-count:not(:empty) { margin-inline-start: .3rem; }
+.favourite-open { display: flex; align-items: center; gap: .75rem; width: 100%; min-width: 0; min-height: 3.5rem; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.favourite-open:focus-visible { outline: 3px solid var(--rose); outline-offset: 2px; }
+.favourite-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .7rem; }
+.favourite-actions .button { flex: 1 1 8rem; min-height: 2.75rem; justify-content: center; }
+.favourite-actions .button-line:not(:hover):not(:focus-visible) { background: transparent; }
 .order-dialog-panel { position: relative; width: 100%; max-height: calc(100dvh - 2rem); overflow: auto; overscroll-behavior: contain; padding: clamp(2.8rem, 4vw, 3.5rem) clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 1.5rem); border-radius: 1.2rem; background: var(--paper); box-shadow: var(--shadow); }
 .order-dialog-close-form { position: sticky; z-index: 2; top: 0; display: flex; justify-content: flex-end; height: 44px; margin: -2.8rem -1rem 1rem; }
 .order-dialog-close { position: static; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--ivory); color: var(--ink); font-size: 1.4rem; line-height: 1; }
@@ -669,7 +685,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .form-details summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--cocoa); font-size: .8rem; font-weight: 800; }
 .form-details .hint { margin-top: 0; }
 /* The popup is warm ivory; the name, price and buttons sit in a soft blush box so the buying part stands out. */
-.lightbox-order-summary { display: grid; flex: 0 0 auto; justify-items: center; gap: .3rem; margin-top: .9rem; padding: .8rem .75rem .75rem; border-radius: 1rem; background: #fde7f0; text-align: center; }
+.lightbox-order-summary { position: relative; display: grid; flex: 0 0 auto; justify-items: center; gap: .3rem; margin-top: .9rem; padding: .8rem .75rem .75rem; border-radius: 1rem; background: #fde7f0; text-align: center; }
 .lightbox-order-summary strong { color: var(--ink); font: 500 1.45rem/1.1 var(--display); }
 .lightbox-order-summary #lightbox-product-price { color: var(--cocoa); font-weight: 800; }
 /* Size choice: native radio buttons shown as pills. The popup and each /p/ page use the same markup. */
@@ -918,10 +934,14 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .catalogue-control-toggle:hover, .catalogue-control-toggle:focus-visible, .catalogue-control-toggle[aria-expanded="true"] { border-color: var(--ink); background: var(--ink); color: var(--ivory); }
 .catalogue-control-toggle:focus-visible, .catalogue-search-form input:focus-visible, .catalogue-filter-fields select:focus-visible, .catalogue-filter-fields .button:focus-visible { outline: 3px solid var(--rose); outline-offset: 3px; }
 .catalogue-control-icon { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
-.catalogue-header-cart { position: relative; }
+.catalogue-header-cart, .catalogue-header-favourites { position: relative; }
 .catalogue-header-cart-count { position: absolute; top: -4px; right: -4px; min-width: 1.25rem; height: 1.25rem; padding: 0 .3rem; border-radius: 999px; background: var(--rose-ink); color: #fff; font-size: .7rem; font-weight: 800; line-height: 1.25rem; text-align: center; }
 @media (max-width: 370px) {
   .site-header .wordmark-subtitle { letter-spacing: .08em; }
+}
+/* On the narrowest phones the header is full; the menu link still shows My favourites and its count. */
+@media (max-width: 352px) {
+  .catalogue-header-favourites { display: none; }
 }
 .catalogue-header-tools .catalogue-control-panel { position: absolute; top: calc(100% + .75rem); right: 0; z-index: 2; width: min(40rem, calc(100vw - (var(--gutter) * 2))); padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .85rem; background: var(--ivory); box-shadow: var(--shadow); }
 .catalogue-search-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .7rem; align-items: end; }

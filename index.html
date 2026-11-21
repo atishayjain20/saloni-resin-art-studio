@@ -51,13 +51,14 @@
     // The 20% sale ends after 30 Nov 2026 23:59 India time (UTC+5:30). From then on the sale price is the price; styles.css and script.js key off this class.
     if (Date.now() >= Date.UTC(2026, 10, 30, 18, 30)) document.documentElement.classList.add("sale-ended");
   </script>
-  <link rel="stylesheet" href="styles.css?v=20261206">
-  <script class="analytics-script" src="analytics.js?v=20261206" defer></script>
-  <script class="google-script" src="google.js?v=20261206" defer></script>
-  <script class="order-form-script" src="order-form.js?v=20261206" defer></script>
-  <script class="site-script" src="script.js?v=20261206" defer></script>
-  <script class="my-orders-script" src="my-orders.js?v=20261206" defer></script>
-  <script class="customizer-script" src="customizer.js?v=20261206" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261207">
+  <script class="analytics-script" src="analytics.js?v=20261207" defer></script>
+  <script class="google-script" src="google.js?v=20261207" defer></script>
+  <script class="order-form-script" src="order-form.js?v=20261207" defer></script>
+  <script class="site-script" src="script.js?v=20261207" defer></script>
+  <script class="my-orders-script" src="my-orders.js?v=20261207" defer></script>
+  <script class="favourites-script" src="favourites.js?v=20261207" defer></script>
+  <script class="customizer-script" src="customizer.js?v=20261207" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -76,6 +77,10 @@
           <button class="catalogue-control-toggle" id="catalogue-filter-toggle" type="button" aria-label="Open gift filters" aria-expanded="false" aria-controls="catalogue-filter-panel">
             <svg class="catalogue-control-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>
             <span class="sr-only">Filters</span>
+          </button>
+          <button class="catalogue-control-toggle catalogue-header-favourites" id="favourites-header" type="button" aria-haspopup="dialog" aria-label="My favourites" hidden>
+            <svg class="catalogue-control-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z"></path></svg>
+            <span class="catalogue-header-cart-count" id="favourites-header-count" aria-hidden="true"></span>
           </button>
           <button class="catalogue-control-toggle catalogue-header-cart" id="catalogue-header-cart" type="button" aria-controls="catalogue-selection" aria-label="View cart" hidden>
             <svg class="catalogue-control-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6L5 8Z"></path><path d="M9 8V7a3 3 0 0 1 6 0v1"></path></svg>
@@ -127,6 +132,7 @@
         <a href="corporate-gifting/">Corporate orders <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#gift"></use></svg> <span aria-hidden="true">↗</span></a>
         <a href="partners/">Partner Circle <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#heart"></use></svg> <span aria-hidden="true">↗</span></a>
         <a href="#my-orders-dialog" data-my-orders-open>My orders <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#gem"></use></svg></a>
+        <a href="#favourites-dialog" data-favourites-open>My favourites <span class="favourites-count" id="favourites-menu-count"></span> <svg class="category-icon" aria-hidden="true" focusable="false"><use href="assets/category-icons.svg#heart"></use></svg></a>
       </nav>
     </div>
     <nav class="category-tabs" aria-label="Gift categories"><div class="category-tabs-list">
@@ -1301,6 +1307,21 @@
     </div>
   </dialog>
 
+  <dialog class="my-orders-dialog" id="favourites-dialog" aria-labelledby="favourites-title">
+    <div class="my-orders-panel">
+      <form method="dialog" class="order-dialog-close-form">
+        <button class="order-dialog-close" id="favourites-close" type="submit" aria-label="Close my favourites"><span aria-hidden="true">×</span></button>
+      </form>
+      <h2 class="my-orders-title" id="favourites-title">My favourites</h2>
+      <div class="my-orders-empty" id="favourites-empty" hidden>
+        <p>Tap the heart on any piece to save it here.</p>
+        <a class="button button-dark" href="#catalogue-filters" data-browse-all>Browse gifts</a>
+      </div>
+      <ul class="my-orders-list" id="favourites-list"></ul>
+      <p class="sr-only" id="favourites-status" role="status"></p>
+    </div>
+  </dialog>
+
   <dialog class="advance-popup" id="advance-popup" aria-labelledby="advance-popup-title" aria-describedby="advance-popup-text">
     <div class="advance-popup-panel">
       <h2 class="advance-popup-title" id="advance-popup-title">Advance payment due</h2>
@@ -1371,6 +1392,7 @@
         <section class="lightbox-more" id="lightbox-more" aria-labelledby="lightbox-more-title" hidden><h3 id="lightbox-more-title">More like this</h3><ul class="lightbox-more-list" id="lightbox-more-list"></ul></section>
       </figure>
       <div class="lightbox-order-summary">
+        <button class="favourite-toggle lightbox-favourite" id="lightbox-favourite" type="button" aria-pressed="false" hidden></button>
         <strong id="lightbox-product-name"></strong>
         <span id="lightbox-product-price" hidden></span>
         <fieldset class="size-choice lightbox-sizes" id="lightbox-sizes" hidden><legend>Size</legend><span class="size-options" id="lightbox-size-options"></span></fieldset>
