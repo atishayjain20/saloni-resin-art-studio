@@ -868,7 +868,7 @@ class FakeFileReader {
   }
 }
 
-function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], previewExpected = false, omitPreviewExpected = false, previewBlob = null, seedOverrides = {}, slugLinks = {}, payments = "", search = "", captchaKey = "", razorpay = false } = {}) {
+function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "catalogue", sourceId = "catalogue:test", productName = "Test frame", bundleItems = [], previewExpected = false, omitPreviewExpected = false, previewBlob = null, seedOverrides = {}, slugLinks = {}, payments = "", search = "", captchaKey = "", razorpay = false, orderDialog = null } = {}) {
   const ids = ["order-form-embed", "order-form-intro", "success-celebration", "request-id", "request-stage", "source-kind", "source-id", "product-context", "product-image", "bundle-items", "product-name-row", "product-name-hint", "product-name", "quantity-row", "quantity", "custom-size", "bundle-sizes", "dimension-fields", "height-feet", "height-inches-part", "width-feet", "width-inches-part", "design-details", "customer-name", "phone", "email", "fulfillment", "shipping-address", "city", "state", "pin", "pin-field", "requested-date", "referral-code", "referral-status", "check-referral", "order-reference-image", "reference-image-preview-wrap", "reference-image-preview", "reference-image-status", "reference-image-actions", "remove-reference-image", "form-status", "submit-button", "another-button", "shipping-fields", "more-details", "bundle-source-ids", "checkout-summary", "checkout-lines", "checkout-subtotal", "checkout-shipping", "checkout-total", "checkout-test-note", "order-final-quote-note", "success-title", "order-dialog-title", "reference-image-fieldset"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   elements.get("order-form-embed").setAttribute("data-order-form-url", "https://script.google.com/macros/s/test/exec");
@@ -883,6 +883,7 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
   form.hidden = true;
   elements.get("order-form-intro").hidden = true;
   elements.set("order-form", form);
+  if (orderDialog) elements.set("order-dialog", orderDialog);
   const errors = [];
   const created = [];
   const fields = {
@@ -953,10 +954,12 @@ function makeFormRuntime({ timeout = 1, requestStage = "quote", sourceKind = "ca
   class FakeRazorpay {
     constructor(options) { this.options = options; this.handlers = {}; this.opened = 0; razorpays.push(this); }
     on(name, handler) { this.handlers[name] = handler; }
-    open() { this.opened += 1; }
+    open() { this.opened += 1; if (windowObject.onRazorpayOpen) windowObject.onRazorpayOpen(); }
   }
   const windowObject = {
     crypto: { randomUUID: () => "request-new" },
+    captureListeners: [],
+    addEventListener(type, listener, capture) { this.captureListeners.push({ type, listener, capture }); },
     location: { search },
     Razorpay: razorpay ? FakeRazorpay : undefined,
     setTimeout(callback, delay) { timers.push(callback); timerDelays.push(delay); return timers.length; },
@@ -1979,6 +1982,45 @@ test("the server's payment answer opens Razorpay with its key, order, amount in 
   assert.equal(button(runtime).disabled, true, "no second tap while the payment window is open");
 });
 
+// A modal <dialog> sits in the browser's top layer above Razorpay's window (which Razorpay adds to <body>) and makes it unclickable.
+function fakeOrderDialog() {
+  const dialog = { open: true, modal: true, log: [] };
+  dialog.matches = (selector) => selector === ":modal" && dialog.open && dialog.modal;
+  dialog.close = () => { dialog.open = false; dialog.log.push("close"); };
+  dialog.show = () => { dialog.open = true; dialog.modal = false; dialog.log.push("show"); };
+  dialog.showModal = () => { dialog.open = true; dialog.modal = true; dialog.log.push("showModal"); };
+  return dialog;
+}
+test("the checkout popup stops being modal while the Razorpay window is open, so the window shows on top, and is modal again after", async () => {
+  const dialog = fakeOrderDialog();
+  const runtime = payRuntime({ orderDialog: dialog });
+  let modalAtOpen = null;
+  runtime.windowObject.onRazorpayOpen = () => { modalAtOpen = dialog.matches(":modal"); };
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  assert.equal(runtime.razorpays[0].opened, 1);
+  assert.equal(modalAtOpen, false, "the popup is non-modal when Razorpay opens");
+  assert.equal(dialog.open, true, "the popup stays open behind the payment window");
+  // The swap's close event must not reach the page's own close handler (which would undo the order dialog).
+  const capture = runtime.windowObject.captureListeners.find((entry) => entry.type === "close" && entry.capture === true);
+  assert.ok(capture, "a capturing close listener is installed");
+  let stopped = 0;
+  capture.listener({ target: dialog, stopImmediatePropagation() { stopped += 1; } });
+  assert.equal(stopped, 1, "the swap close is hidden from the page");
+  capture.listener({ target: dialog, stopImmediatePropagation() { stopped += 1; } });
+  assert.equal(stopped, 1, "a real close by the shopper still reaches the page");
+  runtime.razorpays[0].options.modal.ondismiss();
+  assert.equal(dialog.matches(":modal"), true, "closing the payment window makes the popup modal again");
+  assert.deepEqual(dialog.log, ["close", "show", "close", "showModal"]);
+});
+test("a successful payment also makes the checkout popup modal again", async () => {
+  const dialog = fakeOrderDialog();
+  const runtime = payRuntime({ orderDialog: dialog });
+  fillPay(runtime);
+  await payAndOpen(runtime);
+  runtime.razorpays[0].options.handler(RAZORPAY_RESPONSE);
+  assert.equal(dialog.matches(":modal"), true);
+});
 test("Razorpay Checkout.js is added to the page only when paying, and a failed load keeps the cart and allows another try", async () => {
   const runtime = payRuntime({ razorpay: false });
   fillPay(runtime);
