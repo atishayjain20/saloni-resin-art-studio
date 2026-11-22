@@ -24,10 +24,6 @@ def chunk(kind, body):
     return kind + struct.pack("<I", len(body)) + body + (b"\0" if len(body) & 1 else b"")
 
 
-def has_ai_label(path):
-    return AI_SOURCE.encode() in Path(path).read_bytes()
-
-
 def label(path):
     data = Path(path).read_bytes()
     if data[:4] != b"RIFF" or data[8:12] != b"WEBP":
