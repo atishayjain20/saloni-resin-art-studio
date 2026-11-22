@@ -190,7 +190,7 @@ class StaticSiteContractTests(unittest.TestCase):
         for index, card in enumerate(cards, 1):
             pricing = re.search(r'<dl\b[^>]*class=["\'][^"\']*product-pricing[^"\']*["\'][\s\S]*?</dl>', card)
             self.assertIsNotNone(pricing, f"card {index} has catalogue pricing")
-            rows = re.findall(r'<div><dt>([^<]+)</dt><dd>([^<]+)</dd>(?:<dd class="product-regular-price">.*?</dd>)?</div>', pricing.group(0))
+            rows = re.findall(r'<div><dt>([^<]+)</dt><dd>([^<]+)</dd>(?:<dd class="product-size-count">[2-3] sizes</dd>)?</div>', pricing.group(0))
             self.assertTrue(rows, f"card {index} has a price row")
             self.assertEqual(rows[0][0], "Price", f"card {index} uses a concrete price label")
             self.assertNotIn("From", pricing.group(0))
@@ -486,7 +486,8 @@ class StaticSiteContractTests(unittest.TestCase):
                 for name in names:
                     self.assertTrue((ROOT / "assets" / "ai-images" / f"{stem}--{name}.webp").is_file(), name)
                 self.assertTrue((ROOT / "assets" / f"{stem}.webp").is_file())
-                self.assertIn(f'<dt>Price</dt><dd>₹{price}</dd><dd class="product-regular-price"><span class="sr-only">Regular price </span><s>₹{regular}</s> <span>20% off</span></dd>', card)
+                self.assertIn(f'<dt>Price</dt><dd>₹{price}</dd>', card)
+                self.assertNotRegex(card, r'<s>|product-regular-price|% off')
                 self.assertIn(f"<dt>Size</dt><dd>{size}</dd>", card)
                 self.assertEqual(card[:card.index("<dl")].count("<p"), 2)
 
@@ -998,7 +999,7 @@ class StaticSiteContractTests(unittest.TestCase):
         hero = re.search(r'<section\b[^>]*class=["\']hero-banner\b[\s\S]*?</section>', self.html)
         self.assertIsNotNone(hero)
         slides = re.findall(r'<article class="hero-slide[^"]*"[\s\S]*?</article>', hero.group(0))
-        self.assertEqual(len(slides), 7)
+        self.assertEqual(len(slides), 6)
         for slide_index, slide in enumerate(slides):
             images = re.findall(r'<img\b[^>]*>', slide)
             self.assertEqual(len(images), 3)
@@ -1013,6 +1014,7 @@ class StaticSiteContractTests(unittest.TestCase):
                     self.assertGreater(len(re.search(r'\balt="([^"]*)"', image).group(1)), 8)
                     if slide_index == 0:
                         self.assertNotIn('loading="lazy"', image)
+                        self.assertIn('loading="eager"', image)
                         self.assertEqual('fetchpriority="high"' in image, image_index == 0)
                     else:
                         self.assertIn('loading="lazy"', image)
@@ -1028,7 +1030,7 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(len(re.findall(r'>Shop now</a>', hero)), 0)
         self.assertNotIn('hero-slide-photos', hero)
         self.assertNotIn('hero-slide-cta', hero)
-        # Slides 3-7 share the promo layout of slides 1-2: copy on the left, three priced photos on the right.
+        # Slides 2-6 share the promo layout of the design slide: copy on the left, three priced photos on the right.
         slides = re.findall(r'<article class="hero-slide[^"]*"[\s\S]*?</article>', hero)
         ctas = [
             ("premium", "#premium-collection", "Shop premium"),
@@ -1037,16 +1039,18 @@ class StaticSiteContractTests(unittest.TestCase):
             ("corporate", "#corporate-resin-gifts", "Shop corporate gifts"),
             ("diwali", "#diwali", "Shop Diwali gifts"),
         ]
-        for slide, (shortcut, href, label) in zip(slides[2:], ctas):
+        for slide, (shortcut, href, label) in zip(slides[1:], ctas):
             with self.subTest(slide=shortcut):
                 self.assertIn(f'class="hero-slide hero-promo hero-promo-{shortcut}"', slide)
                 self.assertIn('<div class="hero-promo-copy">', slide)
                 self.assertIn('<ul class="hero-promo-picks"', slide)
-                self.assertEqual(len(re.findall(r'<span class="hero-promo-tag"><span class="sr-only">[^<]+, was </span><s>₹[\d,]+</s> <span class="sr-only">now </span><strong>₹[\d,]+</strong></span>', slide)), 3)
+                self.assertEqual(len(re.findall(r'<span class="hero-promo-tag"><span class="sr-only">[^<]+, </span><strong>₹[\d,]+</strong></span>', slide)), 3)
                 self.assertIn(f'<a class="button hero-promo-cta" href="{href}" data-category-shortcut="{shortcut}">{label}</a>', slide)
                 self.assertEqual(len(re.findall(r'<a\b', slide)), 1)
-        self.assertIn('id="hero-diwali-slide"', slides[6])
-        self.assertIn('<p class="hero-slide-offer" hidden>', slides[6])
+        self.assertEqual(len(slides), 6)
+        self.assertNotRegex(hero, r'hero-promo-sale|20% off|Sale ends|Shop the sale|<s>')
+        self.assertIn('id="hero-diwali-slide"', slides[5])
+        self.assertIn('<p class="hero-slide-offer" hidden>', slides[5])
         self.assertNotIn("Thoughtful custom resin frames, resin art, and personalized gifts from Ajmer, Rajasthan", self.html)
 
     def test_romantic_keepsake_highlight_contract(self):
@@ -1147,8 +1151,8 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertIsNotNone(hero)
         hero_html = hero.group(0)
         self.assertNotIn('hero-actions', hero_html)
-        self.assertEqual(hero_html.count('data-browse-all'), 1)
-        self.assertIn('href="#catalogue-filters" data-browse-all>Shop the sale</a>', hero_html)
+        self.assertEqual(hero_html.count('data-browse-all'), 0)
+        self.assertNotIn('Shop the sale', hero_html)
         self.assertEqual(len(re.findall(r'data-category-shortcut=', hero_html)), 5)
         # The design-a-frame slide and the link under the carousel both open the frame designer.
         self.assertEqual(len(re.findall(r'data-customizer-open', hero_html)), 2)
@@ -2641,14 +2645,12 @@ class ProductSharePageTests(unittest.TestCase):
         source = self.tool_path.read_text(encoding="utf-8")
         self.assertNotRegex(source, r"(?m)^\s*(?:from|import)\s+(?:PIL|requests|jinja2|bs4)\b")
 
-    def test_sale_price_is_the_only_price_off_the_home_page(self):
-        """The 20% sale (ends 30 Nov 2026) shows a struck price only on the home page, so share pages, topic pages
-        and the Merchant feed need no end date and never state a regular price or sale dates."""
-        pages = list((ROOT / "p").glob("*/index.html")) + list(ROOT.glob("*/index.html"))
+    def test_one_honest_price_everywhere_with_no_sale_markup(self):
+        """The fake 20% sale is gone: the home page, share pages, topic pages and the Merchant feed state one price,
+        and never a regular price, percent off or sale dates."""
+        pages = [ROOT / "index.html"] + list((ROOT / "p").glob("*/index.html")) + list(ROOT.glob("*/index.html"))
         self.assertGreater(len(pages), 100)
         for path in pages:
-            if path.parent == ROOT / "p":
-                continue
             text = path.read_text(encoding="utf-8")
             with self.subTest(page=str(path.relative_to(ROOT))):
                 self.assertNotRegex(text, r"product-regular-price|<s>|% off|Sale ends|priceValidUntil|sale-ended", )
@@ -2725,9 +2727,9 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertEqual(by_name.get(name), slug, name)
             self.assertIn("<h1>" + html.escape(name, quote=False) + "</h1>", self.page(slug)[0], name)
         self.assertEqual(len(self.slugs), 106)
-        # 57 products (52 real photos + 5 AI trial); each size of a sized product is its own row (the default size keeps the product's id).
-        self.assertEqual(len({line.split("\t")[10] or line.split("\t")[0] for line in (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8").splitlines()[1:]}), 57)
-        self.assertEqual(len(feed_ids), 103)
+        # 52 products (all real photos, no AI trial); each size of a sized product is its own row (the default size keeps the product's id).
+        self.assertEqual(len({line.split("\t")[10] or line.split("\t")[0] for line in (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8").splitlines()[1:]}), 52)
+        self.assertEqual(len(feed_ids), 95)
 
     def test_pages_and_card_slugs_are_in_step_with_index_html(self):
         tool = load_product_pages_tool()
@@ -3131,8 +3133,8 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertTrue((out / "p" / "keep" / "index.html").exists())
 
     def test_merchant_feed_lists_only_real_photo_single_price_products(self):
-        # Google Merchant Center fetches merchant-feed.tsv every day. AI preview photos (except the AI_FEED_TRIAL products,
-        # whose photos carry Google's AI label) and prices that are a range or "on request" stay out.
+        # Google Merchant Center fetches merchant-feed.tsv every day. AI preview photos (the AI_FEED_TRIAL set is empty, so
+        # all of them) and prices that are a range or "on request" stay out.
         from urllib.parse import unquote
         tool = load_product_pages_tool()
         cards = tool.parse_cards(self.home)
@@ -3150,15 +3152,17 @@ class ProductSharePageTests(unittest.TestCase):
         self.assertGreater(len(wanted), 0)
         # Each trial product is an AI preview, and its photo carries the IPTC trainedAlgorithmicMedia label.
         by_slug = dict(zip(self.slugs, cards))
-        self.assertEqual(len(tool.AI_FEED_TRIAL), 5)
-        for slug in tool.AI_FEED_TRIAL:
-            self.assertTrue(by_slug[slug]["alt"].startswith("Illustrative preview:"), slug)
-            self.assertIn(tool.AI_LABEL, (ROOT / "assets" / by_slug[slug]["file"]).read_bytes(), slug)
-        # An AI photo without the label stops the build instead of reaching Google.
-        trial = next(iter(sorted(tool.AI_FEED_TRIAL)))
+        self.assertEqual(tool.AI_FEED_TRIAL, set(), "no AI-photo product is in the feed")
+        # Were a trial product ever added, its AI photo would need the label; an unlabelled one stops the build instead of reaching Google.
+        trial = next(slug for slug in self.slugs if by_slug[slug]["alt"].startswith("Illustrative preview:") and re.fullmatch(r"₹[0-9,]+", by_slug[slug]["price"]))
         unlabelled = [dict(card, file="diwali-lotus-diya-pair.webp") if slug == trial else card for slug, card in zip(self.slugs, cards)]
-        with self.assertRaises(SystemExit):
-            tool.merchant_feed(unlabelled, self.slugs, sizes)
+        original_trial = tool.AI_FEED_TRIAL
+        tool.AI_FEED_TRIAL = {trial}
+        try:
+            with self.assertRaises(SystemExit):
+                tool.merchant_feed(unlabelled, self.slugs, sizes)
+        finally:
+            tool.AI_FEED_TRIAL = original_trial
         # One row per product, except that each size of a sized product has its own row (checked in ProductSizeTests): here the default rows.
         rows = [line.split("\t") for line in lines[1:]]
         defaults = [fields for fields in rows if not fields[10] or fields[0] == fields[10]]
@@ -3515,7 +3519,7 @@ class ResponsiveCardImageTests(unittest.TestCase):
         html_text = (ROOT / "index.html").read_text(encoding="utf-8")
         hero = re.search(r'<section\b[^>]*class="hero-banner\b[\s\S]*?</section>', html_text).group(0)
         images = re.findall(r"<img\b[^>]*>", hero)
-        self.assertEqual(len(images), 21)
+        self.assertEqual(len(images), 18)
         with_copy = 0
         for tag in images:
             attrs = dict(re.findall(r'([\w-]+)="([^"]*)"', tag))
@@ -3848,12 +3852,12 @@ class ProductSizeTests(unittest.TestCase):
         for slug in self.slugs:
             self.assertEqual((ROOT / "p" / slug / "index.html").read_text(encoding="utf-8"), pages["p/%s/index.html" % slug], slug)
 
-    def test_every_card_shows_todays_price_from_the_tsv_and_the_struck_price_is_25_percent_above(self):
+    def test_every_card_shows_todays_price_from_the_tsv_and_no_struck_price(self):
         for slug, card in zip(self.slugs, self.cards):
             entry = self.sizes[slug]
             article = self.home[card["start"]:card["end"]]
             self.assertEqual(card["price"], self.tool.rupees(entry["price"]), slug)
-            self.assertIn("<s>%s</s>" % self.tool.rupees((entry["price"] * 5 + 2) // 4), article, slug)
+            self.assertNotRegex(article, r"<s>|product-regular-price|% off", slug)
         self.assertEqual(self.tool.rupees(999), "₹999")
         self.assertEqual(self.tool.rupees(1499), "₹1,499")
         self.assertEqual(self.tool.rupees(123456), "₹1,23,456")
@@ -3882,7 +3886,7 @@ class ProductSizeTests(unittest.TestCase):
         self.assertEqual(with_sizes, 45)
         self.assertEqual(len(self.slugs) - with_sizes, 61)
 
-    def test_changing_a_price_in_the_tsv_changes_card_struck_price_page_json_ld_and_feed(self):
+    def test_changing_a_price_in_the_tsv_changes_card_page_json_ld_and_feed(self):
         slug = "om-asiausa-mantra-plaque"
         sizes = {key: dict(value, options=[dict(o) for o in value["options"]]) for key, value in self.sizes.items()}
         sizes[slug]["price"] = 1899
@@ -3894,7 +3898,7 @@ class ProductSizeTests(unittest.TestCase):
         stamped, pages, _ = self.tool.build(self.home, self.sitemap, sizes=sizes)
         article = self.card_article(stamped, slug)
         self.assertIn("<dt>Price</dt><dd>₹1,899</dd>", article)
-        self.assertIn("<s>₹2,374</s>", article)
+        self.assertNotIn("<s>", article)
         self.assertEqual(re.search(r' data-sizes="([^"]*)"', article).group(1).count("₹1,899"), 1)
         self.assertIn("₹2,599", html.unescape(re.search(r' data-sizes="([^"]*)"', article).group(1)))
         page = pages["p/%s/index.html" % slug]
@@ -3924,8 +3928,8 @@ class ProductSizeTests(unittest.TestCase):
         trial = load_product_pages_tool().AI_FEED_TRIAL
         in_feed = [slug for slug in self.slugs if not by_slug[slug]["alt"].startswith("Illustrative preview:") or slug in trial]
         sized_in_feed = [slug for slug in in_feed if self.sizes[slug]["options"]]
-        self.assertEqual(len(sized_in_feed), 25)
-        self.assertEqual(len(in_feed), 57, "no product joined or left the feed")
+        self.assertEqual(len(sized_in_feed), 23)
+        self.assertEqual(len(in_feed), 52, "no product joined or left the feed")
         expected = sum(len(self.sizes[slug]["options"]) if self.sizes[slug]["options"] else 1 for slug in in_feed)
         self.assertEqual(len(rows), expected)
         self.assertEqual(len(rows) - len(in_feed), sum(len(self.sizes[slug]["options"]) - 1 for slug in sized_in_feed))

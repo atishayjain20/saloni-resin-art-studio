@@ -1313,7 +1313,6 @@
     }
 
     initCatalogueExperience();
-    initSaleEnd();
     initDiwaliGreeting();
     initHeroBanner();
     initPhoneDropdowns();
@@ -1367,19 +1366,6 @@
     if (phone.addEventListener) phone.addEventListener("change", sync);
   }
 
-  // After the sale ends (the head script in index.html sets "sale-ended" from 1 Dec 2026, India time) the sale slide and its dot go, and the rest renumber.
-  function initSaleEnd() {
-    if (!document.querySelector("html.sale-ended")) return;
-    var sale = document.querySelector(".hero-promo-sale");
-    var dots = document.querySelectorAll("[data-banner-dot]");
-    if (!sale || !dots.length) return;
-    sale.remove();
-    dots[dots.length - 1].remove();
-    var slides = document.querySelectorAll(".hero-slide");
-    Array.prototype.forEach.call(slides, function (item, index) {
-      item.setAttribute("aria-label", item.getAttribute("aria-label").replace(/^\d+ of \d+/, (index + 1) + " of " + slides.length));
-    });
-  }
 
   // On 8 and 9 November 2026, India time (UTC+5:30), the Diwali offer strip and hero slide show and the Diwali wish opens once per visitor.
   function initDiwaliGreeting(now) {

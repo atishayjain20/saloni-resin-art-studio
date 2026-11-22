@@ -31,7 +31,7 @@ function bannerSlideHtml() {
   return Array.from(section("hero").matchAll(/<article class="hero-slide[^"]*"[\s\S]*?<\/article>/g), (match) => match[0]);
 }
 
-test("homepage first screen is a seven-slide hero banner: sale, design a frame, then Premium, Couple, Marriage, Corporate, Diwali", () => {
+test("homepage first screen is a six-slide hero banner: design a frame, then Premium, Couple, Marriage, Corporate, Diwali", () => {
   const hero = section("hero");
   assert.match(hero, /^<section class="hero-banner shell" id="hero" aria-labelledby="hero-title" aria-roledescription="carousel">/);
   assert.match(hero, /<h1 id="hero-title" class="sr-only">Handmade resin gifts from Ajmer<\/h1>/);
@@ -39,30 +39,14 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
   assert.doesNotMatch(hero, /data-lightbox|reveal|Explore gifts/);
   assert.match(hero, /<div class="hero-banner-track" data-banner-track>/);
   const slides = bannerSlideHtml();
-  assert.equal(slides.length, 7);
-  const [sale, design] = slides;
-  // Slide 1: the 20% sale, built only from facts on the page (no invented deadline or countdown).
-  assert.match(sale, /^<article class="hero-slide hero-promo hero-promo-sale" role="group" aria-roledescription="slide" aria-label="1 of 7: 20% off sale">/);
-  assert.match(sale, /<p class="hero-promo-big"><span>20%<\/span> off<\/p>/);
-  const saleCount = (html.match(/<span>20% off<\/span>/g) || []).length;
-  assert.match(sale, new RegExp(`on ${saleCount} handmade pieces`), "the piece count must match the cards that show 20% off");
-  // The sale is honest: it names its end date (the head script ends it after 30 Nov 2026, India time).
-  assert.match(sale, /<p class="hero-promo-sub hero-promo-ends"><strong>Sale ends 30 Nov<\/strong><\/p>/);
-  assert.doesNotMatch(sale, /hurry|only today|countdown|left/i);
-  assert.equal((sale.match(/<a\b/g) || []).length, 1);
-  assert.match(sale, /<a class="button hero-promo-cta" href="#catalogue-filters" data-browse-all>Shop the sale<\/a>/);
-  [["Preserved Rose Hexagon Frame", "₹3,124", "₹2,499"], ["Sunflower Resin Night Lamp", "₹749", "₹599"], ["Little Brother Name Rakhi", "₹499", "₹399"]].forEach(([title, was, now]) => {
-    const card = html.match(new RegExp(`<article\\b(?:(?!<\\/article>)[\\s\\S])*?<(?:strong|h3)[^>]*>${title}<\\/(?:strong|h3)>[\\s\\S]*?<\\/article>`))?.[0] || "";
-    assert.match(card, new RegExp(`<dd>${now}<\\/dd>[\\s\\S]*?<s>${was}<\\/s>`), `${title} card price must match the sale slide`);
-    assert.match(sale, new RegExp(`<s>${was}<\\/s> <span class="sr-only">now <\\/span><strong>${now}<\\/strong>`), `${title} sticker reads "was … now …"`);
-  });
-  const cheapest = Math.min(...Array.from(html.matchAll(/<dt>(?:Price|From)<\/dt><dd>₹([\d,]+)/g), (match) => Number(match[1].replace(/,/g, ""))));
-  assert.match(sale, new RegExp(`gifts from ₹${cheapest}<`), "the lowest catalogue price must be the one on the slide");
-  // Slide 2: design your own frame.
-  assert.match(design, /^<article class="hero-slide hero-promo hero-promo-design" role="group" aria-roledescription="slide" aria-label="2 of 7: Design your own frame">/);
+  assert.equal(slides.length, 6);
+  const [design] = slides;
+  assert.doesNotMatch(hero, /hero-promo-sale|20% off|Sale ends|Shop the sale/, "no sale slide in the hero");
+  // Slide 1: design your own frame.
+  assert.match(design, /^<article class="hero-slide hero-promo hero-promo-design" role="group" aria-roledescription="slide" aria-label="1 of 6: Design your own frame">/);
   assert.equal((design.match(/<a\b/g) || []).length, 1);
   assert.match(design, /<a class="button hero-promo-cta" href="#customizer" data-customizer-open>Start designing<\/a>/);
-  // Slides 3-7 use the same layout as slides 1-2: copy on the left, three priced photos on the right.
+  // Slides 2-6 use the same layout as slide 1: copy on the left, three priced photos on the right.
   const promoCopy = [
     { theme: "premium", kicker: "Premium collection", big: "Statement pieces", sub: "Tiered sets, trays &amp; glassware", cta: "Shop premium", section: "premium-collection" },
     { theme: "couple", kicker: "For the two of you", big: "Couple gifts", sub: "Keychains, trays &amp; keepsakes", cta: "Shop couple gifts", section: "romantic-keepsakes" },
@@ -70,10 +54,10 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
     { theme: "corporate", kicker: "For teams &amp; clients", big: "Corporate gifts", sub: "Desk pieces, coasters &amp; awards", cta: "Shop corporate gifts", section: "corporate-resin-gifts" },
     { theme: "diwali", kicker: "Festive glow", big: "Diwali gifts", sub: "Welcome pairs, festive sets &amp; pooja plates", cta: "Shop Diwali gifts", section: "diwali" },
   ];
-  slides.slice(2).forEach((slide, index) => {
+  slides.slice(1).forEach((slide, index) => {
     const expected = bannerSlides[index];
     const copy = promoCopy[index];
-    assert.match(slide, new RegExp(`^<article class="hero-slide hero-promo hero-promo-${copy.theme}" role="group" aria-roledescription="slide" aria-label="${index + 3} of 7: ${expected.label}"`));
+    assert.match(slide, new RegExp(`^<article class="hero-slide hero-promo hero-promo-${copy.theme}" role="group" aria-roledescription="slide" aria-label="${index + 2} of 6: ${expected.label}"`));
     assert.doesNotMatch(slide, /<h2|class="eyebrow"|hero-slide-copy|hero-slide-photos|hero-slide-cta/);
     assert.equal((slide.match(/<a\b/g) || []).length, 1);
     assert.match(slide, /<div class="hero-promo-copy">/);
@@ -82,13 +66,13 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
     assert.match(slide, new RegExp(`<a class="button hero-promo-cta" href="${expected.href}" data-category-shortcut="${expected.shortcut}">${copy.cta}</a>`));
     assert.match(slide, /<ul class="hero-promo-picks" aria-label="[^"]+">/);
     assert.deepEqual(Array.from(slide.matchAll(/<img\b[^>]*src="assets\/([^"]+)"/g), (match) => match[1]), expected.images);
-    const tags = Array.from(slide.matchAll(/<li><img\b[^>]*><span class="hero-promo-tag"><span class="sr-only">([^<]+), was <\/span><s>(₹[\d,]+)<\/s> <span class="sr-only">now <\/span><strong>(₹[\d,]+)<\/strong><\/span><\/li>/g));
-    assert.equal(tags.length, 3, "each photo has a was/now price tag");
+    const tags = Array.from(slide.matchAll(/<li><img\b[^>]*><span class="hero-promo-tag"><span class="sr-only">([^<]+), <\/span><strong>(₹[\d,]+)<\/strong><\/span><\/li>/g));
+    assert.equal(tags.length, 3, "each photo has a single price tag");
     // Each tag must match that photo's own catalogue card.
-    tags.forEach(([, title, was, now], tagIndex) => {
+    tags.forEach(([, title, now], tagIndex) => {
       const file = expected.images[tagIndex].replace(/\./g, "\\.");
       const card = html.slice(html.indexOf("data-banner-prev")).match(new RegExp(`assets/${file}[\\s\\S]*?<\\/figcaption>`))?.[0] || "";
-      assert.match(card, new RegExp(`<dd>${now}<\\/dd>[\\s\\S]*?<s>${was}<\\/s>`), `${title} tag matches its catalogue card`);
+      assert.match(card, new RegExp(`<dd>${now}<\\/dd>`), `${title} tag matches its catalogue card`);
     });
     // "from ₹X" is the lowest single price in the section the button opens.
     const target = section(copy.section);
@@ -97,7 +81,7 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
   });
   assert.deepEqual(Array.from(hero.matchAll(/data-category-shortcut="([^"]+)"/g), (match) => match[1]), ["premium", "couple", "marriage", "corporate", "diwali"]);
   assert.match(hero, /<a href="#customizer" data-customizer-open>Or design a custom frame<\/a>/);
-  assert.equal((hero.match(/data-browse-all/g) || []).length, 1, "only the sale slide browses all gifts");
+  assert.equal((hero.match(/data-browse-all/g) || []).length, 0, "no hero slide browses all gifts any more");
   assert.doesNotMatch(hero, /class="instagram-mark"|Request a custom gift|hero-floral-bouquet\.jpg/);
   const footer = html.match(/<footer class="site-footer"[\s\S]*?<\/footer>/)?.[0] || "";
   assert.match(footer, /<a class="instagram-mark" href="https:\/\/www\.instagram\.com\/saloniresin_art_studio\/" target="_blank" rel="noreferrer">Follow the studio <strong>@saloniresin_art_studio<\/strong><\/a>/);
@@ -107,7 +91,7 @@ test("homepage first screen is a seven-slide hero banner: sale, design a frame, 
 
 test("hero banner images exist, carry alt and size, and only slide 1 loads eagerly", () => {
   const slides = bannerSlideHtml();
-  assert.equal(slides.length, 7);
+  assert.equal(slides.length, 6);
   slides.forEach((slide, slideIndex) => {
     const images = Array.from(slide.matchAll(/<img\b[^>]*>/g), (match) => match[0]);
     assert.equal(images.length, 3);
@@ -120,6 +104,7 @@ test("hero banner images exist, carry alt and size, and only slide 1 loads eager
       if (/corporate-|romantic-|marriage-/.test(src)) assert.match(image, /alt="Illustrative preview: /);
       if (slideIndex === 0) {
         assert.doesNotMatch(image, /loading="lazy"/);
+        assert.match(image, /loading="eager"/);
         assert.equal(/fetchpriority="high"/.test(image), imageIndex === 0);
       } else {
         assert.match(image, /loading="lazy" decoding="async"/);
@@ -129,14 +114,14 @@ test("hero banner images exist, carry alt and size, and only slide 1 loads eager
   });
 });
 
-test("hero banner controls are previous, seven dots, then next, hidden without JavaScript", () => {
+test("hero banner controls are previous, six dots, then next, hidden without JavaScript", () => {
   const hero = section("hero");
   const controls = hero.match(/<div class="hero-banner-controls">([\s\S]*?)<\/div>/)?.[1] || "";
   assert.ok(hero.indexOf("hero-banner-controls") > hero.lastIndexOf("</article>"), "controls follow the track");
   assert.ok(hero.lastIndexOf("data-customizer-open") > hero.indexOf("data-banner-next"), "custom-frame link sits below the controls");
   assert.match(controls, /data-banner-prev[^>]*aria-label="Previous slide"/);
   assert.match(controls, /data-banner-next[^>]*aria-label="Next slide"/);
-  assert.deepEqual(Array.from(controls.matchAll(/data-banner-dot[^>]*aria-label="(Show slide \d)"/g), (match) => match[1]), ["Show slide 1", "Show slide 2", "Show slide 3", "Show slide 4", "Show slide 5", "Show slide 6", "Show slide 7"]);
+  assert.deepEqual(Array.from(controls.matchAll(/data-banner-dot[^>]*aria-label="(Show slide \d)"/g), (match) => match[1]), ["Show slide 1", "Show slide 2", "Show slide 3", "Show slide 4", "Show slide 5", "Show slide 6"]);
   assert.equal((controls.match(/aria-current="true"/g) || []).length, 1);
   assert.ok(controls.indexOf("data-banner-prev") < controls.indexOf("data-banner-dot") && controls.lastIndexOf("data-banner-dot") < controls.indexOf("data-banner-next"));
   assert.doesNotMatch(hero, /data-banner-autoplay|Pause slides/, "owner removed the pause button");
@@ -358,11 +343,11 @@ test("leftover beige colours use the new cream and the phone bar matches the pin
 });
 
 test("homepage cache-busts the updated stylesheet, scripts, and customizer", () => {
-  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261213">/);
-  assert.match(html, /<script class="site-script" src="script\.js\?v=20261213" defer><\/script>/);
-  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261213" defer><\/script>/);
-  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261213" defer><\/script>/);
-  assert.match(html, /<script class="favourites-script" src="favourites\.js\?v=20261213" defer><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css\?v=20261214">/);
+  assert.match(html, /<script class="site-script" src="script\.js\?v=20261214" defer><\/script>/);
+  assert.match(html, /<script class="customizer-script" src="customizer\.js\?v=20261214" defer><\/script>/);
+  assert.match(html, /<script class="my-orders-script" src="my-orders\.js\?v=20261214" defer><\/script>/);
+  assert.match(html, /<script class="favourites-script" src="favourites\.js\?v=20261214" defer><\/script>/);
 });
 
 test("every page uses the one shared cache version for its stylesheet and scripts, and the review page loads the shared form script", () => {
@@ -370,9 +355,9 @@ test("every page uses the one shared cache version for its stylesheet and script
     const source = fs.readFileSync(path.join(root, page), "utf8");
     const versions = [...source.matchAll(/(?:styles\.css|analytics\.js|script\.js|customizer\.js|order-form\.js|my-orders\.js|favourites\.js|public-forms\.js)\?v=(\d+)/g)].map((match) => match[1]);
     assert.ok(versions.length >= 2, page);
-    assert.deepEqual([...new Set(versions)], ["20261213"], page);
+    assert.deepEqual([...new Set(versions)], ["20261214"], page);
   }
-  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261213/);
+  assert.match(fs.readFileSync(path.join(root, "reviews/index.html"), "utf8"), /public-forms\.js\?v=20261214/);
 });
 
 test("category tab bar sits in the sticky header after the header row with BESTSELLERS current", () => {
@@ -805,28 +790,18 @@ test("small-screen layout keeps long labels inside the viewport without masking 
   assert.doesNotMatch(css, /body\s*\{[^}]*overflow-x:\s*hidden/);
 });
 
-test("each priced gift shows a crossed-out regular price 25% above today's price, which stays the price paid", () => {
+test("each priced gift shows one honest price, with no crossed-out regular price or percent-off tag", () => {
   const cards = html.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/g) || [];
   assert.equal(cards.length, 106);
-  const rupees = (text) => (text.match(/[0-9][0-9,]*/g) || []).map((n) => Number(n.replace(/,/g, "")));
-  const format = (n) => "₹" + n.toLocaleString("en-IN");
-  let withRegular = 0;
+  let priced = 0;
   cards.forEach((card) => {
-    assert.match(card, /^<dl class="product-pricing"[^>]*><div><dt>(?:Price|From)<\/dt>/, "today's price stays the first row, so filters and the cart read it");
-    const price = card.match(/<dt>(?:Price|From)<\/dt><dd>([^<]*)<\/dd>/)[1];
-    const regular = card.match(/<dt>(?:Price|From)<\/dt><dd>[^<]*<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>([^<]*)<\/s> <span>20% off<\/span><\/dd>(?:<dd class="product-size-count">[2-3] sizes<\/dd>)?<\/div>/);
-    if (!/₹/.test(price)) {
-      assert.equal(regular, null, price + " has no regular price");
-      return;
-    }
-    assert.ok(regular, "regular price for " + price);
-    assert.equal(regular[1], price.replace(/₹([0-9][0-9,]*)/g, (m, n) => format(Math.round(Number(n.replace(/,/g, "")) * 1.25))));
-    assert.equal((card.match(/<dt>/g) || []).length <= 2, true, "no extra row, so the phone price grid keeps its two rows");
-    withRegular += 1;
+    assert.match(card, /^<dl class="product-pricing"[^>]*><div><dt>(?:Price|From)<\/dt><dd>[^<]*<\/dd>/, "today's price stays the first row, so filters and the cart read it");
+    assert.doesNotMatch(card, /<s>|product-regular-price|Regular price|% off/, "one price only");
+    assert.equal((card.match(/<div>[\s\S]*?<\/div>/)[0].match(/<dd>/g) || []).length, 1, "the price row holds one plain price");
+    if (/₹/.test(card.match(/<dt>(?:Price|From)<\/dt><dd>([^<]*)<\/dd>/)[1])) priced += 1;
   });
-  assert.equal(withRegular, 106);
-  assert.match(html, /<dt>Price<\/dt><dd>₹249<\/dd><dd class="product-regular-price"><span class="sr-only">Regular price <\/span><s>₹311<\/s> <span>20% off<\/span><\/dd>/);
-  assert.match(css, /figcaption \.product-pricing > div > dd\.product-regular-price\s*\{[^}]*grid-column:\s*1 \/ -1/);
+  assert.equal(priced, 106);
+  assert.match(html, /<dt>Price<\/dt><dd>₹249<\/dd>/);
   assert.doesNotMatch(html, /<dt>Estimated from<\/dt>/);
   assert.doesNotMatch(section("diwali"), /Diwali prices ₹249–₹1,799/);
 });
@@ -2546,7 +2521,7 @@ test("all 106 catalogue cards keep price first and show only known size rows", (
   assert.equal(expectedRows.length, 106);
   cards.forEach((card, index) => {
     const pricing = card.match(/<dl class="product-pricing"[\s\S]*?<\/dl>/)?.[0] || "";
-    const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-regular-price">.*?<\/dd>)?<\/div>/g)].map((match) => match.slice(1));
+    const rows = [...pricing.matchAll(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-size-count">[2-3] sizes<\/dd>)?<\/div>/g)].map((match) => match.slice(1));
     assert.equal(pricing.match(/aria-label="([^"]+)"/)?.[1], "Catalogue price and size");
     assert.ok(rows.length === 1 || rows.length === 2, `card ${index + 1} has price and optional size rows`);
     assert.match(rows[0][0], /^(?:Price|From)$/);
@@ -2579,7 +2554,7 @@ test("uses known size wording and omits unknown catalogue sizes", () => {
     const end = html.indexOf("</article>", titleIndex);
     return start < 0 || end < 0 ? "" : html.slice(start, end + "</article>".length);
   };
-  const rowsFor = (title) => [...(cardFor(title).match(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-regular-price">.*?<\/dd>)?<\/div>/g) || [])].map((row) => row.match(/<dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>/).slice(1));
+  const rowsFor = (title) => [...(cardFor(title).match(/<div><dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>(?:<dd class="product-size-count">[2-3] sizes<\/dd>)?<\/div>/g) || [])].map((row) => row.match(/<dt>([^<]+)<\/dt><dd>([^<]+)<\/dd>/).slice(1));
   assert.deepEqual(rowsFor("Shubh Labh Door Hanging Pair").slice(1), [["Size", "4–6 in"]]);
   assert.equal(cardFor("Festive Welcome Hamper"), "");
   assert.deepEqual(rowsFor("Ivory Mandala Tealight Holder").slice(1), [["Size", "3 in"]]);
@@ -2670,7 +2645,7 @@ test("the page background is a very pale blush token used for the body and the c
   assert.match(css, /\nbody\s*\{[^}]*background:\s*var\(--page\)/);
 });
 
-test("hero slides 3-7 keep text, buttons and price tags at WCAG AA contrast on their own colours", () => {
+test("hero slides 2-6 keep text, buttons and price tags at WCAG AA contrast on their own colours", () => {
   const colour = (value) => (value.startsWith("var(") ? rootToken(value.slice(6, -1)) : value);
   ["premium", "couple", "marriage", "corporate", "diwali"].forEach((theme) => {
     const rule = css.match(new RegExp(`\\.hero-promo-${theme}\\s*\\{([^}]*)\\}`))[1];
@@ -2687,7 +2662,7 @@ test("hero slides 3-7 keep text, buttons and price tags at WCAG AA contrast on t
 });
 
 test("on 8 and 9 November the Diwali hero slide moves first and shows the offer", () => {
-  const diwaliSlide = bannerSlideHtml()[6];
+  const diwaliSlide = bannerSlideHtml()[5];
   assert.match(diwaliSlide, /id="hero-diwali-slide"/);
   const offer = diwaliSlide.match(/<p class="hero-slide-offer" hidden>([\s\S]*?)<\/p>/);
   assert.ok(offer, "the offer label starts hidden");
@@ -2699,9 +2674,9 @@ test("on 8 and 9 November the Diwali hero slide moves first and shows the offer"
   const source = script.slice(start, script.indexOf("\n  }\n", start) + 4);
   const run = (iso) => {
     const label = (text) => ({ text, getAttribute() { return this.text; }, setAttribute(_name, value) { this.text = value; } });
-    const slides = [label("1 of 5: Premium"), label("2 of 5: Couple"), label("3 of 5: Marriage"), label("4 of 5: Corporate"), label("5 of 5: Diwali")];
+    const slides = [label("1 of 6: Design"), label("2 of 6: Premium"), label("3 of 6: Couple"), label("4 of 6: Marriage"), label("5 of 6: Corporate"), label("6 of 6: Diwali")];
     const offerLabel = { hidden: true };
-    const slide = slides[4];
+    const slide = slides[5];
     const leadImage = { attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
     slide.querySelector = (sel) => (sel === ".hero-slide-offer" ? offerLabel : sel === "img" ? leadImage : null);
     const track = {
@@ -2721,12 +2696,12 @@ test("on 8 and 9 November the Diwali hero slide moves first and shows the offer"
     return { labels: slides.map((item) => item.text), offerLabel, track, leadImage };
   };
   const during = run("2026-11-08T09:00:00Z");
-  assert.deepEqual(during.labels, ["1 of 5: Diwali", "2 of 5: Premium", "3 of 5: Couple", "4 of 5: Marriage", "5 of 5: Corporate"]);
+  assert.deepEqual(during.labels, ["1 of 6: Diwali", "2 of 6: Design", "3 of 6: Premium", "4 of 6: Couple", "5 of 6: Marriage", "6 of 6: Corporate"]);
   assert.equal(during.offerLabel.hidden, false);
   assert.equal(during.track.scrollLeft, 0, "the carousel starts on the Diwali slide");
   assert.deepEqual(during.leadImage.attributes, { loading: "eager", fetchpriority: "high" }, "the first photo shoppers see loads first, not lazily");
   const after = run("2026-11-09T18:31:00Z");
-  assert.deepEqual(after.labels, ["1 of 5: Premium", "2 of 5: Couple", "3 of 5: Marriage", "4 of 5: Corporate", "5 of 5: Diwali"], "back to normal from 10 Nov");
+  assert.deepEqual(after.labels, ["1 of 6: Design", "2 of 6: Premium", "3 of 6: Couple", "4 of 6: Marriage", "5 of 6: Corporate", "6 of 6: Diwali"], "back to normal from 10 Nov");
   assert.equal(after.offerLabel.hidden, true);
   assert.deepEqual(after.leadImage.attributes, {}, "outside the offer the Diwali slide stays lazy");
 });
@@ -2831,62 +2806,10 @@ test("the product popup is warm ivory with the name, price and buttons in a blus
   });
 });
 
-// The 20% sale ends after 30 Nov 2026 23:59 India time (2026-11-30T18:30:00Z); from 1 Dec the sale price is simply the price.
-test("an inline head script marks the page sale-ended exactly from 1 Dec 2026 00:00 India time", () => {
-  const head = html.slice(0, html.indexOf("</head>"));
-  const inline = Array.from(head.matchAll(/<script>([\s\S]*?)<\/script>/g), (match) => match[1]);
-  assert.equal(inline.length, 1, "one tiny inline script in the head");
-  assert.ok(head.indexOf("<script>") < head.indexOf('<link rel="stylesheet"'), "runs before the stylesheet so nothing flashes");
-  assert.equal(Date.UTC(2026, 10, 30, 18, 30), Date.parse("2026-11-30T18:30:00Z"));
-  assert.equal(Date.parse("2026-12-01T00:00:00+05:30"), Date.parse("2026-11-30T18:30:00Z"));
-  const run = (iso) => {
-    const added = [];
-    const context = { Date: { now: () => Date.parse(iso), UTC: Date.UTC }, document: { documentElement: { classList: { add: (name) => added.push(name) } } } };
-    vm.createContext(context);
-    vm.runInContext(inline[0], context);
-    return added;
-  };
-  assert.deepEqual(run("2026-11-21T00:00:00Z"), []);
-  assert.deepEqual(run("2026-11-30T18:29:59Z"), [], "30 Nov 23:59:59 India time is still sale");
-  assert.deepEqual(run("2026-12-01T00:00:00+05:30"), ["sale-ended"], "midnight India time ends the sale");
-  assert.deepEqual(run("2027-03-01T00:00:00Z"), ["sale-ended"]);
-});
-
-test("under sale-ended CSS hides every struck price, 20% off tag, sale slide and the was part of hero tags", () => {
-  const rule = css.match(/html\.sale-ended[^{]*\{[^}]*\}/g) || [];
-  const hidden = rule.filter((item) => /display:\s*none\s*!important/.test(item)).join("\n");
-  [".product-regular-price", ".hero-promo-sale", ".hero-promo-tag s", ".hero-promo-tag .sr-only"].forEach((selector) => {
-    assert.ok(hidden.includes("html.sale-ended " + selector), selector + " is hidden once the sale has ended");
+test("the fake 20% sale is gone: no struck price, percent-off tag, sale deadline or sale-end mechanism in the page, styles or script", () => {
+  [["index.html", html], ["styles.css", css], ["script.js", script]].forEach(([name, source]) => {
+    [/<s>/, /product-regular-price/, /% off/, /Sale ends/, /sale-ended/].forEach((pattern) => {
+      assert.doesNotMatch(source, pattern, `${name} must not contain ${pattern}`);
+    });
   });
-  // The "20% off" tag lives inside the regular-price row, so hiding the row hides it too.
-  assert.ok(/<dd class="product-regular-price">[^]*?<span>20% off<\/span><\/dd>/.test(html));
-  // The sale-ended note sits only in the sale slide, which is removed.
-  assert.equal((html.match(/Sale ends/g) || []).length, 1);
-});
-
-test("initSaleEnd drops the sale slide and its dot, and renumbers the rest, only once the sale has ended", () => {
-  assert.ok(script.indexOf("    initSaleEnd();") > 0 && script.indexOf("    initSaleEnd();") < script.indexOf("    initHeroBanner();"), "slides are final before the carousel reads them");
-  const start = script.indexOf("  function initSaleEnd(");
-  assert.ok(start > 0, "expected initSaleEnd");
-  const source = script.slice(start, script.indexOf("\n  }\n", start) + 5);
-  assert.doesNotMatch(source, /Date/, "the end time lives only in the head script");
-  const run = (ended) => {
-    const slide = (text, extra) => Object.assign({ text, removed: false, getAttribute() { return this.text; }, setAttribute(_name, value) { this.text = value; }, remove() { this.removed = true; } }, extra);
-    const slides = [slide("1 of 7: 20% off sale"), slide("2 of 7: Design"), slide("3 of 7: Premium"), slide("4 of 7: Couple"), slide("5 of 7: Marriage"), slide("6 of 7: Corporate"), slide("7 of 7: Diwali")];
-    const dots = [1, 2, 3, 4, 5, 6, 7].map(() => ({ removed: false, remove() { this.removed = true; } }));
-    const live = (list) => list.filter((item) => !item.removed);
-    const document = {
-      querySelector: (selector) => (selector === ".hero-promo-sale" ? slides[0] : selector === "html.sale-ended" && ended ? {} : null),
-      querySelectorAll: (selector) => (selector === ".hero-slide" ? live(slides) : selector === "[data-banner-dot]" ? live(dots) : []),
-    };
-    vm.runInContext(`${source}\ninitSaleEnd();`, vm.createContext({ document }));
-    return { labels: live(slides).map((item) => item.text), dots: live(dots).length };
-  };
-  const before = run(false);
-  assert.equal(before.labels.length, 7);
-  assert.equal(before.labels[0], "1 of 7: 20% off sale");
-  assert.equal(before.dots, 7);
-  const after = run(true);
-  assert.deepEqual(after.labels, ["1 of 6: Design", "2 of 6: Premium", "3 of 6: Couple", "4 of 6: Marriage", "5 of 6: Corporate", "6 of 6: Diwali"]);
-  assert.equal(after.dots, 6);
 });

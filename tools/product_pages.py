@@ -31,7 +31,7 @@ It also:
 
 Prices and sizes come from data/product-sizes.tsv (one row per product; edit it, then run this script). Each row gives
 today's price. A product with size_choice "yes" also lists 2 or 3 sizes with a fixed price each. The script then:
-  * stamps today's price (and the struck regular price, 25% above it) on the card, so the TSV is the one place to change a price,
+  * stamps today's price on the card, so the TSV is the one place to change a price,
   * for a sized product, stamps data-sizes on the card's photo link (the popup reads it), a "3 sizes" note and the default size
     on the card, a size form on /p/<slug>/ and ProductGroup structured data (one variant per size),
   * adds one merchant-feed.tsv row per size (the default size keeps the old id and link; the others are <slug>--<size>),
@@ -71,14 +71,14 @@ FEED_COLUMNS = ["id", "title", "description", "link", "image_link", "availabilit
 SIZES_FILE = "data/product-sizes.tsv"
 # AI preview products sent to Google as a trial (2026-11-22). Each photo must carry the IPTC "trainedAlgorithmicMedia"
 # label Google asks for (python3 tools/label_ai_image.py assets/<file>). Every other AI preview stays out of the feed.
-AI_FEED_TRIAL = {"pressed-flower-bookmark", "save-our-page", "two-keys-one-little-us", "save-the-date-ring-dish", "the-first-rose-still-with-me"}
+# Emptied 2026-11-22 while the account is under a Misrepresentation review; add slugs back once it is healthy.
+AI_FEED_TRIAL = set()
 AI_LABEL = b"http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
 SIZE_COLUMNS = ["product_id", "todays_price", "todays_size", "size_choice", "size1", "price1", "size2", "price2", "size3", "price3"]
 OPTION_SLOTS = 3
 FEED_ID_MAX = 50
 PRICE_DD_RE = re.compile(r"(<dt>Price</dt><dd>)[^<]*(</dd>)")
 PRICE_ROW_RE = re.compile(r"<div><dt>Price</dt>.*?</div>", re.S)
-STRUCK_RE = re.compile(r"(<s>)[^<]*(</s>)")
 SIZE_DD_RE = re.compile(r"(<div><dt>Size</dt><dd>)[^<]*(</dd></div>)")
 SIZE_COUNT_RE = re.compile(r'<dd class="product-size-count">[^<]*</dd>')
 SIZES_ATTR_RE = re.compile(r' data-sizes="[^"]*"')
@@ -273,8 +273,6 @@ class CardParser(HTMLParser):
         elif tag == "figcaption":
             self._in_caption = True
         elif self._in_caption and tag in ("strong", "h3", "p", "dt", "dd"):
-            if tag == "dd" and "product-regular-price" in (attributes.get("class") or ""):
-                tag = "skip"
             self._tag, self._text = tag, ""
 
     def handle_data(self, data):
@@ -500,7 +498,7 @@ def sizes_json(entry):
 
 
 def stamp_prices(page, cards, slugs, sizes):
-    """index.html with each card's price (and struck regular price, 25% above) taken from sizes. A sized card also gets its default
+    """index.html with each card's price taken from sizes. A sized card also gets its default
     size as the Size text (where it has one) and a "3 sizes" note at the end of its Price row; a one-size card loses any such note."""
     pieces, last = [], 0
     for card, slug in zip(cards, slugs):
@@ -511,7 +509,6 @@ def stamp_prices(page, cards, slugs, sizes):
         if not PRICE_DD_RE.search(article):
             raise SystemExit("No Price row in the card " + card["name"])
         article = PRICE_DD_RE.sub(lambda match: match.group(1) + rupees(entry["price"]) + match.group(2), article, count=1)
-        article = STRUCK_RE.sub(lambda match: match.group(1) + rupees((entry["price"] * 5 + 2) // 4) + match.group(2), article, count=1)
         article = SIZE_COUNT_RE.sub("", article)
         if entry["options"]:
             default = [option["label"] for option in entry["options"] if option["code"] == entry["default"]][0]
