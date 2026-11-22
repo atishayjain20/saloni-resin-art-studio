@@ -302,11 +302,8 @@ h1 em { color: var(--rose); font-style: italic; }
   text-align: center;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
-/* Promo slides: the 20% sale and design-your-frame banners lead the carousel. */
+/* Promo slide: the design-your-frame banner leads the carousel. */
 .hero-promo { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: clamp(0.5rem, 2vw, 1.5rem); padding-inline: clamp(0.9rem, 4vw, 3.5rem); overflow: hidden; }
-.hero-promo-sale { background: radial-gradient(circle at 12% 18%, rgba(242, 160, 7, 0.28), transparent 40%), linear-gradient(135deg, #2a0e1f 0%, #5c0f36 55%, #8f0d49 100%); color: var(--ivory); }
-/* Gold flecks, like the gold flakes set in the resin. */
-.hero-promo-sale::before { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(242, 160, 7, 0.95) 0 1.2px, transparent 1.7px), radial-gradient(circle, rgba(255, 246, 233, 0.6) 0 1px, transparent 1.5px); background-position: 0 0, 19px 11px; background-size: 38px 34px, 57px 49px; content: ""; opacity: 0.35; pointer-events: none; }
 .hero-promo-design { background: radial-gradient(circle at 85% 20%, rgba(176, 18, 91, 0.12), transparent 45%), linear-gradient(135deg, var(--ivory) 0%, #ffe3ee 100%); color: var(--ink); }
 /* Slides 3-7 reuse the promo layout; each one only sets its own colours (all text and stickers pass WCAG AA). */
 .hero-promo-premium { --hp-accent: var(--marigold); --hp-on: var(--ink); --hp-sub: rgba(255, 246, 233, 0.9); --hp-ring: var(--ivory); background: linear-gradient(135deg, #0b1d3a 0%, #12294d 55%, #173a6b 100%); color: var(--ivory); }
@@ -342,7 +339,6 @@ h1 em { color: var(--rose); font-style: italic; }
 .hero-promo-picks li:nth-child(3) { right: 0; transform: translateY(-50%) rotate(7deg); }
 .hero-promo-picks img { width: 100%; height: 100%; border-radius: 0.35rem; object-fit: cover; }
 .hero-promo-tag { position: absolute; bottom: -0.6rem; left: 50%; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--marigold); color: var(--ink); font-size: clamp(0.7rem, 1.5vw, 0.82rem); font-weight: 800; white-space: nowrap; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25); transform: translateX(-50%) rotate(-3deg); }
-.hero-promo-tag s { margin-right: 0.15em; font-weight: 500; opacity: 0.85; }
 .hero-promo-design .hero-promo-tag { background: var(--rose-ink); color: var(--ivory); }
 /* The middle card sits higher and on top, so its sticker goes on its top edge and the side stickers drop below it. */
 .hero-promo-picks li:nth-child(2) .hero-promo-tag { top: -0.7rem; bottom: auto; }
@@ -357,7 +353,6 @@ h1 em { color: var(--rose); font-style: italic; }
 @media (max-width: 350px) {
   .hero-promo-steps { display: none; }
   .hero-promo-big span { font-size: 1.35em; }
-  .hero-promo-sale .hero-promo-copy { gap: 0.15rem; }
 }
 /* The wide 21:9 banner is short for its width, so the photo cards are sized smaller to keep every sticker inside. */
 @media (min-width: 621px) {
@@ -499,28 +494,6 @@ h1 em { color: var(--rose); font-style: italic; }
 :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div:first-child {
   flex-wrap: wrap;
   align-items: center;
-}
-:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div > dd.product-regular-price {
-  grid-column: 1 / -1;
-  flex-basis: 100%;
-  padding: 0;
-  background: none;
-  color: var(--muted);
-  font: 600 .74rem/1.3 var(--sans);
-  letter-spacing: normal;
-}
-:is(.work-card, .romantic-keepsake-card) figcaption .product-pricing .product-regular-price span:not(.sr-only) {
-  display: inline;
-  margin-left: .3rem;
-  white-space: nowrap;
-  color: var(--rose-ink);
-  font-weight: 800;
-}
-.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing > div > dd.product-regular-price {
-  color: #cdbdae;
-}
-.premium-collection-section :is(.work-card, .romantic-keepsake-card) figcaption .product-pricing .product-regular-price span:not(.sr-only) {
-  color: var(--premium-gold);
 }
 
 dialog.lightbox-dialog:not([open]) { display: none; }
@@ -850,9 +823,8 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 }
 
 @media (max-width: 620px) {
-  /* Phone stickers stack the old and new price so the side stickers stay narrow. */
+  /* Phone stickers stay narrow. */
   .hero-promo:not(.hero-promo-design) .hero-promo-tag { display: grid; justify-items: center; padding: 0.1rem 0.45rem; border-radius: 0.6rem; line-height: 1.15; }
-  .hero-promo:not(.hero-promo-design) .hero-promo-tag s { margin: 0; font-size: 0.85em; }
   :root { --sticky-offset: 7.5rem; }
   :root:has(.category-tabs) { --sticky-offset: calc(5.5rem + var(--category-tabs-height)); }
   html { scroll-padding-top: var(--sticky-offset); }
@@ -1368,12 +1340,6 @@ html.js .catalogue-grid > :is(.work-card, .romantic-keepsake-card) > figure > fi
 #review-form .photo-previews li { display: grid; gap: .35rem; justify-items: start; }
 #review-form .photo-previews img { display: block; width: 6.5rem; height: 6.5rem; object-fit: cover; border: 1px solid #dccbc1; border-radius: .6rem; background: #fffaf4; }
 #review-form .photo-previews button { min-height: 2.2rem; padding: .3rem .8rem; border-color: #bca8a0; background: #fff; color: #2b2020; font-size: .78rem; }
-
-/* After the sale ends (head script in index.html) the sale price is the price: no struck prices, "20% off" tags or sale slide. */
-html.sale-ended .product-regular-price,
-html.sale-ended .hero-promo-sale,
-html.sale-ended .hero-promo-tag s,
-html.sale-ended .hero-promo-tag .sr-only { display: none !important; }
 
 @media (min-width: 1024px) {
   body:has(#catalogue-selection) { --max: 1320px; }
