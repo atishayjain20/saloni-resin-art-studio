@@ -979,6 +979,7 @@ dialog.lightbox-dialog::backdrop { background: rgba(42, 14, 31, 0.72); }
 .catalogue-selection-item input { width: 100%; min-height: 2.4rem; padding: .45rem .5rem; border: 1px solid var(--line); border-radius: .45rem; background: var(--paper); color: var(--ink); font: inherit; }
 .catalogue-selection-item-remove { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; min-height: 2.75rem; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--rose-ink); font-size: 1.25rem; line-height: 1; cursor: pointer; }
 .catalogue-selection-item-remove:focus-visible { outline: 3px solid var(--rose); outline-offset: 2px; }
+.catalogue-selection-timing { margin: 0 0 .35rem; color: var(--muted); font-size: .74rem; line-height: 1.4; }
 .catalogue-selection-summary, .catalogue-selection-status { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.45; }
 .catalogue-selection-status { margin-top: .3rem; color: var(--rose-ink); }
 .catalogue-selection .button { min-height: 2.75rem; white-space: nowrap; cursor: pointer; }
