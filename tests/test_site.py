@@ -2725,9 +2725,9 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertEqual(by_name.get(name), slug, name)
             self.assertIn("<h1>" + html.escape(name, quote=False) + "</h1>", self.page(slug)[0], name)
         self.assertEqual(len(self.slugs), 106)
-        # 52 products; each size of a sized product is its own row (the default size keeps the product's id).
-        self.assertEqual(len({line.split("\t")[10] or line.split("\t")[0] for line in (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8").splitlines()[1:]}), 52)
-        self.assertEqual(len(feed_ids), 95)
+        # 57 products (52 real photos + 5 AI trial); each size of a sized product is its own row (the default size keeps the product's id).
+        self.assertEqual(len({line.split("\t")[10] or line.split("\t")[0] for line in (ROOT / "merchant-feed.tsv").read_text(encoding="utf-8").splitlines()[1:]}), 57)
+        self.assertEqual(len(feed_ids), 103)
 
     def test_pages_and_card_slugs_are_in_step_with_index_html(self):
         tool = load_product_pages_tool()
@@ -3131,8 +3131,8 @@ class ProductSharePageTests(unittest.TestCase):
             self.assertTrue((out / "p" / "keep" / "index.html").exists())
 
     def test_merchant_feed_lists_only_real_photo_single_price_products(self):
-        # Google Merchant Center fetches merchant-feed.tsv every day. AI preview photos and prices that are a range
-        # or "on request" stay out: Google wants a photo of the real product and one price that matches the page.
+        # Google Merchant Center fetches merchant-feed.tsv every day. AI preview photos (except the AI_FEED_TRIAL products,
+        # whose photos carry Google's AI label) and prices that are a range or "on request" stay out.
         from urllib.parse import unquote
         tool = load_product_pages_tool()
         cards = tool.parse_cards(self.home)
@@ -3146,8 +3146,19 @@ class ProductSharePageTests(unittest.TestCase):
         self.assertEqual(header, ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists",
                                   "item_group_id", "item_group_title", "size"])
         wanted = [(slug, card) for slug, card in zip(self.slugs, cards)
-                  if not card["alt"].startswith("Illustrative preview:") and re.fullmatch(r"₹[0-9,]+", card["price"])]
+                  if (not card["alt"].startswith("Illustrative preview:") or slug in tool.AI_FEED_TRIAL) and re.fullmatch(r"₹[0-9,]+", card["price"])]
         self.assertGreater(len(wanted), 0)
+        # Each trial product is an AI preview, and its photo carries the IPTC trainedAlgorithmicMedia label.
+        by_slug = dict(zip(self.slugs, cards))
+        self.assertEqual(len(tool.AI_FEED_TRIAL), 5)
+        for slug in tool.AI_FEED_TRIAL:
+            self.assertTrue(by_slug[slug]["alt"].startswith("Illustrative preview:"), slug)
+            self.assertIn(tool.AI_LABEL, (ROOT / "assets" / by_slug[slug]["file"]).read_bytes(), slug)
+        # An AI photo without the label stops the build instead of reaching Google.
+        trial = next(iter(sorted(tool.AI_FEED_TRIAL)))
+        unlabelled = [dict(card, file="diwali-lotus-diya-pair.webp") if slug == trial else card for slug, card in zip(self.slugs, cards)]
+        with self.assertRaises(SystemExit):
+            tool.merchant_feed(unlabelled, self.slugs, sizes)
         # One row per product, except that each size of a sized product has its own row (checked in ProductSizeTests): here the default rows.
         rows = [line.split("\t") for line in lines[1:]]
         defaults = [fields for fields in rows if not fields[10] or fields[0] == fields[10]]
@@ -3910,10 +3921,11 @@ class ProductSizeTests(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)), "ids are unique")
         self.assertTrue(all(len(value) <= 50 for value in ids))
         by_slug = dict(zip(self.slugs, self.cards))
-        in_feed = [slug for slug in self.slugs if not by_slug[slug]["alt"].startswith("Illustrative preview:")]
+        trial = load_product_pages_tool().AI_FEED_TRIAL
+        in_feed = [slug for slug in self.slugs if not by_slug[slug]["alt"].startswith("Illustrative preview:") or slug in trial]
         sized_in_feed = [slug for slug in in_feed if self.sizes[slug]["options"]]
-        self.assertEqual(len(sized_in_feed), 23)
-        self.assertEqual(len(in_feed), 52, "no product joined or left the feed")
+        self.assertEqual(len(sized_in_feed), 25)
+        self.assertEqual(len(in_feed), 57, "no product joined or left the feed")
         expected = sum(len(self.sizes[slug]["options"]) if self.sizes[slug]["options"] else 1 for slug in in_feed)
         self.assertEqual(len(rows), expected)
         self.assertEqual(len(rows) - len(in_feed), sum(len(self.sizes[slug]["options"]) - 1 for slug in sized_in_feed))
