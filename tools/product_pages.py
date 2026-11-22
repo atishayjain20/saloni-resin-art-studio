@@ -69,6 +69,10 @@ CORPORATE_START, CORPORATE_END = "<!-- corporate-collection:start -->", "<!-- co
 FEED_COLUMNS = ["id", "title", "description", "link", "image_link", "availability", "price", "brand", "condition", "identifier_exists",
                 "item_group_id", "item_group_title", "size"]
 SIZES_FILE = "data/product-sizes.tsv"
+# AI preview products sent to Google as a trial (2026-11-22). Each photo must carry the IPTC "trainedAlgorithmicMedia"
+# label Google asks for (python3 tools/label_ai_image.py assets/<file>). Every other AI preview stays out of the feed.
+AI_FEED_TRIAL = {"pressed-flower-bookmark", "save-our-page", "two-keys-one-little-us", "save-the-date-ring-dish", "the-first-rose-still-with-me"}
+AI_LABEL = b"http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
 SIZE_COLUMNS = ["product_id", "todays_price", "todays_size", "size_choice", "size1", "price1", "size2", "price2", "size3", "price3"]
 OPTION_SLOTS = 3
 FEED_ID_MAX = 50
@@ -637,13 +641,16 @@ def pick_more(cards, slugs, groups):
 
 
 def merchant_feed(cards, slugs, sizes=None):
-    """The Google Merchant Center feed (tab-separated). AI preview photos and prices that are a range or on request stay out.
+    """The Google Merchant Center feed (tab-separated). AI preview photos (except AI_FEED_TRIAL) and prices that are a range or on request stay out.
     A product with sizes gets one row per size, grouped by item_group_id; the default size keeps the product's id and link."""
     rows = [FEED_COLUMNS]
     for card, slug in zip(cards, slugs):
         offer = price_offer(card["price"])
-        if card["alt"].startswith("Illustrative preview:") or not offer or offer["@type"] != "Offer":
+        ai_photo = card["alt"].startswith("Illustrative preview:")
+        if (ai_photo and slug not in AI_FEED_TRIAL) or not offer or offer["@type"] != "Offer":
             continue
+        if ai_photo and AI_LABEL not in (ROOT / "assets" / card["file"]).read_bytes():
+            raise SystemExit("%s is an AI photo without the AI label Google needs: run python3 tools/label_ai_image.py assets/%s" % (card["file"], card["file"]))
         entry = (sizes or {}).get(slug)
         image = SITE + "/assets/" + urllib.parse.quote(card["file"])
         link = "%s/%s/%s/" % (SITE, PAGE_DIR, slug)
