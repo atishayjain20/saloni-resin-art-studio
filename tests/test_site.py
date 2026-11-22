@@ -653,6 +653,9 @@ class StaticSiteContractTests(unittest.TestCase):
             "https://saloniresinart.com/corporate-gifting/",
             "https://saloniresinart.com/reviews/",
             "https://saloniresinart.com/shipping-and-returns/",
+            "https://saloniresinart.com/contact/",
+            "https://saloniresinart.com/terms/",
+            "https://saloniresinart.com/privacy/",
         ]
         product_urls = ["https://saloniresinart.com/p/" + slug + "/" for slug in card_slugs(self.html)]
         self.assertGreater(len(product_urls), 20)
@@ -3455,9 +3458,31 @@ class TopicPageTests(unittest.TestCase):
             for topic in self.tool.TOPICS:
                 with self.subTest(page=page, topic=topic["slug"]):
                     self.assertIn('<a href="%s%s/">%s</a>' % (prefix, topic["slug"], html.escape(topic["link"])), footer)
-        known = {"corporate-gifting", "partners", "resin-photo-frames", "namokar-mantra-frames", "reviews", "varmala-preservation", "customised-hampers", "shipping-and-returns"}
+        known = {"corporate-gifting", "partners", "resin-photo-frames", "namokar-mantra-frames", "reviews", "varmala-preservation", "customised-hampers", "shipping-and-returns", "contact", "terms", "privacy"}
         folders = {path.parent.name for path in ROOT.glob("*/index.html")}
         self.assertEqual(folders, known | set(self.TOPIC_SLUGS))
+
+
+class PolicyPageTests(unittest.TestCase):
+    """Google Merchant Center checks a shop for contact details, terms and a privacy policy (Misrepresentation, 2026-11-22)."""
+
+    def test_contact_terms_and_privacy_pages_are_linked_and_name_the_studio(self):
+        home = (ROOT / "index.html").read_text(encoding="utf-8")
+        footer = re.search(r"<footer\b.*?</footer>", home, re.S).group(0)
+        for slug, title in (("contact", "Contact"), ("terms", "Terms of service"), ("privacy", "Privacy policy")):
+            with self.subTest(page=slug):
+                self.assertIn('<a href="%s/">' % slug, footer)
+                page = (ROOT / slug / "index.html").read_text(encoding="utf-8")
+                self.assertIn("<title>%s | Saloni Resin Art Studio</title>" % title, page)
+                self.assertIn('<link rel="canonical" href="https://saloniresinart.com/%s/">' % slug, page)
+                self.assertIn("salonijain9166@gmail.com", page)
+                self.assertIn("Ajmer", page)
+        contact = (ROOT / "contact" / "index.html").read_text(encoding="utf-8")
+        for fact in ("House No. 61, Hathi Bhata, Ajmer, Rajasthan 305001", 'href="tel:+918209238541"', 'href="mailto:salonijain9166@gmail.com"'):
+            self.assertIn(fact, contact)
+        terms = (ROOT / "terms" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Illustrative preview", terms)
+        self.assertIn("Razorpay", (ROOT / "privacy" / "index.html").read_text(encoding="utf-8"))
 
 
 class ResponsiveCardImageTests(unittest.TestCase):
