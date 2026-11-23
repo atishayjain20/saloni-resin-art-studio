@@ -3484,6 +3484,16 @@ class PolicyPageTests(unittest.TestCase):
         self.assertIn("Illustrative preview", terms)
         self.assertIn("Razorpay", (ROOT / "privacy" / "index.html").read_text(encoding="utf-8"))
 
+    def test_whatsapp_catalogue_is_linked_from_home_and_contact(self):
+        link = '<a class="contact-line" href="https://wa.me/c/918209238541" target="_blank" rel="noopener">'
+        home = (ROOT / "index.html").read_text(encoding="utf-8")
+        fallback = re.search(r'<div class="order-inline-fallback".*?</div>', home, re.S).group(0)
+        self.assertIn(link, fallback)
+        footer = re.search(r"<footer\b.*?</footer>", home, re.S).group(0)
+        self.assertIn('href="https://wa.me/c/918209238541" target="_blank" rel="noopener">WhatsApp catalogue</a>', footer)
+        contact = (ROOT / "contact" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('href="https://wa.me/c/918209238541" target="_blank" rel="noopener"', contact)
+
 
 class ResponsiveCardImageTests(unittest.TestCase):
     """Card photos offer a 540 px copy (covers a 171 px card on a 3x phone), while src and the popup keep the full photo."""
