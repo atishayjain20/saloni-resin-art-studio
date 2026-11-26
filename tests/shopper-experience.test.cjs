@@ -366,6 +366,7 @@ test("category tab bar sits in the sticky header after the header row with BESTS
   assert.ok(nav, "category tab nav must live inside .site-header");
   assert.match(header, /<\/nav>\n    <\/div>\n    <nav class="category-tabs"/, "tabs follow the header-inner block");
   const tabs = Array.from(nav[1].matchAll(/<a class="category-tab"([^>]*)>([^<]*)<\/a>/g), (match) => ({ attrs: match[1], label: match[2].trim() }));
+  assert.deepEqual(tabs.shift(), { attrs: ' href="?budget=499"', label: "Gifts under ₹499" }, "the budget tab comes first and opens the existing Up to ₹499 filter");
   assert.deepEqual(tabs.map((tab) => tab.label), ["Bestsellers", "Premium", "Marriage", "Couple", "Corporate", "Studio keepsakes", "Diwali", "All"]);
   const expected = [
     ["#catalogue-filters", "bestsellers"],
