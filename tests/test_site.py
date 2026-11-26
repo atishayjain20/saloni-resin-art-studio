@@ -810,6 +810,13 @@ class StaticSiteContractTests(unittest.TestCase):
         self.assertEqual(len(descriptions), len(collection_specs))
         self.assertEqual(len(headings), len(collection_specs))
 
+    def test_under_499_gifts_is_the_first_category_tab(self):
+        tabs = re.search(r'<div class="category-tabs-list">([\s\S]*?)</div>', self.html).group(1)
+        first = re.search(r"<a\b[^>]*>[\s\S]*?</a>", tabs).group(0)
+        self.assertEqual(first, '<a class="category-tab" href="?budget=499">Gifts under ₹499</a>')
+        self.assertIn('<option value="499">Up to ₹499</option>', self.html)
+        self.assertIn('"499"', (ROOT / "script.js").read_text(encoding="utf-8").split("validBudgets", 1)[1][:60])
+
     def test_varmala_preservation_page_contract(self):
         page_path = ROOT / "varmala-preservation" / "index.html"
         self.assertTrue(page_path.is_file(), "varmala-preservation/index.html must exist")
