@@ -864,6 +864,14 @@ class StaticSiteContractTests(unittest.TestCase):
                 self.assertIn(sentence, self.html)
                 self.assertIn(sentence, page)
         self.assertIn('href="../?product=varmala-keepsake-frame#marriage-gifts"', page)
+        for sentence in (
+            "Also 8 × 10 in ₹2,599 and 12 × 15 in ₹4,749.",
+            "Wedding season offer till 28 February 2027: every varmala frame comes with a free mini resin keychain made with a few flowers from your own varmala.",
+            "In Ajmer city, Saloni picks up your varmala from your home or venue for free.",
+            "From outside Ajmer, courier the flowers to the studio in Ajmer as soon as you can after the wedding; Saloni shares the address and packing tips on WhatsApp.",
+        ):
+            with self.subTest(season_sentence=sentence):
+                self.assertIn(sentence, page)
         self.assertIn('data-product-slug="varmala-keepsake-frame"', self.html)
         whatsapp = re.search(r'<a\b[^>]*href="https://wa\.me/918209238541\?text=[^"]*"[^>]*>', page)
         self.assertIsNotNone(whatsapp)
